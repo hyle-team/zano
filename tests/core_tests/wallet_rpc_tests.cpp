@@ -2646,7 +2646,8 @@ bool wallet_rpc_gateway_overspend::c1(currency::core& c, size_t ev_index, const 
     req.destinations.push_back({MK_TEST_COINS(1), bob_wlt->get_account().get_public_address_str()});
     req.fee = TESTS_DEFAULT_FEE;
     r = invoke_text_json_for_rpc(core_rpc_wrapper, "gateway_create_transfer", req, resp);
-    CHECK_AND_ASSERT_FALSE(r);   // must fail: gateway holds only 1
+    CHECK_AND_ASSERT_MES(r, false, "gateway_create_transfer (A) RPC call failed");
+    CHECK_AND_ASSERT_EQ(resp.status, API_RETURN_CODE_NOT_ENOUGH_MONEY); // must fail: gateway holds only 1
     CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
   }
 
@@ -2661,7 +2662,8 @@ bool wallet_rpc_gateway_overspend::c1(currency::core& c, size_t ev_index, const 
     req.destinations.push_back({10, bob_wlt->get_account().get_public_address_str(),   os_asset_id});
     req.fee = TESTS_DEFAULT_FEE;
     r = invoke_text_json_for_rpc(core_rpc_wrapper, "gateway_create_transfer", req, resp);
-    CHECK_AND_ASSERT_FALSE(r); // must fail: gateway holds only 10 of os_asset_id
+    CHECK_AND_ASSERT_MES(r, false, "gateway_create_transfer (B) RPC call failed");
+    CHECK_AND_ASSERT_EQ(resp.status, API_RETURN_CODE_NOT_ENOUGH_MONEY); // must fail: gateway holds only 10 of os_asset_id
     CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
   }
 
@@ -2680,7 +2682,8 @@ bool wallet_rpc_gateway_overspend::c1(currency::core& c, size_t ev_index, const 
     req.destinations.push_back({1, miner_wlt->get_account().get_public_address_str()});  // 1 unit native
     req.fee = TESTS_DEFAULT_FEE;
     r = invoke_text_json_for_rpc(core_rpc_wrapper, "gateway_create_transfer", req, resp);
-    CHECK_AND_ASSERT_FALSE(r);   // total_native = TESTS_DEFAULT_FEE + 1 > balance
+    CHECK_AND_ASSERT_MES(r, false, "gateway_create_transfer (C) RPC call failed");
+    CHECK_AND_ASSERT_EQ(resp.status, API_RETURN_CODE_NOT_ENOUGH_MONEY); // total_native = TESTS_DEFAULT_FEE + 1 > balance
     CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
   }
 
@@ -2694,7 +2697,8 @@ bool wallet_rpc_gateway_overspend::c1(currency::core& c, size_t ev_index, const 
     req.destinations.push_back({11, miner_wlt->get_account().get_public_address_str(), os_asset_id});
     req.fee = TESTS_DEFAULT_FEE;
     r = invoke_text_json_for_rpc(core_rpc_wrapper, "gateway_create_transfer", req, resp);
-    CHECK_AND_ASSERT_FALSE(r); // total_asset = 11 > balance(10)
+    CHECK_AND_ASSERT_MES(r, false, "gateway_create_transfer (D) RPC call failed");
+    CHECK_AND_ASSERT_EQ(resp.status, API_RETURN_CODE_NOT_ENOUGH_MONEY); // total_asset = 11 > balance(10)
     CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
   }
 

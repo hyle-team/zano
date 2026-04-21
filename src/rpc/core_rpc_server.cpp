@@ -676,7 +676,7 @@ namespace currency
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  bool core_rpc_server::on_gateway_get_address_info(const COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO::request& req, COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  bool core_rpc_server::on_gateway_get_address_info(const COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO::request& req, COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO::response& res, connection_context& cntx)
   {
     currency::gateway_address_id_type addr_id = {};
     address_v v_addr = {};
@@ -742,7 +742,7 @@ namespace currency
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  bool core_rpc_server::on_gateway_create_transfer(const COMMAND_RPC_GATEWAY_CREATE_TRANSFER::request& req, COMMAND_RPC_GATEWAY_CREATE_TRANSFER::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  bool core_rpc_server::on_gateway_create_transfer(const COMMAND_RPC_GATEWAY_CREATE_TRANSFER::request& req, COMMAND_RPC_GATEWAY_CREATE_TRANSFER::response& res, connection_context& cntx)
   {
     //TODO: Some of the code presented here might need to be moved to separate library/module as it touch privacy-sensitive operations
     currency::account_keys dummy_keys = {};
@@ -751,10 +751,10 @@ namespace currency
 
     if (m_core.get_blockchain_storage().is_pre_hardfork_tx_freeze_period_active())
     {
-      er.code = CORE_RPC_ERROR_CODE_CORE_BUSY;
-      er.message = "Pre hardfork freeze period is in effect, sending transactions is not allowed till the next hardfork. Please, try again after the hardfork activation.";
-      LOG_PRINT_L0("[on_gateway_create_transfer]: pre hardfork freeze period is in effect, sending transactions is not allowed till the next hardfork. Please, try again after the hardfork activation.");
-      return false;
+      res.status = API_RETURN_CODE_TX_FREEZE_PERIOD;
+      res.status_error = "Pre hardfork freeze period is in effect, sending transactions is not allowed till the next hardfork. Please, try again after the hardfork activation.";
+      LOG_PRINT_L0("[on_gateway_create_transfer]: pre hardfork freeze period is in effect.");
+      return true;
     }
 
 
@@ -782,44 +782,46 @@ namespace currency
 
     if (!addr_data_ptr)
     {
-      er.code = CORE_RPC_ERROR_CODE_NOT_FOUND;
-      er.message = std::string("Gateway address") + epee::string_tools::pod_to_hex(req.origin_gateway_id) + " not found";
-      return false;
+      res.status = API_RETURN_CODE_NOT_FOUND;
+      res.status_error = std::string("Gateway address ") + epee::string_tools::pod_to_hex(req.origin_gateway_id) + " not found";
+      return true;
     }
     for ( const auto& [asset_id, amount] : total_coins_needed)
     {
       auto it = addr_data_ptr->balances.find(asset_id);
       if (it == addr_data_ptr->balances.end() || it->second.amount < amount)
       {
-        er.code = CORE_RPC_ERROR_CODE_INSUFFICIENT_FUNDS;
-        er.message = std::string("Insufficient funds for asset_id ") + epee::string_tools::pod_to_hex(asset_id);
-        return false;
+        res.status = API_RETURN_CODE_NOT_ENOUGH_MONEY;
+        res.status_error = std::string("Insufficient funds for asset_id ") + epee::string_tools::pod_to_hex(asset_id);
+        return true;
       }
     }
 
     //fill destinations
     std::string legacy_tx_wide_payment_id;
-    bool r = rpc_fill_destinations_helper(req.destinations, ftp.prepared_destinations, ftp.extra, true, er, legacy_tx_wide_payment_id, false, req.origin_gateway_id, [&](const std::string& address, currency::address_v& addr_v, std::string& embedded_payment_id) {
+    epee::json_rpc::error er_local{};
+    bool r = rpc_fill_destinations_helper(req.destinations, ftp.prepared_destinations, ftp.extra, true, er_local, legacy_tx_wide_payment_id, false, req.origin_gateway_id, [&](const std::string& address, currency::address_v& addr_v, std::string& embedded_payment_id) {
       tools::core_fast_rpc_proxy tmp_proxy(*this);
       if (!tmp_proxy.get_transfer_address(address, addr_v, embedded_payment_id))
       {
-        er.code = WALLET_RPC_ERROR_CODE_WRONG_ADDRESS;
-        er.message = std::string("WALLET_RPC_ERROR_CODE_WRONG_ADDRESS: ") + address;
+        er_local.code = WALLET_RPC_ERROR_CODE_WRONG_ADDRESS;
+        er_local.message = std::string("WALLET_RPC_ERROR_CODE_WRONG_ADDRESS: ") + address;
         return false;
       }
       return true;
     });
     if (!r)
     {
-      // er is already filled inside rpc_fill_destinations_helper
-      return false;
+      res.status = API_RETURN_CODE_BAD_ARG;
+      res.status_error = er_local.message;
+      return true;
     }
 
     if(!ftp.prepared_destinations.size() || ftp.prepared_destinations.begin()->addr.size() != 1)
     {
-      er.code = CORE_RPC_ERROR_CODE_WRONG_PARAM;
-      er.message = "No valid destinations were found after processing";
-      return false;
+      res.status = API_RETURN_CODE_BAD_ARG;
+      res.status_error = "No valid destinations were found after processing";
+      return true;
     }
     
     if (ftp.prepared_destinations.size() < CURRENCY_TX_MIN_ALLOWED_OUTS)
@@ -871,6 +873,7 @@ namespace currency
     if(!r)
     {
       res.status = API_RETURN_CODE_FAIL;
+      res.status_error = "Failed to construct transaction";
       return true;
     }
 
@@ -881,7 +884,7 @@ namespace currency
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  bool core_rpc_server::on_gateway_sign_transfer(const COMMAND_RPC_GATEWAY_SIGN_TRANSFER::request& req, COMMAND_RPC_GATEWAY_SIGN_TRANSFER::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  bool core_rpc_server::on_gateway_sign_transfer(const COMMAND_RPC_GATEWAY_SIGN_TRANSFER::request& req, COMMAND_RPC_GATEWAY_SIGN_TRANSFER::response& res, connection_context& cntx)
   {
     transaction tx = {};
 
@@ -889,6 +892,7 @@ namespace currency
     if (!r)
     {
       res.status = API_RETURN_CODE_BAD_ARG;
+      res.status_error = "Failed to deserialize transaction blob";
       return true;
     }
 
@@ -897,6 +901,7 @@ namespace currency
     {
       LOG_ERROR("Transaction hash mismatch in on_gateway_sign_transfer: " << tx_id << "!=" << req.tx_hash_to_sign);
       res.status = API_RETURN_CODE_BAD_ARG;
+      res.status_error = "Transaction hash mismatch";
       return true;
     }
 
@@ -922,9 +927,10 @@ namespace currency
     {
       LOG_ERROR("Expected exactly one gateway signature in on_gateway_sign_transfer, got: " << gw_sig_count);
       res.status = API_RETURN_CODE_BAD_ARG;
+      res.status_error = "Expected exactly one signature";
       return true;
     }
-    
+
     for(auto& sig : tx.signatures)
     {
       if (sig.type() == typeid(gateway_sig))
@@ -937,20 +943,23 @@ namespace currency
         // Right now we assume that gateway-originated tx might have only gateway_inputs in it
         LOG_ERROR("Unexpected signature type in on_gateway_sign_transfer");
         res.status = API_RETURN_CODE_BAD_ARG;
+        res.status_error = "Unexpected signature type in transaction";
         return true;
       }
     }
-    
+
     res.signed_tx_blob = t_serializable_object_to_blob(tx);
     res.status = API_RETURN_CODE_OK;
     return true;
   }
-    bool core_rpc_server::on_gateway_create_owner_change(const COMMAND_RPC_GATEWAY_CREATE_OWNER_CHANGE::request& req, COMMAND_RPC_GATEWAY_CREATE_OWNER_CHANGE::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool core_rpc_server::on_gateway_create_owner_change(const COMMAND_RPC_GATEWAY_CREATE_OWNER_CHANGE::request& req, COMMAND_RPC_GATEWAY_CREATE_OWNER_CHANGE::response& res, connection_context& cntx)
   {
     if (m_core.get_blockchain_storage().is_pre_hardfork_tx_freeze_period_active())
     {
       LOG_PRINT_L0("[on_gateway_create_owner_change]: pre hardfork freeze period is in effect.");
       res.status = API_RETURN_CODE_TX_FREEZE_PERIOD;
+      res.status_error = "Pre hardfork freeze period is in effect, sending transactions is not allowed till the next hardfork.";
       return true;
     }
 
@@ -965,6 +974,7 @@ namespace currency
     if (count_keys != 1)
     {
       res.status = API_RETURN_CODE_BAD_ARG;
+      res.status_error = "Expected exactly one owner key (ecdsa, eddsa, or custom schnorr)";
       return true;
     }
 
@@ -972,6 +982,7 @@ namespace currency
     if (!addr_data_ptr)
     {
       res.status = API_RETURN_CODE_NOT_FOUND;
+      res.status_error = std::string("Gateway address ") + epee::string_tools::pod_to_hex(req.address_id) + " not found";
       return true;
     }
 
@@ -981,6 +992,7 @@ namespace currency
     if (it == addr_data_ptr->balances.end() || it->second.amount < fee)
     {
       res.status = API_RETURN_CODE_NOT_ENOUGH_MONEY;
+      res.status_error = "Insufficient native coin balance for fee";
       return true;
     }
 
@@ -1021,6 +1033,7 @@ namespace currency
     if (!r)
     {
       res.status = API_RETURN_CODE_FAIL;
+      res.status_error = "Failed to construct transaction";
       return true;
     }
 
@@ -1031,7 +1044,7 @@ namespace currency
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  bool core_rpc_server::on_gateway_sign_owner_change(const COMMAND_RPC_GATEWAY_SIGN_OWNER_CHANGE::request& req, COMMAND_RPC_GATEWAY_SIGN_OWNER_CHANGE::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  bool core_rpc_server::on_gateway_sign_owner_change(const COMMAND_RPC_GATEWAY_SIGN_OWNER_CHANGE::request& req, COMMAND_RPC_GATEWAY_SIGN_OWNER_CHANGE::response& res, connection_context& cntx)
   {
     transaction tx = {};
 
@@ -1039,6 +1052,7 @@ namespace currency
     if (!r)
     {
       res.status = API_RETURN_CODE_BAD_ARG;
+      res.status_error = "Failed to deserialize transaction blob";
       return true;
     }
 
@@ -1047,6 +1061,7 @@ namespace currency
     {
       LOG_ERROR("Transaction hash mismatch in on_gateway_sign_owner_change: " << tx_id << " != " << req.tx_hash_to_sign);
       res.status = API_RETURN_CODE_BAD_ARG;
+      res.status_error = "Transaction hash mismatch";
       return true;
     }
 
@@ -1076,6 +1091,7 @@ namespace currency
     {
       LOG_ERROR("Expected exactly one signature in on_gateway_sign_owner_change, got: " << sig_count);
       res.status = API_RETURN_CODE_BAD_ARG;
+      res.status_error = "Expected exactly one signature";
       return true;
     }
 
@@ -1091,6 +1107,7 @@ namespace currency
       {
         LOG_ERROR("Unexpected signature type in on_gateway_sign_owner_change");
         res.status = API_RETURN_CODE_BAD_ARG;
+        res.status_error = "Unexpected signature type in transaction";
         return true;
       }
     }
@@ -1108,19 +1125,21 @@ namespace currency
     {
       LOG_ERROR("[on_gateway_sign_owner_change]: Failed to process signed tx");
       res.status = API_RETURN_CODE_FAIL;
+      res.status_error = "Failed to process signed transaction";
       return true;
     }
     if (tvc.m_verification_failed)
     {
       LOG_ERROR("[on_gateway_sign_owner_change]: signed tx verification failed");
       res.status = API_RETURN_CODE_FAIL;
+      res.status_error = "Signed transaction verification failed";
       return true;
     }
 
     NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::request ntx_req;
     ntx_req.txs.push_back(signed_tx_blob);
-    
-		currency_connection_context fake_context = AUTO_VAL_INIT(fake_context);
+
+    currency_connection_context fake_context = AUTO_VAL_INIT(fake_context);
     m_core.get_protocol()->relay_transactions(ntx_req, fake_context);
 
     res.signed_tx_blob = signed_tx_blob;
@@ -1128,7 +1147,7 @@ namespace currency
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  bool core_rpc_server::on_gateway_get_address_history(const COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY::request& req, COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  bool core_rpc_server::on_gateway_get_address_history(const COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY::request& req, COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY::response& res, connection_context& cntx)
   {
     CHECK_RPC_LIMITS(req.count, RPC_LIMIT_COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY);
     currency::gateway_address_id_type addr_id = {};

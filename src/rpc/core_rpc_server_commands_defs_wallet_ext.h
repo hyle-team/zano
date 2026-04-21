@@ -30,12 +30,14 @@ namespace currency
     struct response
     {
       std::string status;
+      std::string status_error;
       uint64_t total_transactions = 0;
       std::list<tools::wallet_public::wallet_transfer_info> transactions;
       std::list<gateway_balance_entry> balances;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(status)                     DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
+        KV_SERIALIZE(status_error)               DOC_DSCR("Error description if the call failed.") DOC_END
         KV_SERIALIZE(total_transactions)         DOC_DSCR("Total number of transactions associated with the specified gateway address.") DOC_EXMP(100) DOC_END
         KV_SERIALIZE(transactions)               DOC_DSCR("List of transactions associated with the specified gateway address, retrieved based on the provided parameters.") DOC_EXMP_AUTO(1) DOC_END
         KV_SERIALIZE(balances)                   DOC_DSCR("List of balances for different asset_id associated with the gateway address at the time of the request.") DOC_EXMP_AUTO(1) DOC_END

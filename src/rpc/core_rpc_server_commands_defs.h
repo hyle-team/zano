@@ -2231,12 +2231,14 @@ namespace currency
       payment_id_t payment_id;
       crypto::public_key gateway_view_pub_key;
       std::string status;
+      std::string status_error;
 
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(descriptor_info)            DOC_DSCR("Information about the specified gateway address.") DOC_END
         KV_SERIALIZE(balances)                   DOC_DSCR("List of balances for different asset_id associated with the gateway address.") DOC_EXMP_AUTO(1) DOC_END
         KV_SERIALIZE(status)                     DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
+        KV_SERIALIZE(status_error)               DOC_DSCR("Error description if the call failed.") DOC_END
         KV_SERIALIZE(payment_id)                 DOC_DSCR("Payment ID associated with the gateway address.") DOC_EXMP("4cf2c7c7e16d1a2a") DOC_END
         KV_SERIALIZE_POD_AS_HEX_STRING(gateway_view_pub_key) DOC_DSCR("Gateway view public key associated with the gateway address.") DOC_EXMP("0feef5e2ea0e88b592c0a0e6639ce73e12ea9b3136d89464748fcb60bb6f18f5") DOC_END
       END_KV_SERIALIZE_MAP()
@@ -2268,11 +2270,13 @@ namespace currency
     struct response
     {
       std::string status;
+      std::string status_error;
       crypto::hash tx_hash_to_sign;
       std::string tx_blob;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(status)                                          DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
+        KV_SERIALIZE(status_error)                                    DOC_DSCR("Error description if the call failed.") DOC_END
         KV_SERIALIZE_POD_AS_HEX_STRING(tx_hash_to_sign)               DOC_DSCR("Hash of the transaction created for the gateway transfer.") DOC_EXMP("a6e8da986858e6825fce7a192097e6afae4e889cabe853a9c29b964985b23da8") DOC_END
         KV_SERIALIZE_BLOB_AS_HEX_STRING(tx_blob)                    DOC_DSCR("Hex representation of the transaction blob.") DOC_EXMP("0100000001...") DOC_END
       END_KV_SERIALIZE_MAP()
@@ -2303,10 +2307,12 @@ namespace currency
     struct response
     {
       std::string status;
+      std::string status_error;
       std::string signed_tx_blob;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(status)                                      DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
+        KV_SERIALIZE(status_error)                                DOC_DSCR("Error description if the call failed.") DOC_END
         KV_SERIALIZE_BLOB_AS_HEX_STRING(signed_tx_blob)    DOC_DSCR("Hex representation of the signed transaction blob.") DOC_EXMP("0100000001...") DOC_END
       END_KV_SERIALIZE_MAP()
     };
@@ -2331,11 +2337,13 @@ namespace currency
     struct response
     {
       std::string status;
+      std::string status_error;
       crypto::hash tx_hash_to_sign;
       std::string tx_blob;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(status)                               DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
+        KV_SERIALIZE(status_error)                         DOC_DSCR("Error description if the call failed.") DOC_END
         KV_SERIALIZE_POD_AS_HEX_STRING(tx_hash_to_sign)    DOC_DSCR("Hash of the transaction to be signed by the current owner (for both gateway input and ownership proof).") DOC_EXMP("a6e8da986858e6825fce7a192097e6afae4e889cabe853a9c29b964985b23da8") DOC_END
         KV_SERIALIZE_BLOB_AS_HEX_STRING(tx_blob)           DOC_DSCR("Hex representation of the unsigned transaction blob.") DOC_EXMP("0100000001...") DOC_END
       END_KV_SERIALIZE_MAP()
@@ -2366,10 +2374,12 @@ namespace currency
     struct response
     {
       std::string status;
+      std::string status_error;
       std::string signed_tx_blob;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(status)                               DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
+        KV_SERIALIZE(status_error)                         DOC_DSCR("Error description if the call failed.") DOC_END
         KV_SERIALIZE_BLOB_AS_HEX_STRING(signed_tx_blob)    DOC_DSCR("Hex representation of the fully signed transaction blob, ready for sendrawtransaction.") DOC_EXMP("0100000001...") DOC_END
       END_KV_SERIALIZE_MAP()
     };
