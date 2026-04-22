@@ -1803,7 +1803,7 @@ namespace currency
         }
         else
         {
-          res.status = API_RETURN_CODE_FAIL;
+          res.status = API_RETURN_CODE_SIMULATION_FAILED;
         }
         LOG_ERROR("Explicit simulation of block template failed, block was rejected by the core");
         return false;
@@ -1910,11 +1910,11 @@ namespace currency
   {
     //do perform explicit simulation to blacklist failing pool transactions, if any
     LOG_PRINT_MAGENTA("Performing explicit simulation to blacklist failing pool transactions", LOG_LEVEL_0);
-    std::string simulation_result_str;
+    std::string simulation_result_str = API_RETURN_CODE_SIMULATION_FAILED;
     size_t sim_count = 0;
     account_base acc;
     acc.generate();
-    while (simulation_result_str != API_RETURN_CODE_OK && simulation_result_str != API_RETURN_CODE_INTERNAL_ERROR)
+    while (simulation_result_str == API_RETURN_CODE_SIMULATION_FAILED)
     {
       //calling getblocktemplate in simulation mode
       currency::COMMAND_RPC_GETBLOCKTEMPLATE::request tmpl_req_sim = AUTO_VAL_INIT(tmpl_req_sim);
