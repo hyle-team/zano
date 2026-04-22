@@ -99,7 +99,7 @@ namespace currency
             if (it != destinations_in_api.begin())
             {
               er.code = WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID;
-              er.message = std::string("long embedded payment id: ") + epee::string_tools::buff_to_hex_nodelimer(embedded_payment_id) + " can only be set for the first destination (and so you can use integrated address with long payment id only for the fist destination)";
+              er.message = std::string("long embedded payment id: ") + epee::string_tools::buff_to_hex_nodelimer(embedded_payment_id) + " can only be set for the first destination (and so you can use integrated address with long payment id only for the first destination)";
               return false;
             }
             legacy_tx_wide_payment_id = embedded_payment_id;
@@ -145,7 +145,7 @@ namespace currency
           if (it != destinations_in_api.begin())
           {
             er.code = WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID;
-            er.message = std::string("embedded payment id: ") + epee::string_tools::buff_to_hex_nodelimer(embedded_payment_id) + " currently can only be set for the first destination (and so you can use integrated address only for the fist destination)";
+            er.message = std::string("embedded payment id: ") + epee::string_tools::buff_to_hex_nodelimer(embedded_payment_id) + " currently can only be set for the first destination (and so you can use integrated address only for the first destination)";
             return false;
           }
           legacy_tx_wide_payment_id = embedded_payment_id;
