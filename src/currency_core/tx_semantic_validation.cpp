@@ -83,6 +83,12 @@ namespace currency
         return false;
       }
     }
+
+    if (!additional_inputs_types_validations(tx))
+    {
+      LOG_PRINT_RED_L0("extra_inputs_types_validations validation failed.");
+      return false;
+    }
     
     if (!check_outs_valid(tx))
     {

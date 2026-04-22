@@ -3423,16 +3423,24 @@ namespace currency
   //---------------------------------------------------------------
   bool check_inputs_types_supported(const transaction& tx)
   {
-    for(const auto& in : tx.vin)
+    for (const auto& in : tx.vin)
     {
       CHECK_AND_ASSERT_MES(
         in.type() == typeid(txin_to_key) ||
         in.type() == typeid(txin_multisig) ||
         in.type() == typeid(txin_zc_input) ||
-        in.type() == typeid(txin_gateway), 
+        in.type() == typeid(txin_gateway),
         false, "wrong input type: " << in.type().name() << ", in transaction " << get_transaction_hash(tx));
+    }
+    return true;
+  }
 
-      if (tx.hardfork_id > ZANO_HARDFORK_04_ZARCANUM && (in.type() == typeid(txin_to_key) || in.type() == typeid(txin_zc_input)) )
+  //---------------------------------------------------------------
+  bool additional_inputs_types_validations(const transaction& tx)
+  {
+    for (const auto& in : tx.vin)
+    {
+      if (tx.hardfork_id > ZANO_HARDFORK_04_ZARCANUM && (in.type() == typeid(txin_to_key) || in.type() == typeid(txin_zc_input)))
       {
         const std::vector<txout_ref_v>& key_offsets = in.type() == typeid(txin_to_key) ? boost::get<txin_to_key>(in).key_offsets : boost::get<txin_zc_input>(in).key_offsets;
 
@@ -3442,7 +3450,6 @@ namespace currency
         }
       }
     }
-
 
     return true;
   }
