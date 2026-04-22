@@ -7244,14 +7244,14 @@ void wallet2::send_transaction_to_network(const transaction& tx)
     WLT_LOG_L1("[SOCKS5] Sending transaction " << get_transaction_hash(tx) << " via SOCKS5 relay "
         << tx_socks.proxy.proxy_host << ":" << tx_socks.proxy.proxy_port);
     std::string relay_host {};
-    uint16_t relay_port{};
+    //uint16_t relay_port{};
     epee::net_utils::http::url_content u = AUTO_VAL_INIT(u);
     if(epee::net_utils::parse_url(tx_socks.target_url, u) && !u.host.empty())
     {
-      if(u.port != 0 && u.port <= 65535)
-        relay_port = static_cast<uint16_t>(u.port);
-      else
-        relay_port = (u.schema == "https" ? 443 : 80); // fallback to default ports
+      //if(u.port != 0 && u.port <= 65535)
+      //  relay_port = static_cast<uint16_t>(u.port);
+      //else
+      //  relay_port = (u.schema == "https" ? 443 : 80); // fallback to default ports
 
       relay_host = u.host;
     }

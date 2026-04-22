@@ -5245,13 +5245,13 @@ namespace currency
     // no legacy tx-wide payment id specified -- handle intrinsic payment ids
     for (const auto& [intrinsic_payment_id, aid_to_balance_change] : total_balance_change_per_payment_id)
     {
-      bool has_balance_increase = false;
+      //bool has_balance_increase = false;
       for (const auto& [asset_id, balance_change] : aid_to_balance_change)
       {
         tools::wallet_public::wallet_sub_transfer_info wsti{};
         if (balance_change > 0)
         {
-          has_balance_increase = true;
+          //has_balance_increase = true;
           wsti.is_income = true;
           wsti.amount = static_cast<uint64_t>(balance_change);
         }
@@ -5289,15 +5289,15 @@ namespace currency
     //we check if spent_indices have zero then input do not belong to this account, which means that we are seller for this 
     //escrow, and decryption should be processed as income flag
 
-    bool is_income = false;
-    bool is_outcome = false;
+    //bool is_income = false;
+    //bool is_outcome = false;
     bool is_outcome_native_coins = false;
     bool found = false;
     for (const auto& in : wti.tx.vin)
     {
       if(in.type() == typeid(txin_gateway) && boost::get<txin_gateway>(in).gateway_addr == gw_id)
       {
-        is_outcome = true;
+        //is_outcome = true;
         found = true;
         if (boost::get<txin_gateway>(in).asset_id == currency::native_coin_asset_id_1div8)
         {
@@ -5310,7 +5310,7 @@ namespace currency
     {
       if (out.type() == typeid(tx_out_gateway) && boost::get<tx_out_gateway>(out).gateway_addr == gw_id)
       {
-        is_income = true;
+        //is_income = true;
         found = true;
       }
     }

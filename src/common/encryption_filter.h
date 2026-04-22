@@ -129,7 +129,7 @@ namespace tools
 
     ~encrypt_chacha20_processer_base()
     {
-      memset(&m_key, 0, sizeof(m_key));
+      m_key = crypto::chacha_key{};
       memset(&m_base_iv, 0, sizeof(m_base_iv));
     }
 
