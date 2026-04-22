@@ -1879,7 +1879,7 @@ bool blockchain_storage::create_block_template(const create_block_template_param
     uint64_t median_ts = get_last_n_blocks_timestamps_median(BLOCKCHAIN_TIMESTAMP_CHECK_WINDOW);
     if (b.timestamp < median_ts)
     {
-      LOG_PRINT_YELLOW("Block template construction failed because current core timestamp, " << b.timestamp << ", is less than median of last " << BLOCKCHAIN_TIMESTAMP_CHECK_WINDOW << " blocks, " << median_ts, LOG_LEVEL_2);
+      LOG_PRINT_YELLOW("Block template construction failed because current core timestamp, " << b.timestamp << ", is less than median of last " << BLOCKCHAIN_TIMESTAMP_CHECK_WINDOW << " blocks, " << median_ts, LOG_LEVEL_0);
       return false;
     }
   }
@@ -1898,7 +1898,11 @@ bool blockchain_storage::create_block_template(const create_block_template_param
     block_filled = (*pcustom_fill_block_template_func)(b, pos, median_size, already_generated_coins, txs_size, fee, height);
 
   if (!block_filled)
+  {
+    LOG_PRINT_YELLOW("Block template construction failed because block are not filled by fill_block_template()", LOG_LEVEL_0);
     return false;
+  }
+    
 
   resp.txs_fee = fee;
 
