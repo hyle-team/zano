@@ -8289,6 +8289,7 @@ bool blockchain_storage::add_new_block(const block& bl, block_verification_conte
       LOG_PRINT_RED_L0("Block processing is stoped due to MAJOR FAILURE fuse burned");
       bvc.m_added_to_main_chain = false;
       bvc.m_verification_failed = true;
+      bvc.m_major_db_failure = true;
       return false;
     }
 

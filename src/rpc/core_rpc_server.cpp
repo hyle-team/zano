@@ -1791,7 +1791,14 @@ namespace currency
       bool r = m_core.get_blockchain_storage().add_new_block(resp.b, bvc);
       if (!r)
       {
-        res.status = API_RETURN_CODE_FAIL;
+        if (bvc.m_major_db_failure)
+        {
+          res.status = API_RETURN_CODE_INTERNAL_ERROR;
+        }
+        else
+        {
+          res.status = API_RETURN_CODE_FAIL;
+        }
         LOG_ERROR("Explicit simulation of block template failed, block was rejected by the core");
         return false;
       }
@@ -1901,7 +1908,7 @@ namespace currency
     size_t sim_count = 0;
     account_base acc;
     acc.generate();
-    while (simulation_result_str != API_RETURN_CODE_OK)
+    while (simulation_result_str != API_RETURN_CODE_OK && simulation_result_str != API_RETURN_CODE_INTERNAL_ERROR)
     {
       //calling getblocktemplate in simulation mode
       currency::COMMAND_RPC_GETBLOCKTEMPLATE::request tmpl_req_sim = AUTO_VAL_INIT(tmpl_req_sim);
