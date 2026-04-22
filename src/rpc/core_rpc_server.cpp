@@ -1786,6 +1786,12 @@ namespace currency
 
     if (req.do_explicit_simulation)
     {
+      if (!resp.b.tx_hashes.size())
+      {
+        //if there are no transactions in the block, then we can end simulation here, as point of simulation is to blacklist failing transactions
+        return true;
+      }
+
       currency::block_verification_context bvc = AUTO_VAL_INIT(bvc);
       bvc.do_just_simulation = true;
       bool r = m_core.get_blockchain_storage().add_new_block(resp.b, bvc);
