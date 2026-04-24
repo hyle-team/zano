@@ -56,7 +56,8 @@ namespace tools
 
     ~encrypt_chacha8_processer_base()
     {
-
+      m_ctx = ECRYPT_ctx{};
+      m_key = crypto::chacha_key{};
     }
 
     template<typename cb_handler>
