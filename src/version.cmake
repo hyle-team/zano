@@ -14,13 +14,13 @@ endif()
 # Add branch name suffix if not on master or release
 if(NOT BRANCH_RET)
     if(NOT BRANCH_NAME STREQUAL "master" AND NOT BRANCH_NAME STREQUAL "release")
-        set(VERSION "${VERSION}[${BRANCH_NAME}]")
+        set(VERSION "${VERSION}-${BRANCH_NAME}")
     endif()
 endif()
 
 # Add testnet prefix if TESTNET is defined and true
 if(TESTNET)
-    set(VERSION "[testnet]${VERSION}")
+    set(VERSION "testnet-${VERSION}")
 endif()
 
 configure_file("src/version.h.in" "${TO}")
