@@ -1681,7 +1681,7 @@ bool simple_wallet::is_freeze_period_active(std::string& err)
 {
   COMMAND_RPC_GET_INFO::request req{};
   COMMAND_RPC_GET_INFO::response res{};
-  bool r = net_utils::invoke_http_json_remote_command2(m_daemon_address + "/getheight", req, res, m_http_client);
+  bool r = net_utils::invoke_http_json_remote_command2(m_daemon_address + "/getinfo", req, res, m_http_client);
   err = interpret_rpc_response(r, res.status);
   return res.pre_hf_tx_freeze_period_active;
 }
