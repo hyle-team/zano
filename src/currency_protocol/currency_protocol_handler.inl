@@ -881,25 +881,31 @@ namespace currency
     m_p2p->get_connections(connections);
     for (auto& cc : connections)
     {
-      size_t count = 0;
       NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::request req = AUTO_VAL_INIT(req);
       for (auto& qe : que)
       {
-        //exclude relaying to original sender
-        if (qe.second.m_connection_id == cc.m_connection_id)
-          continue;
-        req.txs.insert(req.txs.begin(), qe.first.txs.begin(), qe.first.txs.end());
-        count++;
-        if (req.txs.size() >= CURRENCY_RELAY_TXS_MAX_COUNT) 
-          break;
+        if (qe.second.m_connection_id == cc.m_connection_id) continue;
+        for (auto& tx : qe.first.txs) 
+        {
+          if (req.txs.size() >= CURRENCY_RELAY_TXS_MAX_COUNT) 
+          {
+            post_notify<NOTIFY_OR_INVOKE_NEW_TRANSACTIONS>(req, cc);
+            if (debug_ss.tellp())
+              debug_ss << ", ";
+            debug_ss << cc << ": " << req.txs.size();
+
+            req = AUTO_VAL_INIT(req);   // start a new batch
+          }
+          req.txs.push_back(tx);        // one-by-one, not range insert
+        }
       }
       if (req.txs.size())
       {
         post_notify<NOTIFY_OR_INVOKE_NEW_TRANSACTIONS>(req, cc);
-
         if (debug_ss.tellp())
           debug_ss << ", ";
         debug_ss << cc << ": " << req.txs.size();
+
       }
     }
     TIME_MEASURE_FINISH_MS(ms);
