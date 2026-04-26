@@ -255,6 +255,8 @@ namespace nodetool
     const uint32_t pick_depth = anonymize ? depth + depth / 5 : depth;
     BOOST_REVERSE_FOREACH(const peers_indexed::value_type& vl, by_time_index)
     {
+      if (!vl.last_seen)
+        continue;
       if(cnt++ >= pick_depth)
         break;
       bs_head.push_back(vl);
