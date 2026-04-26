@@ -168,7 +168,23 @@ public:
     if constexpr (is_ssl)
     {
       this->set_domain(dest_host);
-      this->do_handshake();
+      try 
+      {
+        this->do_handshake();
+      }
+      catch (const std::exception& e) 
+      {
+        LOG_ERROR("SOCKS5 TLS handshake failed: " << e.what());
+        this->disconnect();
+        return false;
+      }
+      catch (...)
+      {
+        LOG_ERROR("SOCKS5 TLS handshake failed.");
+        this->disconnect();
+        return false;
+      }
+
     }
     return true;
   }
