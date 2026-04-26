@@ -161,7 +161,9 @@ namespace epee
       //for pod types
       array_entry_t<type_name> sa;
       uint64_t size = read_varint();
-      CHECK_AND_ASSERT_THROW_MES(this->m_array_elements_count + size < this->m_limits.max_array_elements_count, "Wrong blob data in portable storage: max_array_elements_count (" << this->m_limits.max_array_elements_count << ") exceeded");
+      CHECK_AND_ASSERT_THROW_MES(size < this->m_limits.max_array_elements_count && size < this->m_limits.max_array_elements_count - this->m_array_elements_count,
+                "Wrong blob data ...: max_array_elements_count exceeded (size=" << size << ")");
+
       size_t loaded_items_count = 0;
       //TODO: add some optimization here later
       while (size--)
