@@ -378,7 +378,7 @@ bool hard_fork_1_checkpoint_basic_test::generate(std::vector<test_event_entry>& 
 
   CREATE_TEST_WALLET(alice_wlt, alice_acc, blk_0);
   REFRESH_TEST_WALLET_AT_GEN_TIME(events, alice_wlt, blk_5r, 2 * CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 5);
-  CHECK_TEST_WALLET_BALANCE_AT_GEN_TIME(alice_wlt, MK_TEST_COINS(90));
+  CHECK_TEST_WALLET_BALANCE_AT_GEN_TIME(alice_wlt, 0); // 0 - cuz we skip unlock_time
 
   // try to mine a PoS block using locked coins
   block blk_6;
