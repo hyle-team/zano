@@ -3950,11 +3950,13 @@ bool wallet2::generate_utxo_defragmentation_transaction_if_needed(currency::tran
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-std::string wallet2::get_transfers_str(bool include_spent /*= true*/, bool include_unspent /*= true*/, bool show_only_unknown /*= false*/, const std::string& filter_asset_ticker /*= std::string{}*/) const
+std::string wallet2::get_transfers_str(bool include_spent /*= true*/, bool include_unspent /*= true*/, bool show_only_unknown /*= false*/,
+  const std::string& filter_asset_ticker /*= std::string{}*/, bool show_ki_instead_of_aid /*= false*/) const
 {
-  static const char* header = " index                 amount  ticker          g_index  flags         block  tx                                                                out#  asset id";
+  static const char* header_aid = " index                 amount  ticker          g_index  flags          block  tx                                                                out#  asset id";
+  static const char* header_ki  = " index                 amount  ticker          g_index  flags          block  tx                                                                out#  key image";
   std::stringstream ss;
-  ss << header << ENDL;
+  ss << (show_ki_instead_of_aid ? header_ki : header_aid) << ENDL;
   size_t count = 0;
   size_t unknown_assets_outs_count = 0;
   for (const auto& tr : m_transfers)
@@ -3989,13 +3991,10 @@ std::string wallet2::get_transfers_str(bool include_spent /*= true*/, bool inclu
       std::setw(7) << transfer_flags_to_str(td.m_flags) << "  " <<
       std::setw(7) << td.m_ptx_wallet_info->m_block_height << "  " <<
       get_transaction_hash(td.m_ptx_wallet_info->m_tx) << "  " <<
-      std::setw(4) << td.m_internal_output_index << "  ";
-    if (native_coin)
-      ss << "                                                                ";
-    else
-      ss << td.get_asset_id();
-
-    ss << ENDL;
+      std::setw(4) << td.m_internal_output_index << "  " <<
+      (show_ki_instead_of_aid ? (td.m_key_image == null_ki ? std::string() : crypto::pod_to_hex(td.m_key_image))
+        : (native_coin ? std::string() : crypto::pod_to_hex(td.get_asset_id()))) <<
+      ENDL;
 
     ++count;
   }
@@ -8888,7 +8887,7 @@ bool wallet2::configure_socks_relay(const std::string& addr_port)
   socks5::socks5_proxy_settings cfg = m_socks5_relay_cfg;
 
   socks5::socks5_endpoint_config ep {};
-  // if already configured — keep timeouts/use_remote_dns/target_url
+  // if already configured � keep timeouts/use_remote_dns/target_url
   if(cfg.transactions)
     ep = *cfg.transactions;
 
