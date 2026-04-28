@@ -53,3 +53,4 @@ static_assert(crypto::bpp_crypto_trait_ZC_out::c_bpp_values_max == CURRENCY_TX_M
 #define CRYPTO_HDS_GW_OUT_AMOUNT_MASK               "ZANO_HDS_GW_OUT_AMOUNT_MASK____"
 #define CRYPTO_HDS_CHACHA_WALLET_HEADER             "ZANO_HDS_CHACHA_WALLET_HEADER__"
 #define CRYPTO_HDS_CHACHA_WALLET_BODY               "ZANO_HDS_CHACHA_WALLET_BODY____"
+#define CRYPTO_HDS_WALLET_KDF_ROMIX                 "ZANO_HDS_WALLET_KDF_ROMIX______"

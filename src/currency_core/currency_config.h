@@ -192,6 +192,13 @@
 #define WALLET_FILE_BINARY_HEADER_VERSION_INITAL        1000
 #define WALLET_FILE_BINARY_HEADER_VERSION_2             1001
 #define WALLET_FILE_BINARY_HEADER_VERSION_3             1002
+#define WALLET_FILE_BINARY_HEADER_VERSION_4             1003
+
+#define WALLET_KDF_ALGO_NONE                            0
+#define WALLET_KDF_ALGO_ROMIX_KECCAK                    1
+#define WALLET_KDF_ROMIX_N_LOG2                         20 //phase 1: the buffer size is V = 2^(N_log2) * 32 bytes, where N_log2 = 20 -> 1 million blocks * 32 bytes = 32 MiB
+#define WALLET_KDF_ROMIX_PHASE2_LOG2_REDUCTION          3  //phase 2: iteration reduction: 0 = full N phase 2 iterations, 1 = N/2 iterations 2 = N/4, 3 = N/8, 4 = N/16 ... (still 32 MiB at N_log2=20)
+#define WALLET_KDF_SALT_SIZE                            16
 
 #define WALLET_FILE_MAX_KEYS_SIZE                       10000 //
 #define WALLET_BRAIN_DATE_OFFSET                        1543622400

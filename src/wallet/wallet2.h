@@ -293,6 +293,11 @@ namespace tools
       crypto::chacha_iv   iv;
       std::string         account_data;
 
+      uint8_t             kdf_algo{0};
+      uint8_t             kdf_N_log2{0};
+      std::string         kdf_salt;
+      uint8_t             kdf_phase2_log2_reduction{0};
+
       static keys_file_data from_old(const keys_file_data_old& v)
       {
         keys_file_data result = AUTO_VAL_INIT(result);
@@ -301,11 +306,18 @@ namespace tools
         return result;
       }
 
-      DEFINE_SERIALIZATION_VERSION(2)
+      DEFINE_SERIALIZATION_VERSION(4)
       BEGIN_SERIALIZE_OBJECT()
         VERSION_ENTRY(version)
         FIELD(iv)
         FIELD(account_data)
+        if (version >= 3)
+        {
+          FIELD(kdf_algo)
+          FIELD(kdf_N_log2)
+          FIELD(kdf_salt)
+          FIELD(kdf_phase2_log2_reduction)
+        }
       END_SERIALIZE()
     };
 
@@ -383,7 +395,7 @@ namespace tools
     void store(const std::wstring& path);
     void store(const std::wstring& path, const std::string& password);
     void store_watch_only(const std::wstring& path, const std::string& password) const;
-    bool store_keys(std::string& buff, const std::string& password, wallet2::keys_file_data& keys_file_data, bool store_as_watch_only = false);
+    bool store_keys(std::string& buff, const std::string& password, wallet2::keys_file_data& keys_file_data, bool store_as_watch_only = false, std::string* out_body_password = nullptr);
     std::wstring get_wallet_path()const { return m_wallet_file; }
     std::string get_wallet_password()const { return m_password; }
     currency::account_base& get_account() { return m_account; }
@@ -808,7 +820,7 @@ private:
     // ------------------------------------------------------------------------------------
     void add_transfers_to_expiration_list(const std::vector<uint64_t>& selected_transfers, const std::vector<payment_details_subtransfer>& received, uint64_t expiration, const crypto::hash& related_tx_id);
     void remove_transfer_from_expiration_list(uint64_t transfer_index);
-    void load_keys(const std::string& keys_file_name, const std::string& password, uint64_t file_signature, keys_file_data& kf_data);
+    void load_keys(const std::string& keys_file_name, const std::string& password, uint64_t file_signature, keys_file_data& kf_data, std::string* out_body_password = nullptr);
     void process_ado_in_new_transaction(const currency::asset_descriptor_operation& ado, process_transaction_context& ptc);
     void process_new_transaction(const currency::transaction& tx, uint64_t height, const currency::block& b, const std::vector<uint64_t>* pglobal_indexes);
     void fetch_tx_global_indixes(const currency::transaction& tx, std::vector<uint64_t>& goutputs_indexes);
