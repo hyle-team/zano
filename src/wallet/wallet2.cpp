@@ -3076,7 +3076,7 @@ void wallet2::init_log_prefix()
   m_log_prefix = m_account.get_public_address_str().substr(0, 6);
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::load_keys2ki(bool create_if_not_exist, bool& need_to_resync)
+void wallet2::load_keys2ki(bool create_if_not_exist, bool skip_loading_ki_from_file, bool& need_to_resync)
 {
   m_pending_key_images_file_container.close(); // just in case it was opened
   bool pki_corrupted = false;
@@ -3086,6 +3086,12 @@ void wallet2::load_keys2ki(bool create_if_not_exist, bool& need_to_resync)
   if (pki_corrupted)
   {
     WLT_LOG_ERROR("file " << string_encoding::convert_to_ansii(m_pending_ki_file) << " is corrupted! " << reason);
+  }
+
+  if (skip_loading_ki_from_file)
+  {
+    WLT_LOG_L0("loading of pending_key_images file container skipped");
+    return;
   }
 
   if (m_pending_key_images.size() < m_pending_key_images_file_container.size())
@@ -3198,7 +3204,7 @@ void wallet2::generate(const std::wstring& path, const std::string& pass, bool a
   if (m_watch_only && !auditable_wallet)
   {
     bool stub;
-    load_keys2ki(true, stub);
+    load_keys2ki(true, false, stub);
   }
   store();
 }
@@ -3263,7 +3269,7 @@ void wallet2::load_votes_config()
   }
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::load(const std::wstring& wallet_, const std::string& password)
+void wallet2::load(const std::wstring& wallet_, const std::string& password, bool skip_pending_ki_load /* = false */)
 {
   clear();
   prepare_file_names(wallet_);
@@ -3330,7 +3336,7 @@ void wallet2::load(const std::wstring& wallet_, const std::string& password)
 
 
   if (m_watch_only && !is_auditable())
-    load_keys2ki(true, need_to_resync);
+    load_keys2ki(true, skip_pending_ki_load, need_to_resync);
 
   boost::system::error_code ec = AUTO_VAL_INIT(ec);
   m_current_wallet_file_size = boost::filesystem::file_size(wallet_, ec);
@@ -3498,7 +3504,7 @@ void wallet2::store_watch_only(const std::wstring& path_to_save, const std::stri
   if (!is_auditable())
   {
     bool stub = false;
-    wo.load_keys2ki(true, stub); // to create outkey2ki file
+    wo.load_keys2ki(true, true, stub); // to create outkey2ki file
   }
 
   // populate pending key images for spent outputs (this will help to resync watch-only wallet)
@@ -5430,6 +5436,16 @@ bool wallet2::reset_history()
   m_account = acc_tmp;
   m_password = pass;
   prepare_file_names(file_path);
+  WLT_LOG_L0("reset_history() succeeded");
+  return true;
+}
+//-------------------------------
+bool wallet2::reset_pending_keyimages()
+{
+  WLT_CHECK_AND_ASSERT_MES(is_watch_only(), false, "reset_pending_keyimages was called for a watch-only wallet");
+  m_pending_key_images.clear();
+  m_pending_key_images_file_container.clear();
+  WLT_LOG_L0("reset_pending_keyimages() succeeded");
   return true;
 }
 //-------------------------------
@@ -7914,16 +7930,28 @@ void wallet2::restore_key_images_in_wo_wallet(const std::wstring& filename, cons
 {
   WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(!m_watch_only, "restore_key_images_in_wo_wallet can only be used in non watch-only wallet");
   bool r = false;
+  std::string filename_utf8 = epee::string_encoding::wstring_to_utf8(filename);
 
   // load the given watch-only wallet
   wallet2 wo;
-  wo.load(filename, password);
-  WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(wo.is_watch_only(), epee::string_encoding::wstring_to_utf8(filename) << " is not a watch-only wallet");
+  try
+  {
+    WLT_LOG_L0("restore_key_images_in_wo_wallet: loading " << filename_utf8 << " watch-only wallet...");
+    wo.load(filename, password, true /* skip_pending_ki_load */);
+  }
+  catch(error::wallet_load_notice_wallet_restored&)
+  {
+    // do nothing if wallet is loaded but needs resync
+  }
+
+  WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(wo.is_watch_only(), filename_utf8 << " is not a watch-only wallet");
   if (m_account.get_keys().view_secret_key != wo.get_account().get_keys().view_secret_key ||
     m_account.get_public_address() != wo.get_account().get_public_address())
   {
-    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(false, epee::string_encoding::wstring_to_utf8(filename) << " has keys that differ from this wallet's keys; wrong wallet?");
+    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(false, filename_utf8 << " has keys that differ from this wallet's keys; wrong wallet?");
   }
+
+  WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(!wo.m_transfers.empty(), filename_utf8 << " has been reset or not yet synced, it should be fully synced first.");
 
   //
   // 1. Find missing key images and calculate them using secret spend key. Populate missing_ki_items container.
@@ -7944,8 +7972,13 @@ void wallet2::restore_key_images_in_wo_wallet(const std::wstring& filename, cons
     auto it = wo.m_key_images.find(ki);
     WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(it != wo.m_key_images.end(), "restore_key_images_in_wo_wallet: m_key_images inconsistency, ki: " << ki);
     size_t transfer_index = it->second;
+    if (wo.m_transfers.count(transfer_index) == 0)
+    {
+      WLT_LOG_L0("restore_key_images_in_wo_wallet: transfer " << transfer_index << " isn't present in m_transfers (perhaps, concise_mode=1 and it was spent)");
+      continue;
+    }
     transfer_indices_to_include.insert(transfer_index);
-    WLT_LOG_L1("restore_key_images_in_wo_wallet: transfer " << transfer_index << " is in m_pending_key_images, included");
+    WLT_LOG_L0("restore_key_images_in_wo_wallet: transfer " << transfer_index << " is in m_pending_key_images, included");
   }
 
   for(auto el : wo.m_transfers)
@@ -7954,7 +7987,7 @@ void wallet2::restore_key_images_in_wo_wallet(const std::wstring& filename, cons
     if (el.second.m_key_image == null_ki)
     {
       transfer_indices_to_include.insert(transfer_index);
-      WLT_LOG_L1("restore_key_images_in_wo_wallet: ki is null for ti " << transfer_index << ", included");
+      WLT_LOG_L0("restore_key_images_in_wo_wallet: ki is null for ti " << transfer_index << ", included");
     }
   }
 
@@ -7997,11 +8030,12 @@ void wallet2::restore_key_images_in_wo_wallet(const std::wstring& filename, cons
     r = wo.m_pending_key_images.insert(std::make_pair(item.out_pub_key, item.ki)).second;
     WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(r, "restore_key_images_in_wo_wallet: insert failed, out_pub_key: " << item.out_pub_key << ", i: " << i);
     wo.m_pending_key_images_file_container.push_back(out_key_to_ki{item.out_pub_key, item.ki});
-    LOG_PRINT_L0("restore_key_images_in_wo_wallet: added #" << i << " ti: " << item.transfer_index << ", pk: " << item.out_pub_key << ", ki: " << item.ki);
+    WLT_LOG_L0("restore_key_images_in_wo_wallet: added #" << i << " ti: " << item.transfer_index << ", pk: " << item.out_pub_key << ", ki: " << item.ki);
   }
 
   wo.reset_history();
   wo.store();
+  WLT_LOG_L0("restore_key_images_in_wo_wallet: completed");
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::clear_utxo_cold_sig_reservation(std::vector<uint64_t>& affected_transfer_ids)

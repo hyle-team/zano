@@ -143,6 +143,7 @@ namespace
   const command_line::arg_descriptor<bool>          arg_seed_doctor("seed-doctor", "Experimental: if your seed is not working for recovery this is likely because you've made a mistake whene you were doing back up(typo, wrong words order, missing word). This experimental code will attempt to recover seed phrase from with few approaches.");
   const command_line::arg_descriptor<bool>          arg_no_whitelist("no-white-list", "Do not load white list from interned.");
   const command_line::arg_descriptor<std::string>   arg_restore_ki_in_wo_wallet("restore-ki-in-wo-wallet", "Watch-only missing key images restoration. Please, DON'T use it unless you 100% sure of what are you doing.", "");
+  const command_line::arg_descriptor<bool>          arg_resync_and_exit("resync-and-exit", "Resync the wallet, keeping tx keys (but clearing pending key images for watch-only wallets!). Exit when done.", "");
   const command_line::arg_descriptor<bool>          arg_no_idle_unlock_spent("no-idle-unlock-utxo", "Do not unlock utxo that looks like it should be unlocked(marked as spent but no unconfirmed tx that spends it).");
   const command_line::arg_descriptor<int>           arg_concise_mode("concise-mode", "When in concise mode (=1, default) the wallet removes spent UTXO/txs from history after some time to keep its size sane. Can be disabled (=0) if necessary.", 1);
 
@@ -201,6 +202,12 @@ namespace
     std::ostream& operator<<(const T& val)
     {
       m_oss << val;
+      return m_oss;
+    }
+
+    std::ostream& operator<<(std::ostream& (*manip)(std::ostream&))
+    {
+      m_oss << manip;
       return m_oss;
     }
 
@@ -559,6 +566,18 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
     m_do_refresh_after_load = false;
   }
 
+  if (!m_do_refresh_after_load && m_do_resync_and_exit)
+  {
+    fail_msg_writer() << "conflicting parameters: --resync-and-exit AND --no-refresh";
+    return false;
+  }
+
+  if (m_offline_mode && m_do_resync_and_exit)
+  {
+    fail_msg_writer() << "conflicting parameters: --resync-and-exit AND --offline-mode";
+    return false;
+  }
+
   m_password_salt = crypto::rand<uint64_t>();
   m_password_hash = get_hash_from_pass_and_salt(pwd_container.password(), m_password_salt);
 
@@ -621,6 +640,30 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
 
   m_wallet->init(m_daemon_address);
 
+  if (was_open && m_do_resync_and_exit)
+  {
+    message_writer(epee::log_space::console_color_yellow, true, std::string(), LOG_LEVEL_0) << "NOTE: resync and exit requested; proceeding...";
+    if (!try_connect_to_daemon())
+      return false;
+    uint64_t top_height_before = m_wallet->get_top_block_height();
+    m_wallet->reset_history();
+    if (m_wallet->is_watch_only())
+      m_wallet->reset_pending_keyimages();
+    refresh(std::vector<std::string>());
+    uint64_t top_height_after = m_wallet->get_top_block_height();
+    if (top_height_after >= top_height_before)
+    {
+      message_writer(epee::log_space::console_color_green, true, std::string(), LOG_LEVEL_0) << "resync completed, " << (m_wallet->is_watch_only() ? "pending ki reset, " : "") << "terminating as requested...";
+      if (m_wallet->is_watch_only())
+        message_writer(epee::log_space::console_color_yellow, true, std::string(), LOG_LEVEL_0) << ENDL << "WARNING: wallet balance is almost certainly incorrect. You must restore key images using the master wallet." << ENDL;
+    }
+    else
+      fail_msg_writer() << "resync wasn't successfull, try again";
+    close_wallet();
+    return false;
+  }
+
+
   if (was_open && (m_do_refresh_after_load && !m_offline_mode))
     refresh(std::vector<std::string>());
 
@@ -658,11 +701,6 @@ void simple_wallet::handle_command_line(const boost::program_options::variables_
   m_no_whitelist = command_line::get_arg(vm, arg_no_whitelist);
   m_restore_ki_in_wo_wallet = command_line::get_arg(vm, arg_restore_ki_in_wo_wallet);
   m_do_not_unlock_reserved_on_idle = command_line::get_arg(vm, arg_no_idle_unlock_spent);
-  m_enable_tx_socks5_relay_proxy = command_line::get_arg(vm, command_line::arg_enable_tx_socks5_relay_proxy);
-  m_tx_relay_url = command_line::get_arg(vm, command_line::arg_tx_relay_url);
-  m_enable_block_socks5_relay_proxy = command_line::get_arg(vm, command_line::arg_enable_block_socks5_relay_proxy);
-  m_block_relay_url = command_line::get_arg(vm, command_line::arg_block_relay_url);
-
   m_concise_mode    = command_line::get_arg(vm, arg_concise_mode) == 1;
 
   m_allow_legacy_payment_id_size = command_line::has_arg(vm, command_line::arg_allow_legacy_payment_id_size);
@@ -830,7 +868,8 @@ bool simple_wallet::open_wallet(const string &wallet_file, const std::string& pa
   {
     try
     {
-      m_wallet->load(epee::string_encoding::utf8_to_wstring(m_wallet_file), password);
+      bool skip_pending_ki_load = m_do_resync_and_exit;
+      m_wallet->load(epee::string_encoding::utf8_to_wstring(m_wallet_file), password, skip_pending_ki_load);
       print_wallet_opened_msg();
       preconfig_wallet_obj();
       display_vote_info(*m_wallet);
@@ -896,23 +935,24 @@ bool simple_wallet::save(const std::vector<std::string> &args)
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::process_ki_restoration()
 {
-  if (!m_restore_ki_in_wo_wallet.empty())
-  {
-    std::wstring wo_filename = epee::string_encoding::utf8_to_wstring(m_restore_ki_in_wo_wallet);
-    CHECK_AND_ASSERT_THROW_MES(std::filesystem::exists(wo_filename), "cannot open " << m_restore_ki_in_wo_wallet);
+  SIMPLE_WALLET_BEGIN_TRY_ENTRY()
+  if (m_restore_ki_in_wo_wallet.empty())
+    return true; // means the wallet can load and work further normally
 
-    tools::password_container wo_password;
-    if (!wo_password.read_password("Enter password for wallet " + m_restore_ki_in_wo_wallet + " :"))
-      return false;
+  std::wstring wo_filename = epee::string_encoding::utf8_to_wstring(m_restore_ki_in_wo_wallet);
+  CHECK_AND_ASSERT_THROW_MES(std::filesystem::exists(wo_filename), "cannot open " << m_restore_ki_in_wo_wallet);
 
-    m_wallet->restore_key_images_in_wo_wallet(wo_filename, wo_password.password());
+  tools::password_container wo_password;
+  if (!wo_password.read_password("Enter password for wallet " + m_restore_ki_in_wo_wallet + " :"))
+    return false;
 
-    success_msg_writer() << "Missing key images have been successfully repared in " << m_restore_ki_in_wo_wallet << ENDL;
-    
-    return false; // means the wallet processing should stop now
-  }
+  m_wallet->restore_key_images_in_wo_wallet(wo_filename, wo_password.password());
 
-  return true; // means the wallet can load and work further normally
+  message_writer(epee::log_space::console_color_green, true, std::string(), LOG_LEVEL_0) << ENDL << "Missing key images have been successfully repared in " << m_restore_ki_in_wo_wallet << ENDL;
+
+  SIMPLE_WALLET_CATCH_TRY_ENTRY();
+
+  return false; // means the wallet processing should stop now
 }
 //----------------------------------------------------------------------------------------------------
 #ifdef CPU_MINING_ENABLED
@@ -3694,6 +3734,7 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_params, command_line::arg_enable_block_socks5_relay_proxy);
   command_line::add_arg(desc_params, command_line::arg_block_relay_url);
   command_line::add_arg(desc_params, arg_concise_mode);
+  command_line::add_arg(desc_params, arg_resync_and_exit);
 
 
   tools::wallet_rpc_server::init_options(desc_params);
@@ -3986,7 +4027,12 @@ int main(int argc, char* argv[])
     //runs wallet with console interface
     sw->set_offline_mode(offline_mode);
     r = sw->init(vm);
-    CHECK_AND_ASSERT_MES(r, EXIT_FAILURE, "Failed to initialize wallet");
+    if (!r)
+    {
+      message_writer(epee::log_space::console_color_default, true, std::string(), LOG_LEVEL_0) << "\nWallet initialization interrupted, exiting...";
+      return EXIT_FAILURE;
+    }
+
     if (command_line::get_arg(vm, arg_generate_new_wallet).size() || command_line::get_arg(vm, arg_generate_new_auditable_wallet).size())
       return EXIT_FAILURE;
 

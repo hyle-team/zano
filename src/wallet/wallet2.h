@@ -378,7 +378,7 @@ namespace tools
     void generate(const std::wstring& path, const std::string& password, bool auditable_wallet);
     void restore(const std::wstring& path, const std::string& pass, const std::string& seed_or_tracking_seed, bool tracking_wallet, const std::string& seed_password);
     void restore(const std::wstring& path, const std::string& pass, const std::string& secret_derivation, bool is_auditabe_wallet, uint64_t creation_timestamp);
-    void load(const std::wstring& path, const std::string& password);
+    void load(const std::wstring& path, const std::string& password, bool skip_pending_ki_load = false);
     void store();
     void store(const std::wstring& path);
     void store(const std::wstring& path, const std::string& password);
@@ -687,6 +687,7 @@ namespace tools
     bool build_minted_block(const mining_context& cxt, const currency::account_public_address& miner_address);
     std::string get_extra_text_for_block(uint64_t new_block_expected_height);
     bool reset_history();
+    bool reset_pending_keyimages();
     bool is_transfer_unlocked(const transfer_details& td) const;
     bool is_transfer_unlocked(const transfer_details& td, bool for_pos_mining, uint64_t& stake_lock_time) const;
     void get_mining_history(wallet_public::mining_history& hist, uint64_t timestamp_from = 0);
@@ -912,7 +913,7 @@ private:
 
 
     void init_log_prefix();
-    void load_keys2ki(bool create_if_not_exist, bool& need_to_resync);
+    void load_keys2ki(bool create_if_not_exist, bool skip_loading_ki_from_file, bool& need_to_resync);
 
     void send_transaction_to_network(const currency::transaction& tx);
     void add_sent_tx_detailed_info(const currency::transaction& tx, 
