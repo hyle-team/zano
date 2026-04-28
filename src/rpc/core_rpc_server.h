@@ -41,6 +41,7 @@ namespace currency
     void set_rpc_chain_handler(epee::net_utils::http::i_chain_handler* prpc_chain_handler) { m_prpc_chain_handler = prpc_chain_handler; }
     bool on_get_blocks_direct(const COMMAND_RPC_GET_BLOCKS_DIRECT::request& req, COMMAND_RPC_GET_BLOCKS_DIRECT::response& res, connection_context& cntx);
     void set_ignore_connectivity_status(bool ignore) { m_ignore_offline_status = ignore;}
+    void set_enabled_admin_api(bool enabled) { m_enabled_admin_api = enabled; }
 
     bool on_get_height(const COMMAND_RPC_GET_HEIGHT::request& req, COMMAND_RPC_GET_HEIGHT::response& res, connection_context& cntx);
     bool on_get_blocks(const COMMAND_RPC_GET_BLOCKS_FAST::request& req, COMMAND_RPC_GET_BLOCKS_FAST::response& res, connection_context& cntx);
@@ -193,10 +194,10 @@ namespace currency
         
         //gateway addresses api
         MAP_JON_RPC("gateway_get_address_info",    on_gateway_get_address_info,    COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO)
-        MAP_JON_RPC("gateway_create_transfer",     on_gateway_create_transfer,     COMMAND_RPC_GATEWAY_CREATE_TRANSFER)
-        MAP_JON_RPC("gateway_sign_transfer",       on_gateway_sign_transfer,       COMMAND_RPC_GATEWAY_SIGN_TRANSFER)
-        MAP_JON_RPC("gateway_create_owner_change", on_gateway_create_owner_change, COMMAND_RPC_GATEWAY_CREATE_OWNER_CHANGE)
-        MAP_JON_RPC("gateway_sign_owner_change",   on_gateway_sign_owner_change,   COMMAND_RPC_GATEWAY_SIGN_OWNER_CHANGE)
+        MAP_JON_RPC_CONDITIONAL("gateway_create_transfer",     on_gateway_create_transfer,     COMMAND_RPC_GATEWAY_CREATE_TRANSFER, m_enabled_admin_api)
+        MAP_JON_RPC_CONDITIONAL("gateway_sign_transfer",       on_gateway_sign_transfer,       COMMAND_RPC_GATEWAY_SIGN_TRANSFER, m_enabled_admin_api)
+        MAP_JON_RPC_CONDITIONAL("gateway_create_owner_change", on_gateway_create_owner_change, COMMAND_RPC_GATEWAY_CREATE_OWNER_CHANGE, m_enabled_admin_api)
+        MAP_JON_RPC_CONDITIONAL("gateway_sign_owner_change",   on_gateway_sign_owner_change,   COMMAND_RPC_GATEWAY_SIGN_OWNER_CHANGE, m_enabled_admin_api)
         MAP_JON_RPC("gateway_get_address_history", on_gateway_get_address_history, COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY)
 
         CHAIN_TO_PHANDLER(m_prpc_chain_handler)

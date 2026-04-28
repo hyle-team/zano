@@ -884,7 +884,8 @@ bool wallet_true_rpc_pos_mining::c1(currency::core& c, size_t ev_index, const st
   bc_services::bc_offers_service bos(nullptr);
   bos.set_disabled(true);
   currency::core_rpc_server core_rpc_wrapper(c, p2p, bos);
-  core_rpc_wrapper.set_ignore_connectivity_status(true);
+  core_rpc_wrapper.set_ignore_connectivity_status(true); 
+  core_rpc_wrapper.set_enabled_admin_api(true);
   
   boost::program_options::options_description desc_options;
   currency::core_rpc_server::init_options(desc_options);
@@ -1840,7 +1841,8 @@ bool wallet_rpc_gateway_address::c1(currency::core& c, size_t ev_index, const st
   nodetool::node_server<currency::t_currency_protocol_handler<currency::core> > dummy_p2p(cprotocol);
   bc_services::bc_offers_service dummy_bc(nullptr);
   currency::core_rpc_server core_rpc_wrapper(c, dummy_p2p, dummy_bc);
-  core_rpc_wrapper.set_ignore_connectivity_status(true);
+  core_rpc_wrapper.set_ignore_connectivity_status(true); 
+  core_rpc_wrapper.set_enabled_admin_api(true);
 
   std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
   std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
@@ -2154,7 +2156,8 @@ bool wallet_rpc_gateway_signatures::c1(currency::core& c, size_t ev_index, const
   nodetool::node_server<currency::t_currency_protocol_handler<currency::core> > dummy_p2p(cprotocol);
   bc_services::bc_offers_service dummy_bc(nullptr);
   currency::core_rpc_server core_rpc_wrapper(c, dummy_p2p, dummy_bc);
-  core_rpc_wrapper.set_ignore_connectivity_status(true);
+  core_rpc_wrapper.set_ignore_connectivity_status(true); 
+  core_rpc_wrapper.set_enabled_admin_api(true);
 
   std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
   std::shared_ptr<tools::wallet2> bob_wlt = init_playtime_test_wallet(events, c, BOB_ACC_IDX);
@@ -2399,6 +2402,7 @@ bool wallet_rpc_gateway_illegal_asset_id::c1(currency::core& c, size_t ev_index,
   bc_services::bc_offers_service dummy_bc(nullptr);
   currency::core_rpc_server core_rpc_wrapper(c, dummy_p2p, dummy_bc);
   core_rpc_wrapper.set_ignore_connectivity_status(true);
+  core_rpc_wrapper.set_enabled_admin_api(true);
 
   std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
   tools::wallet_rpc_server miner_wlt_rpc(miner_wlt);
@@ -2540,7 +2544,8 @@ bool wallet_rpc_gateway_overspend::c1(currency::core& c, size_t ev_index, const 
   nodetool::node_server<currency::t_currency_protocol_handler<currency::core>> dummy_p2p(cprotocol);
   bc_services::bc_offers_service dummy_bc(nullptr);
   currency::core_rpc_server core_rpc_wrapper(c, dummy_p2p, dummy_bc);
-  core_rpc_wrapper.set_ignore_connectivity_status(true);
+  core_rpc_wrapper.set_ignore_connectivity_status(true); 
+  core_rpc_wrapper.set_enabled_admin_api(true);
 
   std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
   std::shared_ptr<tools::wallet2> bob_wlt = init_playtime_test_wallet(events, c, BOB_ACC_IDX);
@@ -2759,7 +2764,8 @@ bool wallet_rpc_gateway_service_entries::c1(currency::core& c, size_t ev_index, 
   nodetool::node_server<currency::t_currency_protocol_handler<currency::core> > dummy_p2p(cprotocol);
   bc_services::bc_offers_service dummy_bc(nullptr);
   currency::core_rpc_server core_rpc_wrapper(c, dummy_p2p, dummy_bc);
-  core_rpc_wrapper.set_ignore_connectivity_status(true);
+  core_rpc_wrapper.set_ignore_connectivity_status(true); 
+  core_rpc_wrapper.set_enabled_admin_api(true);
 
   std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
   std::shared_ptr<tools::wallet2> bob_wlt = init_playtime_test_wallet(events, c, BOB_ACC_IDX);
@@ -2915,7 +2921,8 @@ bool wallet_rpc_gateway_reorg_spend::c1(currency::core& c, size_t ev_index, cons
   nodetool::node_server<currency::t_currency_protocol_handler<currency::core> > dummy_p2p(cprotocol);
   bc_services::bc_offers_service dummy_bc(nullptr);
   currency::core_rpc_server core_rpc_wrapper(c, dummy_p2p, dummy_bc);
-  core_rpc_wrapper.set_ignore_connectivity_status(true);
+  core_rpc_wrapper.set_ignore_connectivity_status(true); 
+  core_rpc_wrapper.set_enabled_admin_api(true);
 
   std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
   std::shared_ptr<tools::wallet2> bob_wlt= init_playtime_test_wallet(events, c, BOB_ACC_IDX);
@@ -3053,7 +3060,8 @@ bool wallet_rpc_gateway_reorg_receive::c1(currency::core& c, size_t ev_index, co
   nodetool::node_server<currency::t_currency_protocol_handler<currency::core> > dummy_p2p(cprotocol);
   bc_services::bc_offers_service dummy_bc(nullptr);
   currency::core_rpc_server core_rpc_wrapper(c, dummy_p2p, dummy_bc);
-  core_rpc_wrapper.set_ignore_connectivity_status(true);
+  core_rpc_wrapper.set_ignore_connectivity_status(true); 
+  core_rpc_wrapper.set_enabled_admin_api(true);
 
   std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
   tools::wallet_rpc_server miner_wlt_rpc(miner_wlt);
@@ -3174,7 +3182,8 @@ bool wallet_rpc_gateway_owner_change_altchain::c1(currency::core& c, size_t ev_i
   nodetool::node_server<currency::t_currency_protocol_handler<currency::core> > dummy_p2p(cprotocol);
   bc_services::bc_offers_service dummy_bc(nullptr);
   currency::core_rpc_server core_rpc_wrapper(c, dummy_p2p, dummy_bc);
-  core_rpc_wrapper.set_ignore_connectivity_status(true);
+  core_rpc_wrapper.set_ignore_connectivity_status(true); 
+  core_rpc_wrapper.set_enabled_admin_api(true);
 
   std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
   tools::wallet_rpc_server miner_wlt_rpc(miner_wlt);

@@ -519,7 +519,9 @@ bool invoke_text_json_for_core(currency::core& c, const std::string& method_name
   bc_services::bc_offers_service of(nullptr); 
 
   currency::core_rpc_server core_rpc_wrapper(c, p2p, of);
-  core_rpc_wrapper.set_ignore_connectivity_status(true);
+  core_rpc_wrapper.set_ignore_connectivity_status(true); 
+  core_rpc_wrapper.set_enabled_admin_api(true);
+  
   return invoke_text_json_for_rpc(core_rpc_wrapper, method_name, req, resp);
 }
 

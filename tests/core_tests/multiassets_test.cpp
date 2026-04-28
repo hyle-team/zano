@@ -1655,7 +1655,8 @@ bool eth_signed_asset_via_rpc::c1(currency::core& c, size_t ev_index, const std:
   nodetool::node_server<currency::t_currency_protocol_handler<currency::core> > p2p(m_cprotocol);
   bc_services::bc_offers_service of(nullptr);
   currency::core_rpc_server core_rpc_wrapper(c, p2p, of);
-  core_rpc_wrapper.set_ignore_connectivity_status(true);
+  core_rpc_wrapper.set_ignore_connectivity_status(true); 
+  core_rpc_wrapper.set_enabled_admin_api(true);
 
   // asset description
   asset_descriptor_base adb{};
