@@ -864,7 +864,7 @@ bool simple_wallet::process_ki_restoration()
 
   m_wallet->restore_key_images_in_wo_wallet(wo_filename, wo_password.password());
 
-  message_writer(epee::log_space::console_color_green, true, std::string(), LOG_LEVEL_0) << ENDL << "Missing key images have been successfully repared in " << m_restore_ki_in_wo_wallet << ENDL;
+  message_writer(epee::log_space::console_color_green, true, std::string(), LOG_LEVEL_0) << ENDL << "Missing key images have been successfully repaired in " << m_restore_ki_in_wo_wallet << ENDL;
 
   SIMPLE_WALLET_CATCH_TRY_ENTRY();
 
@@ -2270,7 +2270,7 @@ bool simple_wallet::list_outputs(const std::vector<std::string> &args)
   bool include_spent = true, include_unspent = true, show_only_unknown = false;
   std::string filter_asset_ticker{};
 
-  bool arg_spent_flags = false, arg_unknown_assets = false, arg_ticker_filer = false;
+  bool arg_spent_flags = false, arg_unknown_assets = false, arg_ticker_filer = false, show_ki_instead_of_aid = false;
 
   auto process_arg = [&](const std::string& arg) -> bool {
     if (!arg_spent_flags && (arg == "u" || arg == "unspent" || arg == "available"))
@@ -2281,6 +2281,8 @@ bool simple_wallet::list_outputs(const std::vector<std::string> &args)
       arg_unknown_assets = true, show_only_unknown = true;
     else if (!arg_ticker_filer && (arg.find("ticker=") == 0 || arg.find("t=") == 0))
       arg_ticker_filer = true, filter_asset_ticker = boost::erase_all_copy(boost::erase_all_copy(arg, "ticker="), "t=");
+    else if (!show_ki_instead_of_aid && (arg == "ki" || arg == "kis" || arg == "keyimage" || arg == "keyimages"))
+      show_ki_instead_of_aid = true;
     else
       return false;
     return true;
@@ -2295,7 +2297,7 @@ bool simple_wallet::list_outputs(const std::vector<std::string> &args)
     }
   }
 
-  success_msg_writer() << m_wallet->get_transfers_str(include_spent, include_unspent, show_only_unknown, filter_asset_ticker);
+  success_msg_writer() << m_wallet->get_transfers_str(include_spent, include_unspent, show_only_unknown, filter_asset_ticker, show_ki_instead_of_aid);
 
   return true;
 }

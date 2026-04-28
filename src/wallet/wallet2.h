@@ -605,7 +605,7 @@ namespace tools
     bool fill_mining_context(mining_context& ctx);
     
     void get_transfers(transfer_container& incoming_transfers) const;
-    std::string get_transfers_str(bool include_spent = true, bool include_unspent = true, bool show_only_unknown = false, const std::string& filter_asset_ticker = std::string{}) const;
+    std::string get_transfers_str(bool include_spent = true, bool include_unspent = true, bool show_only_unknown = false, const std::string& filter_asset_ticker = std::string{}, bool show_ki_instead_of_aid = false) const;
     std::string get_balance_str() const;
     std::string get_balance_str_raw() const;
 
