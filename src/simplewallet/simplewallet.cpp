@@ -343,7 +343,7 @@ simple_wallet::simple_wallet()
   m_cmd_binder.set_handler("tracking_seed", boost::bind(&simple_wallet::tracking_seed, this,ph::_1), "For auditable wallets: prints tracking seed for wallet's audit by a third party");
 
   m_cmd_binder.set_handler("save", boost::bind(&simple_wallet::save, this,ph::_1), "Save wallet synchronized data");
-  m_cmd_binder.set_handler("save_watch_only", boost::bind(&simple_wallet::save_watch_only, this,ph::_1), "save_watch_only <filename> <password> - save as watch-only wallet file.");
+  m_cmd_binder.set_handler("save_watch_only", boost::bind(&simple_wallet::save_watch_only, this,ph::_1), "save_watch_only <filename> [password] - save as watch-only wallet file. If password is omitted, it will be asked interactively.");
 
   m_cmd_binder.set_handler("sign_transfer", boost::bind(&simple_wallet::sign_transfer, this,ph::_1), "sign_transfer <unsgined_tx_file> <signed_tx_file> - sign unsigned tx from a watch-only wallet");
   m_cmd_binder.set_handler("submit_transfer", boost::bind(&simple_wallet::submit_transfer, this,ph::_1), "submit_transfer <signed_tx_file> - broadcast signed tx");
@@ -2417,14 +2417,42 @@ void simple_wallet::set_offline_mode(bool offline_mode)
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::save_watch_only(const std::vector<std::string> &args)
 {
-  if (args.size() < 2)
+  if (args.size() < 1)
   {
-    fail_msg_writer() << "wrong parameters, expected filename and password";
+    fail_msg_writer() << "wrong parameters, expected filename";
     return true;
   }
+
+  std::string password;
+  if (args.size() >= 2)
+  {
+    password = args[1];
+  }
+  else
+  {
+    tools::password_container pwd_container;
+    if (!pwd_container.read_password("Enter password for the watch-only wallet: "))
+    {
+      fail_msg_writer() << "failed to read password";
+      return true;
+    }
+    tools::password_container pwd_container_confirm;
+    if (!pwd_container_confirm.read_password("Confirm password: "))
+    {
+      fail_msg_writer() << "failed to read password";
+      return true;
+    }
+    if (pwd_container.password() != pwd_container_confirm.password())
+    {
+      fail_msg_writer() << "passwords do not match";
+      return true;
+    }
+    password = pwd_container.password();
+  }
+
   try
   {
-    m_wallet->store_watch_only(epee::string_encoding::convert_to_unicode(args[0]), args[1]);
+    m_wallet->store_watch_only(epee::string_encoding::convert_to_unicode(args[0]), password);
     success_msg_writer() << "Watch-only wallet has been stored to " << args[0];
   }
   catch (const std::exception& e)
