@@ -1940,7 +1940,7 @@ bool simple_wallet::transfer_impl(const std::vector<std::string> &args_, uint64_
           }
           if (i != 0)
           {
-            fail_msg_writer() << "long embedded payment id: " << epee::string_tools::buff_to_hex_nodelimer(embedded_payment_id) << " can only be set for the first destination (and so you can use integrated address with long payment id only for the fist destination)";
+            fail_msg_writer() << "long embedded payment id: " << epee::string_tools::buff_to_hex_nodelimer(embedded_payment_id) << " can only be set for the first destination (and so you can use integrated address with long payment id only for the first destination)";
             return true;
           }
           legacy_tx_wide_payment_id = embedded_payment_id;
@@ -1965,7 +1965,7 @@ bool simple_wallet::transfer_impl(const std::vector<std::string> &args_, uint64_
         }
         if (i != 0)
         {
-          fail_msg_writer() << "embedded payment id: " << epee::string_tools::buff_to_hex_nodelimer(embedded_payment_id) << " currently can only be set for the first destination (and so you can use integrated address only for the fist destination)";
+          fail_msg_writer() << "embedded payment id: " << epee::string_tools::buff_to_hex_nodelimer(embedded_payment_id) << " currently can only be set for the first destination (and so you can use integrated address only for the first destination)";
           return true;
         }
         legacy_tx_wide_payment_id = embedded_payment_id;
