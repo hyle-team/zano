@@ -799,14 +799,11 @@ gen_wallet_unlock_by_block_and_by_time::gen_wallet_unlock_by_block_and_by_time()
 bool gen_wallet_unlock_by_block_and_by_time::generate(std::vector<test_event_entry>& events) const
 {
   // Test outline:
-  // 1) creates two txs both having unlock_time set to non-zero (few blocks further for the first one and some time in future for the second one);
-  // 2) puts these txs into the blockchain;
-  // 3) checks balalce and verifies unability to spend money from both of locked tx;
-  // 4) makes few blocks to unlock the first tx;
-  // 5) spends money form the first tx, checks balance and so..
-  // 6) verifies unability to spens money from the second tx that is still locked;
-  // 7) moves the time forward to unlock it;
-  // 8) spends the money and checks balances.
+  // Only coinbase transactions are allowed to carry unlock_time - non-coinbase txs with any unlock_time must be ignored by the wallet during sync
+  // 1) creates two normal (non-coinbase) txs both having unlock_time set to non-zero (few blocks further for the first one and some time in future for the second one);
+  // 2) put these txs into the blockchain;
+  // 3) make sure the recipient's wallet ignores both txs - balance stays at zero and spends fail;
+  // 4) even after the would-be unlock moment passes, balance still stays at zero.
 
   GENERATE_ACCOUNT(preminer_acc);
   GENERATE_ACCOUNT(miner_acc);
@@ -826,7 +823,7 @@ bool gen_wallet_unlock_by_block_and_by_time::generate(std::vector<test_event_ent
   CREATE_TEST_WALLET(alice_wlt, alice_acc, blk_0);
 
   REFRESH_TEST_WALLET_AT_GEN_TIME(events, miner_wlt, blk_0r, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
-  
+
   transaction tx_0 = AUTO_VAL_INIT(tx_0);
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
   std::vector<tx_destination_entry> destinations(
@@ -836,8 +833,8 @@ bool gen_wallet_unlock_by_block_and_by_time::generate(std::vector<test_event_ent
       { MK_TEST_COINS(10), alice_acc.get_public_address() }
     }
   );
-  
-  // create two txs (2x 3000 test coins to Alice) both having non-zero unlock_time
+
+  // create two txs (2x 30 test coins to Alice) both having non-zero unlock_time
   uint64_t unlock_block_num = CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 2 + WALLET_DEFAULT_TX_SPENDABLE_AGE + 2;
   uint64_t unlock_time = blk_0.timestamp + 10000;
   miner_wlt->transfer(destinations, 0, unlock_block_num, TESTS_DEFAULT_FEE, std::vector<extra_v>(), std::vector<attachment_v>(), tx_0);
@@ -845,15 +842,19 @@ bool gen_wallet_unlock_by_block_and_by_time::generate(std::vector<test_event_ent
   events.push_back(tx_0);
   events.push_back(tx_1);
 
+  // both of these normal txs carry non-zero unlock_time, so wallets must ignore them during sync
+  CHECK_AND_ASSERT_MES(!is_coinbase(tx_0) && get_tx_max_unlock_time(tx_0) != 0, false, "tx_0 is expected to be non-coinbase with non-zero unlock_time");
+  CHECK_AND_ASSERT_MES(!is_coinbase(tx_1) && get_tx_max_unlock_time(tx_1) != 0, false, "tx_1 is expected to be non-coinbase with non-zero unlock_time");
+
   // put them into a block
   MAKE_NEXT_BLOCK_TX_LIST(events, blk_1, blk_0r, miner_acc, std::list<transaction>({tx_0, tx_1}));
-  
-  // rewind WALLET_DEFAULT_TX_SPENDABLE_AGE blocks to be able to spend txs outputs 
+
+  // rewind WALLET_DEFAULT_TX_SPENDABLE_AGE blocks (kept to preserve block height assumptions)
   REWIND_BLOCKS_N_WITH_TIME(events, blk_1r, blk_1, miner_acc, WALLET_DEFAULT_TX_SPENDABLE_AGE);
 
-  // check balances and make sure we can't spend the money now
+  // wallet must ignore both locked non-coinbase txs - balance is zero, spends fail
   REFRESH_TEST_WALLET_AT_GEN_TIME(events, alice_wlt, blk_1r, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 2 + WALLET_DEFAULT_TX_SPENDABLE_AGE);
-  CHECK_TEST_WALLET_BALANCE_AT_GEN_TIME_FULL(alice_wlt, MK_TEST_COINS(60), 0, 0, 0, 0);
+  CHECK_TEST_WALLET_BALANCE_AT_GEN_TIME_FULL(alice_wlt, 0, 0, 0, 0, 0);
   bool r = false;
   try
   {
@@ -866,47 +867,43 @@ bool gen_wallet_unlock_by_block_and_by_time::generate(std::vector<test_event_ent
   CHECK_AND_ASSERT_MES(r, false, "Expected error 'not enought money' wasn't caught");
   DO_CALLBACK(events, "c1");
 
-  // make a block, this should unlock the first tx
+  // make a block - had the old behavior been in effect, the block-locked tx would unlock here;
   MAKE_NEXT_BLOCK(events, blk_2, blk_1r, miner_acc);
 
-  // check balance, spend to money, make sure it was spent
   REFRESH_TEST_WALLET_AT_GEN_TIME(events, alice_wlt, blk_2, 1);
-  CHECK_TEST_WALLET_BALANCE_AT_GEN_TIME_FULL(alice_wlt, MK_TEST_COINS(60), 0, MK_TEST_COINS(30), 0, 0); // 3000 became unlocked
-  MAKE_TEST_WALLET_TX(events, tx_b, alice_wlt, MK_TEST_COINS(29), miner_acc);
-  DO_CALLBACK(events, "c2");
-
-  // move the time to the moment just 3 seconds before the second tx gets unloccked
-  test_core_time::adjust(unlock_time - CURRENCY_LOCKED_TX_ALLOWED_DELTA_SECONDS - 3);
-  events.push_back(event_core_time(unlock_time - CURRENCY_LOCKED_TX_ALLOWED_DELTA_SECONDS - 3));
-
-  // check the balance, make sure the tx is still locked and money can't be spent
-  REFRESH_TEST_WALLET_AT_GEN_TIME(events, alice_wlt, blk_2, 0);
-  CHECK_TEST_WALLET_BALANCE_AT_GEN_TIME_FULL(alice_wlt, MK_TEST_COINS(60 - 29) - TESTS_DEFAULT_FEE, 0, 0, 0, MK_TEST_COINS(29));
+  CHECK_TEST_WALLET_BALANCE_AT_GEN_TIME_FULL(alice_wlt, 0, 0, 0, 0, 0);
 
   r = false;
   try
   {
-    MAKE_TEST_WALLET_TX(events, tx_c, alice_wlt, MK_TEST_COINS(29), miner_acc);
+    MAKE_TEST_WALLET_TX(events, tx_b_bad, alice_wlt, MK_TEST_COINS(29), miner_acc);
   }
   catch (const tools::error::not_enough_money&)
   {
     r = true;
   }
-  CHECK_AND_ASSERT_MES(r, false, "Expected error 'not enought money' wasn't caught");
-  DO_CALLBACK(events, "c3");
+  CHECK_AND_ASSERT_MES(r, false, "Expected error 'not enought money' wasn't caught after block-based unlock moment");
+  DO_CALLBACK(events, "c2");
 
-  // move the time to the moment the second tx should be unlocked
+  // move the time to the moment the second (time-locked) tx would have been unlocked by the old rules
   test_core_time::adjust(unlock_time - CURRENCY_LOCKED_TX_ALLOWED_DELTA_SECONDS);
   events.push_back(event_core_time(unlock_time - CURRENCY_LOCKED_TX_ALLOWED_DELTA_SECONDS));
-  
-  // check balance
-  REFRESH_TEST_WALLET_AT_GEN_TIME(events, alice_wlt, blk_2, 0);
-  CHECK_TEST_WALLET_BALANCE_AT_GEN_TIME_FULL(alice_wlt, MK_TEST_COINS(60 - 29) - TESTS_DEFAULT_FEE, 0, MK_TEST_COINS(30), 0, MK_TEST_COINS(29));
 
-  // make sure the money can be spent now, put a transaction
-  MAKE_TEST_WALLET_TX(events, tx_d, alice_wlt, MK_TEST_COINS(29), miner_acc);
-  
-  // final checks
+  // balance still zero - wallet ignores both txs
+  REFRESH_TEST_WALLET_AT_GEN_TIME(events, alice_wlt, blk_2, 0);
+  CHECK_TEST_WALLET_BALANCE_AT_GEN_TIME_FULL(alice_wlt, 0, 0, 0, 0, 0);
+
+  r = false;
+  try
+  {
+    MAKE_TEST_WALLET_TX(events, tx_c_bad, alice_wlt, MK_TEST_COINS(29), miner_acc);
+  }
+  catch (const tools::error::not_enough_money&)
+  {
+    r = true;
+  }
+  CHECK_AND_ASSERT_MES(r, false, "Expected error 'not enought money' wasn't caught after timestamp-based unlock moment");
+  DO_CALLBACK(events, "c3");
   DO_CALLBACK(events, "c4");
 
   return true;
@@ -922,7 +919,8 @@ bool gen_wallet_unlock_by_block_and_by_time::c1(currency::core& c, size_t ev_ind
   CHECK_AND_ASSERT_MES(blocks_fetched == CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 2 + WALLET_DEFAULT_TX_SPENDABLE_AGE, false, "Incorrect numbers of blocks fetched");
   alice_wlt->scan_tx_pool(has_alias);
 
-  if (!check_balance_via_wallet(*alice_wlt.get(), "alice_wlt", MK_TEST_COINS(60), 0, 0, 0, 0))
+  // Both incoming txs are non-coinbase and carry unlock_time, so wallet must ignore them - balance is zero.
+  if (!check_balance_via_wallet(*alice_wlt.get(), "alice_wlt", 0, 0, 0, 0, 0))
     return false;
 
   bool r = false;
@@ -955,7 +953,8 @@ bool gen_wallet_unlock_by_block_and_by_time::c2(currency::core& c, size_t ev_ind
   CHECK_AND_ASSERT_MES(blocks_fetched == 1, false, "Incorrect numbers of blocks fetched");
   alice_wlt->scan_tx_pool(has_alias);
 
-  if (!check_balance_via_wallet(*alice_wlt.get(), "alice_wlt", MK_TEST_COINS(60 - 29) - TESTS_DEFAULT_FEE, 0, 0, 0, MK_TEST_COINS(29)))
+  // ignore the non-coinbase locked txs
+  if (!check_balance_via_wallet(*alice_wlt.get(), "alice_wlt", 0, 0, 0, 0, 0))
     return false;
 
   alice_wlt->reset_password(g_wallet_password);
@@ -977,7 +976,7 @@ bool gen_wallet_unlock_by_block_and_by_time::c3(currency::core& c, size_t ev_ind
   CHECK_AND_ASSERT_MES(blocks_fetched == 0, false, "Incorrect numbers of blocks fetched");
   alice_wlt->scan_tx_pool(has_alias);
 
-  if (!check_balance_via_wallet(*alice_wlt.get(), "alice_wlt", MK_TEST_COINS(60 - 29) - TESTS_DEFAULT_FEE, 0, 0, 0, MK_TEST_COINS(29)))
+  if (!check_balance_via_wallet(*alice_wlt.get(), "alice_wlt", 0, 0, 0, 0, 0))
     return false;
 
   bool r = false;
@@ -1010,7 +1009,7 @@ bool gen_wallet_unlock_by_block_and_by_time::c4(currency::core& c, size_t ev_ind
   CHECK_AND_ASSERT_MES(blocks_fetched == 0, false, "Incorrect numbers of blocks fetched");
   alice_wlt->scan_tx_pool(has_alias);
 
-  if (!check_balance_via_wallet(*alice_wlt.get(), "alice_wlt", MK_TEST_COINS(60 - 29 - 29) - TESTS_DEFAULT_FEE * 2, 0, 0, 0, MK_TEST_COINS(29 + 29)))
+  if (!check_balance_via_wallet(*alice_wlt.get(), "alice_wlt", 0, 0, 0, 0, 0))
     return false;
 
   alice_wlt->reset_password(g_wallet_password);
