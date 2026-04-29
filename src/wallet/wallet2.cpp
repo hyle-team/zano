@@ -4760,14 +4760,12 @@ bool wallet2::proxy_to_daemon(const std::string& uri, const std::string& body, i
 }
 //----------------------------------------------------------------------------------------------------
 void pick_decoys_from_pools(std::vector<out_entry>& coinbase_candidates, std::vector<out_entry>& noncb_candidates,
-  size_t wanted_decoys_count, uint64_t real_gindex, std::vector<out_entry>&  decoy_storage_out)
+  size_t wanted_decoys_count, uint64_t real_gindex, decoy_selection_generator::dist_kind mode, std::vector<out_entry>& decoy_storage_out)
 {
   decoy_storage_out.clear();
 
   std::shuffle(coinbase_candidates.begin(), coinbase_candidates.end(), crypto::uniform_random_bit_generator());
   std::shuffle(noncb_candidates.begin(), noncb_candidates.end(), crypto::uniform_random_bit_generator());
-
-  bool include_one_noncb = ((crypto::rand<uint32_t>() % 100) < WALLET_NONCB_SET_PROB_PERCENT) && !noncb_candidates.empty();
 
   std::unordered_set<uint64_t> used_gindices;
   used_gindices.reserve(wanted_decoys_count + 1);
@@ -4788,17 +4786,23 @@ void pick_decoys_from_pools(std::vector<out_entry>& coinbase_candidates, std::ve
     return false;
   };
 
-  size_t cb_cur = 0, nc_cur = 0;
+  const bool prefer_coinbase = (mode == decoy_selection_generator::dist_kind::coinbase);
+  std::vector<out_entry>& preferred = prefer_coinbase ? coinbase_candidates : noncb_candidates;
+  std::vector<out_entry>& opposite = prefer_coinbase ? noncb_candidates : coinbase_candidates;
 
-  if (include_one_noncb)
-    take_next_unique(noncb_candidates, nc_cur);
+  bool include_one_opposite = ((crypto::rand<uint32_t>() % 100) < WALLET_NONCB_SET_PROB_PERCENT) && !opposite.empty();
+
+  size_t pref_cur = 0, opp_cur = 0;
+
+  if (include_one_opposite)
+    take_next_unique(opposite, opp_cur);
 
   while (decoy_storage_out.size() < wanted_decoys_count)
   {
-    if (take_next_unique(coinbase_candidates, cb_cur))
+    if (take_next_unique(preferred, pref_cur))
       continue;
 
-    if (!take_next_unique(noncb_candidates, nc_cur))
+    if (!take_next_unique(opposite, opp_cur))
       break;
   }
 }
@@ -4960,7 +4964,7 @@ void wallet2::distribute_decoys_and_build_sources(const currency::COMMAND_RPC_GE
         /* entry_allowed */ [&](const out_entry& /*oe*/)                  { return true; },
         coinbase_candidates, noncb_candidates);
 
-      pick_decoys_from_pools(coinbase_candidates, noncb_candidates, plan.target_decoy_count, td.m_global_output_index, local_decoys);
+      pick_decoys_from_pools(coinbase_candidates, noncb_candidates, plan.target_decoy_count, td.m_global_output_index, decoy_selection_generator::dist_kind::regular, local_decoys);
     }
 
     std::sort(local_decoys.begin(), local_decoys.end(),
@@ -5091,7 +5095,7 @@ bool wallet2::prepare_pos_zc_input_and_ring(const transfer_details& td, const cu
       coinbase_candidates, noncb_candidates
     );
 
-    pick_decoys_from_pools(coinbase_candidates, noncb_candidates, required_decoys_count, td.m_global_output_index, decoy_storage);
+    pick_decoys_from_pools(coinbase_candidates, noncb_candidates, required_decoys_count, td.m_global_output_index, decoy_selection_generator::dist_kind::coinbase, decoy_storage);
 
     WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(decoy_storage.size() == required_decoys_count, "for PoS stake got less decoys than required: picked=" << decoy_storage.size() << " < " << required_decoys_count << " (coinbase_candidates=" << coinbase_candidates.size() << ", noncb_pool=" << noncb_candidates.size() << ")");
 

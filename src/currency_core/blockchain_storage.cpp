@@ -9356,7 +9356,7 @@ bool blockchain_storage::is_block_fit_for_strategy(uint64_t h, const std::string
 
   if (strategy == LOOK_UP_STRATEGY_REGULAR_TX)
   {
-    return true;
+    return !blk.tx_hashes.empty();
   }
   else if (strategy == LOOK_UP_STRATEGY_POS_COINBASE)
   {
