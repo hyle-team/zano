@@ -750,7 +750,18 @@ namespace currency
   bool core_rpc_server::on_gateway_create_transfer(const COMMAND_RPC_GATEWAY_CREATE_TRANSFER::request& req, COMMAND_RPC_GATEWAY_CREATE_TRANSFER::response& res, connection_context& cntx)
   {
     //TODO: Some of the code presented here might need to be moved to separate library/module as it touch privacy-sensitive operations
-    currency::account_keys dummy_keys = {};
+
+    if (req.gateway_view_secret_key == currency::null_skey)
+    {
+      res.status = API_RETURN_CODE_BAD_ARG;
+      res.status_error = "gateway_view_secret_key is required, must be a non-null secret";
+      return true;
+    }
+
+    // gw has no real spend_secret_key; we put view_secret_key into the spend slot
+    // so encrypt_payload_items produces a tx_crypto_checksum the scanner can actually undo
+    currency::account_keys gw_sender_keys = {};
+    gw_sender_keys.spend_secret_key = req.gateway_view_secret_key;
     currency::finalize_tx_param ftp = {};
     currency::finalized_tx ftx = {};
 
@@ -874,7 +885,15 @@ namespace currency
       ftp.extra.push_back(tc);
     }
 
-    r = currency::construct_tx(dummy_keys, ftp, ftx);
+    if (!ftp.prepared_destinations.size() || ftp.prepared_destinations.begin()->addr.size() != 1)
+    {
+      er.code = CORE_RPC_ERROR_CODE_WRONG_PARAM;
+      er.message = "No valid destinations were found after processing";
+      return false;
+    }
+
+
+    r = currency::construct_tx(gw_sender_keys, ftp, ftx);
     if(!r)
     {
       res.status = API_RETURN_CODE_FAIL;
@@ -1164,6 +1183,14 @@ namespace currency
   bool core_rpc_server::on_gateway_get_address_history(const COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY::request& req, COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY::response& res, connection_context& cntx)
   {
     CHECK_RPC_LIMITS(req.count, RPC_LIMIT_COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY);
+
+    if (req.gateway_view_secret_key == currency::null_skey)
+    {
+      res.status = API_RETURN_CODE_BAD_ARG;
+      res.status_error = "gateway_view_secret_key is required, must be a non-null secret";
+      return true;
+    }
+
     currency::gateway_address_id_type addr_id = {};
     address_v v_addr = {};
     payment_id_t dummy_payment_id = {};

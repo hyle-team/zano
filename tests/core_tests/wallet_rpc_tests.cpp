@@ -2983,6 +2983,7 @@ bool wallet_rpc_gateway_history_after_outgoing::c1(currency::core& c, size_t /*e
   ct_req.destinations.push_back({MK_TEST_COINS(1), bob_wlt->get_account().get_public_address_str()});
   ct_req.fee = TESTS_DEFAULT_FEE;
   ct_req.comment = "history-after-outgoing-repro"; // fire null derivation
+  ct_req.gateway_view_secret_key = gw_view_sec_key; // for keeping sender-side derivation symmetric
   r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_create_transfer", ct_req, ct_resp);
   CHECK_AND_ASSERT_MES(r, false, "gateway_create_transfer failed");
   CHECK_AND_ASSERT_FALSE(ct_resp.tx_blob.empty());

@@ -2264,14 +2264,16 @@ namespace currency
       std::string comment;
       std::vector<currency::tx_service_attachment> service_entries;
       bool service_entries_permanent;
+      crypto::secret_key gateway_view_secret_key; // for keeping sender-side derivation symmetric
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE_POD_AS_HEX_STRING(origin_gateway_id)  DOC_DSCR("Origin gateway ID for the transfer.")           DOC_EXMP("gateway1qxyz...") DOC_END
-        KV_SERIALIZE(destinations)                         DOC_DSCR("Details of the gateway transfer destinations.") DOC_EXMP_AUTO(1) DOC_END
-        KV_SERIALIZE(fee)                                  DOC_DSCR("Transaction fee for the gateway transfer.")     DOC_EXMP(100000000) DOC_END
-        KV_SERIALIZE(comment)                              DOC_DSCR("Comment for the gateway transfer.")             DOC_EXMP("Some comment") DOC_END
-        KV_SERIALIZE(service_entries)                      DOC_DSCR("Service entries for the gateway transfer.")     DOC_EXMP_AUTO(1) DOC_END
-        KV_SERIALIZE(service_entries_permanent)            DOC_DSCR("Whether the service entries are permanent.")    DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(origin_gateway_id)         DOC_DSCR("Origin gateway ID for the transfer.")                                   DOC_EXMP("gateway1qxyz...") DOC_END
+        KV_SERIALIZE(destinations)                                DOC_DSCR("Details of the gateway transfer destinations.")                         DOC_EXMP_AUTO(1) DOC_END
+        KV_SERIALIZE(fee)                                         DOC_DSCR("Transaction fee for the gateway transfer.")                             DOC_EXMP(100000000) DOC_END
+        KV_SERIALIZE(comment)                                     DOC_DSCR("Comment for the gateway transfer.")                                     DOC_EXMP("Some comment") DOC_END
+        KV_SERIALIZE(service_entries)                             DOC_DSCR("Service entries for the gateway transfer.")                             DOC_EXMP_AUTO(1) DOC_END
+        KV_SERIALIZE(service_entries_permanent)                   DOC_DSCR("Whether the service entries are permanent.")                            DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(gateway_view_secret_key)   DOC_DSCR("GW view secret key, used as sender-side key when encrypting tx_extra")  DOC_EXMP("28bdc0a8...") DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
