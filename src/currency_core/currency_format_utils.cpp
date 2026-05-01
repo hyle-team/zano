@@ -2961,7 +2961,8 @@ namespace currency
 
       //include offers if need
       tx.attachment = attachments;
-      encrypt_payload_items(tx, sender_account_keys, crypt_destination_addr, gen_context.tx_key, result.derivation);
+      if (crypt_destination_addr != null_pub_addr)
+        encrypt_payload_items(tx, sender_account_keys, crypt_destination_addr, gen_context.tx_key, result.derivation);
     }
     else
     {
