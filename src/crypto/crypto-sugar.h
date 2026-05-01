@@ -1298,6 +1298,23 @@ namespace crypto
       std::vector<item_t> m_elements;
     };
 
+    //
+    // h - hash to crypto::hash [0..2^256-1], no reduce
+    //
+
+    static hash h(const char(&str32)[32], const crypto::hash& h, const uint64_t i)
+    {
+      hs_t hs_calculator(3);
+      hs_calculator.add_32_chars(str32);
+      hs_calculator.add_hash(h);
+      hs_calculator.add_scalar(scalar_t(i));
+      return hs_calculator.calc_hash_no_reduce();
+    }
+
+    //
+    // hs - hash to scalar [0..l-1]
+    //
+    
     static scalar_t hs(const scalar_t& s, const std::vector<point_t>& ps0, const std::vector<point_t>& ps1)
     {
       hs_t hs_calculator(3);
@@ -1391,6 +1408,10 @@ namespace crypto
       hs_calculator.add_scalar(index);
       return hs_calculator.calc_hash();
     }
+
+    //
+    // hp - hash to point (group element)
+    //
 
     static point_t hp(const point_t& p)
     {
