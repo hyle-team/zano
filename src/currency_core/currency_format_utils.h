@@ -546,6 +546,7 @@ namespace currency
   bool get_account_address_and_payment_id_from_str(account_public_address& addr, payment_id_t& payment_id, const std::string& str);
   bool get_account_address_and_payment_id_from_str(address_v& v_addr, payment_id_t& payment_id, const std::string& str);
   bool parse_payment_id_from_hex_str(const std::string& payment_id_str, payment_id_t& payment_id);
+  bool generate_key_derivation(const address_v& addr_v, const crypto::secret_key& tx_secret_key, crypto::key_derivation& derivation);
   bool is_coinbase(const transaction& tx);
   bool is_coinbase(const transaction& tx, bool& pos_coinbase);
   bool is_pos_coinbase(const transaction& tx);

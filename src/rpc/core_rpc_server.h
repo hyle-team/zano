@@ -96,6 +96,7 @@ namespace currency
     bool on_get_asset_info(const COMMAND_RPC_GET_ASSET_INFO::request& req, COMMAND_RPC_GET_ASSET_INFO::response& res, connection_context& cntx);
     bool on_get_assets_list(const COMMAND_RPC_GET_ASSETS_LIST::request& req, COMMAND_RPC_GET_ASSETS_LIST::response& res, connection_context& cntx);
     bool on_decrypt_tx_details(const COMMAND_RPC_DECRYPT_TX_DETAILS::request& req, COMMAND_RPC_DECRYPT_TX_DETAILS::response& res, epee::json_rpc::error& error_resp, connection_context& cntx);
+    bool on_decrypt_tx_outs_and_update_op(const COMMAND_RPC_DECRYPT_TX_OUTS_AND_UPDATE_OP::request& req, COMMAND_RPC_DECRYPT_TX_OUTS_AND_UPDATE_OP::response& res, epee::json_rpc::error& error_resp, connection_context& cntx);
 
     bool on_get_main_block_details(const COMMAND_RPC_GET_BLOCK_DETAILS::request& req, COMMAND_RPC_GET_BLOCK_DETAILS::response& res, epee::json_rpc::error& error_resp, connection_context& cntx);
     bool on_get_alt_block_details(const COMMAND_RPC_GET_BLOCK_DETAILS::request& req, COMMAND_RPC_GET_BLOCK_DETAILS::response& res, epee::json_rpc::error& error_resp, connection_context& cntx);
@@ -179,6 +180,7 @@ namespace currency
         MAP_JON_RPC   ("get_asset_info",              on_get_asset_info,             COMMAND_RPC_GET_ASSET_INFO)
         MAP_JON_RPC   ("get_assets_list",             on_get_assets_list,            COMMAND_RPC_GET_ASSETS_LIST)
         MAP_JON_RPC_WE("decrypt_tx_details",          on_decrypt_tx_details,         COMMAND_RPC_DECRYPT_TX_DETAILS)
+        MAP_JON_RPC_WE("decrypt_tx_outs_and_update_op", on_decrypt_tx_outs_and_update_op, COMMAND_RPC_DECRYPT_TX_OUTS_AND_UPDATE_OP)
 
         MAP_JON_RPC_WE("get_main_block_details",      on_get_main_block_details,      COMMAND_RPC_GET_BLOCK_DETAILS)
         MAP_JON_RPC_WE("get_alt_block_details",       on_get_alt_block_details,       COMMAND_RPC_GET_BLOCK_DETAILS)
