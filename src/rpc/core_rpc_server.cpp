@@ -1135,6 +1135,15 @@ namespace currency
       res.status_error = "Signed transaction verification failed";
       return true;
     }
+    
+    /*
+    * We don't want to return "already exists" error, some exchanges/custody might specifically want to relay tx again.
+    if (!tvc.m_should_be_relayed && !tvc.m_already_existed)
+    {
+      res.status = API_RETURN_CODE_ALREADY_EXISTS;
+      return true;
+    }
+    */
 
     NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::request ntx_req;
     ntx_req.txs.push_back(signed_tx_blob);
