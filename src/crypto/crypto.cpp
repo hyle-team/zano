@@ -35,9 +35,6 @@ namespace crypto {
   const key_image I = *reinterpret_cast<const key_image*>(&I_);
   const key_image L = *reinterpret_cast<const key_image*>(&L_);
 
-  static const key_derivation zero_key_derivation = {{'\x01', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0'}};
-
-
   extern "C" {
 #include "crypto-ops.h"
 #include "random.h"
@@ -177,8 +174,6 @@ namespace crypto {
     ge_mul8(&point3, &point2);
     ge_p1p1_to_p2(&point2, &point3);
     ge_tobytes(&derivation, &point2);
-    if (derivation == zero_key_derivation)
-      return false;
     return true;
   }
 
