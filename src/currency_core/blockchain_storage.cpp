@@ -3365,16 +3365,17 @@ bool blockchain_storage::get_random_outs_for_amounts4(const COMMAND_RPC_GET_RAND
       }
     };
 
+    const size_t requested_heights_count = req.batches[i].heights.size();
     search_pass(req.look_up_strategy);
-#ifdef TESTNET
-    // when we restart testnet, if a chain restart leaves too few post-HF4 PoS coinbase blocks to fill the ring, pad the result with REGULAR_TX blocks so PoS staking can bootstrap itself
-    const bool need_fallback = out_blocks.size() < req.batches[i].heights.size();
-#else
-    const bool need_fallback = out_blocks.size() == 0;
-#endif
-    if(need_fallback && req.look_up_strategy != LOOK_UP_STRATEGY_REGULAR_TX)
+
+    if (out_blocks.size() < requested_heights_count && req.look_up_strategy != LOOK_UP_STRATEGY_REGULAR_TX)
     {
       search_pass(LOOK_UP_STRATEGY_REGULAR_TX);
+    }
+
+    if (out_blocks.size() < requested_heights_count)
+    {
+      search_pass(LOOK_UP_STRATEGY_ANY);
     }
   }
   return true;
@@ -9355,6 +9356,10 @@ bool blockchain_storage::is_block_fit_for_strategy(uint64_t h, const std::string
   else if (strategy == LOOK_UP_STRATEGY_POS_COINBASE)
   {
     return is_pos_block(blk);
+  }
+  else if (strategy == LOOK_UP_STRATEGY_ANY)
+  {
+    return true;
   }
   else
   {
