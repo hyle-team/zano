@@ -1433,23 +1433,23 @@ namespace currency
     LOCAL_CHECK(tx_pub_key != null_pkey && R.from_public_key(tx_pub_key) && R.is_in_main_subgroup(), "unsigned_tx: tx public key is missing or invalid");
     LOCAL_CHECK(tx_pub_key == (crypto::scalar_t(req.tx_secret_key) * crypto::c_point_G).to_public_key(), "tx_secret_key doesn't match the transaction public key");
 
-    auto& decode_output = [&req, &res](const address_v& addr_v, const tx_out_v& out_v, size_t i, const crypto::key_derivation& derivation, bool& unknown_output_type) -> bool {
+    auto& decode_output = [&req, &res](const address_v& addr_v, const tx_out_v& out_v, size_t addr_idx, size_t out_idx, const crypto::key_derivation& derivation, bool& unknown_output_type) -> bool {
       VARIANT_SWITCH_BEGIN(out_v)
         VARIANT_CASE_CONST(tx_out_zarcanum, zo)
           if (addr_v.type() != typeid(account_public_address))
             return false;
           auto& decoded_out = res.decoded_outputs.emplace_back();
-          decoded_out.out_index = i;
-          decoded_out.address = req.outputs_addresses[i];
+          decoded_out.out_index = out_idx;
+          decoded_out.address = req.outputs_addresses[addr_idx];
           crypto::scalar_t amount_blinding_mask{}, asset_id_blinding_mask{};
-          return currency::decode_output_data(zo, derivation, i, decoded_out.amount, decoded_out.asset_id, amount_blinding_mask, asset_id_blinding_mask, decoded_out.payment_id);
+          return currency::decode_output_data(zo, derivation, out_idx, decoded_out.amount, decoded_out.asset_id, amount_blinding_mask, asset_id_blinding_mask, decoded_out.payment_id);
         VARIANT_CASE_CONST(tx_out_gateway, gwo)
           if (addr_v.type() != typeid(gateway_address_id_type))
             return false;
           auto& decoded_out = res.decoded_outputs.emplace_back();
-          decoded_out.out_index = i;
-          decoded_out.address = req.outputs_addresses[i];
-          return currency::decode_output_data(gwo, derivation, i, decoded_out.payment_id);
+          decoded_out.out_index = out_idx;
+          decoded_out.address = req.outputs_addresses[addr_idx];
+          return currency::decode_output_data(gwo, derivation, out_idx, decoded_out.payment_id);
         VARIANT_CASE_OTHER()
           unknown_output_type = true;
           return false;
@@ -1474,7 +1474,7 @@ namespace currency
 
         const tx_out_v& out_v = tx.vout[i];
         bool unknown_output_type = false;
-        bool r = decode_output(addr_v, out_v, i, derivation, unknown_output_type);
+        bool r = decode_output(addr_v, out_v, i, i, derivation, unknown_output_type);
         LOCAL_CHECK_INT_ERR(!unknown_output_type, (std::string("unknown output type: ") + out_v.type().name()));
         LOCAL_CHECK(r, "output #" + epee::string_tools::num_to_string_fast(i) + ": cannot be decoded");
       }
@@ -1505,9 +1505,9 @@ namespace currency
         bool decoded = false;
         for(size_t out_idx = 0; out_idx < tx.vout.size(); ++out_idx)
         {
-          const tx_out_v& out_v = tx.vout[i];
+          const tx_out_v& out_v = tx.vout[out_idx];
           bool unknown_output_type = false;
-          bool decoded_using_this_out = decode_output(addr_v, out_v, i, derivation, unknown_output_type);
+          bool decoded_using_this_out = decode_output(addr_v, out_v, i, out_idx, derivation, unknown_output_type);
           LOCAL_CHECK_INT_ERR(!unknown_output_type, (std::string("unknown output type: ") + out_v.type().name()));
           if (!decoded_using_this_out)
           {
