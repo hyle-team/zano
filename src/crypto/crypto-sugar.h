@@ -1302,6 +1302,14 @@ namespace crypto
     // h - hash to crypto::hash [0..2^256-1], no reduce
     //
 
+    static hash h(const char(&str32)[32], const crypto::hash& h)
+    {
+      hs_t hs_calculator(3);
+      hs_calculator.add_32_chars(str32);
+      hs_calculator.add_hash(h);
+      return hs_calculator.calc_hash_no_reduce();
+    }
+
     static hash h(const char(&str32)[32], const crypto::hash& h, const uint64_t i)
     {
       hs_t hs_calculator(3);
