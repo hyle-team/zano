@@ -1139,6 +1139,7 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY_HF(wallet_rpc_gateway_illegal_asset_id, "6-*");
     GENERATE_AND_PLAY_HF(wallet_rpc_gateway_overspend, "6-*");
     GENERATE_AND_PLAY_HF(wallet_rpc_gateway_service_entries, "6-*");
+    GENERATE_AND_PLAY_HF(wallet_rpc_gateway_history_after_outgoing, "6-*");
     GENERATE_AND_PLAY_HF(wallet_rpc_gateway_reorg_spend, "6-*");
     GENERATE_AND_PLAY_HF(wallet_rpc_gateway_reorg_receive, "6-*");
     GENERATE_AND_PLAY_HF(wallet_rpc_gateway_owner_change_altchain, "6-*");

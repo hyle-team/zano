@@ -128,6 +128,13 @@ struct wallet_rpc_gateway_service_entries : public wallet_test
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };
 
+struct wallet_rpc_gateway_history_after_outgoing : public wallet_test
+{
+  wallet_rpc_gateway_history_after_outgoing();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};
+
 struct wallet_rpc_gateway_reorg_spend : public wallet_test
 {
   wallet_rpc_gateway_reorg_spend();
