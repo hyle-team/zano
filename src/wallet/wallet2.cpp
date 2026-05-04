@@ -3013,7 +3013,25 @@ bool wallet2::reset_all()
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::store_keys(std::string& buff, const std::string& password, wallet2::keys_file_data& keys_file_data, bool store_as_watch_only /* = false */)
+namespace
+{
+  std::string derive_wallet_password_stretched(const std::string& password, const tools::wallet2::keys_file_data& kf_data)
+  {
+    if (kf_data.kdf_algo == WALLET_KDF_ALGO_NONE)
+      return password;
+    CHECK_AND_ASSERT_THROW_MES(kf_data.kdf_algo == WALLET_KDF_ALGO_ROMIX_KECCAK, "unsupported wallet KDF algo: " << (int)kf_data.kdf_algo);
+    CHECK_AND_ASSERT_THROW_MES(kf_data.kdf_salt.size() == WALLET_KDF_SALT_SIZE, "unexpected wallet KDF salt size: " << kf_data.kdf_salt.size());
+
+    uint8_t stretched[32];
+    crypto::derive_key_romix_keccak(CRYPTO_HDS_WALLET_KDF_ROMIX, password.data(), password.size(),
+      kf_data.kdf_salt.data(), kf_data.kdf_salt.size(), kf_data.kdf_N_log2, kf_data.kdf_phase2_log2_reduction, stretched);
+    std::string result(reinterpret_cast<const char*>(stretched), sizeof(stretched));
+    memset(stretched, 0, sizeof(stretched));
+    return result;
+  }
+}
+//----------------------------------------------------------------------------------------------------
+bool wallet2::store_keys(std::string& buff, const std::string& password, wallet2::keys_file_data& keys_file_data, bool store_as_watch_only /* = false */, std::string* out_body_password /* = nullptr */)
 {
   currency::account_base acc = m_account;
   if (store_as_watch_only)
@@ -3023,17 +3041,27 @@ bool wallet2::store_keys(std::string& buff, const std::string& password, wallet2
   bool r = epee::serialization::store_t_to_binary(acc, account_data);
   WLT_CHECK_AND_ASSERT_MES(r, false, "failed to serialize wallet keys");
 
-  
+  keys_file_data.kdf_algo = WALLET_KDF_ALGO_ROMIX_KECCAK;
+  keys_file_data.kdf_N_log2 = WALLET_KDF_ROMIX_N_LOG2;
+  keys_file_data.kdf_phase2_log2_reduction = WALLET_KDF_ROMIX_PHASE2_LOG2_REDUCTION;
+  keys_file_data.kdf_salt.resize(WALLET_KDF_SALT_SIZE);
+  crypto::generate_random_bytes(keys_file_data.kdf_salt.size(), keys_file_data.kdf_salt.data());
+
+  // memory-hard stretch
+  const std::string stretched = derive_wallet_password_stretched(password, keys_file_data);
 
   crypto::chacha_key key;
-  crypto::chacha_generate_key_and_iv(CRYPTO_HDS_CHACHA_WALLET_HEADER, password.data(), password.size(), 0, key);
+  crypto::chacha_generate_key_and_iv(CRYPTO_HDS_CHACHA_WALLET_HEADER, stretched.data(), stretched.size(), 0, key);
   std::string cipher;
   cipher.resize(account_data.size());
-  keys_file_data.iv = crypto::rand<crypto::chacha_iv>(); 
+  keys_file_data.iv = crypto::rand<crypto::chacha_iv>();
   crypto::chacha20(account_data.data(), account_data.size(), key, keys_file_data.iv, &cipher[0]);
   keys_file_data.account_data = cipher;
 
   r = ::serialization::dump_binary(keys_file_data, buff);
+
+  if (out_body_password)
+    *out_body_password = stretched;
 
   return true;
 }
@@ -3134,7 +3162,7 @@ bool wallet2::prepare_file_names(const std::wstring& file_path)
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::load_keys(const std::string& buff, const std::string& password, uint64_t file_signature, keys_file_data& kf_data)
+void wallet2::load_keys(const std::string& buff, const std::string& password, uint64_t file_signature, keys_file_data& kf_data, std::string* out_body_password)
 {
   bool r = false;
   if (file_signature == WALLET_FILE_SIGNATURE_OLD)
@@ -3149,7 +3177,8 @@ void wallet2::load_keys(const std::string& buff, const std::string& password, ui
   }
   THROW_IF_TRUE_WALLET_EX(!r, error::wallet_internal_error, "internal error: failed to deserialize");
   std::string account_data;
-    
+  std::string body_password = password;
+
   if (kf_data.version <= 1)
   {
     crypto::chacha_key key;
@@ -3157,11 +3186,20 @@ void wallet2::load_keys(const std::string& buff, const std::string& password, ui
     account_data.resize(kf_data.account_data.size());
     crypto::chacha8(kf_data.account_data.data(), kf_data.account_data.size(), key, kf_data.iv, &account_data[0]);
   }
-  else
+  else if (kf_data.version == 2)
   {
-    //version 2
+    //legacy version 2
     crypto::chacha_key key;
     crypto::chacha_generate_key_and_iv(CRYPTO_HDS_CHACHA_WALLET_HEADER, password.data(), password.size(), 0, key);
+    account_data.resize(kf_data.account_data.size());
+    crypto::chacha20(kf_data.account_data.data(), kf_data.account_data.size(), key, kf_data.iv, &account_data[0]);
+  }
+  else
+  {
+    // version 3: ROMix-like Keccak password stretching drives the existing chacha KDF
+    body_password = derive_wallet_password_stretched(password, kf_data);
+    crypto::chacha_key key;
+    crypto::chacha_generate_key_and_iv(CRYPTO_HDS_CHACHA_WALLET_HEADER, body_password.data(), body_password.size(), 0, key);
     account_data.resize(kf_data.account_data.size());
     crypto::chacha20(kf_data.account_data.data(), kf_data.account_data.size(), key, kf_data.iv, &account_data[0]);
   }
@@ -3178,6 +3216,8 @@ void wallet2::load_keys(const std::string& buff, const std::string& password, ui
     WLT_LOG_L0("Wrong password for wallet " << string_encoding::convert_to_ansii(m_wallet_file));
     tools::error::throw_wallet_ex<error::invalid_password>(std::string(__FILE__ ":" STRINGIZE(__LINE__)));
   }
+  if (out_body_password)
+    *out_body_password = body_password;
   init_log_prefix();
 }
 //----------------------------------------------------------------------------------------------------
@@ -3300,7 +3340,8 @@ void wallet2::load(const std::wstring& wallet_, const std::string& password, boo
   keys_buff.resize(wbh.m_cb_keys);
   data_file.read((char*)keys_buff.data(), wbh.m_cb_keys);
   wallet2::keys_file_data kf_data = AUTO_VAL_INIT(kf_data);
-  load_keys(keys_buff, password, wbh.m_signature, kf_data);
+  std::string body_password;
+  load_keys(keys_buff, password, wbh.m_signature, kf_data, &body_password);
 
   bool need_to_resync = false;
   if (wbh.m_ver == WALLET_FILE_BINARY_HEADER_VERSION_INITAL)
@@ -3326,6 +3367,15 @@ void wallet2::load(const std::wstring& wallet_, const std::string& password, boo
     in.push(data_file);
     need_to_resync = !tools::portable_unserialize_obj_from_stream(*this, in);
     WLT_LOG_L1("Detected format: WALLET_FILE_BINARY_HEADER_VERSION_3 (need_to_resync=" << need_to_resync << ")");
+  }
+  else if (wbh.m_ver == WALLET_FILE_BINARY_HEADER_VERSION_4)
+  {
+    tools::encrypt_chacha20_in_filter decrypt_filter(body_password, kf_data.iv, CRYPTO_HDS_CHACHA_WALLET_BODY);
+    boost::iostreams::filtering_istream in;
+    in.push(decrypt_filter);
+    in.push(data_file);
+    need_to_resync = !tools::portable_unserialize_obj_from_stream(*this, in);
+    WLT_LOG_L1("Detected format: WALLET_FILE_BINARY_HEADER_VERSION_4 (need_to_resync=" << need_to_resync << ")");
   }
   else
   {
@@ -3379,8 +3429,9 @@ void wallet2::store(const std::wstring& path_to_save, const std::string& passwor
 
   //prepare data
   std::string keys_buff;
+  std::string body_password;
   wallet2::keys_file_data keys_file_data = AUTO_VAL_INIT(keys_file_data);
-  bool r = store_keys(keys_buff, password, keys_file_data, m_watch_only);
+  bool r = store_keys(keys_buff, password, keys_file_data, m_watch_only, &body_password);
   WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(r, "failed to store_keys for wallet " << ascii_path_to_save);
 
   //store data
@@ -3388,7 +3439,7 @@ void wallet2::store(const std::wstring& path_to_save, const std::string& passwor
   wbh.m_signature = WALLET_FILE_SIGNATURE_V2;
   wbh.m_cb_keys = keys_buff.size();
   //@#@ change it to proper
-  wbh.m_ver = WALLET_FILE_BINARY_HEADER_VERSION_3;
+  wbh.m_ver = WALLET_FILE_BINARY_HEADER_VERSION_4;
   std::string header_buff((const char*)&wbh, sizeof(wbh));
 
   uint64_t ts = m_core_runtime_config.get_core_time();
@@ -3404,7 +3455,7 @@ void wallet2::store(const std::wstring& path_to_save, const std::string& passwor
 
   WLT_LOG_L0("Storing to temporary file " << tmp_file_path.string() << " ...");
   //creating encryption stream
-  tools::encrypt_chacha20_out_filter decrypt_filter(m_password, keys_file_data.iv, CRYPTO_HDS_CHACHA_WALLET_BODY);
+  tools::encrypt_chacha20_out_filter decrypt_filter(body_password, keys_file_data.iv, CRYPTO_HDS_CHACHA_WALLET_BODY);
   boost::iostreams::filtering_ostream out;
   out.push(decrypt_filter);
   out.push(data_file);

@@ -13,6 +13,7 @@
 
 #if defined(__cplusplus)
 #include <memory.h>
+#include <vector>
 namespace crypto
 {
   // all C function share the same space of names regardless of 'namespace', but here we put it into crypto just for convenience -- sowle
@@ -115,6 +116,72 @@ namespace crypto
   {
     static_assert(std::is_trivially_copyable_v<T>, "Type must be trivially copyable (POD)");
     chacha20(&pod_object, sizeof pod_object, key, iv, &pod_object);
+  }
+
+  // ROMix-Keccak memory-hard password stretching built purely on Keccak-256
+  inline void derive_key_romix_keccak(const char (&hdss)[32], const void* password_data, size_t password_data_size,
+    const void* salt_data, size_t salt_data_size, uint8_t N_log2, uint8_t phase2_log2_reduction, uint8_t (&out_stretched)[32])
+  {
+    if (N_log2 < 10)
+      N_log2 = 10; // 32kb ram min
+    if (N_log2 > 30)
+      N_log2 = 30; // 32gb ram max
+    const uint64_t N = (uint64_t)1 << N_log2;
+    const uint64_t mask = N - 1;
+
+    if (phase2_log2_reduction >= N_log2)
+      phase2_log2_reduction = (uint8_t)(N_log2 - 1);
+    const uint64_t phase2_iters = N >> phase2_log2_reduction;
+
+    // phase 1
+    std::vector<uint8_t> V(N * 32);
+    {
+      std::string seed; // [hdss 32B][salt 16B][password ?B]
+      seed.reserve(32 + salt_data_size + password_data_size);
+      seed.append(hdss, 32);
+      if (salt_data_size)
+        seed.append(reinterpret_cast<const char*>(salt_data), salt_data_size);
+      if (password_data_size)
+        seed.append(reinterpret_cast<const char*>(password_data), password_data_size);
+      keccak(reinterpret_cast<const uint8_t*>(seed.data()), (int)seed.size(), V.data(), 32);
+      if (!seed.empty())
+        memset(const_cast<char*>(seed.data()), 0, seed.size());
+    }
+    
+    
+    uint8_t block_in[40]; // 32 + i(8) = 40
+    for (uint64_t i = 1; i < N; ++i)
+    {
+      memcpy(block_in, V.data() + (i - 1) * 32, 32);
+      for (int b = 0; b < 8; ++b)
+        block_in[32 + b] = (uint8_t)(i >> (8 * b));
+      keccak(block_in, 40, V.data() + i * 32, 32);
+    }
+
+    // phase 2 - data dependent random walk the read idx depends on the current state X, so V cannot be streamed
+    uint8_t X[32];
+    memcpy(X, V.data() + (N - 1) * 32, 32);
+    uint8_t mix[40];
+    for (uint64_t j = 0; j < phase2_iters; ++j)
+    {
+      uint64_t idx_raw = 0;
+      for (int b = 0; b < 8; ++b)
+        idx_raw |= (uint64_t)X[b] << (8 * b);
+      const uint64_t idx = idx_raw & mask;
+      const uint8_t* Vi = V.data() + idx * 32;
+      for (int k = 0; k < 32; ++k)
+        mix[k] = X[k] ^ Vi[k];
+      for (int b = 0; b < 8; ++b)
+        mix[32 + b] = (uint8_t)(j >> (8 * b));
+      keccak(mix, 40, X, 32);
+    }
+
+    memcpy(out_stretched, X, 32);
+
+    // wipe buffs
+    memset(V.data(), 0, V.size());
+    memset(X, 0, sizeof(X));
+    memset(mix, 0, sizeof(mix));
   }
 
 
