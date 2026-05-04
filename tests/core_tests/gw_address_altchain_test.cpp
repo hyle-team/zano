@@ -5,6 +5,7 @@
 #include "chaingen.h"
 #include "gw_address_altchain_test.h"
 #include "chaingen_helpers.h"
+#include "currency_core/crypto_config.h"
 
 using namespace currency;
 
@@ -21,7 +22,7 @@ using namespace currency;
 
 static bool sign_gw_inputs(transaction& tx, const crypto::public_key& gw_view_pub, const keypair& gw_spend_kp)
 {
-  crypto::hash tx_hash_for_signing = get_transaction_hash(tx);
+  crypto::hash tx_id = get_transaction_hash(tx);
   for (size_t i = 0; i < tx.signatures.size(); ++i)
   {
     auto& sig = tx.signatures[i];
@@ -31,10 +32,14 @@ static bool sign_gw_inputs(transaction& tx, const crypto::public_key& gw_view_pu
     CHECKED_GET_SPECIFIC_VARIANT(in_v, const txin_gateway, in_gw, false);
     if (in_gw.gateway_addr != gw_view_pub)
       continue;
+    // domain-separated hash for gateway input signature
+    crypto::hash tx_hash_for_input_sig = currency::prepare_prefix_hash_for_sign(tx, i, tx_id);
+    CHECK_AND_ASSERT_MES(tx_hash_for_input_sig != currency::null_hash, false, "prepare_prefix_hash_for_sign failed");
+    crypto::hash hash_to_sign = crypto::hash_helper_t::h(CRYPTO_HDS_GW_INPUT_SIGNATURE, tx_hash_for_input_sig, 0);
     gateway_sig& gws = boost::get<gateway_sig>(sig);
     CHECKED_GET_SPECIFIC_VARIANT(gws.s, crypto::generic_schnorr_sig_s, gsss, false);
     crypto::generic_schnorr_sig& gss = static_cast<crypto::generic_schnorr_sig&>(gsss);
-    CHECK_AND_ASSERT_TRUE(crypto::generate_schnorr_sig<crypto::gt_G>(tx_hash_for_signing, crypto::point_t(gw_spend_kp.pub), crypto::scalar_t(gw_spend_kp.sec), gss));
+    CHECK_AND_ASSERT_TRUE(crypto::generate_schnorr_sig<crypto::gt_G>(hash_to_sign, crypto::point_t(gw_spend_kp.pub), crypto::scalar_t(gw_spend_kp.sec), gss));
   }
   return true;
 }
@@ -539,12 +544,13 @@ bool gw_addr_altchain_owner_change::generate(std::vector<test_event_entry>& even
     r = construct_tx(alice_acc.get_keys(), sources, dests, std::vector<extra_v>({ gwdo_upd }), empty_attachment, tx_c_update, tx_version, tx_hardfork_id, tx_key, 0);
     CHECK_AND_ASSERT_MES(r, false, "construct_tx for owner change failed");
 
-    // add ownership proof signed by current owner
+    // add ownership proof signed by current owner over the domain-separated hash
     gateway_address_ownership_proof gaoop{};
     crypto::hash tx_hash = get_transaction_hash(tx_c_update);
+    crypto::hash hash_to_sign_ownership = crypto::hash_helper_t::h(CRYPTO_HDS_GW_CHANGE_OWNER_SIGNATURE, tx_hash, 0);
     crypto::generic_schnorr_sig_s gsss{};
     crypto::generic_schnorr_sig& gss = static_cast<crypto::generic_schnorr_sig&>(gsss);
-    CHECK_AND_ASSERT_TRUE(crypto::generate_schnorr_sig<crypto::gt_G>(tx_hash, crypto::point_t(m_gw_addr_spend.pub), crypto::scalar_t(m_gw_addr_spend.sec), gss));
+    CHECK_AND_ASSERT_TRUE(crypto::generate_schnorr_sig<crypto::gt_G>(hash_to_sign_ownership, crypto::point_t(m_gw_addr_spend.pub), crypto::scalar_t(m_gw_addr_spend.sec), gss));
     gaoop.sign = gsss;
     tx_c_update.proofs.push_back(gaoop);
 

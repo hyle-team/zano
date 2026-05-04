@@ -2014,13 +2014,13 @@ bool wallet_rpc_gateway_address::c1(currency::core& c, size_t ev_index, const st
   currency::COMMAND_RPC_GATEWAY_SIGN_TRANSFER::request gw_sign_transfer_req = {};
   currency::COMMAND_RPC_GATEWAY_SIGN_TRANSFER::response gw_sign_transfer_resp = {}; 
 
-  //TODO: gw_sign_transfer_req.opt_custom_schnorr_signature = 
+  //TODO: gw_sign_transfer_req.opt_custom_schnorr_signature =
   crypto::generic_schnorr_sig_s sig{};
   r = crypto::generate_schnorr_sig(gw_create_transfer_resp.tx_hash_to_sign, gw_addr_secret_key, sig);
   CHECK_AND_ASSERT_MES(r, false, "failed to call generate_schnorr_sig");
   gw_sign_transfer_req.opt_custom_schnorr_signature = sig;
   gw_sign_transfer_req.tx_blob = gw_create_transfer_resp.tx_blob;
-  gw_sign_transfer_req.tx_hash_to_sign = gw_create_transfer_resp.tx_hash_to_sign;
+  gw_sign_transfer_req.tx_id = gw_create_transfer_resp.tx_id;
   r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_sign_transfer", gw_sign_transfer_req, gw_sign_transfer_resp);
   CHECK_AND_ASSERT_MES(r, false, "failed to call");
 
@@ -2247,7 +2247,7 @@ bool wallet_rpc_gateway_signatures::c1(currency::core& c, size_t ev_index, const
   currency::COMMAND_RPC_GATEWAY_SIGN_TRANSFER::response eth_sign_resp = {};
   eth_sign_req.opt_ecdsa_signature = eth_sig;
   eth_sign_req.tx_blob = eth_gw_create_resp.tx_blob;
-  eth_sign_req.tx_hash_to_sign = eth_gw_create_resp.tx_hash_to_sign;
+  eth_sign_req.tx_id = eth_gw_create_resp.tx_id;
   r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_sign_transfer", eth_sign_req, eth_sign_resp);
   CHECK_AND_ASSERT_MES(r, false, "gateway_sign_transfer (ETH) failed");
 
@@ -2347,7 +2347,7 @@ bool wallet_rpc_gateway_signatures::c1(currency::core& c, size_t ev_index, const
   currency::COMMAND_RPC_GATEWAY_SIGN_TRANSFER::response eddsa_sign_resp = {};
   eddsa_sign_req.opt_eddsa_signature = eddsa_sig;
   eddsa_sign_req.tx_blob = eddsa_gw_create_resp.tx_blob;
-  eddsa_sign_req.tx_hash_to_sign = eddsa_gw_create_resp.tx_hash_to_sign;
+  eddsa_sign_req.tx_id = eddsa_gw_create_resp.tx_id;
   r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_sign_transfer", eddsa_sign_req, eddsa_sign_resp);
   CHECK_AND_ASSERT_MES(r, false, "gateway_sign_transfer (EdDSA) failed");
 
@@ -2842,7 +2842,7 @@ bool wallet_rpc_gateway_service_entries::c1(currency::core& c, size_t ev_index, 
   currency::COMMAND_RPC_GATEWAY_SIGN_TRANSFER::response sign_resp = {};
   sign_req.opt_ecdsa_signature = eth_sig;
   sign_req.tx_blob = ct_resp.tx_blob;
-  sign_req.tx_hash_to_sign = ct_resp.tx_hash_to_sign;
+  sign_req.tx_id = ct_resp.tx_id;
   r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_sign_transfer", sign_req, sign_resp);
   CHECK_AND_ASSERT_MES(r, false, "gateway_sign_transfer failed");
 
@@ -3002,7 +3002,7 @@ bool wallet_rpc_gateway_reorg_spend::c1(currency::core& c, size_t ev_index, cons
   currency::COMMAND_RPC_GATEWAY_SIGN_TRANSFER::response sign_resp = {};
   sign_req.opt_ecdsa_signature = eth_sig;
   sign_req.tx_blob = ct_resp.tx_blob;
-  sign_req.tx_hash_to_sign = ct_resp.tx_hash_to_sign;
+  sign_req.tx_id = ct_resp.tx_id;
   r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_sign_transfer", sign_req, sign_resp);
   CHECK_AND_ASSERT_MES(r, false, "gateway_sign_transfer failed");
 
@@ -3135,7 +3135,7 @@ bool wallet_rpc_gateway_reorg_receive::c1(currency::core& c, size_t ev_index, co
 //
 // GW address created and funded in chain A (common)
 // Chain B: spend with original owner
-// Chain C: change owner via gateway_create_owner_change/gateway_sign_owner_change API, then spend with new owner
+// Chain C: change owner via gateway_create_owner_change/gateway_submit_owner_change API, then spend with new owner
 // Multi-switch B<->C checking balances and owner validity
 //   C main (owner changed, spend with new owner)
 //   -> B main (old owner, spend with old owner)
@@ -3284,7 +3284,7 @@ bool wallet_rpc_gateway_owner_change_altchain::c1(currency::core& c, size_t ev_i
     currency::COMMAND_RPC_GATEWAY_SIGN_TRANSFER::response st_resp = {};
     st_req.opt_custom_schnorr_signature = sig;
     st_req.tx_blob = ct_resp.tx_blob;
-    st_req.tx_hash_to_sign = ct_resp.tx_hash_to_sign;
+    st_req.tx_id = ct_resp.tx_id;
     ok = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_sign_transfer", st_req, st_resp);
     CHECK_AND_ASSERT_MES(ok, false, "gateway_sign_transfer failed");
 
@@ -3302,17 +3302,22 @@ bool wallet_rpc_gateway_owner_change_altchain::c1(currency::core& c, size_t ev_i
     bool ok = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_create_owner_change", oc_req, oc_resp);
     CHECK_AND_ASSERT_MES(ok, false, "gateway_create_owner_change failed");
 
-    crypto::generic_schnorr_sig_s sig{};
-    ok = crypto::generate_schnorr_sig(oc_resp.tx_hash_to_sign, current_owner_sec, sig);
-    CHECK_AND_ASSERT_MES(ok, false, "generate_schnorr_sig for owner change failed");
+    crypto::generic_schnorr_sig_s transfer_sig{};
+    ok = crypto::generate_schnorr_sig(oc_resp.hash_to_sign_transfer, current_owner_sec, transfer_sig);
+    CHECK_AND_ASSERT_MES(ok, false, "generate_schnorr_sig (transfer) for owner change failed");
 
-    currency::COMMAND_RPC_GATEWAY_SIGN_OWNER_CHANGE::request so_req = {};
-    currency::COMMAND_RPC_GATEWAY_SIGN_OWNER_CHANGE::response so_resp = {};
-    so_req.opt_custom_schnorr_signature = sig;
+    crypto::generic_schnorr_sig_s ownership_sig{};
+    ok = crypto::generate_schnorr_sig(oc_resp.hash_to_sign_ownership, current_owner_sec, ownership_sig);
+    CHECK_AND_ASSERT_MES(ok, false, "generate_schnorr_sig (ownership) for owner change failed");
+
+    currency::COMMAND_RPC_GATEWAY_SUBMIT_OWNER_CHANGE::request so_req = {};
+    currency::COMMAND_RPC_GATEWAY_SUBMIT_OWNER_CHANGE::response so_resp = {};
+    so_req.opt_transfer_custom_schnorr_signature = transfer_sig;
+    so_req.opt_ownership_custom_schnorr_signature = ownership_sig;
     so_req.tx_blob = oc_resp.tx_blob;
-    so_req.tx_hash_to_sign = oc_resp.tx_hash_to_sign;
-    ok = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_sign_owner_change", so_req, so_resp);
-    CHECK_AND_ASSERT_MES(ok, false, "gateway_sign_owner_change failed");
+    so_req.tx_id = oc_resp.tx_id;
+    ok = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_submit_owner_change", so_req, so_resp);
+    CHECK_AND_ASSERT_MES(ok, false, "gateway_submit_owner_change failed");
 
     return deserialize_tx(so_resp.signed_tx_blob, out_tx);
   };

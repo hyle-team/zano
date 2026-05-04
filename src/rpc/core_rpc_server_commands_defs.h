@@ -2281,14 +2281,16 @@ namespace currency
     {
       std::string status;
       std::string status_error;
+      crypto::hash tx_id;
       crypto::hash tx_hash_to_sign;
       std::string tx_blob;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(status)                                          DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
         KV_SERIALIZE(status_error)                                    DOC_DSCR("Error description if the call failed.") DOC_END
-        KV_SERIALIZE_POD_AS_HEX_STRING(tx_hash_to_sign)               DOC_DSCR("Hash of the transaction created for the gateway transfer.") DOC_EXMP("a6e8da986858e6825fce7a192097e6afae4e889cabe853a9c29b964985b23da8") DOC_END
-        KV_SERIALIZE_BLOB_AS_HEX_STRING(tx_blob)                    DOC_DSCR("Hex representation of the transaction blob.") DOC_EXMP("0100000001...") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(tx_id)                         DOC_DSCR("Actual hash of the transaction") DOC_EXMP("a6e8da986858e6825fce7a192097e6afae4e889cabe853a9c29b964985b23da8") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(tx_hash_to_sign)               DOC_DSCR("Hash to be signed by the current owner for the gateway input") DOC_EXMP("b1c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef012") DOC_END
+        KV_SERIALIZE_BLOB_AS_HEX_STRING(tx_blob)                      DOC_DSCR("Hex representation of the transaction blob.") DOC_EXMP("0100000001...") DOC_END
       END_KV_SERIALIZE_MAP()
     };
   };
@@ -2299,18 +2301,18 @@ namespace currency
     struct request
     {
       std::string tx_blob;
-      crypto::hash tx_hash_to_sign;
+      crypto::hash tx_id;
 
       std::optional<crypto::eth_signature>          opt_ecdsa_signature;
       std::optional<crypto::eddsa_signature>        opt_eddsa_signature;
       std::optional<crypto::generic_schnorr_sig_s>  opt_custom_schnorr_signature;  //Zano specific generic schnorr signature public key
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE_BLOB_AS_HEX_STRING(tx_blob)    DOC_DSCR("Hex representation of the transaction blob to sign.") DOC_EXMP("0100000001...") DOC_END
-        KV_SERIALIZE_POD_AS_HEX_STRING(tx_hash_to_sign)               DOC_DSCR("Hash of the transaction to sign.") DOC_EXMP("a6e8da986858e6825fce7a192097e6afae4e889cabe853a9c29b964985b23da8") DOC_END
-        KV_SERIALIZE_POD_AS_HEX_STRING(opt_ecdsa_signature)           DOC_DSCR("ECDSA (Ethereum) signature for signing the transaction (hex-encoded).") DOC_EXMP("b1c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123") DOC_END
-        KV_SERIALIZE_POD_AS_HEX_STRING(opt_eddsa_signature)           DOC_DSCR("EdDSA (Solana) signature for signing the transaction (hex-encoded).") DOC_EXMP("dc2a4459e7369633a52b1bf277839a00201009a3efbf3ecb69bea2186c26b58909351fc9ac90b3ecfdfbc7c66431e0303dca179c138ac17ad9bef1177331a704") DOC_END
-        KV_SERIALIZE_POD_AS_HEX_STRING(opt_custom_schnorr_signature)  DOC_DSCR("Custom Schnorr signature for signing the transaction (hex-encoded).") DOC_EXMP("b1c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef01") DOC_END
+        KV_SERIALIZE_BLOB_AS_HEX_STRING(tx_blob)                      DOC_DSCR("Hex representation of the transaction blob to sign.") DOC_EXMP("0100000001...") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(tx_id)                         DOC_DSCR("Actual hash of the transaction.") DOC_EXMP("a6e8da986858e6825fce7a192097e6afae4e889cabe853a9c29b964985b23da8") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(opt_ecdsa_signature)           DOC_DSCR("ECDSA (Ethereum) signature of hash_to_sign by the current owner.") DOC_EXMP("b1c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(opt_eddsa_signature)           DOC_DSCR("EdDSA (Solana) signature of hash_to_sign by the current owner.") DOC_EXMP("dc2a4459e7369633a52b1bf277839a00201009a3efbf3ecb69bea2186c26b58909351fc9ac90b3ecfdfbc7c66431e0303dca179c138ac17ad9bef1177331a704") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(opt_custom_schnorr_signature)  DOC_DSCR("Schnorr signature of hash_to_sign by the current owner.") DOC_EXMP("b1c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef01") DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
@@ -2348,36 +2350,49 @@ namespace currency
     {
       std::string status;
       std::string status_error;
-      crypto::hash tx_hash_to_sign;
+      crypto::hash tx_id;
+      crypto::hash hash_to_sign_transfer;
+      crypto::hash hash_to_sign_ownership;
       std::string tx_blob;
+      crypto::secret_key tx_secret_key;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(status)                               DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
-        KV_SERIALIZE(status_error)                         DOC_DSCR("Error description if the call failed.") DOC_END
-        KV_SERIALIZE_POD_AS_HEX_STRING(tx_hash_to_sign)    DOC_DSCR("Hash of the transaction to be signed by the current owner (for both gateway input and ownership proof).") DOC_EXMP("a6e8da986858e6825fce7a192097e6afae4e889cabe853a9c29b964985b23da8") DOC_END
-        KV_SERIALIZE_BLOB_AS_HEX_STRING(tx_blob)           DOC_DSCR("Hex representation of the unsigned transaction blob.") DOC_EXMP("0100000001...") DOC_END
+        KV_SERIALIZE(status)                                    DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
+        KV_SERIALIZE(status_error)                              DOC_DSCR("Error description if the call failed.") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(tx_id)                   DOC_DSCR("Actual hash of the transaction (for reference and tx tracking).") DOC_EXMP("a6e8da986858e6825fce7a192097e6afae4e889cabe853a9c29b964985b23da8") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(hash_to_sign_transfer)   DOC_DSCR("Hash to be signed by the current owner for the gateway input, same scheme as regular gateway transfers - equals prepare_prefix_hash_for_sign over the tx.") DOC_EXMP("b1c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef012") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(hash_to_sign_ownership)  DOC_DSCR("Hash to be signed by the current owner for the ownership change proof.") DOC_EXMP("dc2a4459e7369633a52b1bf277839a00201009a3efbf3ecb69bea2186c26b589") DOC_END
+        KV_SERIALIZE_BLOB_AS_HEX_STRING(tx_blob)                DOC_DSCR("Hex representation of the unsigned transaction blob.") DOC_EXMP("0100000001...") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(tx_secret_key)           DOC_DSCR("Secret key of the transaction.") DOC_EXMP("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcd0f") DOC_END
       END_KV_SERIALIZE_MAP()
     };
   };
 
-  struct COMMAND_RPC_GATEWAY_SIGN_OWNER_CHANGE
+  struct COMMAND_RPC_GATEWAY_SUBMIT_OWNER_CHANGE
   {
-    DOC_COMMAND("Signs a gateway owner change transaction and broadcasts it to the network. A single signature from the current owner is used for both the gateway input (fee) and the ownership proof, since both are signed over the same tx hash by the same key.");
+    DOC_COMMAND("Submits a gateway owner change transaction: assembles the prepared tx blob with the supplied signatures and broadcasts it to the network. Two domain-separated signatures from the current owner must be supplied: one for the gateway input (fee) and one for the ownership change proof.");
     struct request
     {
       std::string tx_blob;
-      crypto::hash tx_hash_to_sign;
+      crypto::hash tx_id;
 
-      std::optional<crypto::eth_signature>          opt_ecdsa_signature;
-      std::optional<crypto::eddsa_signature>        opt_eddsa_signature;
-      std::optional<crypto::generic_schnorr_sig_s>  opt_custom_schnorr_signature;
+      std::optional<crypto::eth_signature>          opt_transfer_ecdsa_signature;
+      std::optional<crypto::eddsa_signature>        opt_transfer_eddsa_signature;
+      std::optional<crypto::generic_schnorr_sig_s>  opt_transfer_custom_schnorr_signature;
+
+      std::optional<crypto::eth_signature>          opt_ownership_ecdsa_signature;
+      std::optional<crypto::eddsa_signature>        opt_ownership_eddsa_signature;
+      std::optional<crypto::generic_schnorr_sig_s>  opt_ownership_custom_schnorr_signature;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE_BLOB_AS_HEX_STRING(tx_blob)                          DOC_DSCR("Hex representation of the unsigned transaction blob from gateway_create_owner_change.") DOC_EXMP("0100000001...") DOC_END
-        KV_SERIALIZE_POD_AS_HEX_STRING(tx_hash_to_sign)                   DOC_DSCR("Hash of the transaction to sign.") DOC_EXMP("a6e8da986858e6825fce7a192097e6afae4e889cabe853a9c29b964985b23da8") DOC_END
-        KV_SERIALIZE_POD_AS_HEX_STRING(opt_ecdsa_signature)               DOC_DSCR("ECDSA (Ethereum) signature of tx_hash by the current owner.") DOC_EXMP("b1c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123") DOC_END
-        KV_SERIALIZE_POD_AS_HEX_STRING(opt_eddsa_signature)               DOC_DSCR("EdDSA (Solana) signature of tx_hash by the current owner.") DOC_EXMP("dc2a4459e7369633a52b1bf277839a00201009a3efbf3ecb69bea2186c26b58909351fc9ac90b3ecfdfbc7c66431e0303dca179c138ac17ad9bef1177331a704") DOC_END
-        KV_SERIALIZE_POD_AS_HEX_STRING(opt_custom_schnorr_signature)      DOC_DSCR("Schnorr signature of tx_hash by the current owner.") DOC_EXMP("b1c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef01") DOC_END
+        KV_SERIALIZE_BLOB_AS_HEX_STRING(tx_blob)                                    DOC_DSCR("Hex representation of the unsigned transaction blob from gateway_create_owner_change.") DOC_EXMP("0100000001...") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(tx_id)                                       DOC_DSCR("Actual hash of the transaction.") DOC_EXMP("a6e8da986858e6825fce7a192097e6afae4e889cabe853a9c29b964985b23da8") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(opt_transfer_ecdsa_signature)                DOC_DSCR("ECDSA (Ethereum) signature of hash_to_sign_transfer by the current owner.") DOC_EXMP("b1c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(opt_transfer_eddsa_signature)                DOC_DSCR("EdDSA (Solana) signature of hash_to_sign_transfer by the current owner.") DOC_EXMP("dc2a4459e7369633a52b1bf277839a00201009a3efbf3ecb69bea2186c26b58909351fc9ac90b3ecfdfbc7c66431e0303dca179c138ac17ad9bef1177331a704") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(opt_transfer_custom_schnorr_signature)       DOC_DSCR("Schnorr signature of hash_to_sign_transfer by the current owner.") DOC_EXMP("b1c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef01") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(opt_ownership_ecdsa_signature)               DOC_DSCR("ECDSA (Ethereum) signature of hash_to_sign_ownership by the current owner.") DOC_EXMP("b1c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(opt_ownership_eddsa_signature)               DOC_DSCR("EdDSA (Solana) signature of hash_to_sign_ownership by the current owner.") DOC_EXMP("dc2a4459e7369633a52b1bf277839a00201009a3efbf3ecb69bea2186c26b58909351fc9ac90b3ecfdfbc7c66431e0303dca179c138ac17ad9bef1177331a704") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(opt_ownership_custom_schnorr_signature)      DOC_DSCR("Schnorr signature of hash_to_sign_ownership by the current owner.") DOC_EXMP("b1c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef01") DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
