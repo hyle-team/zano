@@ -5144,22 +5144,23 @@ bool blockchain_storage::validate_gw_address_ownership(const transaction& tx, co
   CHECK_AND_ASSERT_MES(gad.info_history.size(), false, "Ownership validation failed: gateway_address_info_history is empty for gw address " << gao.address_id << " in tx " << tx_id);
 
   const gateway_address_descriptor_base address_desciptor = gad.info_history.back();
+  const crypto::hash hash_to_verify_ownership = crypto::hash_helper_t::h(CRYPTO_HDS_GW_CHANGE_OWNER_SIGNATURE, tx_id, 0);
 
   VARIANT_SWITCH_BEGIN(address_desciptor.owner_key)
   VARIANT_CASE_CONST(crypto::public_key, o)
   {
     CHECK_AND_ASSERT_MES(gaoop.sign.type() == typeid(crypto::generic_schnorr_sig_s), false, "Ownership validation failed: invalid signature type for gw address " << gao.address_id << ", expected: generic_schnorr_sig_s, tx: " << tx_id);
-    r = crypto::verify_schnorr_sig(tx_id, o, boost::get<crypto::generic_schnorr_sig_s>(gaoop.sign));
+    r = crypto::verify_schnorr_sig(hash_to_verify_ownership, o, boost::get<crypto::generic_schnorr_sig_s>(gaoop.sign));
   }
   VARIANT_CASE_CONST(crypto::eth_public_key, u)
   {
     CHECK_AND_ASSERT_MES(gaoop.sign.type() == typeid(crypto::eth_signature), false, "Ownership validation failed: invalid signature type for gw address " << gao.address_id << ", expected: eth_signature, tx: " << tx_id);
-    r = crypto::verify_eth_signature(tx_id, u, boost::get<crypto::eth_signature>(gaoop.sign));
+    r = crypto::verify_eth_signature(hash_to_verify_ownership, u, boost::get<crypto::eth_signature>(gaoop.sign));
   }
   VARIANT_CASE_CONST(crypto::eddsa_public_key, u)
   {
     CHECK_AND_ASSERT_MES(gaoop.sign.type() == typeid(crypto::eddsa_signature), false, "Ownership validation failed: invalid signature type for gw address " << gao.address_id << ", expected: eddsa_signature, tx: " << tx_id);
-    r = crypto::verify_eddsa_signature(tx_id, u, boost::get<crypto::eddsa_signature>(gaoop.sign));
+    r = crypto::verify_eddsa_signature(hash_to_verify_ownership, u, boost::get<crypto::eddsa_signature>(gaoop.sign));
   }
   VARIANT_SWITCH_END();
 
@@ -6489,13 +6490,14 @@ bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, 
   CHECK_AND_ASSERT_MES(gw_entry_ptr->info_history.size(), false, "Gateway input validation failed: gateway address " << gw_in.gateway_addr << " has no info history");
 
   const gateway_owner_key_v& gw_owner_key = gw_entry_ptr->info_history.back().owner_key;
+  const crypto::hash hash_to_verify_gw_input = crypto::hash_helper_t::h(CRYPTO_HDS_GW_INPUT_SIGNATURE, tx_hash_for_signature, 0);
   VARIANT_SWITCH_BEGIN(gw_owner_key);
     VARIANT_CASE_CONST(crypto::public_key, pkey)
     {
       CHECK_AND_ASSERT_MES(sig.s.type() == typeid(crypto::generic_schnorr_sig_s), false, "Unexpected signature type ("<< sig.s.type().name() <<
         ") for gw_in.gateway_addr " << gw_in.gateway_addr << ", expected: generic_schnorr_sig_s, tx: " << tx_prefix_hash);
       const crypto::generic_schnorr_sig_s& signature = boost::get<crypto::generic_schnorr_sig_s>(sig.s);
-      bool r = crypto::verify_schnorr_sig(tx_hash_for_signature, pkey, signature);
+      bool r = crypto::verify_schnorr_sig(hash_to_verify_gw_input, pkey, signature);
       CHECK_AND_ASSERT_MES(r, false, "verify_schnorr_sig failed");
     }
     VARIANT_CASE_CONST(crypto::eth_public_key, pkey)
@@ -6503,7 +6505,7 @@ bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, 
       CHECK_AND_ASSERT_MES(sig.s.type() == typeid(crypto::eth_signature), false, "Unexpected signature type (" << sig.s.type().name() <<
         ") for gw_in.gateway_addr " << gw_in.gateway_addr << ", eth_signature, tx: " << tx_prefix_hash);
       const crypto::eth_signature& signature = boost::get<crypto::eth_signature>(sig.s);
-      bool r = crypto::verify_eth_signature(tx_hash_for_signature, pkey, signature);
+      bool r = crypto::verify_eth_signature(hash_to_verify_gw_input, pkey, signature);
       CHECK_AND_ASSERT_MES(r, false, "verify_eth_signature failed");
     }
     VARIANT_CASE_CONST(crypto::eddsa_public_key, pkey)
@@ -6511,7 +6513,7 @@ bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, 
       CHECK_AND_ASSERT_MES(sig.s.type() == typeid(crypto::eddsa_signature), false, "Unexpected signature type (" << sig.s.type().name() <<
         ") for gw_in.gateway_addr " << gw_in.gateway_addr << ", expected: eddsa_signature, tx: " << tx_prefix_hash);
       const crypto::eddsa_signature& signature = boost::get<crypto::eddsa_signature>(sig.s);
-      bool r = crypto::verify_eddsa_signature(tx_hash_for_signature, pkey, signature);
+      bool r = crypto::verify_eddsa_signature(hash_to_verify_gw_input, pkey, signature);
       CHECK_AND_ASSERT_MES(r, false, "verify_eddsa_signature failed");
     }
     VARIANT_CASE_THROW_ON_OTHER();

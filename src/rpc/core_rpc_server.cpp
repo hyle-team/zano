@@ -11,6 +11,7 @@ using namespace epee;
 #include "common/command_line.h"
 #include "currency_core/currency_format_utils.h"
 #include "currency_core/account.h"
+#include "currency_core/crypto_config.h"
 
 #include "misc_language.h"
 #include "crypto/hash.h"
@@ -883,7 +884,16 @@ namespace currency
     }
 
     res.tx_blob = t_serializable_object_to_blob(ftx.tx);
-    res.tx_hash_to_sign = get_transaction_hash(ftx.tx);
+    res.tx_id = get_transaction_hash(ftx.tx);
+
+    crypto::hash tx_hash_for_input_sig = currency::prepare_prefix_hash_for_sign(ftx.tx, 0, res.tx_id);
+    if (tx_hash_for_input_sig == currency::null_hash)
+    {
+      res.status = API_RETURN_CODE_FAIL;
+      res.status_error = "prepare prefix hash for sign failed";
+      return true;
+    }
+    res.tx_hash_to_sign = crypto::hash_helper_t::h(CRYPTO_HDS_GW_INPUT_SIGNATURE, tx_hash_for_input_sig, 0);
 
     res.status = API_RETURN_CODE_OK;
     return true;
@@ -902,9 +912,9 @@ namespace currency
     }
 
     crypto::hash tx_id = get_transaction_hash(tx);
-    if(tx_id != req.tx_hash_to_sign)
+    if(tx_id != req.tx_id)
     {
-      LOG_ERROR("Transaction hash mismatch in on_gateway_sign_transfer: " << tx_id << "!=" << req.tx_hash_to_sign);
+      LOG_ERROR("Transaction hash mismatch in on_gateway_sign_transfer: " << tx_id << " != " << req.tx_id);
       res.status = API_RETURN_CODE_BAD_ARG;
       res.status_error = "Transaction hash mismatch";
       return true;
@@ -1043,13 +1053,24 @@ namespace currency
     }
 
     res.tx_blob = t_serializable_object_to_blob(ftx.tx);
-    res.tx_hash_to_sign = get_transaction_hash(ftx.tx);
+    res.tx_id = get_transaction_hash(ftx.tx);
+    res.tx_secret_key = ftx.one_time_key;
+
+    crypto::hash tx_hash_for_input_sig = currency::prepare_prefix_hash_for_sign(ftx.tx, 0, res.tx_id);
+    if (tx_hash_for_input_sig == currency::null_hash)
+    {
+      res.status = API_RETURN_CODE_FAIL;
+      res.status_error = "prepare_prefix_hash_for_sign failed";
+      return true;
+    }
+    res.hash_to_sign_transfer  = crypto::hash_helper_t::h(CRYPTO_HDS_GW_INPUT_SIGNATURE, tx_hash_for_input_sig, 0);
+    res.hash_to_sign_ownership = crypto::hash_helper_t::h(CRYPTO_HDS_GW_CHANGE_OWNER_SIGNATURE, res.tx_id, 0);
 
     res.status = API_RETURN_CODE_OK;
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  bool core_rpc_server::on_gateway_sign_owner_change(const COMMAND_RPC_GATEWAY_SIGN_OWNER_CHANGE::request& req, COMMAND_RPC_GATEWAY_SIGN_OWNER_CHANGE::response& res, connection_context& cntx)
+  bool core_rpc_server::on_gateway_submit_owner_change(const COMMAND_RPC_GATEWAY_SUBMIT_OWNER_CHANGE::request& req, COMMAND_RPC_GATEWAY_SUBMIT_OWNER_CHANGE::response& res, connection_context& cntx)
   {
     transaction tx = {};
 
@@ -1062,41 +1083,63 @@ namespace currency
     }
 
     crypto::hash tx_id = get_transaction_hash(tx);
-    if (tx_id != req.tx_hash_to_sign)
+    if (tx_id != req.tx_id)
     {
-      LOG_ERROR("Transaction hash mismatch in on_gateway_sign_owner_change: " << tx_id << " != " << req.tx_hash_to_sign);
+      LOG_ERROR("Transaction hash mismatch in on_gateway_submit_owner_change: " << tx_id << " != " << req.tx_id);
       res.status = API_RETURN_CODE_BAD_ARG;
       res.status_error = "Transaction hash mismatch";
       return true;
     }
 
-    size_t sig_count = 0;
+    size_t transfer_sig_count = 0;
     gateway_signature_v gw_sig;
-    gateway_owner_signature_v ownership_sig;
-    if (req.opt_ecdsa_signature)
+    if (req.opt_transfer_ecdsa_signature)
     {
-      gw_sig = req.opt_ecdsa_signature.value();
-      ownership_sig = req.opt_ecdsa_signature.value();
-      sig_count++;
+      gw_sig = req.opt_transfer_ecdsa_signature.value();
+      transfer_sig_count++;
     }
-    if (req.opt_custom_schnorr_signature)
+    if (req.opt_transfer_custom_schnorr_signature)
     {
-      gw_sig = req.opt_custom_schnorr_signature.value();
-      ownership_sig = req.opt_custom_schnorr_signature.value();
-      sig_count++;
+      gw_sig = req.opt_transfer_custom_schnorr_signature.value();
+      transfer_sig_count++;
     }
-    if (req.opt_eddsa_signature)
+    if (req.opt_transfer_eddsa_signature)
     {
-      gw_sig = req.opt_eddsa_signature.value();
-      ownership_sig = req.opt_eddsa_signature.value();
-      sig_count++;
+      gw_sig = req.opt_transfer_eddsa_signature.value();
+      transfer_sig_count++;
     }
 
-    if (sig_count != 1)
+    if (transfer_sig_count != 1)
     {
-      LOG_ERROR("Expected exactly one signature in on_gateway_sign_owner_change, got: " << sig_count);
+      LOG_ERROR("Expected exactly one transfer signature in on_gateway_submit_owner_change, got: " << transfer_sig_count);
       res.status = API_RETURN_CODE_BAD_ARG;
-      res.status_error = "Expected exactly one signature";
+      res.status_error = "Expected exactly one transfer signature";
+      return true;
+    }
+
+    size_t ownership_sig_count = 0;
+    gateway_owner_signature_v ownership_sig;
+    if (req.opt_ownership_ecdsa_signature)           
+    {
+      ownership_sig = req.opt_ownership_ecdsa_signature.value();
+      ownership_sig_count++;
+    }
+    if (req.opt_ownership_custom_schnorr_signature) 
+    {
+      ownership_sig = req.opt_ownership_custom_schnorr_signature.value();
+      ownership_sig_count++;
+    }
+    if (req.opt_ownership_eddsa_signature)
+    {
+      ownership_sig = req.opt_ownership_eddsa_signature.value();
+      ownership_sig_count++;
+    }
+
+    if (ownership_sig_count != 1)
+    {
+      LOG_ERROR("Expected exactly one ownership signature in on_gateway_submit_owner_change, got: " << ownership_sig_count);
+      res.status = API_RETURN_CODE_BAD_ARG;
+      res.status_error = "Expected exactly one ownership signature";
       return true;
     }
 
@@ -1110,7 +1153,7 @@ namespace currency
       }
       else
       {
-        LOG_ERROR("Unexpected signature type in on_gateway_sign_owner_change");
+        LOG_ERROR("Unexpected signature type in on_gateway_submit_owner_change");
         res.status = API_RETURN_CODE_BAD_ARG;
         res.status_error = "Unexpected signature type in transaction";
         return true;
@@ -1128,14 +1171,14 @@ namespace currency
     tx_verification_context tvc = AUTO_VAL_INIT(tvc);
     if (!m_core.handle_incoming_tx(signed_tx_blob, tvc, false))
     {
-      LOG_ERROR("[on_gateway_sign_owner_change]: Failed to process signed tx");
+      LOG_ERROR("[on_gateway_submit_owner_change]: Failed to process signed tx");
       res.status = API_RETURN_CODE_FAIL;
       res.status_error = "Failed to process signed transaction";
       return true;
     }
     if (tvc.m_verification_failed)
     {
-      LOG_ERROR("[on_gateway_sign_owner_change]: signed tx verification failed");
+      LOG_ERROR("[on_gateway_submit_owner_change]: signed tx verification failed");
       res.status = API_RETURN_CODE_FAIL;
       res.status_error = "Signed transaction verification failed";
       return true;

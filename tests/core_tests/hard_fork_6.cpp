@@ -7,6 +7,7 @@
 #include "wallet/wallet_rpc_server.h"
 #include "chaingen_helpers.h"
 #include "random_helper.h"
+#include "currency_core/crypto_config.h"
 
 using namespace currency;
 
@@ -1298,7 +1299,7 @@ bool hard_fork_6_full_gw_tx_test::generate(std::vector<test_event_entry>& events
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_to_key failed");
 
   // sign gw inputs
-  crypto::hash tx_hash_for_signing = get_transaction_hash(tx_7);
+  crypto::hash tx_id_for_signing = get_transaction_hash(tx_7);
   for(size_t i = 0; i < tx_7.signatures.size(); ++i)
   {
     auto& sig = tx_7.signatures[i];
@@ -1306,13 +1307,16 @@ bool hard_fork_6_full_gw_tx_test::generate(std::vector<test_event_entry>& events
       continue;
     const auto& in_v = tx_7.vin[i];
     CHECKED_GET_SPECIFIC_VARIANT(in_v, const txin_gateway, in_gw, false);
+    crypto::hash tx_hash_for_input_sig = currency::prepare_prefix_hash_for_sign(tx_7, i, tx_id_for_signing);
+    CHECK_AND_ASSERT_MES(tx_hash_for_input_sig != currency::null_hash, false, "prepare_prefix_hash_for_sign failed");
+    crypto::hash hash_to_sign = crypto::hash_helper_t::h(CRYPTO_HDS_GW_INPUT_SIGNATURE, tx_hash_for_input_sig, 0);
     gateway_sig& gws = boost::get<gateway_sig>(sig);
     CHECKED_GET_SPECIFIC_VARIANT(gws.s, crypto::generic_schnorr_sig_s, gsss, false);
     crypto::generic_schnorr_sig& gss = static_cast<crypto::generic_schnorr_sig&>(gsss);
     if (in_gw.gateway_addr == m_gw_addr1_view.pub)
-      CHECK_AND_ASSERT_TRUE(crypto::generate_schnorr_sig<crypto::gt_G>(tx_hash_for_signing, crypto::point_t(m_gw_addr1_spend.pub), crypto::scalar_t(m_gw_addr1_spend.sec), gss));
+      CHECK_AND_ASSERT_TRUE(crypto::generate_schnorr_sig<crypto::gt_G>(hash_to_sign, crypto::point_t(m_gw_addr1_spend.pub), crypto::scalar_t(m_gw_addr1_spend.sec), gss));
     else
-      CHECK_AND_ASSERT_TRUE(crypto::generate_schnorr_sig<crypto::gt_G>(tx_hash_for_signing, crypto::point_t(m_gw_addr2_spend.pub), crypto::scalar_t(m_gw_addr2_spend.sec), gss));
+      CHECK_AND_ASSERT_TRUE(crypto::generate_schnorr_sig<crypto::gt_G>(hash_to_sign, crypto::point_t(m_gw_addr2_spend.pub), crypto::scalar_t(m_gw_addr2_spend.sec), gss));
   }
 
   ADD_CUSTOM_EVENT(events, tx_7);
@@ -1393,7 +1397,7 @@ bool hard_fork_6_full_gw_tx_test::generate(std::vector<test_event_entry>& events
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_to_key failed");
 
   // sign gw inputs
-  tx_hash_for_signing = get_transaction_hash(tx_8);
+  tx_id_for_signing = get_transaction_hash(tx_8);
   for(size_t i = 0; i < tx_8.signatures.size(); ++i)
   {
     auto& sig = tx_8.signatures[i];
@@ -1401,14 +1405,16 @@ bool hard_fork_6_full_gw_tx_test::generate(std::vector<test_event_entry>& events
       continue;
     const auto& in_v = tx_8.vin[i];
     CHECKED_GET_SPECIFIC_VARIANT(in_v, const txin_gateway, in_gw, false);
+    crypto::hash tx_hash_for_input_sig = currency::prepare_prefix_hash_for_sign(tx_8, i, tx_id_for_signing);
+    CHECK_AND_ASSERT_MES(tx_hash_for_input_sig != currency::null_hash, false, "prepare_prefix_hash_for_sign failed");
+    crypto::hash hash_to_sign = crypto::hash_helper_t::h(CRYPTO_HDS_GW_INPUT_SIGNATURE, tx_hash_for_input_sig, 0);
     gateway_sig& gws = boost::get<gateway_sig>(sig);
     CHECKED_GET_SPECIFIC_VARIANT(gws.s, crypto::generic_schnorr_sig_s, gsss, false);
     crypto::generic_schnorr_sig& gss = static_cast<crypto::generic_schnorr_sig&>(gsss);
     if (in_gw.gateway_addr == m_gw_addr1_view.pub)
-      CHECK_AND_ASSERT_TRUE(crypto::generate_schnorr_sig<crypto::gt_G>(tx_hash_for_signing, crypto::point_t(m_gw_addr1_spend.pub), crypto::scalar_t(m_gw_addr1_spend.sec), gss));
+      CHECK_AND_ASSERT_TRUE(crypto::generate_schnorr_sig<crypto::gt_G>(hash_to_sign, crypto::point_t(m_gw_addr1_spend.pub), crypto::scalar_t(m_gw_addr1_spend.sec), gss));
     else
-      CHECK_AND_ASSERT_TRUE(crypto::generate_schnorr_sig<crypto::gt_G>(tx_hash_for_signing, crypto::point_t(m_gw_addr2_spend.pub), crypto::scalar_t(m_gw_addr2_spend.sec), gss));
-
+      CHECK_AND_ASSERT_TRUE(crypto::generate_schnorr_sig<crypto::gt_G>(hash_to_sign, crypto::point_t(m_gw_addr2_spend.pub), crypto::scalar_t(m_gw_addr2_spend.sec), gss));
   }
 
   ADD_CUSTOM_EVENT(events, tx_8);
@@ -1460,7 +1466,7 @@ bool hard_fork_6_full_gw_tx_test::generate(std::vector<test_event_entry>& events
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_to_key failed");
 
   // sign gw inputs
-  tx_hash_for_signing = get_transaction_hash(tx_9);
+  tx_id_for_signing = get_transaction_hash(tx_9);
   for(size_t i = 0; i < tx_9.signatures.size(); ++i)
   {
     auto& sig = tx_9.signatures[i];
@@ -1468,13 +1474,16 @@ bool hard_fork_6_full_gw_tx_test::generate(std::vector<test_event_entry>& events
       continue;
     const auto& in_v = tx_9.vin[i];
     CHECKED_GET_SPECIFIC_VARIANT(in_v, const txin_gateway, in_gw, false);
+    crypto::hash tx_hash_for_input_sig = currency::prepare_prefix_hash_for_sign(tx_9, i, tx_id_for_signing);
+    CHECK_AND_ASSERT_MES(tx_hash_for_input_sig != currency::null_hash, false, "prepare_prefix_hash_for_sign failed");
+    crypto::hash hash_to_sign = crypto::hash_helper_t::h(CRYPTO_HDS_GW_INPUT_SIGNATURE, tx_hash_for_input_sig, 0);
     gateway_sig& gws = boost::get<gateway_sig>(sig);
     CHECKED_GET_SPECIFIC_VARIANT(gws.s, crypto::generic_schnorr_sig_s, gsss, false);
     crypto::generic_schnorr_sig& gss = static_cast<crypto::generic_schnorr_sig&>(gsss);
     if (in_gw.gateway_addr == m_gw_addr1_view.pub)
-      CHECK_AND_ASSERT_TRUE(crypto::generate_schnorr_sig<crypto::gt_G>(tx_hash_for_signing, crypto::point_t(m_gw_addr1_spend.pub), crypto::scalar_t(m_gw_addr1_spend.sec), gss));
+      CHECK_AND_ASSERT_TRUE(crypto::generate_schnorr_sig<crypto::gt_G>(hash_to_sign, crypto::point_t(m_gw_addr1_spend.pub), crypto::scalar_t(m_gw_addr1_spend.sec), gss));
     else
-      CHECK_AND_ASSERT_TRUE(crypto::generate_schnorr_sig<crypto::gt_G>(tx_hash_for_signing, crypto::point_t(m_gw_addr2_spend.pub), crypto::scalar_t(m_gw_addr2_spend.sec), gss));
+      CHECK_AND_ASSERT_TRUE(crypto::generate_schnorr_sig<crypto::gt_G>(hash_to_sign, crypto::point_t(m_gw_addr2_spend.pub), crypto::scalar_t(m_gw_addr2_spend.sec), gss));
 
   }
 
