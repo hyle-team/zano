@@ -1433,7 +1433,7 @@ namespace currency
     LOCAL_CHECK(tx_pub_key != null_pkey && R.from_public_key(tx_pub_key) && R.is_in_main_subgroup(), "unsigned_tx: tx public key is missing or invalid");
     LOCAL_CHECK(tx_pub_key == (crypto::scalar_t(req.tx_secret_key) * crypto::c_point_G).to_public_key(), "tx_secret_key doesn't match the transaction public key");
 
-    auto& decode_output = [&req, &res](const address_v& addr_v, const tx_out_v& out_v, size_t addr_idx, size_t out_idx, const crypto::key_derivation& derivation, bool& unknown_output_type) -> bool {
+    auto decode_output = [&req, &res](const address_v& addr_v, const tx_out_v& out_v, size_t addr_idx, size_t out_idx, const crypto::key_derivation& derivation, bool& unknown_output_type) -> bool {
       VARIANT_SWITCH_BEGIN(out_v)
         VARIANT_CASE_CONST(tx_out_zarcanum, zo)
           if (addr_v.type() != typeid(account_public_address))
