@@ -663,8 +663,10 @@ namespace currency
 
   // decoy strategy for regular TX
   #define LOOK_UP_STRATEGY_REGULAR_TX           "LOOK_UP_STRATEGY_REGULAR_TX"
-  // decoy strategy for PoS coinbase 
+  // decoy strategy for PoS coinbase
   #define LOOK_UP_STRATEGY_POS_COINBASE         "LOOK_UP_STRATEGY_POS_COINBASE"
+  // fallback accept any
+  #define LOOK_UP_STRATEGY_ANY                  "LOOK_UP_STRATEGY_ANY"
   struct COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4
   {
     DOC_COMMAND("Version 4 of the command to retrieve random decoy outputs for specified amounts, focusing on either pre-zarcanum or post-zarcanum zones based on the amount value.");
