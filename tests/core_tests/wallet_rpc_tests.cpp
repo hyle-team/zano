@@ -2008,6 +2008,7 @@ bool wallet_rpc_gateway_address::c1(currency::core& c, size_t ev_index, const st
   gw_create_transfer_req.fee = TESTS_DEFAULT_FEE;
   gw_create_transfer_req.comment = "this is a transfer from a gw address to a normal address";
   gw_create_transfer_req.origin_gateway_id = gw_addr_public_key;
+  gw_create_transfer_req.gateway_view_secret_key = gw_addr_secret_key;
   r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_create_transfer", gw_create_transfer_req, gw_create_transfer_resp);
   CHECK_AND_ASSERT_MES(r, false, "gateway_create_transfer failed");
 
@@ -2236,6 +2237,7 @@ bool wallet_rpc_gateway_signatures::c1(currency::core& c, size_t ev_index, const
   eth_gw_create_req.destinations.push_back({MK_TEST_COINS(1), bob_wlt->get_account().get_public_address_str()});
   eth_gw_create_req.fee = TESTS_DEFAULT_FEE;
   eth_gw_create_req.comment = "eth gateway transfer test";
+  eth_gw_create_req.gateway_view_secret_key = eth_gw_view_sec_key;
   r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_create_transfer", eth_gw_create_req, eth_gw_create_resp);
   CHECK_AND_ASSERT_MES(r, false, "gateway_create_transfer (ETH) failed");
 
@@ -2336,6 +2338,7 @@ bool wallet_rpc_gateway_signatures::c1(currency::core& c, size_t ev_index, const
   eddsa_gw_create_req.destinations.push_back({MK_TEST_COINS(1), bob_wlt->get_account().get_public_address_str()});
   eddsa_gw_create_req.fee = TESTS_DEFAULT_FEE;
   eddsa_gw_create_req.comment = "eddsa gateway transfer test";
+  eddsa_gw_create_req.gateway_view_secret_key = eddsa_gw_view_sec_key;
   r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_create_transfer", eddsa_gw_create_req, eddsa_gw_create_resp);
   CHECK_AND_ASSERT_MES(r, false, "gateway_create_transfer (EdDSA) failed");
 
@@ -2647,6 +2650,7 @@ bool wallet_rpc_gateway_overspend::c1(currency::core& c, size_t ev_index, const 
     currency::COMMAND_RPC_GATEWAY_CREATE_TRANSFER::request req = {};
     currency::COMMAND_RPC_GATEWAY_CREATE_TRANSFER::response resp = {};
     req.origin_gateway_id = eth_gw_view_pub_key;
+    req.gateway_view_secret_key = eth_gw_view_sec_key;
     req.destinations.push_back({MK_TEST_COINS(2), miner_wlt->get_account().get_public_address_str()});
     req.destinations.push_back({MK_TEST_COINS(1), bob_wlt->get_account().get_public_address_str()});
     req.fee = TESTS_DEFAULT_FEE;
@@ -2663,6 +2667,7 @@ bool wallet_rpc_gateway_overspend::c1(currency::core& c, size_t ev_index, const 
     currency::COMMAND_RPC_GATEWAY_CREATE_TRANSFER::request req = {};
     currency::COMMAND_RPC_GATEWAY_CREATE_TRANSFER::response resp = {};
     req.origin_gateway_id = eth_gw_view_pub_key;
+    req.gateway_view_secret_key = eth_gw_view_sec_key;
     req.destinations.push_back({15, miner_wlt->get_account().get_public_address_str(), os_asset_id});
     req.destinations.push_back({10, bob_wlt->get_account().get_public_address_str(),   os_asset_id});
     req.fee = TESTS_DEFAULT_FEE;
@@ -2684,6 +2689,7 @@ bool wallet_rpc_gateway_overspend::c1(currency::core& c, size_t ev_index, const 
     currency::COMMAND_RPC_GATEWAY_CREATE_TRANSFER::request req = {};
     currency::COMMAND_RPC_GATEWAY_CREATE_TRANSFER::response resp = {};
     req.origin_gateway_id = eth_gw_view_pub_key;
+    req.gateway_view_secret_key = eth_gw_view_sec_key;
     req.destinations.push_back({1, miner_wlt->get_account().get_public_address_str()});  // 1 unit native
     req.fee = TESTS_DEFAULT_FEE;
     r = invoke_text_json_for_rpc(core_rpc_wrapper, "gateway_create_transfer", req, resp);
@@ -2699,6 +2705,7 @@ bool wallet_rpc_gateway_overspend::c1(currency::core& c, size_t ev_index, const 
     currency::COMMAND_RPC_GATEWAY_CREATE_TRANSFER::request req = {};
     currency::COMMAND_RPC_GATEWAY_CREATE_TRANSFER::response resp = {};
     req.origin_gateway_id = eth_gw_view_pub_key;
+    req.gateway_view_secret_key = eth_gw_view_sec_key;
     req.destinations.push_back({11, miner_wlt->get_account().get_public_address_str(), os_asset_id});
     req.fee = TESTS_DEFAULT_FEE;
     r = invoke_text_json_for_rpc(core_rpc_wrapper, "gateway_create_transfer", req, resp);
@@ -2713,6 +2720,7 @@ bool wallet_rpc_gateway_overspend::c1(currency::core& c, size_t ev_index, const 
     currency::COMMAND_RPC_GATEWAY_CREATE_TRANSFER::request req = {};
     currency::COMMAND_RPC_GATEWAY_CREATE_TRANSFER::response resp = {};
     req.origin_gateway_id = eth_gw_view_pub_key;
+    req.gateway_view_secret_key = eth_gw_view_sec_key;
     req.destinations.push_back({10, miner_wlt->get_account().get_public_address_str(), os_asset_id});
     req.fee = TESTS_DEFAULT_FEE;
     r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_create_transfer", req, resp);
@@ -2830,6 +2838,7 @@ bool wallet_rpc_gateway_service_entries::c1(currency::core& c, size_t ev_index, 
   ct_req.service_entries.push_back(sa_plain);
   ct_req.service_entries.push_back(sa_enc);
   ct_req.service_entries_permanent = false;  // attachments, not extra
+  ct_req.gateway_view_secret_key = gw_view_sec_key;
   r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_create_transfer", ct_req, ct_resp);
   CHECK_AND_ASSERT_MES(r, false, "gateway_create_transfer with service entries failed");
   CHECK_AND_ASSERT_FALSE(ct_resp.tx_blob.empty());
@@ -2879,10 +2888,10 @@ bool wallet_rpc_gateway_service_entries::c1(currency::core& c, size_t ev_index, 
     CHECK_AND_ASSERT_MES(se0.flags == 0, false, "plaintext service entry must have flags==0 got " << (int)se0.flags);
     CHECK_AND_ASSERT_MES(se0.body == plain_body, false, "plaintext service entry body mismatch: '" << se0.body << "' != '" << plain_body << "'");
 
-    // gateway key != recipient key
+    // gateway uses sender-side derivation symmetry to decrypt its own outgoing entry
     const auto& se1 = wti.service_entries[1];
     CHECK_AND_ASSERT_MES((se1.flags & TX_SERVICE_ATTACHMENT_ENCRYPT_BODY) != 0, false, "encrypted service entry must have TX_SERVICE_ATTACHMENT_ENCRYPT_BODY set");
-    CHECK_AND_ASSERT_MES(se1.body != enc_body, false, "encrypted service entry body must not equal plaintext after decryption with wrong key");
+    CHECK_AND_ASSERT_MES(se1.body == enc_body, false, "encrypted service entry body must decrypt to plaintext using gateway_view_secret_key: '" << se1.body << "' != '" << enc_body << "'");
 
     break;
   }
@@ -2996,7 +3005,7 @@ bool wallet_rpc_gateway_history_after_outgoing::c1(currency::core& c, size_t /*e
   currency::COMMAND_RPC_GATEWAY_SIGN_TRANSFER::response sign_resp = {};
   sign_req.opt_ecdsa_signature = eth_sig;
   sign_req.tx_blob = ct_resp.tx_blob;
-  sign_req.tx_hash_to_sign = ct_resp.tx_hash_to_sign;
+  sign_req.tx_id = ct_resp.tx_id;
   r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_sign_transfer", sign_req, sign_resp);
   CHECK_AND_ASSERT_MES(r, false, "gateway_sign_transfer failed");
 
@@ -3127,6 +3136,7 @@ bool wallet_rpc_gateway_reorg_spend::c1(currency::core& c, size_t ev_index, cons
   ct_req.destinations.push_back({MK_TEST_COINS(1), miner_wlt->get_account().get_public_address_str()});
   ct_req.destinations.push_back({MK_TEST_COINS(1), bob_wlt->get_account().get_public_address_str()});
   ct_req.fee = TESTS_DEFAULT_FEE;
+  ct_req.gateway_view_secret_key = gw_view_sec_key;
   r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_create_transfer", ct_req, ct_resp);
   CHECK_AND_ASSERT_MES(r, false, "gateway_create_transfer failed");
 
@@ -3409,6 +3419,7 @@ bool wallet_rpc_gateway_owner_change_altchain::c1(currency::core& c, size_t ev_i
     ct_req.origin_gateway_id = gw_view_pub;
     ct_req.destinations.push_back({ amount, bob_addr_str });
     ct_req.fee = TESTS_DEFAULT_FEE;
+    ct_req.gateway_view_secret_key = gw_view_sec;
     bool ok = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_create_transfer", ct_req, ct_resp);
     CHECK_AND_ASSERT_MES(ok, false, "gateway_create_transfer failed");
 
