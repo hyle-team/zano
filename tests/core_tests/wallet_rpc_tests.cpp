@@ -2888,10 +2888,10 @@ bool wallet_rpc_gateway_service_entries::c1(currency::core& c, size_t ev_index, 
     CHECK_AND_ASSERT_MES(se0.flags == 0, false, "plaintext service entry must have flags==0 got " << (int)se0.flags);
     CHECK_AND_ASSERT_MES(se0.body == plain_body, false, "plaintext service entry body mismatch: '" << se0.body << "' != '" << plain_body << "'");
 
-    // gateway key != recipient key
+    // gateway uses sender-side derivation symmetry to decrypt its own outgoing entry
     const auto& se1 = wti.service_entries[1];
     CHECK_AND_ASSERT_MES((se1.flags & TX_SERVICE_ATTACHMENT_ENCRYPT_BODY) != 0, false, "encrypted service entry must have TX_SERVICE_ATTACHMENT_ENCRYPT_BODY set");
-    CHECK_AND_ASSERT_MES(se1.body != enc_body, false, "encrypted service entry body must not equal plaintext after decryption with wrong key");
+    CHECK_AND_ASSERT_MES(se1.body == enc_body, false, "encrypted service entry body must decrypt to plaintext using gateway_view_secret_key: '" << se1.body << "' != '" << enc_body << "'");
 
     break;
   }
