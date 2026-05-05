@@ -885,14 +885,6 @@ namespace currency
       ftp.extra.push_back(tc);
     }
 
-    if (!ftp.prepared_destinations.size() || ftp.prepared_destinations.begin()->addr.size() != 1)
-    {
-      er.code = CORE_RPC_ERROR_CODE_WRONG_PARAM;
-      er.message = "No valid destinations were found after processing";
-      return false;
-    }
-
-
     r = currency::construct_tx(gw_sender_keys, ftp, ftx);
     if(!r)
     {
