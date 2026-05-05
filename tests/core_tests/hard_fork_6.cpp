@@ -1309,7 +1309,7 @@ bool hard_fork_6_full_gw_tx_test::generate(std::vector<test_event_entry>& events
     CHECKED_GET_SPECIFIC_VARIANT(in_v, const txin_gateway, in_gw, false);
     crypto::hash tx_hash_for_input_sig = currency::prepare_prefix_hash_for_sign(tx_7, i, tx_id_for_signing);
     CHECK_AND_ASSERT_MES(tx_hash_for_input_sig != currency::null_hash, false, "prepare_prefix_hash_for_sign failed");
-    crypto::hash hash_to_sign = crypto::hash_helper_t::h(CRYPTO_HDS_GW_INPUT_SIGNATURE, tx_hash_for_input_sig, 0);
+    crypto::hash hash_to_sign = crypto::hash_helper_t::h(CRYPTO_HDS_GW_INPUT_SIGNATURE, tx_hash_for_input_sig);
     gateway_sig& gws = boost::get<gateway_sig>(sig);
     CHECKED_GET_SPECIFIC_VARIANT(gws.s, crypto::generic_schnorr_sig_s, gsss, false);
     crypto::generic_schnorr_sig& gss = static_cast<crypto::generic_schnorr_sig&>(gsss);
@@ -1407,7 +1407,7 @@ bool hard_fork_6_full_gw_tx_test::generate(std::vector<test_event_entry>& events
     CHECKED_GET_SPECIFIC_VARIANT(in_v, const txin_gateway, in_gw, false);
     crypto::hash tx_hash_for_input_sig = currency::prepare_prefix_hash_for_sign(tx_8, i, tx_id_for_signing);
     CHECK_AND_ASSERT_MES(tx_hash_for_input_sig != currency::null_hash, false, "prepare_prefix_hash_for_sign failed");
-    crypto::hash hash_to_sign = crypto::hash_helper_t::h(CRYPTO_HDS_GW_INPUT_SIGNATURE, tx_hash_for_input_sig, 0);
+    crypto::hash hash_to_sign = crypto::hash_helper_t::h(CRYPTO_HDS_GW_INPUT_SIGNATURE, tx_hash_for_input_sig);
     gateway_sig& gws = boost::get<gateway_sig>(sig);
     CHECKED_GET_SPECIFIC_VARIANT(gws.s, crypto::generic_schnorr_sig_s, gsss, false);
     crypto::generic_schnorr_sig& gss = static_cast<crypto::generic_schnorr_sig&>(gsss);
@@ -1476,7 +1476,7 @@ bool hard_fork_6_full_gw_tx_test::generate(std::vector<test_event_entry>& events
     CHECKED_GET_SPECIFIC_VARIANT(in_v, const txin_gateway, in_gw, false);
     crypto::hash tx_hash_for_input_sig = currency::prepare_prefix_hash_for_sign(tx_9, i, tx_id_for_signing);
     CHECK_AND_ASSERT_MES(tx_hash_for_input_sig != currency::null_hash, false, "prepare_prefix_hash_for_sign failed");
-    crypto::hash hash_to_sign = crypto::hash_helper_t::h(CRYPTO_HDS_GW_INPUT_SIGNATURE, tx_hash_for_input_sig, 0);
+    crypto::hash hash_to_sign = crypto::hash_helper_t::h(CRYPTO_HDS_GW_INPUT_SIGNATURE, tx_hash_for_input_sig);
     gateway_sig& gws = boost::get<gateway_sig>(sig);
     CHECKED_GET_SPECIFIC_VARIANT(gws.s, crypto::generic_schnorr_sig_s, gsss, false);
     crypto::generic_schnorr_sig& gss = static_cast<crypto::generic_schnorr_sig&>(gsss);

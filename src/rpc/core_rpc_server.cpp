@@ -904,7 +904,7 @@ namespace currency
       res.status_error = "prepare prefix hash for sign failed";
       return true;
     }
-    res.tx_hash_to_sign = crypto::hash_helper_t::h(CRYPTO_HDS_GW_INPUT_SIGNATURE, tx_hash_for_input_sig, 0);
+    res.tx_hash_to_sign = crypto::hash_helper_t::h(CRYPTO_HDS_GW_INPUT_SIGNATURE, tx_hash_for_input_sig);
 
     res.status = API_RETURN_CODE_OK;
     return true;
@@ -1074,8 +1074,8 @@ namespace currency
       res.status_error = "prepare_prefix_hash_for_sign failed";
       return true;
     }
-    res.hash_to_sign_transfer  = crypto::hash_helper_t::h(CRYPTO_HDS_GW_INPUT_SIGNATURE, tx_hash_for_input_sig, 0);
-    res.hash_to_sign_ownership = crypto::hash_helper_t::h(CRYPTO_HDS_GW_CHANGE_OWNER_SIGNATURE, res.tx_id, 0);
+    res.hash_to_sign_transfer  = crypto::hash_helper_t::h(CRYPTO_HDS_GW_INPUT_SIGNATURE, tx_hash_for_input_sig);
+    res.hash_to_sign_ownership = crypto::hash_helper_t::h(CRYPTO_HDS_GW_CHANGE_OWNER_SIGNATURE, res.tx_id);
 
     res.status = API_RETURN_CODE_OK;
     return true;

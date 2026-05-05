@@ -5145,7 +5145,7 @@ bool blockchain_storage::validate_gw_address_ownership(const transaction& tx, co
   CHECK_AND_ASSERT_MES(gad.info_history.size(), false, "Ownership validation failed: gateway_address_info_history is empty for gw address " << gao.address_id << " in tx " << tx_id);
 
   const gateway_address_descriptor_base address_desciptor = gad.info_history.back();
-  const crypto::hash hash_to_verify_ownership = crypto::hash_helper_t::h(CRYPTO_HDS_GW_CHANGE_OWNER_SIGNATURE, tx_id, 0);
+  const crypto::hash hash_to_verify_ownership = crypto::hash_helper_t::h(CRYPTO_HDS_GW_CHANGE_OWNER_SIGNATURE, tx_id);
 
   VARIANT_SWITCH_BEGIN(address_desciptor.owner_key)
   VARIANT_CASE_CONST(crypto::public_key, o)
@@ -6491,7 +6491,7 @@ bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, 
   CHECK_AND_ASSERT_MES(gw_entry_ptr->info_history.size(), false, "Gateway input validation failed: gateway address " << gw_in.gateway_addr << " has no info history");
 
   const gateway_owner_key_v& gw_owner_key = gw_entry_ptr->info_history.back().owner_key;
-  const crypto::hash hash_to_verify_gw_input = crypto::hash_helper_t::h(CRYPTO_HDS_GW_INPUT_SIGNATURE, tx_hash_for_signature, 0);
+  const crypto::hash hash_to_verify_gw_input = crypto::hash_helper_t::h(CRYPTO_HDS_GW_INPUT_SIGNATURE, tx_hash_for_signature);
   VARIANT_SWITCH_BEGIN(gw_owner_key);
     VARIANT_CASE_CONST(crypto::public_key, pkey)
     {
