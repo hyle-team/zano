@@ -1091,55 +1091,54 @@ namespace currency
       return true;
     }
 
-    size_t transfer_sig_count = 0;
+    size_t sig_count = 0;
     gateway_signature_v gw_sig;
+    gateway_owner_signature_v ownership_sig;
     if (req.opt_transfer_ecdsa_signature)
     {
+      if (!req.opt_ownership_ecdsa_signature)
+      {
+        LOG_ERROR("on_gateway_submit_owner_change: transfer is ecdsa, ownership must be ecdsa too");
+        res.status = API_RETURN_CODE_BAD_ARG;
+        res.status_error = "Ownership signature type does not match transfer signature type (expected ecdsa)";
+        return true;
+      }
       gw_sig = req.opt_transfer_ecdsa_signature.value();
-      transfer_sig_count++;
+      ownership_sig = req.opt_ownership_ecdsa_signature.value();
+      sig_count++;
     }
     if (req.opt_transfer_custom_schnorr_signature)
     {
+      if (!req.opt_ownership_custom_schnorr_signature)
+      {
+        LOG_ERROR("on_gateway_submit_owner_change: transfer is custom schnorr, ownership must be custom schnorr too");
+        res.status = API_RETURN_CODE_BAD_ARG;
+        res.status_error = "Ownership signature type does not match transfer signature type (expected custom schnorr)";
+        return true;
+      }
       gw_sig = req.opt_transfer_custom_schnorr_signature.value();
-      transfer_sig_count++;
+      ownership_sig = req.opt_ownership_custom_schnorr_signature.value();
+      sig_count++;
     }
     if (req.opt_transfer_eddsa_signature)
     {
+      if (!req.opt_ownership_eddsa_signature)
+      {
+        LOG_ERROR("on_gateway_submit_owner_change: transfer is eddsa, ownership must be eddsa too");
+        res.status = API_RETURN_CODE_BAD_ARG;
+        res.status_error = "Ownership signature type does not match transfer signature type (expected eddsa)";
+        return true;
+      }
       gw_sig = req.opt_transfer_eddsa_signature.value();
-      transfer_sig_count++;
+      ownership_sig = req.opt_ownership_eddsa_signature.value();
+      sig_count++;
     }
 
-    if (transfer_sig_count != 1)
+    if (sig_count != 1)
     {
-      LOG_ERROR("Expected exactly one transfer signature in on_gateway_submit_owner_change, got: " << transfer_sig_count);
+      LOG_ERROR("Expected exactly one transfer signature in on_gateway_submit_owner_change, got: " << sig_count);
       res.status = API_RETURN_CODE_BAD_ARG;
       res.status_error = "Expected exactly one transfer signature";
-      return true;
-    }
-
-    size_t ownership_sig_count = 0;
-    gateway_owner_signature_v ownership_sig;
-    if (req.opt_ownership_ecdsa_signature)           
-    {
-      ownership_sig = req.opt_ownership_ecdsa_signature.value();
-      ownership_sig_count++;
-    }
-    if (req.opt_ownership_custom_schnorr_signature) 
-    {
-      ownership_sig = req.opt_ownership_custom_schnorr_signature.value();
-      ownership_sig_count++;
-    }
-    if (req.opt_ownership_eddsa_signature)
-    {
-      ownership_sig = req.opt_ownership_eddsa_signature.value();
-      ownership_sig_count++;
-    }
-
-    if (ownership_sig_count != 1)
-    {
-      LOG_ERROR("Expected exactly one ownership signature in on_gateway_submit_owner_change, got: " << ownership_sig_count);
-      res.status = API_RETURN_CODE_BAD_ARG;
-      res.status_error = "Expected exactly one ownership signature";
       return true;
     }
 
