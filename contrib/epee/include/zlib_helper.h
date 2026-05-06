@@ -73,7 +73,7 @@ namespace zlib_helper
 		return r;
 	}
 
-	inline bool unpack(const std::string& target, std::string& decode_summary_buff, size_t max_output_size = 0)
+	inline bool unpack(const std::string& target, std::string& decode_summary_buff, size_t max_output_size = ZLIB_MAX_DECOMPRESSED_SIZE)
 	{
 		z_stream    zstream = {0};
 		int ret = inflateInit(&zstream);//
@@ -149,7 +149,7 @@ namespace zlib_helper
 		return true;
 	}
 
-	inline 	bool unpack(std::string& target, size_t max_output_size = 0)
+	inline 	bool unpack(std::string& target, size_t max_output_size = ZLIB_MAX_DECOMPRESSED_SIZE)
 	{
 		std::string decode_summary_buff;
 		bool r = unpack(target, decode_summary_buff, max_output_size);

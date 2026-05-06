@@ -346,6 +346,10 @@ if(NOT DISABLE_MDBX)
    add_definitions(-DENABLED_ENGINE_MDBX)
 endif()
 
+if (BUILD_TESTS)
+  add_definitions(-DBUILD_TESTS)
+endif()
+
   
 add_subdirectory(contrib)
 add_subdirectory(src)

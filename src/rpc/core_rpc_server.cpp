@@ -11,6 +11,7 @@ using namespace epee;
 #include "common/command_line.h"
 #include "currency_core/currency_format_utils.h"
 #include "currency_core/account.h"
+#include "currency_core/crypto_config.h"
 
 #include "misc_language.h"
 #include "crypto/hash.h"
@@ -676,6 +677,22 @@ namespace currency
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
+  bool gateway_descriptor_api_info::from_gateway_address_descriptor_base(const gateway_address_descriptor_base& gadb)
+  {
+    meta_info = gadb.meta_info;
+    VARIANT_SWITCH_BEGIN(gadb.owner_key);
+      VARIANT_CASE_CONST(crypto::public_key, owner_key)
+        opt_owner_custom_schnorr_pub_key = owner_key;
+      VARIANT_CASE_CONST(crypto::eth_public_key, owner_key)
+        opt_owner_ecdsa_pub_key = owner_key;
+      VARIANT_CASE_CONST(crypto::eddsa_public_key, owner_key)
+        opt_owner_eddsa_pub_key = owner_key;
+      VARIANT_CASE_OTHER();
+        return false;
+    VARIANT_SWITCH_END();
+    return true;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_gateway_get_address_info(const COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO::request& req, COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO::response& res, connection_context& cntx)
   {
     currency::gateway_address_id_type addr_id = {};
@@ -713,22 +730,11 @@ namespace currency
     }
 
     const auto& last_info = addr_data_ptr->info_history.back();
-    res.descriptor_info.meta_info = last_info.meta_info;
-    VARIANT_SWITCH_BEGIN(last_info.owner_key);
-    VARIANT_CASE_CONST(crypto::public_key, owner_key)
+    if (!res.descriptor_info.from_gateway_address_descriptor_base(last_info))
     {
-      res.descriptor_info.opt_owner_custom_schnorr_pub_key = owner_key;
+      res.status = API_RETURN_CODE_INTERNAL_ERROR;
+      return true;
     }
-    VARIANT_CASE_CONST(crypto::eth_public_key, owner_key)
-    {
-      res.descriptor_info.opt_owner_ecdsa_pub_key = owner_key;
-    }
-    VARIANT_CASE_CONST(crypto::eddsa_public_key, owner_key)
-    {
-      res.descriptor_info.opt_owner_eddsa_pub_key = owner_key;
-    }
-    VARIANT_CASE_THROW_ON_OTHER();
-    VARIANT_SWITCH_END();
 
     for (const auto& [asset_id, balance_entry] : addr_data_ptr->balances)
     {
@@ -745,7 +751,18 @@ namespace currency
   bool core_rpc_server::on_gateway_create_transfer(const COMMAND_RPC_GATEWAY_CREATE_TRANSFER::request& req, COMMAND_RPC_GATEWAY_CREATE_TRANSFER::response& res, connection_context& cntx)
   {
     //TODO: Some of the code presented here might need to be moved to separate library/module as it touch privacy-sensitive operations
-    currency::account_keys dummy_keys = {};
+
+    if (req.gateway_view_secret_key == currency::null_skey)
+    {
+      res.status = API_RETURN_CODE_BAD_ARG;
+      res.status_error = "gateway_view_secret_key is required, must be a non-null secret";
+      return true;
+    }
+
+    // gw has no real spend_secret_key; we put view_secret_key into the spend slot
+    // so encrypt_payload_items produces a tx_crypto_checksum the scanner can actually undo
+    currency::account_keys gw_sender_keys = {};
+    gw_sender_keys.spend_secret_key = req.gateway_view_secret_key;
     currency::finalize_tx_param ftp = {};
     currency::finalized_tx ftx = {};
 
@@ -869,7 +886,7 @@ namespace currency
       ftp.extra.push_back(tc);
     }
 
-    r = currency::construct_tx(dummy_keys, ftp, ftx);
+    r = currency::construct_tx(gw_sender_keys, ftp, ftx);
     if(!r)
     {
       res.status = API_RETURN_CODE_FAIL;
@@ -878,7 +895,16 @@ namespace currency
     }
 
     res.tx_blob = t_serializable_object_to_blob(ftx.tx);
-    res.tx_hash_to_sign = get_transaction_hash(ftx.tx);
+    res.tx_id = get_transaction_hash(ftx.tx);
+
+    crypto::hash tx_hash_for_input_sig = currency::prepare_prefix_hash_for_sign(ftx.tx, 0, res.tx_id);
+    if (tx_hash_for_input_sig == currency::null_hash)
+    {
+      res.status = API_RETURN_CODE_FAIL;
+      res.status_error = "prepare prefix hash for sign failed";
+      return true;
+    }
+    res.tx_hash_to_sign = crypto::hash_helper_t::h(CRYPTO_HDS_GW_INPUT_SIGNATURE, tx_hash_for_input_sig);
 
     res.status = API_RETURN_CODE_OK;
     return true;
@@ -897,9 +923,9 @@ namespace currency
     }
 
     crypto::hash tx_id = get_transaction_hash(tx);
-    if(tx_id != req.tx_hash_to_sign)
+    if(tx_id != req.tx_id)
     {
-      LOG_ERROR("Transaction hash mismatch in on_gateway_sign_transfer: " << tx_id << "!=" << req.tx_hash_to_sign);
+      LOG_ERROR("Transaction hash mismatch in on_gateway_sign_transfer: " << tx_id << " != " << req.tx_id);
       res.status = API_RETURN_CODE_BAD_ARG;
       res.status_error = "Transaction hash mismatch";
       return true;
@@ -1038,13 +1064,24 @@ namespace currency
     }
 
     res.tx_blob = t_serializable_object_to_blob(ftx.tx);
-    res.tx_hash_to_sign = get_transaction_hash(ftx.tx);
+    res.tx_id = get_transaction_hash(ftx.tx);
+    res.tx_secret_key = ftx.one_time_key;
+
+    crypto::hash tx_hash_for_input_sig = currency::prepare_prefix_hash_for_sign(ftx.tx, 0, res.tx_id);
+    if (tx_hash_for_input_sig == currency::null_hash)
+    {
+      res.status = API_RETURN_CODE_FAIL;
+      res.status_error = "prepare_prefix_hash_for_sign failed";
+      return true;
+    }
+    res.hash_to_sign_transfer  = crypto::hash_helper_t::h(CRYPTO_HDS_GW_INPUT_SIGNATURE, tx_hash_for_input_sig);
+    res.hash_to_sign_ownership = crypto::hash_helper_t::h(CRYPTO_HDS_GW_CHANGE_OWNER_SIGNATURE, res.tx_id);
 
     res.status = API_RETURN_CODE_OK;
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  bool core_rpc_server::on_gateway_sign_owner_change(const COMMAND_RPC_GATEWAY_SIGN_OWNER_CHANGE::request& req, COMMAND_RPC_GATEWAY_SIGN_OWNER_CHANGE::response& res, connection_context& cntx)
+  bool core_rpc_server::on_gateway_submit_owner_change(const COMMAND_RPC_GATEWAY_SUBMIT_OWNER_CHANGE::request& req, COMMAND_RPC_GATEWAY_SUBMIT_OWNER_CHANGE::response& res, connection_context& cntx)
   {
     transaction tx = {};
 
@@ -1057,9 +1094,9 @@ namespace currency
     }
 
     crypto::hash tx_id = get_transaction_hash(tx);
-    if (tx_id != req.tx_hash_to_sign)
+    if (tx_id != req.tx_id)
     {
-      LOG_ERROR("Transaction hash mismatch in on_gateway_sign_owner_change: " << tx_id << " != " << req.tx_hash_to_sign);
+      LOG_ERROR("Transaction hash mismatch in on_gateway_submit_owner_change: " << tx_id << " != " << req.tx_id);
       res.status = API_RETURN_CODE_BAD_ARG;
       res.status_error = "Transaction hash mismatch";
       return true;
@@ -1068,30 +1105,51 @@ namespace currency
     size_t sig_count = 0;
     gateway_signature_v gw_sig;
     gateway_owner_signature_v ownership_sig;
-    if (req.opt_ecdsa_signature)
+    if (req.opt_transfer_ecdsa_signature)
     {
-      gw_sig = req.opt_ecdsa_signature.value();
-      ownership_sig = req.opt_ecdsa_signature.value();
+      if (!req.opt_ownership_ecdsa_signature)
+      {
+        LOG_ERROR("on_gateway_submit_owner_change: transfer is ecdsa, ownership must be ecdsa too");
+        res.status = API_RETURN_CODE_BAD_ARG;
+        res.status_error = "Ownership signature type does not match transfer signature type (expected ecdsa)";
+        return true;
+      }
+      gw_sig = req.opt_transfer_ecdsa_signature.value();
+      ownership_sig = req.opt_ownership_ecdsa_signature.value();
       sig_count++;
     }
-    if (req.opt_custom_schnorr_signature)
+    if (req.opt_transfer_custom_schnorr_signature)
     {
-      gw_sig = req.opt_custom_schnorr_signature.value();
-      ownership_sig = req.opt_custom_schnorr_signature.value();
+      if (!req.opt_ownership_custom_schnorr_signature)
+      {
+        LOG_ERROR("on_gateway_submit_owner_change: transfer is custom schnorr, ownership must be custom schnorr too");
+        res.status = API_RETURN_CODE_BAD_ARG;
+        res.status_error = "Ownership signature type does not match transfer signature type (expected custom schnorr)";
+        return true;
+      }
+      gw_sig = req.opt_transfer_custom_schnorr_signature.value();
+      ownership_sig = req.opt_ownership_custom_schnorr_signature.value();
       sig_count++;
     }
-    if (req.opt_eddsa_signature)
+    if (req.opt_transfer_eddsa_signature)
     {
-      gw_sig = req.opt_eddsa_signature.value();
-      ownership_sig = req.opt_eddsa_signature.value();
+      if (!req.opt_ownership_eddsa_signature)
+      {
+        LOG_ERROR("on_gateway_submit_owner_change: transfer is eddsa, ownership must be eddsa too");
+        res.status = API_RETURN_CODE_BAD_ARG;
+        res.status_error = "Ownership signature type does not match transfer signature type (expected eddsa)";
+        return true;
+      }
+      gw_sig = req.opt_transfer_eddsa_signature.value();
+      ownership_sig = req.opt_ownership_eddsa_signature.value();
       sig_count++;
     }
 
     if (sig_count != 1)
     {
-      LOG_ERROR("Expected exactly one signature in on_gateway_sign_owner_change, got: " << sig_count);
+      LOG_ERROR("Expected exactly one transfer signature in on_gateway_submit_owner_change, got: " << sig_count);
       res.status = API_RETURN_CODE_BAD_ARG;
-      res.status_error = "Expected exactly one signature";
+      res.status_error = "Expected exactly one transfer signature";
       return true;
     }
 
@@ -1105,7 +1163,7 @@ namespace currency
       }
       else
       {
-        LOG_ERROR("Unexpected signature type in on_gateway_sign_owner_change");
+        LOG_ERROR("Unexpected signature type in on_gateway_submit_owner_change");
         res.status = API_RETURN_CODE_BAD_ARG;
         res.status_error = "Unexpected signature type in transaction";
         return true;
@@ -1123,18 +1181,27 @@ namespace currency
     tx_verification_context tvc = AUTO_VAL_INIT(tvc);
     if (!m_core.handle_incoming_tx(signed_tx_blob, tvc, false))
     {
-      LOG_ERROR("[on_gateway_sign_owner_change]: Failed to process signed tx");
+      LOG_ERROR("[on_gateway_submit_owner_change]: Failed to process signed tx");
       res.status = API_RETURN_CODE_FAIL;
       res.status_error = "Failed to process signed transaction";
       return true;
     }
     if (tvc.m_verification_failed)
     {
-      LOG_ERROR("[on_gateway_sign_owner_change]: signed tx verification failed");
+      LOG_ERROR("[on_gateway_submit_owner_change]: signed tx verification failed");
       res.status = API_RETURN_CODE_FAIL;
       res.status_error = "Signed transaction verification failed";
       return true;
     }
+    
+    /*
+    * We don't want to return "already exists" error, some exchanges/custody might specifically want to relay tx again.
+    if (!tvc.m_should_be_relayed && !tvc.m_already_existed)
+    {
+      res.status = API_RETURN_CODE_ALREADY_EXISTS;
+      return true;
+    }
+    */
 
     NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::request ntx_req;
     ntx_req.txs.push_back(signed_tx_blob);
@@ -1150,6 +1217,14 @@ namespace currency
   bool core_rpc_server::on_gateway_get_address_history(const COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY::request& req, COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY::response& res, connection_context& cntx)
   {
     CHECK_RPC_LIMITS(req.count, RPC_LIMIT_COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY);
+
+    if (req.gateway_view_secret_key == currency::null_skey)
+    {
+      res.status = API_RETURN_CODE_BAD_ARG;
+      res.status_error = "gateway_view_secret_key is required, must be a non-null secret";
+      return true;
+    }
+
     currency::gateway_address_id_type addr_id = {};
     address_v v_addr = {};
     payment_id_t dummy_payment_id = {};
@@ -1392,7 +1467,8 @@ namespace currency
 
     LOCAL_CHECK(req.tx_id.empty() != req.tx_blob.empty(), "One of either tx_id or tx_blob must be specified.");
 
-    transaction tx{};
+    res.tx = transaction{};
+    transaction& tx = res.tx;
     if (!req.tx_id.empty())
     {
       CHECK_CORE_READY_WE();
@@ -1418,6 +1494,29 @@ namespace currency
     LOCAL_CHECK(tx_pub_key != null_pkey && R.from_public_key(tx_pub_key) && R.is_in_main_subgroup(), "unsigned_tx: tx public key is missing or invalid");
     LOCAL_CHECK(tx_pub_key == (crypto::scalar_t(req.tx_secret_key) * crypto::c_point_G).to_public_key(), "tx_secret_key doesn't match the transaction public key");
 
+    auto decode_output = [&req, &res](const address_v& addr_v, const tx_out_v& out_v, size_t addr_idx, size_t out_idx, const crypto::key_derivation& derivation, bool& unknown_output_type) -> bool {
+      VARIANT_SWITCH_BEGIN(out_v)
+        VARIANT_CASE_CONST(tx_out_zarcanum, zo)
+          if (addr_v.type() != typeid(account_public_address))
+            return false;
+          auto& decoded_out = res.decoded_outputs.emplace_back();
+          decoded_out.out_index = out_idx;
+          decoded_out.address = req.outputs_addresses[addr_idx];
+          crypto::scalar_t amount_blinding_mask{}, asset_id_blinding_mask{};
+          return currency::decode_output_data(zo, derivation, out_idx, decoded_out.amount, decoded_out.asset_id, amount_blinding_mask, asset_id_blinding_mask, decoded_out.payment_id);
+        VARIANT_CASE_CONST(tx_out_gateway, gwo)
+          if (addr_v.type() != typeid(gateway_address_id_type))
+            return false;
+          auto& decoded_out = res.decoded_outputs.emplace_back();
+          decoded_out.out_index = out_idx;
+          decoded_out.address = req.outputs_addresses[addr_idx];
+          return currency::decode_output_data(gwo, derivation, out_idx, decoded_out.payment_id);
+        VARIANT_CASE_OTHER()
+          unknown_output_type = true;
+          return false;
+      VARIANT_SWITCH_END()
+    };
+
     if (req.strict_output_addresses_match)
     {
       LOCAL_CHECK(req.outputs_addresses.size() == tx.vout.size(), "outputs_addresses count (" + epee::string_tools::num_to_string_fast(req.outputs_addresses.size()) + " doesn't match tx.vout size (" + epee::string_tools::num_to_string_fast(tx.vout.size()) + ")");
@@ -1427,22 +1526,18 @@ namespace currency
         if (req.outputs_addresses[i].empty())
           continue; // skip this output if the given address is empty string
 
-        account_public_address addr{};
+        address_v addr_v{};
         payment_id_t payment_id{};
-        LOCAL_CHECK(currency::get_account_address_and_payment_id_from_str(addr, payment_id, req.outputs_addresses[i]) && payment_id.empty(), "output address #" + epee::string_tools::num_to_string_fast(i) + " couldn't be parsed or it is an integrated address (which is not supported)");
-
-        tx_out_v& out_v = tx.vout[i];
-        LOCAL_CHECK(out_v.type() == typeid(tx_out_zarcanum), "tx output #" + epee::string_tools::num_to_string_fast(i) + " has wrong type");
-        const tx_out_zarcanum& zo = boost::get<tx_out_zarcanum>(out_v);
+        LOCAL_CHECK(currency::get_account_address_and_payment_id_from_str(addr_v, payment_id, req.outputs_addresses[i]) && payment_id.empty(), "output address #" + epee::string_tools::num_to_string_fast(i) + " couldn't be parsed or it is an integrated address (which is not supported)");
 
         crypto::key_derivation derivation{};
-        LOCAL_CHECK_INT_ERR(crypto::generate_key_derivation(addr.view_public_key, req.tx_secret_key, derivation), "output #" + epee::string_tools::num_to_string_fast(i) + ": generate_key_derivation failed");
-      
-        auto& decoded_out = res.decoded_outputs.emplace_back();
-        decoded_out.out_index = i;
-        decoded_out.address = req.outputs_addresses[i];
-        crypto::scalar_t amount_blinding_mask{}, asset_id_blinding_mask{};
-        LOCAL_CHECK(currency::decode_output_data(zo, derivation, i, decoded_out.amount, decoded_out.asset_id, amount_blinding_mask, asset_id_blinding_mask, decoded_out.payment_id), "output #" + epee::string_tools::num_to_string_fast(i) + ": cannot be decoded");
+        LOCAL_CHECK_INT_ERR(generate_key_derivation(addr_v, req.tx_secret_key, derivation), "output #" + epee::string_tools::num_to_string_fast(i) + ": generate_key_derivation failed");
+
+        const tx_out_v& out_v = tx.vout[i];
+        bool unknown_output_type = false;
+        bool r = decode_output(addr_v, out_v, i, i, derivation, unknown_output_type);
+        LOCAL_CHECK_INT_ERR(!unknown_output_type, (std::string("unknown output type: ") + out_v.type().name()));
+        LOCAL_CHECK(r, "output #" + epee::string_tools::num_to_string_fast(i) + ": cannot be decoded");
       }
     }
     else
@@ -1461,26 +1556,21 @@ namespace currency
 
       for(size_t i = 0; i < req.outputs_addresses.size(); ++i)
       {
-        account_public_address addr{};
+        address_v addr_v{};
         payment_id_t payment_id{};
-        LOCAL_CHECK(currency::get_account_address_and_payment_id_from_str(addr, payment_id, req.outputs_addresses[i]) && payment_id.empty(), "output address #" + epee::string_tools::num_to_string_fast(i) + " couldn't be parsed or it is an integrated address (which is not supported)");
+        LOCAL_CHECK(currency::get_account_address_and_payment_id_from_str(addr_v, payment_id, req.outputs_addresses[i]) && payment_id.empty(), "output address #" + epee::string_tools::num_to_string_fast(i) + " couldn't be parsed or it is an integrated address (which is not supported)");
 
         crypto::key_derivation derivation{};
-        LOCAL_CHECK_INT_ERR(crypto::generate_key_derivation(addr.view_public_key, req.tx_secret_key, derivation), "output_address #" + epee::string_tools::num_to_string_fast(i) + ": generate_key_derivation failed");
+        LOCAL_CHECK_INT_ERR(generate_key_derivation(addr_v, req.tx_secret_key, derivation), "output #" + epee::string_tools::num_to_string_fast(i) + ": generate_key_derivation failed");
 
         bool decoded = false;
         for(size_t out_idx = 0; out_idx < tx.vout.size(); ++out_idx)
         {
-          tx_out_v& out_v = tx.vout[out_idx];
-          if (out_v.type() != typeid(tx_out_zarcanum))
-            continue;
-          const tx_out_zarcanum& zo = boost::get<tx_out_zarcanum>(out_v);
-      
-          auto& decoded_out = res.decoded_outputs.emplace_back();
-          decoded_out.out_index = out_idx;
-          decoded_out.address = req.outputs_addresses[i];
-          crypto::scalar_t amount_blinding_mask{}, asset_id_blinding_mask{};
-          if (!currency::decode_output_data(zo, derivation, out_idx, decoded_out.amount, decoded_out.asset_id, amount_blinding_mask, asset_id_blinding_mask, decoded_out.payment_id))
+          const tx_out_v& out_v = tx.vout[out_idx];
+          bool unknown_output_type = false;
+          bool decoded_using_this_out = decode_output(addr_v, out_v, i, out_idx, derivation, unknown_output_type);
+          LOCAL_CHECK_INT_ERR(!unknown_output_type, (std::string("unknown output type: ") + out_v.type().name()));
+          if (!decoded_using_this_out)
           {
             res.decoded_outputs.pop_back();
             continue; // this output is not decoded with the given address, try next one
@@ -1495,6 +1585,65 @@ namespace currency
     res.verified_tx_id = get_transaction_hash(tx);
 
     res.status = API_RETURN_CODE_OK;
+    return true;
+#undef LOCAL_CHECK
+#undef LOCAL_CHECK_INT_ERR
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool core_rpc_server::on_decrypt_tx_outs_and_update_op(const COMMAND_RPC_DECRYPT_TX_OUTS_AND_UPDATE_OP::request& req, COMMAND_RPC_DECRYPT_TX_OUTS_AND_UPDATE_OP::response& res, epee::json_rpc::error& error_resp, connection_context& cntx)
+  {
+#define LOCAL_CHECK(cond, msg)         if (!(cond)) { error_resp.code = CORE_RPC_ERROR_CODE_WRONG_PARAM;    error_resp.message = msg; LOG_PRINT_L1("on_decrypt_tx_outs_and_ownership_change: " << error_resp.message); return false; }
+#define LOCAL_CHECK_INT_ERR(cond, msg) if (!(cond)) { error_resp.code = CORE_RPC_ERROR_CODE_INTERNAL_ERROR; error_resp.message = msg; LOG_PRINT_L1("on_decrypt_tx_outs_and_ownership_change: " << error_resp.message); return false; }
+
+    COMMAND_RPC_DECRYPT_TX_DETAILS::response dtd_res{};
+    if (!on_decrypt_tx_details(req, dtd_res, error_resp, cntx))
+    {
+      res.status = dtd_res.status;
+      return false;
+    }
+
+    res.tx_in_json        = std::move(dtd_res.tx_in_json);
+    res.verified_tx_id    = std::move(dtd_res.verified_tx_id);
+
+    size_t sensitive_operations = 0;
+    // find out whether it normal transfer or ownership change
+    gateway_address_descriptor_operation gado{};
+    if (get_type_in_variant_container<gateway_address_descriptor_operation>(dtd_res.tx.extra, gado))
+    {
+      ++sensitive_operations;
+      if (gado.operation.type() == typeid(gateway_address_descriptor_operation_update))
+      {
+        // found gateway operation update
+        gateway_address_descriptor_operation_update& gadou = boost::get<gateway_address_descriptor_operation_update>(gado.operation);
+        res.gw_update.emplace();
+        res.gw_update->decoded_outputs = std::move(dtd_res.decoded_outputs);
+        res.gw_update->gw_updated_descriptor.emplace();
+        res.gw_update->gw_updated_descriptor->from_gateway_address_descriptor_base(gadou.descriptor);
+        res.gw_update->gw_updated_descriptor->opt_gateway_address.emplace(get_account_address_as_str(gadou.address_id));
+      }
+    }
+
+    asset_descriptor_operation ado{};
+    if (get_type_in_variant_container<asset_descriptor_operation>(dtd_res.tx.extra, ado))
+    {
+      ++sensitive_operations;
+      if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_UPDATE)
+      {
+        res.asset_update.emplace();
+        res.asset_update->decoded_outputs = std::move(dtd_res.decoded_outputs);
+        res.asset_update->asset_updated_descriptor.emplace(ado);
+      }
+    }
+
+    LOCAL_CHECK(sensitive_operations <= 1, "more the one sensitive operation (gw update, asset update) found in this transaction");
+
+    if (sensitive_operations == 0)
+    {
+      // consider as normal tx
+      res.normal_transfer.emplace();
+      res.normal_transfer->decoded_outputs = std::move(dtd_res.decoded_outputs);
+    }
+
     return true;
 #undef LOCAL_CHECK
 #undef LOCAL_CHECK_INT_ERR

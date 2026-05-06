@@ -240,8 +240,12 @@ bool do_serialize(Archive<false>& ar, std::unordered_map<K, T>& v)
 }
 
 template <template <bool> class Archive, class T, class K>
-bool do_serialize(Archive<true>& ar, std::unordered_map<K, T>& v)
+bool do_serialize(Archive<true>& ar, std::unordered_map<K, T>& v_)
 {
+  std::list<std::pair<K, T>> v(v_.begin(), v_.end());
+
+  v.sort([](const std::pair<K, T>& a, const std::pair<K, T>& b) -> bool { return a.first < b.first; });
+
   size_t cnt = v.size();
   ar.begin_array(cnt);
   for (auto it = v.begin(); it != v.end(); it++)

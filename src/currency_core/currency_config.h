@@ -10,7 +10,7 @@
 #ifndef TESTNET
 #define CURRENCY_FORMATION_VERSION                      84
 #else
-#define CURRENCY_FORMATION_VERSION                      102
+#define CURRENCY_FORMATION_VERSION                      103
 #endif
 
 #define CURRENCY_GENESIS_NONCE                          (CURRENCY_FORMATION_VERSION + 101011010121) //bender's nightmare
@@ -138,7 +138,11 @@
 #define STRARUM_DEFAULT_PORT                            51113
 #define P2P_NETWORK_ID_TESTNET_FLAG                     1
 #define P2P_MAINTAINERS_PUB_KEY                         "aaa2d7aabc8d383fd53a3ae898697b28f236ceade6bafc1eecff413a6a02272a"
-#define DIFFICULTY_POS_STARTER                          1
+#ifdef BUILD_TESTS
+#  define DIFFICULTY_POS_STARTER                        1
+#else
+#  define DIFFICULTY_POS_STARTER                        5'000'000'000'000'000'000ULL
+#endif
 #endif
 
 #define P2P_NETWORK_ID_VER                              (CURRENCY_FORMATION_VERSION+0)
@@ -313,14 +317,14 @@
 #define ZANO_HARDFORK_02_AFTER_HEIGHT                   0
 #define ZANO_HARDFORK_03_AFTER_HEIGHT                   0
 
-#define ZANO_HARDFORK_04_AFTER_HEIGHT                   800
-#define ZANO_HARDFORK_04_TIMESTAMP_ACTUAL               1776839453ull // 2026-02-22 06:30:53 UTC
+#define ZANO_HARDFORK_04_AFTER_HEIGHT                   850
+#define ZANO_HARDFORK_04_TIMESTAMP_ACTUAL               1778000000ull // 2026-05-05 16:53:20 UTC
 
-#define ZANO_HARDFORK_05_AFTER_HEIGHT                   801
-#define ZANO_HARDFORK_05_MIN_BUILD_VER                  472
+#define ZANO_HARDFORK_05_AFTER_HEIGHT                   851
+#define ZANO_HARDFORK_05_MIN_BUILD_VER                  474
 
-#define ZANO_HARDFORK_06_AFTER_HEIGHT                   1100
-#define ZANO_HARDFORK_06_MIN_BUILD_VER                  472
+#define ZANO_HARDFORK_06_AFTER_HEIGHT                   1050
+#define ZANO_HARDFORK_06_MIN_BUILD_VER                  474
 #endif
 
 

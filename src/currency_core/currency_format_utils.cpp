@@ -4878,6 +4878,18 @@ namespace currency
   {
     return epee::string_tools::parse_hexstr_to_binbuff(payment_id_str, payment_id);
   }
+  //-----------------------------------------------------------------------
+  bool generate_key_derivation(const address_v& addr_v, const crypto::secret_key& tx_secret_key, crypto::key_derivation& derivation)
+  {
+    VARIANT_SWITCH_BEGIN(addr_v)
+      VARIANT_CASE_CONST(account_public_address, normal_address)
+        return crypto::generate_key_derivation(normal_address.view_public_key, tx_secret_key, derivation);
+      VARIANT_CASE_CONST(gateway_address_id_type, gw_address)
+        return crypto::generate_key_derivation(gw_address, tx_secret_key, derivation);
+      VARIANT_CASE_OTHER()
+        return false;
+    VARIANT_SWITCH_END()
+  }
   //--------------------------------------------------------------------------------
   crypto::hash prepare_prefix_hash_for_sign(const transaction& tx, uint64_t in_index, const crypto::hash& tx_id)
   {

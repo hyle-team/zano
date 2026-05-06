@@ -41,6 +41,7 @@ namespace currency
     void set_rpc_chain_handler(epee::net_utils::http::i_chain_handler* prpc_chain_handler) { m_prpc_chain_handler = prpc_chain_handler; }
     bool on_get_blocks_direct(const COMMAND_RPC_GET_BLOCKS_DIRECT::request& req, COMMAND_RPC_GET_BLOCKS_DIRECT::response& res, connection_context& cntx);
     void set_ignore_connectivity_status(bool ignore) { m_ignore_offline_status = ignore;}
+    void set_enabled_admin_api(bool enabled) { m_enabled_admin_api = enabled; }
 
     bool on_get_height(const COMMAND_RPC_GET_HEIGHT::request& req, COMMAND_RPC_GET_HEIGHT::response& res, connection_context& cntx);
     bool on_get_blocks(const COMMAND_RPC_GET_BLOCKS_FAST::request& req, COMMAND_RPC_GET_BLOCKS_FAST::response& res, connection_context& cntx);
@@ -95,6 +96,7 @@ namespace currency
     bool on_get_asset_info(const COMMAND_RPC_GET_ASSET_INFO::request& req, COMMAND_RPC_GET_ASSET_INFO::response& res, connection_context& cntx);
     bool on_get_assets_list(const COMMAND_RPC_GET_ASSETS_LIST::request& req, COMMAND_RPC_GET_ASSETS_LIST::response& res, connection_context& cntx);
     bool on_decrypt_tx_details(const COMMAND_RPC_DECRYPT_TX_DETAILS::request& req, COMMAND_RPC_DECRYPT_TX_DETAILS::response& res, epee::json_rpc::error& error_resp, connection_context& cntx);
+    bool on_decrypt_tx_outs_and_update_op(const COMMAND_RPC_DECRYPT_TX_OUTS_AND_UPDATE_OP::request& req, COMMAND_RPC_DECRYPT_TX_OUTS_AND_UPDATE_OP::response& res, epee::json_rpc::error& error_resp, connection_context& cntx);
 
     bool on_get_main_block_details(const COMMAND_RPC_GET_BLOCK_DETAILS::request& req, COMMAND_RPC_GET_BLOCK_DETAILS::response& res, epee::json_rpc::error& error_resp, connection_context& cntx);
     bool on_get_alt_block_details(const COMMAND_RPC_GET_BLOCK_DETAILS::request& req, COMMAND_RPC_GET_BLOCK_DETAILS::response& res, epee::json_rpc::error& error_resp, connection_context& cntx);
@@ -108,7 +110,7 @@ namespace currency
     bool on_gateway_create_transfer(const COMMAND_RPC_GATEWAY_CREATE_TRANSFER::request& req, COMMAND_RPC_GATEWAY_CREATE_TRANSFER::response& res, connection_context& cntx);
     bool on_gateway_sign_transfer(const COMMAND_RPC_GATEWAY_SIGN_TRANSFER::request& req, COMMAND_RPC_GATEWAY_SIGN_TRANSFER::response& res, connection_context& cntx);
     bool on_gateway_create_owner_change(const COMMAND_RPC_GATEWAY_CREATE_OWNER_CHANGE::request& req, COMMAND_RPC_GATEWAY_CREATE_OWNER_CHANGE::response& res, connection_context& cntx);
-    bool on_gateway_sign_owner_change(const COMMAND_RPC_GATEWAY_SIGN_OWNER_CHANGE::request& req, COMMAND_RPC_GATEWAY_SIGN_OWNER_CHANGE::response& res, connection_context& cntx);
+    bool on_gateway_submit_owner_change(const COMMAND_RPC_GATEWAY_SUBMIT_OWNER_CHANGE::request& req, COMMAND_RPC_GATEWAY_SUBMIT_OWNER_CHANGE::response& res, connection_context& cntx);
     bool on_gateway_get_address_history(const COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY::request& req, COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY::response& res, connection_context& cntx);
 
 
@@ -178,6 +180,7 @@ namespace currency
         MAP_JON_RPC   ("get_asset_info",              on_get_asset_info,             COMMAND_RPC_GET_ASSET_INFO)
         MAP_JON_RPC   ("get_assets_list",             on_get_assets_list,            COMMAND_RPC_GET_ASSETS_LIST)
         MAP_JON_RPC_WE("decrypt_tx_details",          on_decrypt_tx_details,         COMMAND_RPC_DECRYPT_TX_DETAILS)
+        MAP_JON_RPC_WE("decrypt_tx_outs_and_update_op", on_decrypt_tx_outs_and_update_op, COMMAND_RPC_DECRYPT_TX_OUTS_AND_UPDATE_OP)
 
         MAP_JON_RPC_WE("get_main_block_details",      on_get_main_block_details,      COMMAND_RPC_GET_BLOCK_DETAILS)
         MAP_JON_RPC_WE("get_alt_block_details",       on_get_alt_block_details,       COMMAND_RPC_GET_BLOCK_DETAILS)
@@ -193,10 +196,10 @@ namespace currency
         
         //gateway addresses api
         MAP_JON_RPC("gateway_get_address_info",    on_gateway_get_address_info,    COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO)
-        MAP_JON_RPC("gateway_create_transfer",     on_gateway_create_transfer,     COMMAND_RPC_GATEWAY_CREATE_TRANSFER)
-        MAP_JON_RPC("gateway_sign_transfer",       on_gateway_sign_transfer,       COMMAND_RPC_GATEWAY_SIGN_TRANSFER)
-        MAP_JON_RPC("gateway_create_owner_change", on_gateway_create_owner_change, COMMAND_RPC_GATEWAY_CREATE_OWNER_CHANGE)
-        MAP_JON_RPC("gateway_sign_owner_change",   on_gateway_sign_owner_change,   COMMAND_RPC_GATEWAY_SIGN_OWNER_CHANGE)
+        MAP_JON_RPC_CONDITIONAL("gateway_create_transfer",     on_gateway_create_transfer,     COMMAND_RPC_GATEWAY_CREATE_TRANSFER, m_enabled_admin_api)
+        MAP_JON_RPC_CONDITIONAL("gateway_sign_transfer",       on_gateway_sign_transfer,       COMMAND_RPC_GATEWAY_SIGN_TRANSFER, m_enabled_admin_api)
+        MAP_JON_RPC_CONDITIONAL("gateway_create_owner_change", on_gateway_create_owner_change, COMMAND_RPC_GATEWAY_CREATE_OWNER_CHANGE, m_enabled_admin_api)
+        MAP_JON_RPC_CONDITIONAL("gateway_submit_owner_change", on_gateway_submit_owner_change, COMMAND_RPC_GATEWAY_SUBMIT_OWNER_CHANGE, m_enabled_admin_api)
         MAP_JON_RPC("gateway_get_address_history", on_gateway_get_address_history, COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY)
 
         CHAIN_TO_PHANDLER(m_prpc_chain_handler)

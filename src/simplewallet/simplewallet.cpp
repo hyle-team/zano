@@ -143,6 +143,7 @@ namespace
   const command_line::arg_descriptor<bool>          arg_seed_doctor("seed-doctor", "Experimental: if your seed is not working for recovery this is likely because you've made a mistake whene you were doing back up(typo, wrong words order, missing word). This experimental code will attempt to recover seed phrase from with few approaches.");
   const command_line::arg_descriptor<bool>          arg_no_whitelist("no-white-list", "Do not load white list from interned.");
   const command_line::arg_descriptor<std::string>   arg_restore_ki_in_wo_wallet("restore-ki-in-wo-wallet", "Watch-only missing key images restoration. Please, DON'T use it unless you 100% sure of what are you doing.", "");
+  const command_line::arg_descriptor<bool>          arg_resync_and_exit("resync-and-exit", "Resync the wallet, keeping tx keys (but clearing pending key images for watch-only wallets!). Exit when done.", "");
   const command_line::arg_descriptor<bool>          arg_no_idle_unlock_spent("no-idle-unlock-utxo", "Do not unlock utxo that looks like it should be unlocked(marked as spent but no unconfirmed tx that spends it).");
   const command_line::arg_descriptor<int>           arg_concise_mode("concise-mode", "When in concise mode (=1, default) the wallet removes spent UTXO/txs from history after some time to keep its size sane. Can be disabled (=0) if necessary.", 1);
 
@@ -201,6 +202,12 @@ namespace
     std::ostream& operator<<(const T& val)
     {
       m_oss << val;
+      return m_oss;
+    }
+
+    std::ostream& operator<<(std::ostream& (*manip)(std::ostream&))
+    {
+      m_oss << manip;
       return m_oss;
     }
 
@@ -336,7 +343,7 @@ simple_wallet::simple_wallet()
   m_cmd_binder.set_handler("tracking_seed", boost::bind(&simple_wallet::tracking_seed, this,ph::_1), "For auditable wallets: prints tracking seed for wallet's audit by a third party");
 
   m_cmd_binder.set_handler("save", boost::bind(&simple_wallet::save, this,ph::_1), "Save wallet synchronized data");
-  m_cmd_binder.set_handler("save_watch_only", boost::bind(&simple_wallet::save_watch_only, this,ph::_1), "save_watch_only <filename> <password> - save as watch-only wallet file.");
+  m_cmd_binder.set_handler("save_watch_only", boost::bind(&simple_wallet::save_watch_only, this,ph::_1), "save_watch_only <filename> [password] - save as watch-only wallet file. If password is omitted, it will be asked interactively.");
 
   m_cmd_binder.set_handler("sign_transfer", boost::bind(&simple_wallet::sign_transfer, this,ph::_1), "sign_transfer <unsgined_tx_file> <signed_tx_file> - sign unsigned tx from a watch-only wallet");
   m_cmd_binder.set_handler("submit_transfer", boost::bind(&simple_wallet::submit_transfer, this,ph::_1), "submit_transfer <signed_tx_file> - broadcast signed tx");
@@ -559,6 +566,18 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
     m_do_refresh_after_load = false;
   }
 
+  if (!m_do_refresh_after_load && m_do_resync_and_exit)
+  {
+    fail_msg_writer() << "conflicting parameters: --resync-and-exit AND --no-refresh";
+    return false;
+  }
+
+  if (m_offline_mode && m_do_resync_and_exit)
+  {
+    fail_msg_writer() << "conflicting parameters: --resync-and-exit AND --offline-mode";
+    return false;
+  }
+
   m_password_salt = crypto::rand<uint64_t>();
   m_password_hash = get_hash_from_pass_and_salt(pwd_container.password(), m_password_salt);
 
@@ -621,6 +640,30 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
 
   m_wallet->init(m_daemon_address);
 
+  if (was_open && m_do_resync_and_exit)
+  {
+    message_writer(epee::log_space::console_color_yellow, true, std::string(), LOG_LEVEL_0) << "NOTE: resync and exit requested; proceeding...";
+    if (!try_connect_to_daemon())
+      return false;
+    uint64_t top_height_before = m_wallet->get_top_block_height();
+    m_wallet->reset_history();
+    if (m_wallet->is_watch_only())
+      m_wallet->reset_pending_keyimages();
+    refresh(std::vector<std::string>());
+    uint64_t top_height_after = m_wallet->get_top_block_height();
+    if (top_height_after >= top_height_before)
+    {
+      message_writer(epee::log_space::console_color_green, true, std::string(), LOG_LEVEL_0) << "resync completed, " << (m_wallet->is_watch_only() ? "pending ki reset, " : "") << "terminating as requested...";
+      if (m_wallet->is_watch_only())
+        message_writer(epee::log_space::console_color_yellow, true, std::string(), LOG_LEVEL_0) << ENDL << "WARNING: wallet balance is almost certainly incorrect. You must restore key images using the master wallet." << ENDL;
+    }
+    else
+      fail_msg_writer() << "resync wasn't successfull, try again";
+    close_wallet();
+    return false;
+  }
+
+
   if (was_open && (m_do_refresh_after_load && !m_offline_mode))
     refresh(std::vector<std::string>());
 
@@ -658,11 +701,6 @@ void simple_wallet::handle_command_line(const boost::program_options::variables_
   m_no_whitelist = command_line::get_arg(vm, arg_no_whitelist);
   m_restore_ki_in_wo_wallet = command_line::get_arg(vm, arg_restore_ki_in_wo_wallet);
   m_do_not_unlock_reserved_on_idle = command_line::get_arg(vm, arg_no_idle_unlock_spent);
-  m_enable_tx_socks5_relay_proxy = command_line::get_arg(vm, command_line::arg_enable_tx_socks5_relay_proxy);
-  m_tx_relay_url = command_line::get_arg(vm, command_line::arg_tx_relay_url);
-  m_enable_block_socks5_relay_proxy = command_line::get_arg(vm, command_line::arg_enable_block_socks5_relay_proxy);
-  m_block_relay_url = command_line::get_arg(vm, command_line::arg_block_relay_url);
-
   m_concise_mode    = command_line::get_arg(vm, arg_concise_mode) == 1;
 
   m_allow_legacy_payment_id_size = command_line::has_arg(vm, command_line::arg_allow_legacy_payment_id_size);
@@ -830,7 +868,8 @@ bool simple_wallet::open_wallet(const string &wallet_file, const std::string& pa
   {
     try
     {
-      m_wallet->load(epee::string_encoding::utf8_to_wstring(m_wallet_file), password);
+      bool skip_pending_ki_load = m_do_resync_and_exit;
+      m_wallet->load(epee::string_encoding::utf8_to_wstring(m_wallet_file), password, skip_pending_ki_load);
       print_wallet_opened_msg();
       preconfig_wallet_obj();
       display_vote_info(*m_wallet);
@@ -896,23 +935,24 @@ bool simple_wallet::save(const std::vector<std::string> &args)
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::process_ki_restoration()
 {
-  if (!m_restore_ki_in_wo_wallet.empty())
-  {
-    std::wstring wo_filename = epee::string_encoding::utf8_to_wstring(m_restore_ki_in_wo_wallet);
-    CHECK_AND_ASSERT_THROW_MES(std::filesystem::exists(wo_filename), "cannot open " << m_restore_ki_in_wo_wallet);
+  SIMPLE_WALLET_BEGIN_TRY_ENTRY()
+  if (m_restore_ki_in_wo_wallet.empty())
+    return true; // means the wallet can load and work further normally
 
-    tools::password_container wo_password;
-    if (!wo_password.read_password("Enter password for wallet " + m_restore_ki_in_wo_wallet + " :"))
-      return false;
+  std::wstring wo_filename = epee::string_encoding::utf8_to_wstring(m_restore_ki_in_wo_wallet);
+  CHECK_AND_ASSERT_THROW_MES(std::filesystem::exists(wo_filename), "cannot open " << m_restore_ki_in_wo_wallet);
 
-    m_wallet->restore_key_images_in_wo_wallet(wo_filename, wo_password.password());
+  tools::password_container wo_password;
+  if (!wo_password.read_password("Enter password for wallet " + m_restore_ki_in_wo_wallet + " :"))
+    return false;
 
-    success_msg_writer() << "Missing key images have been successfully repared in " << m_restore_ki_in_wo_wallet << ENDL;
-    
-    return false; // means the wallet processing should stop now
-  }
+  m_wallet->restore_key_images_in_wo_wallet(wo_filename, wo_password.password());
 
-  return true; // means the wallet can load and work further normally
+  message_writer(epee::log_space::console_color_green, true, std::string(), LOG_LEVEL_0) << ENDL << "Missing key images have been successfully repaired in " << m_restore_ki_in_wo_wallet << ENDL;
+
+  SIMPLE_WALLET_CATCH_TRY_ENTRY();
+
+  return false; // means the wallet processing should stop now
 }
 //----------------------------------------------------------------------------------------------------
 #ifdef CPU_MINING_ENABLED
@@ -1940,7 +1980,7 @@ bool simple_wallet::transfer_impl(const std::vector<std::string> &args_, uint64_
           }
           if (i != 0)
           {
-            fail_msg_writer() << "long embedded payment id: " << epee::string_tools::buff_to_hex_nodelimer(embedded_payment_id) << " can only be set for the first destination (and so you can use integrated address with long payment id only for the fist destination)";
+            fail_msg_writer() << "long embedded payment id: " << epee::string_tools::buff_to_hex_nodelimer(embedded_payment_id) << " can only be set for the first destination (and so you can use integrated address with long payment id only for the first destination)";
             return true;
           }
           legacy_tx_wide_payment_id = embedded_payment_id;
@@ -1965,7 +2005,7 @@ bool simple_wallet::transfer_impl(const std::vector<std::string> &args_, uint64_
         }
         if (i != 0)
         {
-          fail_msg_writer() << "embedded payment id: " << epee::string_tools::buff_to_hex_nodelimer(embedded_payment_id) << " currently can only be set for the first destination (and so you can use integrated address only for the fist destination)";
+          fail_msg_writer() << "embedded payment id: " << epee::string_tools::buff_to_hex_nodelimer(embedded_payment_id) << " currently can only be set for the first destination (and so you can use integrated address only for the first destination)";
           return true;
         }
         legacy_tx_wide_payment_id = embedded_payment_id;
@@ -2377,14 +2417,42 @@ void simple_wallet::set_offline_mode(bool offline_mode)
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::save_watch_only(const std::vector<std::string> &args)
 {
-  if (args.size() < 2)
+  if (args.size() < 1)
   {
-    fail_msg_writer() << "wrong parameters, expected filename and password";
+    fail_msg_writer() << "wrong parameters, expected filename";
     return true;
   }
+
+  std::string password;
+  if (args.size() >= 2)
+  {
+    password = args[1];
+  }
+  else
+  {
+    tools::password_container pwd_container;
+    if (!pwd_container.read_password("Enter password for the watch-only wallet: "))
+    {
+      fail_msg_writer() << "failed to read password";
+      return true;
+    }
+    tools::password_container pwd_container_confirm;
+    if (!pwd_container_confirm.read_password("Confirm password: "))
+    {
+      fail_msg_writer() << "failed to read password";
+      return true;
+    }
+    if (pwd_container.password() != pwd_container_confirm.password())
+    {
+      fail_msg_writer() << "passwords do not match";
+      return true;
+    }
+    password = pwd_container.password();
+  }
+
   try
   {
-    m_wallet->store_watch_only(epee::string_encoding::convert_to_unicode(args[0]), args[1]);
+    m_wallet->store_watch_only(epee::string_encoding::convert_to_unicode(args[0]), password);
     success_msg_writer() << "Watch-only wallet has been stored to " << args[0];
   }
   catch (const std::exception& e)
@@ -2403,7 +2471,7 @@ bool simple_wallet::list_outputs(const std::vector<std::string> &args)
   bool include_spent = true, include_unspent = true, show_only_unknown = false;
   std::string filter_asset_ticker{};
 
-  bool arg_spent_flags = false, arg_unknown_assets = false, arg_ticker_filer = false;
+  bool arg_spent_flags = false, arg_unknown_assets = false, arg_ticker_filer = false, show_ki_instead_of_aid = false;
 
   auto process_arg = [&](const std::string& arg) -> bool {
     if (!arg_spent_flags && (arg == "u" || arg == "unspent" || arg == "available"))
@@ -2414,6 +2482,8 @@ bool simple_wallet::list_outputs(const std::vector<std::string> &args)
       arg_unknown_assets = true, show_only_unknown = true;
     else if (!arg_ticker_filer && (arg.find("ticker=") == 0 || arg.find("t=") == 0))
       arg_ticker_filer = true, filter_asset_ticker = boost::erase_all_copy(boost::erase_all_copy(arg, "ticker="), "t=");
+    else if (!show_ki_instead_of_aid && (arg == "ki" || arg == "kis" || arg == "keyimage" || arg == "keyimages"))
+      show_ki_instead_of_aid = true;
     else
       return false;
     return true;
@@ -2428,7 +2498,7 @@ bool simple_wallet::list_outputs(const std::vector<std::string> &args)
     }
   }
 
-  success_msg_writer() << m_wallet->get_transfers_str(include_spent, include_unspent, show_only_unknown, filter_asset_ticker);
+  success_msg_writer() << m_wallet->get_transfers_str(include_spent, include_unspent, show_only_unknown, filter_asset_ticker, show_ki_instead_of_aid);
 
   return true;
 }
@@ -3694,6 +3764,7 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_params, command_line::arg_enable_block_socks5_relay_proxy);
   command_line::add_arg(desc_params, command_line::arg_block_relay_url);
   command_line::add_arg(desc_params, arg_concise_mode);
+  command_line::add_arg(desc_params, arg_resync_and_exit);
 
 
   tools::wallet_rpc_server::init_options(desc_params);
@@ -3986,7 +4057,12 @@ int main(int argc, char* argv[])
     //runs wallet with console interface
     sw->set_offline_mode(offline_mode);
     r = sw->init(vm);
-    CHECK_AND_ASSERT_MES(r, EXIT_FAILURE, "Failed to initialize wallet");
+    if (!r)
+    {
+      message_writer(epee::log_space::console_color_default, true, std::string(), LOG_LEVEL_0) << "\nWallet initialization interrupted, exiting...";
+      return EXIT_FAILURE;
+    }
+
     if (command_line::get_arg(vm, arg_generate_new_wallet).size() || command_line::get_arg(vm, arg_generate_new_auditable_wallet).size())
       return EXIT_FAILURE;
 
