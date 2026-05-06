@@ -138,7 +138,11 @@
 #define STRARUM_DEFAULT_PORT                            51113
 #define P2P_NETWORK_ID_TESTNET_FLAG                     1
 #define P2P_MAINTAINERS_PUB_KEY                         "aaa2d7aabc8d383fd53a3ae898697b28f236ceade6bafc1eecff413a6a02272a"
-#define DIFFICULTY_POS_STARTER                          5'000'000'000'000'000'000ULL
+#ifdef BUILD_TESTS
+#  define DIFFICULTY_POS_STARTER                        1
+#else
+#  define DIFFICULTY_POS_STARTER                        5'000'000'000'000'000'000ULL
+#endif
 #endif
 
 #define P2P_NETWORK_ID_VER                              (CURRENCY_FORMATION_VERSION+0)
