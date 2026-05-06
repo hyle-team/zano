@@ -13,6 +13,7 @@
 #include <string>
 
 #include "crypto/chacha.h"
+#include "crypto/wallet_kdf.h"
 #include "currency_core/crypto_config.h"
 #include "currency_core/currency_config.h"
 

@@ -30,6 +30,7 @@ using namespace epee;
 
 #include "common/boost_serialization_helper.h"
 #include "crypto/crypto.h"
+#include "crypto/wallet_kdf.h"
 #include "serialization/binary_utils.h"
 #include "currency_core/bc_payments_id_service.h"
 #include "version.h"
