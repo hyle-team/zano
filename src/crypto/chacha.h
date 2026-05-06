@@ -13,7 +13,6 @@
 
 #if defined(__cplusplus)
 #include <memory.h>
-#include <vector>
 namespace crypto
 {
   // all C function share the same space of names regardless of 'namespace', but here we put it into crypto just for convenience -- sowle
@@ -117,6 +116,7 @@ namespace crypto
     static_assert(std::is_trivially_copyable_v<T>, "Type must be trivially copyable (POD)");
     chacha20(&pod_object, sizeof pod_object, key, iv, &pod_object);
   }
+
 
   //
   // legacy functions
