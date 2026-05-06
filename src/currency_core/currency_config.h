@@ -10,7 +10,7 @@
 #ifndef TESTNET
 #define CURRENCY_FORMATION_VERSION                      84
 #else
-#define CURRENCY_FORMATION_VERSION                      102
+#define CURRENCY_FORMATION_VERSION                      103
 #endif
 
 #define CURRENCY_GENESIS_NONCE                          (CURRENCY_FORMATION_VERSION + 101011010121) //bender's nightmare
@@ -310,14 +310,14 @@
 #define ZANO_HARDFORK_02_AFTER_HEIGHT                   0
 #define ZANO_HARDFORK_03_AFTER_HEIGHT                   0
 
-#define ZANO_HARDFORK_04_AFTER_HEIGHT                   800
-#define ZANO_HARDFORK_04_TIMESTAMP_ACTUAL               1776839453ull // 2026-02-22 06:30:53 UTC
+#define ZANO_HARDFORK_04_AFTER_HEIGHT                   1440
+#define ZANO_HARDFORK_04_TIMESTAMP_ACTUAL               1778000000ull // 2026-05-05 16:53:20 UTC
 
-#define ZANO_HARDFORK_05_AFTER_HEIGHT                   801
-#define ZANO_HARDFORK_05_MIN_BUILD_VER                  472
+#define ZANO_HARDFORK_05_AFTER_HEIGHT                   1441
+#define ZANO_HARDFORK_05_MIN_BUILD_VER                  474
 
-#define ZANO_HARDFORK_06_AFTER_HEIGHT                   1100
-#define ZANO_HARDFORK_06_MIN_BUILD_VER                  472
+#define ZANO_HARDFORK_06_AFTER_HEIGHT                   1800
+#define ZANO_HARDFORK_06_MIN_BUILD_VER                  474
 #endif
 
 
