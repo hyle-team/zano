@@ -130,7 +130,7 @@ namespace
   const command_line::arg_descriptor<bool>          arg_dont_set_date  ( "no-set-creation-date", "Do not set wallet creation date", false);
   const command_line::arg_descriptor<int>           arg_daemon_port  ("daemon-port", "Use daemon instance at port <arg> instead of default", 0);
   const command_line::arg_descriptor<bool>          arg_do_pos_mining  ( "do-pos-mining", "Do PoS mining", false);
-  const command_line::arg_descriptor<std::string>   arg_pos_mining_reward_address  ( "pos-mining-reward-address", "Block reward will be sent to the giving address if specified", "" );
+  const command_line::arg_descriptor<std::string>   arg_pos_mining_reward_address  ( "pos-mining-reward-address", "Block reward will be sent to the giving address if specified(Not recommended, as this may have privacy implications.)", "" );
   const command_line::arg_descriptor<std::string>   arg_pos_mining_defrag  ( "pos-mining-defrag", "<min_outs_cnt>,<max_outs_cnt>,<amount_limit>|disable Generate defragmentation tx for small outputs each time a PoS block is found. Disabled by default. If empty string given, the default params used: " STR(DEFAULT_WALLET_MIN_UTXO_COUNT_FOR_DEFRAGMENTATION_TX) "," STR(DEFAULT_WALLET_MAX_UTXO_COUNT_FOR_DEFRAGMENTATION_TX) ",1.0", "disable" );
   const command_line::arg_descriptor<std::string>   arg_restore_wallet  ( "restore-wallet", "Restore wallet from seed phrase or tracking seed and save it to <arg>", "" );
   const command_line::arg_descriptor<bool>          arg_offline_mode  ( "offline-mode", "Don't connect to daemon, work offline (for cold-signing process)");
