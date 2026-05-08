@@ -749,6 +749,8 @@ namespace currency
     if(!m_core.find_blockchain_supplement(arg.block_ids, r))
     {
       LOG_PRINT_CC_RED(m_connection_context, "[HANDLE]NOTIFY_REQUEST_CHAIN: failed (find_blockchain_supplement failed, arg.block_ids.size()=" << arg.block_ids.size() << ").", LOG_LEVEL_1);
+      m_p2p->drop_connection(context);
+      m_p2p->add_ip_fail(context.m_remote_ip);
       return 1;
     }
     LOG_PRINT_L2("[NOTIFY]NOTIFY_RESPONSE_CHAIN_ENTRY: m_start_height=" << r.start_height << ", m_total_height=" << r.total_height << ", m_block_ids.size()=" << r.m_block_ids.size());
