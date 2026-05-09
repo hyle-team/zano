@@ -125,7 +125,7 @@ namespace tools
       : m_total_written(0)
       , m_base_iv(iv)
     {
-      crypto::chacha_generate_key_and_iv(hdss, pass.data(), pass.size(), 0, m_key);
+      crypto::chacha_generate_key(hdss, pass.data(), pass.size(), 0, m_key);
     }
 
     ~encrypt_chacha20_processer_base()

@@ -92,7 +92,7 @@ namespace crypto
     iv = hash_result.iv;
   }
 
-  inline void chacha_generate_key_and_iv(const char(&hdss)[32], const void* p_data, size_t data_size, uint64_t index, chacha_key& key)
+  inline void chacha_generate_key(const char(&hdss)[32], const void* p_data, size_t data_size, uint64_t index, chacha_key& key)
   {
     chacha_iv iv_dummy{};
     chacha_generate_key_and_iv(hdss, p_data, data_size, index, key, iv_dummy);

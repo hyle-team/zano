@@ -3026,7 +3026,7 @@ bool wallet2::store_keys(std::string& buff, const std::string& password, wallet2
   
 
   crypto::chacha_key key;
-  crypto::chacha_generate_key_and_iv(CRYPTO_HDS_CHACHA_WALLET_HEADER, password.data(), password.size(), 0, key);
+  crypto::chacha_generate_key(CRYPTO_HDS_CHACHA_WALLET_HEADER, password.data(), password.size(), 0, key);
   std::string cipher;
   cipher.resize(account_data.size());
   keys_file_data.iv = crypto::rand<crypto::chacha_iv>(); 
@@ -3161,7 +3161,7 @@ void wallet2::load_keys(const std::string& buff, const std::string& password, ui
   {
     //version 2
     crypto::chacha_key key;
-    crypto::chacha_generate_key_and_iv(CRYPTO_HDS_CHACHA_WALLET_HEADER, password.data(), password.size(), 0, key);
+    crypto::chacha_generate_key(CRYPTO_HDS_CHACHA_WALLET_HEADER, password.data(), password.size(), 0, key);
     account_data.resize(kf_data.account_data.size());
     crypto::chacha20(kf_data.account_data.data(), kf_data.account_data.size(), key, kf_data.iv, &account_data[0]);
   }
