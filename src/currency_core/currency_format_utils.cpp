@@ -5003,6 +5003,7 @@ namespace currency
   {
     if (meta_info_name.size() > ASSET_META_INFO_MAX_SIZE)
       return false;
+    return true;
   }
   //------------------------------------------------------------------
   bool validate_asset_ticker_and_full_name(const asset_descriptor_base& adb)
