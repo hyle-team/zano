@@ -6936,14 +6936,81 @@ bool wallet2::validate_sign(const std::string& buff, const crypto::signature& si
   return crypto::check_signature(h, pkey, sig);
 }
 //----------------------------------------------------------------------------------------------------
+namespace 
+{
+  struct wallet_cmd_encrypt_data_result
+  {
+    static constexpr uint32_t magic_number_reference_value = 0x45574E5A; // "ZNWE"
+    uint32_t magic_number = magic_number_reference_value;
+    uint8_t version = 0;
+    uint64_t iv_nonce;
+    std::string encrypted_data;
+    BEGIN_SERIALIZE_OBJECT()
+      FIELD(magic_number)
+      VERSION_TO_MEMBER(0, version)
+      FIELD(iv_nonce)
+      FIELD(encrypted_data)
+    END_SERIALIZE()
+  };
+}
 bool wallet2::encrypt_buffer(const std::string& buff, std::string& res_buff)
 {
-  res_buff = buff;
-  crypto::chacha_crypt_legacy(res_buff, m_account.get_keys().view_secret_key);
+  // TODO: consider moving to chacha20-poly1305 / or incremental keccak at least in future -- sowle
+  crypto::chacha_key key{};
+  crypto::chacha_generate_key(CRYPTO_HDS_CHACHA_WALLET_GENERIC_ENCODE, m_account.get_keys().view_secret_key.data, sizeof(m_account.get_keys().view_secret_key), 0, key);
+
+  uint64_t nonce = crypto::rand<uint64_t>();
+  std::string buff_for_hash = buff;
+  epst::append_pod_to_strbuff(nonce, buff_for_hash);
+  epst::append_pod_to_strbuff(key, buff_for_hash);
+
+  std::string hash128_str;
+  crypto::hash h = crypto::cn_fast_hash(buff_for_hash.data(), buff_for_hash.size()); // h = keccak(m || chacha_iv || chacha_key)
+  hash128_str.append((const char*)&h, 16);
+
+  crypto::chacha_iv iv{};
+  iv.u64 = nonce;
+  wallet_cmd_encrypt_data_result data_result{};
+  data_result.iv_nonce = nonce;
+  data_result.encrypted_data = crypto::chacha20(key, iv, buff + hash128_str);        // encrypted_data = chacha20(chacha_key, chacha_iv, m || h[0..15])
+
+  bool r = t_serializable_object_to_blob(data_result, res_buff);
+  WLT_CHECK_AND_ASSERT_MES(r, false, "t_serializable_object_to_blob(data_result) failed");
+
   return true;
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::decrypt_buffer(const std::string& buff, std::string& res_buff)
+{
+  wallet_cmd_encrypt_data_result data_result{};
+  bool r = t_unserializable_object_from_blob(data_result, buff);
+  WLT_CHECK_AND_ASSERT_MES(r, false, "t_unserializable_object_from_blob(data_result) failed");
+  WLT_CHECK_AND_ASSERT_MES(data_result.magic_number == wallet_cmd_encrypt_data_result::magic_number_reference_value, false, "incorrect magic number");
+
+  crypto::chacha_key key{};
+  crypto::chacha_generate_key(CRYPTO_HDS_CHACHA_WALLET_GENERIC_ENCODE, m_account.get_keys().view_secret_key.data, sizeof(m_account.get_keys().view_secret_key), 0, key);
+  crypto::chacha_iv iv{};
+  iv.u64 = data_result.iv_nonce;
+  res_buff = crypto::chacha20(key, iv, data_result.encrypted_data); // res_buf = buff + buff_hash128_str
+
+  WLT_CHECK_AND_ASSERT_MES(res_buff.size() >= 16, false, "too small data buffer, probably tampered");
+  std::string hash128_str_decoded = res_buff.substr(res_buff.size() - 16);
+  res_buff.erase(res_buff.size() - 16);
+
+  std::string buff_for_hash = res_buff;
+  epst::append_pod_to_strbuff(data_result.iv_nonce, buff_for_hash);
+  epst::append_pod_to_strbuff(key, buff_for_hash);
+
+  std::string hash128_str_calculated; // 128 bit hash
+  crypto::hash h = crypto::cn_fast_hash(buff_for_hash.data(), buff_for_hash.size()); // h = keccak(m || chacha_iv || chacha_key)
+  hash128_str_calculated.append((const char*)&h, 16);
+
+  WLT_CHECK_AND_ASSERT_MES(hash128_str_decoded == hash128_str_calculated, false, "hash128 missmatch");
+
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
+bool wallet2::decrypt_buffer_legacy(const std::string& buff, std::string& res_buff)
 {
   res_buff = buff;
   crypto::chacha_crypt_legacy(res_buff, m_account.get_keys().view_secret_key);

@@ -86,6 +86,7 @@ namespace tools
     const static command_line::arg_descriptor<std::string> arg_miner_text_info;
     const static command_line::arg_descriptor<bool>        arg_deaf_mode;
     const static command_line::arg_descriptor<std::string> arg_jwt_secret;
+    const static command_line::arg_descriptor<bool>        arg_allow_legacy_decrypt;
 
 
 
@@ -177,6 +178,7 @@ namespace tools
         MAP_JON_RPC_WE("sign_message",                        on_sign_message,                  wallet_public::COMMAND_SIGN_MESSAGE)
         MAP_JON_RPC_WE("encrypt_data",                        on_encrypt_data,                  wallet_public::COMMAND_ENCRYPT_DATA)
         MAP_JON_RPC_WE("decrypt_data",                        on_decrypt_data,                  wallet_public::COMMAND_DECRYPT_DATA)
+        MAP_JON_RPC_WE("decrypt_data_legacy",                 on_decrypt_data_legacy,           wallet_public::COMMAND_DECRYPT_DATA_LEGACY)
 
         //utility call
         MAP_JON_RPC_WE("proxy_to_daemon",                     on_proxy_to_daemon,               wallet_public::COMMAND_PROXY_TO_DAEMON)
@@ -250,6 +252,7 @@ namespace tools
     bool on_sign_message(const wallet_public::COMMAND_SIGN_MESSAGE::request& req, wallet_public::COMMAND_SIGN_MESSAGE::response& res, epee::json_rpc::error& er, connection_context& cntx);
     bool on_encrypt_data(const wallet_public::COMMAND_ENCRYPT_DATA::request& req, wallet_public::COMMAND_ENCRYPT_DATA::response& res, epee::json_rpc::error& er, connection_context& cntx);
     bool on_decrypt_data(const wallet_public::COMMAND_DECRYPT_DATA::request& req, wallet_public::COMMAND_DECRYPT_DATA::response& res, epee::json_rpc::error& er, connection_context& cntx);
+    bool on_decrypt_data_legacy(const wallet_public::COMMAND_DECRYPT_DATA_LEGACY::request& req, wallet_public::COMMAND_DECRYPT_DATA_LEGACY::response& res, epee::json_rpc::error& er, connection_context& cntx);
 
     bool on_proxy_to_daemon(const wallet_public::COMMAND_PROXY_TO_DAEMON::request& req, wallet_public::COMMAND_PROXY_TO_DAEMON::response& res, epee::json_rpc::error& er, connection_context& cntx);
     bool on_clear_utxo_cold_sig_reservation(const wallet_public::COMMAND_CLEAR_UTXO_COLD_SIG_RESERVATION::request& req, wallet_public::COMMAND_CLEAR_UTXO_COLD_SIG_RESERVATION::response& res, epee::json_rpc::error& er, connection_context& cntx);
@@ -272,6 +275,7 @@ namespace tools
     bool m_do_mint;
     bool m_deaf;
     bool m_allow_legacy_payment_id_size;
+    bool m_allow_legacy_decrypt;
     uint64_t m_last_wallet_store_height;
     std::string m_jwt_secret;
     epee::misc_utils::expirating_set<std::string, uint64_t> m_jwt_used_salts;
