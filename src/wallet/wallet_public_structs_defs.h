@@ -755,6 +755,108 @@ namespace tools::wallet_public
     };
   };
 
+  struct COMMAND_RPC_GET_OUTPUTS
+  {
+    DOC_COMMAND("Returns a list of UTXO/STXO of the wallet (i.e. outputs that were sent to this wallet).");
+
+    struct request
+    {
+      std::string         output_type; // "all"/"", "spent"/"unavailable", "unspent"/"available"
+      crypto::public_key  asset_id;
+      
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(output_type)                DOC_DSCR("(optional) Type of outputs to get. Options are: 'all'/'', 'spent'/'unavailable', 'unspent'/'available', default is 'all'. Note: old spent transfers are truncated from wallet's history unless the wallet is in concise mode.") DOC_EXMP("unspent") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(asset_id) DOC_DSCR("(optional) If specified, only outs with the given asset id will be returned.")  DOC_EXMP("cc608f59f8080e2fbfe3c8c80eb6e6a953d47cf2d6aebd345bada3a1cab99852")   DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct output_details
+    {
+      uint64_t out_id;
+      uint64_t amount;
+      crypto::public_key asset_id;
+      crypto::key_image key_image;
+      crypto::public_key pub_key;
+      crypto::hash tx_id;
+      uint64_t tx_out_index;
+      uint64_t global_index;
+      uint64_t block_height;
+      uint64_t block_timestamp;
+      uint64_t spent_height;
+      uint8_t flags;
+      bool spent;
+      bool spendable;
+      bool native_coin;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(out_id)                     DOC_DSCR("Wallet-internal output ID (stable for the wallet's lifetime). Can be passed to 'transfer' via 'out_ids_to_spend' to constrain output selection.") DOC_EXMP(10) DOC_END
+        KV_SERIALIZE(amount)                     DOC_DSCR("Output amount.") DOC_EXMP(1000000000000) DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(asset_id) DOC_DSCR("Asset ID of the output.") DOC_EXMP("cc608f59f8080e2fbfe3c8c80eb6e6a953d47cf2d6aebd345bada3a1cab99852") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(key_image)DOC_DSCR("Key image computed for this output.") DOC_EXMP("97d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(pub_key)  DOC_DSCR("Output's public key.") DOC_EXMP("01220e8304d46b940a86e383d55ca5887b34f158a7365bbcdd17c5a305814a93") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(tx_id)    DOC_DSCR("Hash of the transaction that produced this output.") DOC_EXMP("5509650e12c8f901e6731a2bfaf3abfd64409e3e1366d3d94cd11db8beddb0c3") DOC_END
+        KV_SERIALIZE(tx_out_index)               DOC_DSCR("Index of this output within the producing transaction's output vector.") DOC_EXMP(2) DOC_END
+        KV_SERIALIZE(global_index)               DOC_DSCR("Global output index assigned by the blockchain.") DOC_EXMP(123456) DOC_END
+        KV_SERIALIZE(block_height)               DOC_DSCR("Height of the block containing the producing transaction.") DOC_EXMP(2734512) DOC_END
+        KV_SERIALIZE(block_timestamp)            DOC_DSCR("Unix timestamp of the block containing the producing transaction.") DOC_EXMP(1712590951) DOC_END
+        KV_SERIALIZE(spent_height)               DOC_DSCR("Height of the block in which this output was spent on-chain, or 0 if not yet spent on-chain.") DOC_EXMP(0) DOC_END
+        KV_SERIALIZE(flags)                      DOC_DSCR("Bitmask of state flags: 0x01 -- spent, 0x02 -- blocked, 0x04 -- reserved for an escrow proposal, 0x08 -- mined output, 0x10 -- reserved for cold-signing, 0x80 -- reserved for an asset operation with external signing.") DOC_EXMP(8) DOC_END
+        KV_SERIALIZE(spent)                      DOC_DSCR("True if the output is marked as spent.") DOC_EXMP(false) DOC_END
+        KV_SERIALIZE(spendable)                  DOC_DSCR("True if the output is currently eligible for a new transfer (unspent, unblocked, and not reserved).") DOC_EXMP(true) DOC_END
+        KV_SERIALIZE(native_coin)                DOC_DSCR("True if 'asset_id' is the native-coin asset ID.") DOC_EXMP(true) DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      std::vector<output_details> outputs;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(outputs)                   DOC_DSCR("List of outputs.") DOC_EXMP_AUTO(1) DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+  
+  struct COMMAND_RPC_GET_UTXO_STATS
+  {
+    DOC_COMMAND("Collects and retreives UTXO statistics");
+
+    struct request
+    {
+      crypto::public_key asset_id = currency::native_coin_asset_id;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_POD_AS_HEX_STRING(asset_id) DOC_DSCR("(optional) If specified, only UTXO with the given asset id will be analyzed. If omitted, native coin asset id is assumed.")  DOC_EXMP("cc608f59f8080e2fbfe3c8c80eb6e6a953d47cf2d6aebd345bada3a1cab99852")   DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct bucket
+    {
+      uint64_t lower_bound;
+      uint64_t upper_bound;
+      uint64_t total_utxo;
+      uint64_t total_amount;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(lower_bound)                DOC_DSCR("Lower bound of this bucket's amount range (inclusive).") DOC_EXMP(10000000) DOC_END
+        KV_SERIALIZE(upper_bound)                DOC_DSCR("Upper bound of this bucket's amount range (inclusive).") DOC_EXMP(500000000) DOC_END
+        KV_SERIALIZE(total_utxo)                 DOC_DSCR("Number of UTXO whose amounts fall within this bucket's range.") DOC_EXMP(13) DOC_END
+        KV_SERIALIZE(total_amount)               DOC_DSCR("Sum of amounts of all UTXO in this bucket.") DOC_EXMP(800000000) DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      crypto::public_key asset_id;
+      std::vector<bucket> buckets;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_POD_AS_HEX_STRING(asset_id) DOC_DSCR("Asset ID the statistics were collected for.")  DOC_EXMP("cc608f59f8080e2fbfe3c8c80eb6e6a953d47cf2d6aebd345bada3a1cab99852")   DOC_END
+        KV_SERIALIZE(buckets)                    DOC_DSCR("Power-of-ten histogram of UTXO grouped by amount range; empty buckets are omitted.") DOC_EXMP_AUTO(1) DOC_END;
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
   struct COMMAND_RPC_REGISTER_ALIAS
   {
     DOC_COMMAND("Register an alias for the address");

@@ -521,6 +521,123 @@ namespace tools
     WALLET_RPC_CATCH_TRY_ENTRY();
   }
   //------------------------------------------------------------------------------------------------------------------------------
+  STATIC_CHECK_TYPE_TOTAL_FIELDS(tools::transfer_details_base, 7, "check COMMAND_RPC_GET_OUTPUTS::transfer_details <-> tools::transfer_details_base correspondence");
+  
+  bool wallet_rpc_server::on_get_outputs(const wallet_public::COMMAND_RPC_GET_OUTPUTS::request& req, wallet_public::COMMAND_RPC_GET_OUTPUTS::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    WALLET_RPC_BEGIN_TRY_ENTRY();
+    bool include_spent = true;
+    bool include_unspent = true;
+    if (req.output_type == "available" || req.output_type == "unspent")
+      include_spent = false;
+    if (req.output_type == "unavailable" || req.output_type == "spent")
+      include_unspent = false;
+
+    bool filter_by_asset = req.asset_id != currency::null_pkey;
+
+    const wallet2& wlt = *w.get_wallet().get(); // safe to store a ref, as the object is locked and stored in w (wallet_rpc_locker)
+    
+    wlt.enumerate_transfers([&](uint64_t tid, const tools::transfer_details& td)
+      {
+        if ((td.is_spent() && !include_spent) || (!td.is_spent() && !include_unspent))
+          return true; // continue
+
+        const crypto::public_key asset_id = td.get_asset_id();
+        if (filter_by_asset && asset_id != req.asset_id)
+          return true; // continue
+
+        CHECK_AND_ASSERT_THROW_MES(td.m_ptx_wallet_info, "m_ptx_wallet_info is null");
+        auto& od = res.outputs.emplace_back();
+        od.amount           = td.amount();
+        od.asset_id         = asset_id;
+        od.block_height     = td.m_ptx_wallet_info->m_block_height;
+        od.block_timestamp  = td.m_ptx_wallet_info->m_block_timestamp;
+        od.flags            = td.m_flags;
+        od.global_index     = td.m_global_output_index;
+        od.key_image        = td.m_key_image;
+        od.native_coin      = td.is_native_coin();
+        currency::get_out_pub_key_from_tx_out_v(td.output(), od.pub_key); // don't check result
+        od.spendable        = td.is_spendable();
+        od.spent            = td.is_spent();
+        od.spent_height     = td.m_spent_height;
+        od.out_id           = tid;
+        od.tx_id            = td.tx_hash();
+        od.tx_out_index     = td.m_internal_output_index;
+        return true; // continue
+      }
+    );
+
+    return true;
+    WALLET_RPC_CATCH_TRY_ENTRY();
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool wallet_rpc_server::on_get_utxo_stats(const wallet_public::COMMAND_RPC_GET_UTXO_STATS::request& req, wallet_public::COMMAND_RPC_GET_UTXO_STATS::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    WALLET_RPC_BEGIN_TRY_ENTRY();
+    const wallet2& wlt = *w.get_wallet().get(); // safe to store ref, as the object is locked and stored in w (wallet_rpc_locker)
+    
+    res.asset_id = req.asset_id;
+
+    //std::vector<uint64_t> amounts{1000, 1, 9, 10, 15, 17, 999, 999, UINT64_MAX / 2, UINT64_MAX / 2 + 1, 0};
+    //std::vector<uint64_t> amounts{1000, 10, 15, 17, 999, 999, UINT64_MAX};
+
+    std::vector<uint64_t> amounts;
+    amounts.reserve(wlt.get_transfer_entries_count());
+    wlt.enumerate_transfers([&](uint64_t tid, const tools::transfer_details& td)
+      {
+        if (!td.is_spent())
+          return true; // continue
+
+        const crypto::public_key asset_id = td.get_asset_id();
+        if (asset_id != req.asset_id)
+          return true; // continue
+
+        amounts.push_back(td.amount());
+        return true; // continue
+      }
+    );
+
+    std::sort(amounts.begin(), amounts.end());
+
+    size_t amounts_index = 0; // in amounts
+
+    // 2^64 ~= 1.84 * 10^19
+    // [0,9], [10,99], [100,999], [1000,9999] ... [10000000000000000000, 18446744073709551615] = [10e19, 2e64-1]
+    uint64_t lower_bound = UINT64_MAX, upper_bound = 0;
+    for(uint64_t power_p = 0, power_n = 10, i = 0; i < 20; ++i)
+    {
+      auto& bucket = res.buckets.emplace_back();
+      bucket.lower_bound = power_p;
+      bucket.upper_bound = power_n < UINT64_MAX ? power_n - 1 : UINT64_MAX;
+      for(; amounts_index < amounts.size(); ++amounts_index)
+      {
+        if (amounts[amounts_index] > bucket.upper_bound)
+          break;
+        if (bucket.total_amount + amounts[amounts_index] < bucket.total_amount)
+        {
+          er.code = WALLET_RPC_ERROR_CODE_GENERIC_ERROR;
+          er.message = "amount sum overflow";
+          return false;
+        }
+        bucket.total_amount += amounts[amounts_index];
+        bucket.total_utxo   += 1;
+      }
+      if (bucket.total_utxo == 0)
+        res.buckets.pop_back();
+      if (amounts_index == amounts.size())
+        break;
+
+      power_p = power_n;
+      if (power_n < UINT64_MAX / 10)
+        power_n *= 10;
+      else
+        power_n = UINT64_MAX;
+    }
+
+    return true;
+    WALLET_RPC_CATCH_TRY_ENTRY();
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
   bool wallet_rpc_server::on_transfer(const wallet_public::COMMAND_RPC_TRANSFER::request& req, wallet_public::COMMAND_RPC_TRANSFER::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
     WALLET_RPC_BEGIN_TRY_ENTRY();
