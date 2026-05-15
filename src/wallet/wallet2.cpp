@@ -3200,7 +3200,7 @@ void wallet2::load_keys(const std::string& buff, const std::string& password, ui
     // version 3: ROMix-like Keccak password stretching drives the existing chacha KDF
     body_password = derive_wallet_password_stretched(password, kf_data);
     crypto::chacha_key key;
-    crypto::chacha_generate_key_and_iv(CRYPTO_HDS_CHACHA_WALLET_HEADER, body_password.data(), body_password.size(), 0, key);
+    crypto::chacha_generate_key(CRYPTO_HDS_CHACHA_WALLET_HEADER, body_password.data(), body_password.size(), 0, key);
     account_data.resize(kf_data.account_data.size());
     crypto::chacha20(kf_data.account_data.data(), kf_data.account_data.size(), key, kf_data.iv, &account_data[0]);
   }
