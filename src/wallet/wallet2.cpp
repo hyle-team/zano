@@ -7251,15 +7251,17 @@ void wallet2::select_decoys(currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS
 void wallet2::build_distribution_for_input(std::vector<uint64_t>& height_distrib, uint64_t own_height, decoy_selection_generator::dist_kind kind) const
 {
   decoy_selection_generator zarcanum_decoy_set_generator;
-  const uint64_t max_height = get_blockchain_current_size();
+  const uint64_t chain_size = get_blockchain_current_size();
+
+  if (chain_size <= WALLET_DEFAULT_TX_SPENDABLE_AGE)
+    return;
+  const uint64_t max_height = chain_size - WALLET_DEFAULT_TX_SPENDABLE_AGE;
+
   zarcanum_decoy_set_generator.init(max_height, kind);
   THROW_IF_FALSE_WALLET_INT_ERR_EX(zarcanum_decoy_set_generator.is_initialized(), "decoy_selection_generator is not initialized");
 
-  if (max_height == 0)
-    return;
-
   uint64_t want = height_distrib.size();
-  
+
   if (want == 0)
   {
     want = m_core_runtime_config.hf4_minimum_mixins;
