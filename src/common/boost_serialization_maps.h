@@ -57,12 +57,16 @@ struct if_you_see_this_check_END_BOOST_SERIALIZATION_TOTAL_FIELDS_macro;
 template <class T, std::size_t Expected>
 using validate_fields_t = std::conditional_t<(boost::pfr::tuple_size_v<T> == Expected), int, if_you_see_this_check_END_BOOST_SERIALIZATION_TOTAL_FIELDS_macro<Expected, boost::pfr::tuple_size_v<T>>>;
 
+template<std::size_t expected, std::size_t actual>
+constexpr bool static_check_num_eq() { static_assert(expected == actual, "numbers mismatched -- see static_check_num_eq<expected, actual> in the instantiation below"); return expected == actual; }
 
 
 #ifndef DISABLE_PFR_SERIALIZATION_SELFCHECK
   #define END_BOOST_SERIALIZATION_TOTAL_FIELDS(num_fields) { using _check = validate_fields_t<std::remove_reference<decltype(*this)>::type, num_fields>; static_assert(sizeof(_check) != 999, "Dummy Assert"); } }
+  #define STATIC_CHECK_TYPE_TOTAL_FIELDS(T, num_fields, msg) static_assert(static_check_num_eq<boost::pfr::tuple_size_v<T>, (num_fields)>(), "====> ERROR: number of fields for type " #T " has changed; " msg)
 #else
   #define END_BOOST_SERIALIZATION_TOTAL_FIELDS(num_fields) END_BOOST_SERIALIZATION()
+  #define STATIC_CHECK_TYPE_TOTAL_FIELDS(T, num_fields, msg)
 #endif
 
 #define BOOST_SERIALIZATION_CURRENT_ARCHIVE_VER(current_version) static const unsigned int current_boost_version_serialization_version = current_version;
