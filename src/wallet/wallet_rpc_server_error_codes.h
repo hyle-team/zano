@@ -18,3 +18,4 @@
 #define WALLET_RPC_ERROR_CODE_GENERIC_ERROR                       -9
 #define WALLET_RPC_ERROR_CODE_KEY_IMAGE_ALREADY_SPENT             -10
 #define WALLET_RPC_ERROR_CODE_TX_FREEZE_PERIOD                    -11
+#define WALLET_RPC_ERROR_CODE_DEPRECATED                          -12

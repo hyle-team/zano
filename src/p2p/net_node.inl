@@ -518,15 +518,13 @@ namespace nodetool
   template<class t_payload_net_handler>
   bool node_server<t_payload_net_handler>::run(bool sync_call)
   {
-    //here you can set worker threads count
-    int thrds_count = 10;
 
     m_net_server.add_idle_handler(boost::bind(&node_server<t_payload_net_handler>::idle_worker, this), 1000);
     m_net_server.add_idle_handler(boost::bind(&t_payload_net_handler::on_idle, &m_payload_handler), 1000);
 
     //go to loop
-    LOG_PRINT("Run net_service loop( " << thrds_count << " threads)...", LOG_LEVEL_0);
-    if(!m_net_server.run_server(thrds_count, sync_call))
+    LOG_PRINT("Run net_service loop( " << m_threads_count << " threads)...", LOG_LEVEL_0);
+    if(!m_net_server.run_server(m_threads_count, sync_call))
     {
       LOG_ERROR("Failed to run net tcp server!");
     }

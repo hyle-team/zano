@@ -1739,17 +1739,17 @@ namespace tools::wallet_public
       END_KV_SERIALIZE_MAP()
     };
   };
-   
+
   struct COMMAND_ENCRYPT_DATA
   {
-    DOC_COMMAND("Trivially encrypt base64 encoded data message with chacha using wallet spend key")
+    DOC_COMMAND("Encrypt arbitrary data with chacha using wallet view secret key")
 
     struct request
     {
       std::string buff; //base64 encoded data
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(buff) DOC_DSCR("base64 encoded data message to be encrypted")    DOC_EXMP("ZGNjc2Ztc2xrZm12O2xrZm12OydlbGtmdm0nbGtmbXY=")  DOC_END
+        KV_SERIALIZE_BLOB_AS_BASE64_STRING(buff) DOC_DSCR("base64-encoded data message to be encrypted")    DOC_EXMP("ZGNjc2Ztc2xrZm12O2xrZm12OydlbGtmdm0nbGtmbXY=")  DOC_END
       END_KV_SERIALIZE_MAP()
     };     
 
@@ -1757,14 +1757,36 @@ namespace tools::wallet_public
     { 
       std::string res_buff; //base64 encoded encrypted data
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(res_buff) DOC_DSCR("base64 encoded resulted data message")    DOC_EXMP("ZGNjc2Ztc2xrZm12O2xrZm12OydlbGtmdm0nbGtmbXY=")  DOC_END
+        KV_SERIALIZE_BLOB_AS_BASE64_STRING(res_buff) DOC_DSCR("base64-encoded ciphertext")    DOC_EXMP("ZGNjc2Ztc2xrZm12O2xrZm12OydlbGtmdm0nbGtmbXY=")  DOC_END
       END_KV_SERIALIZE_MAP()
     };
   }; 
   
   struct COMMAND_DECRYPT_DATA
   {
-    DOC_COMMAND("Trivially decrypt base64 encoded data message with chacha using wallet spend key")
+    DOC_COMMAND("Decrypt base64 encoded data message with chacha using wallet view secret key")
+    struct request
+    {
+      std::string buff; //base64 encoded encrypted data
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_BLOB_AS_BASE64_STRING(buff) DOC_DSCR("base64-encoded ciphertext")    DOC_EXMP("ZGNjc2Ztc2xrZm12O2xrZm12OydlbGtmdm0nbGtmbXY=")  DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      std::string res_buff; //base64 encoded data
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_BLOB_AS_BASE64_STRING(res_buff) DOC_DSCR("base64-encoded decrypted result")    DOC_EXMP("ZGNjc2Ztc2xrZm12O2xrZm12OydlbGtmdm0nbGtmbXY=")  DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
+  struct COMMAND_DECRYPT_DATA_LEGACY
+  {
+    DOC_COMMAND("(deprecated) Trivially decrypt base64 encoded data message with chacha using wallet view secret key")
     struct request
     {
       std::string buff; //base64 encoded encrypted data

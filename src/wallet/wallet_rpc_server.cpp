@@ -87,11 +87,12 @@ void exception_handler()
 namespace tools
 {
   //-----------------------------------------------------------------------------------
-  const command_line::arg_descriptor<std::string> wallet_rpc_server::arg_rpc_bind_port    ("rpc-bind-port",   "Starts wallet as rpc server for wallet operations, sets bind port for server");
-  const command_line::arg_descriptor<std::string> wallet_rpc_server::arg_rpc_bind_ip      ("rpc-bind-ip",     "Specify ip to bind rpc server", "127.0.0.1");
-  const command_line::arg_descriptor<std::string> wallet_rpc_server::arg_miner_text_info  ("miner-text-info", "Wallet password");
-  const command_line::arg_descriptor<bool>        wallet_rpc_server::arg_deaf_mode        ("deaf",            "Put wallet into 'deaf' mode make it ignore any rpc commands(usable for safe PoS mining)");
-  const command_line::arg_descriptor<std::string> wallet_rpc_server::arg_jwt_secret       ("jwt-secret",      "Enables JWT auth over secret string provided");
+  const command_line::arg_descriptor<std::string> wallet_rpc_server::arg_rpc_bind_port        ("rpc-bind-port",       "Starts wallet as rpc server for wallet operations, sets bind port for server");
+  const command_line::arg_descriptor<std::string> wallet_rpc_server::arg_rpc_bind_ip          ("rpc-bind-ip",         "Specify ip to bind rpc server", "127.0.0.1");
+  const command_line::arg_descriptor<std::string> wallet_rpc_server::arg_miner_text_info      ("miner-text-info",     "Set block extra text info");
+  const command_line::arg_descriptor<bool>        wallet_rpc_server::arg_deaf_mode            ("deaf",                "Put wallet into 'deaf' mode make it ignore any rpc commands(usable for safe PoS mining)");
+  const command_line::arg_descriptor<std::string> wallet_rpc_server::arg_jwt_secret           ("jwt-secret",          "Enables JWT auth over secret string provided");
+  const command_line::arg_descriptor<bool>        wallet_rpc_server::arg_allow_legacy_decrypt ("allow-legacy-decrypt","Allows deprecated legacy decrypt RPC. Don't use it unless you know what you're doing.");
 
   void wallet_rpc_server::init_options(boost::program_options::options_description& desc)
   {
@@ -100,6 +101,7 @@ namespace tools
     command_line::add_arg(desc, arg_miner_text_info);
     command_line::add_arg(desc, arg_deaf_mode);
     command_line::add_arg(desc, arg_jwt_secret);
+    command_line::add_arg(desc, arg_allow_legacy_decrypt);
     command_line::add_arg(desc, command_line::arg_allow_legacy_payment_id_size);
   }
   //------------------------------------------------------------------------------------------------------------------------------
@@ -110,6 +112,7 @@ namespace tools
     , m_deaf(false)
     , m_last_wallet_store_height(0)
     , m_allow_legacy_payment_id_size(false)
+    , m_allow_legacy_decrypt(false)
   {}
   //------------------------------------------------------------------------------------------------------------------------------
   wallet_rpc_server::wallet_rpc_server(i_wallet_provider* provider_ptr):
@@ -118,6 +121,7 @@ namespace tools
     , m_deaf(false)
     , m_last_wallet_store_height(0)
     , m_allow_legacy_payment_id_size(false)
+    , m_allow_legacy_decrypt(false)
   {}
   //------------------------------------------------------------------------------------------------------------------------------
 //   std::shared_ptr<wallet2> wallet_rpc_server::get_wallet()
@@ -211,6 +215,8 @@ namespace tools
     }
 
     m_allow_legacy_payment_id_size = command_line::has_arg(vm, command_line::arg_allow_legacy_payment_id_size);
+
+    m_allow_legacy_decrypt = command_line::has_arg(vm, arg_allow_legacy_decrypt);
 
     return true;
   }
@@ -1650,9 +1656,15 @@ namespace tools
   bool wallet_rpc_server::on_encrypt_data(const wallet_public::COMMAND_ENCRYPT_DATA::request& req, wallet_public::COMMAND_ENCRYPT_DATA::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
     WALLET_RPC_BEGIN_TRY_ENTRY();
-    std::string buff = epee::string_encoding::base64_decode(req.buff);
-    w.get_wallet()->encrypt_buffer(buff, res.res_buff);
-    res.res_buff = epee::string_encoding::base64_encode(res.res_buff);
+    w.get_wallet()->encrypt_buffer(req.buff, res.res_buff);
+    return true;
+    WALLET_RPC_CATCH_TRY_ENTRY();
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool wallet_rpc_server::on_decrypt_data(const wallet_public::COMMAND_DECRYPT_DATA::request& req, wallet_public::COMMAND_DECRYPT_DATA::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    WALLET_RPC_BEGIN_TRY_ENTRY();
+    w.get_wallet()->decrypt_buffer(req.buff, res.res_buff);
     return true;
     WALLET_RPC_CATCH_TRY_ENTRY();
   }
@@ -1694,20 +1706,21 @@ namespace tools
     WALLET_RPC_CATCH_TRY_ENTRY();
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  bool wallet_rpc_server::on_decrypt_data(const wallet_public::COMMAND_DECRYPT_DATA::request& req, wallet_public::COMMAND_DECRYPT_DATA::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  bool wallet_rpc_server::on_decrypt_data_legacy(const wallet_public::COMMAND_DECRYPT_DATA_LEGACY::request& req, wallet_public::COMMAND_DECRYPT_DATA_LEGACY::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
     WALLET_RPC_BEGIN_TRY_ENTRY();
+    if (!m_allow_legacy_decrypt)
+    {
+      er.code = WALLET_RPC_ERROR_CODE_DEPRECATED;
+      er.message = "This RPC method is deprecated.";
+      return false;
+    }
     std::string buff = epee::string_encoding::base64_decode(req.buff);
-    w.get_wallet()->encrypt_buffer(buff, res.res_buff);
+    w.get_wallet()->decrypt_buffer_legacy(buff, res.res_buff);
     res.res_buff = epee::string_encoding::base64_encode(res.res_buff);
     return true;
     WALLET_RPC_CATCH_TRY_ENTRY();
   }
   //------------------------------------------------------------------------------------------------------------------------------
-//   bool wallet_rpc_server::reset_active_wallet(std::shared_ptr<wallet2> w)
-//   {
-//     m_pwallet = w;
-//     return true;
-//   }
-  //------------------------------------------------------------------------------------------------------------------------------
+
 } // namespace tools

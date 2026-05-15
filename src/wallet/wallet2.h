@@ -792,6 +792,7 @@ namespace tools
     bool validate_sign(const std::string& buff, const crypto::signature& sig, const crypto::public_key& pkey);
     bool encrypt_buffer(const std::string& buff, std::string& res_buff);
     bool decrypt_buffer(const std::string& buff, std::string& res_buff);
+    bool decrypt_buffer_legacy(const std::string& buff, std::string& res_buff); // don't use it, deprecated -- sowle
     bool is_in_hardfork_zone(uint64_t hardfork_index) const;
     //performance inefficient call, suitable only for rare ocasions or super lazy developers
     bool proxy_to_daemon(const std::string& uri, const std::string& body, int& response_code, std::string& response_body);

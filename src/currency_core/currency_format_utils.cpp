@@ -4984,6 +4984,9 @@ namespace currency
   //------------------------------------------------------------------
 #define ASSET_TICKER_REGEXP     R"([A-Za-z0-9]{1,14})"
 #define ASSET_FULL_NAME_REGEXP  R"([A-Za-z0-9.,:!?\-() ]{0,400})"
+#define ASSET_META_INFO_MAX_SIZE  4000
+
+
   bool validate_asset_ticker(const std::string& ticker)
   {
     static std::regex asset_ticker_regexp(ASSET_TICKER_REGEXP);
@@ -4996,12 +4999,22 @@ namespace currency
     return std::regex_match(full_name, asset_full_name_regexp);
   }
   //------------------------------------------------------------------
+  bool validate_asset_meta_info(const std::string& meta_info_name)
+  {
+    if (meta_info_name.size() > ASSET_META_INFO_MAX_SIZE)
+      return false;
+    return true;
+  }
+  //------------------------------------------------------------------
   bool validate_asset_ticker_and_full_name(const asset_descriptor_base& adb)
   {
     if (!validate_asset_ticker(adb.ticker))
       return false;
 
     if (!validate_asset_full_name(adb.full_name))
+      return false;
+
+    if(!validate_asset_meta_info(adb.meta_info))
       return false;
 
     //CHECK_AND_ASSERT_MES(validate_asset_ticker(adb.ticker), false, "asset's ticker isn't valid: " << adb.ticker);

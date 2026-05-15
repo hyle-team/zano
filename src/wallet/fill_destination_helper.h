@@ -55,7 +55,7 @@ namespace currency
         return false;
       }
 
-      bool self_directed_destination = (de.addr.front().type() == typeid(account_public_address) ? (de.addr.front() == self_address) : false);
+      bool self_directed_destination = de.addr.front() == self_address;
       if (self_directed_destination && embedded_payment_id.size() != 0)
       {
         er.code = WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID;
