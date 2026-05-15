@@ -4005,8 +4005,8 @@ bool wallet2::generate_utxo_defragmentation_transaction_if_needed(currency::tran
 std::string wallet2::get_transfers_str(bool include_spent /*= true*/, bool include_unspent /*= true*/, bool show_only_unknown /*= false*/,
   const std::string& filter_asset_ticker /*= std::string{}*/, bool show_ki_instead_of_aid /*= false*/) const
 {
-  static const char* header_aid = " index                 amount  ticker          g_index  flags          block  tx                                                                out#  asset id";
-  static const char* header_ki  = " index                 amount  ticker          g_index  flags          block  tx                                                                out#  key image";
+  static const char* header_aid = " out id                amount  ticker          g_index  flags         block  tx                                                                out#  asset id";
+  static const char* header_ki  = " out id                amount  ticker          g_index  flags         block  tx                                                                out#  key image";
   std::stringstream ss;
   ss << (show_ki_instead_of_aid ? header_ki : header_aid) << ENDL;
   size_t count = 0;
@@ -4513,12 +4513,12 @@ void wallet2::submit_transfer_files(const std::string& signed_tx_file, currency:
   submit_transfer(signed_tx_blob, tx);
 }
 //----------------------------------------------------------------------------------------------------
-uint64_t wallet2::get_recent_transfers_total_count()
+uint64_t wallet2::get_recent_transfers_total_count() const
 {
   return m_transfer_history.size();
 }
 //----------------------------------------------------------------------------------------------------
-uint64_t wallet2::get_transfer_entries_count()
+uint64_t wallet2::get_transfer_entries_count() const
 {
   return m_transfers.size();
 }

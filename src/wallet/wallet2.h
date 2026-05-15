@@ -403,8 +403,8 @@ namespace tools
 
     void get_recent_transfers_history(std::vector<wallet_public::wallet_transfer_info>& trs, size_t offset, size_t count, uint64_t& total, uint64_t& last_item_index, bool exclude_mining_txs = false, bool start_from_end = true);
     bool is_defragmentation_transaction(const wallet_public::wallet_transfer_info& wti);
-    uint64_t get_recent_transfers_total_count();
-    uint64_t get_transfer_entries_count();
+    uint64_t get_recent_transfers_total_count() const;
+    uint64_t get_transfer_entries_count() const;
     void get_unconfirmed_transfers(std::vector<wallet_public::wallet_transfer_info>& trs, bool exclude_mining_txs = false);
     void init(const std::string& daemon_address = "http://localhost:8080");
     bool deinit();
@@ -622,6 +622,11 @@ namespace tools
 
     // Returns all payments by given id in unspecified order
     void get_payments(const std::string& payment_id, std::list<payment_details>& payments, uint64_t min_height = 0) const;
+
+    // callback: (uint64_t tid, const tools::transfer_details& td) -> bool, true -- continue, false -- stop
+    // TODO: consider renaming to enumerate_outputs
+    template<typename callback_t>
+    void enumerate_transfers(callback_t cb) const;
 
     // callback: (const wallet_public::wallet_transfer_info& wti) -> bool, true -- continue, false -- stop
     template<typename callback_t>
@@ -1269,6 +1274,14 @@ namespace tools
     }
     cxt.status = API_RETURN_CODE_NOT_FOUND;
     return false;
+  }
+
+  template<typename callback_t>
+  void wallet2::enumerate_transfers(callback_t cb) const
+  {
+    for(auto it = m_transfers.begin(); it != m_transfers.end(); ++it)
+      if (!cb(it->first, it->second))
+        break;
   }
 
   template<typename callback_t>

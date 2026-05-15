@@ -359,10 +359,6 @@ namespace tools
     uint64_t amount() const { return m_amount; }
     uint64_t amount_for_global_output_index() const { return is_zc() ? 0 : m_amount; } // amount value for global outputs index, it's zero for outputs with hidden amounts
 
-    // @#@ will throw if type is not tx_out_bare, TODO: change according to new model, 
-    // need to replace all get_tx_out_bare_from_out_v() to proper code
-    //const currency::tx_out_bare& output() const { return currency::get_tx_out_bare_from_out_v(m_ptx_wallet_info->m_tx.vout[m_internal_output_index]); }
-
     const currency::tx_out_v& output() const { return m_ptx_wallet_info->m_tx.vout[m_internal_output_index]; }
     uint8_t mix_attr() const { uint8_t result = UINT8_MAX; get_mix_attr_from_tx_out_v(output(), result); return result; }
     crypto::hash tx_hash() const { return get_transaction_hash(m_ptx_wallet_info->m_tx); }
