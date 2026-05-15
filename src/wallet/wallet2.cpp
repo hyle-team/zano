@@ -6788,13 +6788,24 @@ bool wallet2::get_ionic_swap_proposal_info(const wallet_public::ionic_swap_propo
   std::vector<bool> bob_outs;
   bob_outs.resize(proposal.tx_template.vout.size());
 
+  // result = result + value
+  auto assign_add_with_overflow_check = [&](const uint64_t& value, uint64_t& result) {
+    THROW_IF_FALSE_WALLET_INT_ERR_EX(result + value >= result, "get_ionic_swap_proposal_info overflow: " << result << " + " << value << " < " << result);
+    result += value;
+  };
+  // returns a + b
+  auto add_with_overflow_check = [&](const uint64_t& a, const uint64_t& b) -> uint64_t {
+    THROW_IF_FALSE_WALLET_INT_ERR_EX(a <= UINT64_MAX - b, "get_ionic_swap_proposal_info overflow: " << a << " + " << b);
+    return a + b;
+  };
+
   for (const auto& o : outs)
   {
     THROW_IF_FALSE_WALLET_INT_ERR_EX(ionic_context.gen_context.asset_ids.size() > o.index, "Tx gen context has mismatch with tx(asset_ids) ");
     THROW_IF_FALSE_WALLET_INT_ERR_EX(ionic_context.gen_context.asset_ids[o.index].to_public_key() == o.asset_id, "Tx gen context has mismatch with tx(asset_id != asset_id) ");
     THROW_IF_FALSE_WALLET_INT_ERR_EX(ionic_context.gen_context.amounts[o.index].m_u64[0] == o.amount, "Tx gen context has mismatch with tx(amount != amount)");
 
-    ammounts_to_b[o.asset_id] += o.amount;
+    assign_add_with_overflow_check(o.amount, ammounts_to_b[o.asset_id]);
     bob_outs[o.index] = true;
   }
   size_t i = 0;
@@ -6809,7 +6820,7 @@ bool wallet2::get_ionic_swap_proposal_info(const wallet_public::ionic_swap_propo
 
     crypto::public_key asset_id = ionic_context.gen_context.asset_ids[i].to_public_key();
     uint64_t amount = ionic_context.gen_context.amounts[i].m_u64[0];
-    ammounts_to_a[asset_id] += amount;
+    assign_add_with_overflow_check(amount, ammounts_to_a[asset_id]);
   }
 
   //read amounts already provided by third party
@@ -6837,7 +6848,7 @@ bool wallet2::get_ionic_swap_proposal_info(const wallet_public::ionic_swap_propo
       WLT_LOG_RED("Unexpected type of input in ionic_swap tx: " << tx.vin[i].type().name(), LOG_LEVEL_0);
       return false;
     }
-    amounts_provided_by_a[in_asset_id] += amount;
+    assign_add_with_overflow_check(amount, amounts_provided_by_a[in_asset_id]);
 
     //if (proposal_info.mixins == 0 || proposal_info.mixins > mx)
     //{
@@ -6860,12 +6871,12 @@ bool wallet2::get_ionic_swap_proposal_info(const wallet_public::ionic_swap_propo
   {
     uint64_t amount_sent_back_to_initiator = ammounts_to_a[a.first];
 
-    if (amounts_provided_by_a[a.first] < (a.second + amount_sent_back_to_initiator))
+    if (amounts_provided_by_a[a.first] < add_with_overflow_check(a.second, amount_sent_back_to_initiator))
     {
       WLT_LOG_RED("Amount[" << a.first << "] provided by Alice(" << amounts_provided_by_a[a.first] << ") is less then transfered to Bob(" << a.second << ")", LOG_LEVEL_0);
       return false;
     }
-    amounts_provided_by_a[a.first] -= (amount_sent_back_to_initiator + a.second);
+    amounts_provided_by_a[a.first] -= add_with_overflow_check(amount_sent_back_to_initiator, a.second);
     proposal_info.to_finalizer.push_back(view::asset_funds{ a.first, a.second });
     //clean accounted assets
     ammounts_to_a.erase(ammounts_to_a.find(a.first));
