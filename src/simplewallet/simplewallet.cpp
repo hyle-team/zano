@@ -149,6 +149,8 @@ namespace
 
   const command_line::arg_descriptor< std::vector<std::string> > arg_command  ("command", "");
 
+  static constexpr std::string_view s_simplewallet_version_long = CURRENCY_NAME " simplewallet v" PROJECT_VERSION_LONG;
+
   inline std::string interpret_rpc_response(bool ok, const std::string& status)
   {
     std::string err;
@@ -299,6 +301,7 @@ simple_wallet::simple_wallet()
   m_cmd_binder.set_handler("start_mining", boost::bind(&simple_wallet::start_mining, this, ph::_1), "start_mining <threads_count> - Start mining in daemon");
   m_cmd_binder.set_handler("stop_mining", boost::bind(&simple_wallet::stop_mining, this, ph::_1), "Stop mining in daemon");
 #endif // #ifdef CPU_MINING_ENABLED
+  m_cmd_binder.set_handler("version", boost::bind(&simple_wallet::version, this, ph::_1), "Print wallet's version");
   m_cmd_binder.set_handler("refresh", boost::bind(&simple_wallet::refresh, this, ph::_1), "Resynchronize transactions and balance");
   m_cmd_binder.set_handler("r", boost::bind(&simple_wallet::refresh, this, ph::_1), "Alias for 'refresh'");
   m_cmd_binder.set_handler("balance", boost::bind(&simple_wallet::show_balance, this, ph::_1), "[r,raw] Show current wallet balance, with 'raw' param it displays all assets without filtering against whitelists"); 
@@ -1136,6 +1139,12 @@ void simple_wallet::on_mw_get_wallets(std::vector<tools::wallet_public::wallet_e
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::on_mw_select_wallet(uint64_t wallet_id)
 {
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
+bool simple_wallet::version(const std::vector<std::string>& args)
+{
+  success_msg_writer() << s_simplewallet_version_long;
   return true;
 }
 //----------------------------------------------------------------------------------------------------
@@ -3791,7 +3800,7 @@ int main(int argc, char* argv[])
     }
     else if (command_line::get_arg(vm, command_line::arg_version))
     {
-      success_msg_writer() << CURRENCY_NAME << " simplewallet v" << PROJECT_VERSION_LONG;
+      success_msg_writer() << s_simplewallet_version_long;
       exit_requested = true;
       return true;
     }

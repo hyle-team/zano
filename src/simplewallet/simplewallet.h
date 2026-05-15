@@ -54,6 +54,7 @@ namespace currency
     bool start_mining(const std::vector<std::string> &args);
     bool stop_mining(const std::vector<std::string> &args);
 #endif // #ifdef CPU_MINING_ENABLED
+    bool version(const std::vector<std::string> &args);
     bool refresh(const std::vector<std::string> &args);
     bool show_balance(const std::vector<std::string> &args = std::vector<std::string>());
     bool list_recent_transfers(const std::vector<std::string>& args);
