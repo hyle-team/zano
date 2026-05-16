@@ -2514,7 +2514,7 @@ bool blockchain_storage::is_reorganize_required(const block_extended_info& main_
       return false;
     else
     {
-      if (is_hardfork_active(ZANO_HARDFORK_04_ZARCANUM))
+      if (m_core_runtime_config.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, alt_chain_bei.height))
       {
         // prefer blocks with more summary fee(to motivate stakers include transactions)
 
@@ -7217,7 +7217,12 @@ bool blockchain_storage::validate_pos_block(const block& b,
   }
   TIME_MEASURE_FINISH_PD(pos_validate_ki_search);
 
-  if (!is_hardfork_active(ZANO_HARDFORK_04_ZARCANUM))
+  // HF activation decisions for this PoS block must be made against the block's own height,
+  // not the main-chain tip — otherwise alt-chain blocks straddling a hardfork boundary would
+  // be routed to the wrong validation branch.
+  const uint64_t validating_height = for_altchain ? (split_height + alt_chain.size()) : m_db_blocks.size();
+
+  if (!is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, validating_height))
   {
     // the following check is de-facto not applicable since 2021-10, but left intact to avoid consensus issues
     // PoS blocks don't use etc_tx_time anymore to store actual timestamp; instead, they use tx_service_attachment in mining tx extra
@@ -7242,7 +7247,7 @@ bool blockchain_storage::validate_pos_block(const block& b,
   CHECK_AND_ASSERT_MES(r, false, "failed to build kernel_stake");
   kernel_hash = crypto::cn_fast_hash(&sk, sizeof(sk));
 
-  if (is_hardfork_active(ZANO_HARDFORK_04_ZARCANUM))
+  if (is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, validating_height))
   {
     CHECK_AND_ASSERT_MES(b.miner_tx.version > TRANSACTION_VERSION_PRE_HF4, false, "Zarcanum PoS: miner tx with version " << b.miner_tx.version << " is not allowed");
     CHECK_AND_ASSERT_MES(b.miner_tx.vin[1].type() == typeid(txin_zc_input), false, "incorrect input 1 type: " << b.miner_tx.vin[1].type().name() << ", txin_zc_input expected");

@@ -152,6 +152,7 @@ namespace currency
     struct scan_for_keys_context
     {
       bool check_hf4_coinage_rule = true;                      // input
+      uint64_t validating_height = UINT64_MAX;                 // input
       std::list<tx_out_zarcanum> zc_outs;                      // output
     };
 
@@ -815,7 +816,8 @@ namespace currency
   template<class visitor_t>
   bool blockchain_storage::scan_outputkeys_for_indexes(const transaction &validated_tx, const txin_v& verified_input, visitor_t& vis, uint64_t& max_related_block_height, scan_for_keys_context& scan_context) const
   {
-    bool hf4 = this->is_hardfork_active(ZANO_HARDFORK_04_ZARCANUM);
+    const uint64_t hf_decision_height = scan_context.validating_height != UINT64_MAX ? scan_context.validating_height : this->get_current_blockchain_size();
+    bool hf4 = this->is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, hf_decision_height);
 
     uint64_t amount = get_amount_from_variant(verified_input);
     const std::vector<txout_ref_v>& key_offsets = get_key_offsets_from_txin_v(verified_input);
@@ -934,13 +936,13 @@ namespace currency
       ++output_index;
     }
 
-    if (scan_context.check_hf4_coinage_rule && m_core_runtime_config.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, this->get_current_blockchain_size()))
-    { 
+    if (scan_context.check_hf4_coinage_rule && m_core_runtime_config.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, hf_decision_height))
+    {
       //with hard fork 4 make it network rule to have at least 10 confirmations
-      
-      if (this->get_current_blockchain_size() - max_related_block_height < CURRENCY_HF4_MANDATORY_MIN_COINAGE)
+
+      if (hf_decision_height - max_related_block_height < CURRENCY_HF4_MANDATORY_MIN_COINAGE)
       {
-        LOG_ERROR("Coinage rule is broken (mainblock): current blockchain size = " << this->get_current_blockchain_size() << ", max_related_block_height = " << max_related_block_height << ", tx: " << get_transaction_hash(validated_tx));
+        LOG_ERROR("Coinage rule is broken (mainblock): validating height = " << hf_decision_height << ", max_related_block_height = " << max_related_block_height << ", tx: " << get_transaction_hash(validated_tx));
         return false;
       }
     }
