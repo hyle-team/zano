@@ -197,6 +197,7 @@
 #define WALLET_FILE_BINARY_HEADER_VERSION_2             1001
 #define WALLET_FILE_BINARY_HEADER_VERSION_3             1002
 #define WALLET_FILE_BINARY_HEADER_VERSION_4             1003
+#define WALLET_FILE_BINARY_HEADER_VERSION_5             1004
 
 #define WALLET_KDF_ALGO_NONE                            0
 #define WALLET_KDF_ALGO_ROMIX_KECCAK                    1

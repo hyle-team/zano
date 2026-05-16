@@ -184,6 +184,18 @@ TEST(chacha_stream_test, diversity_test_on_different_stream_behaviour_20)
   do_diversity_test_on_different_stream_behaviour<tools::encrypt_chacha20_in_filter, tools::encrypt_chacha20_out_filter>(true);
 }
 
+TEST(chacha_stream_test, basic_test_with_serialization_on_top_20_v2)
+{
+  do_basic_test_with_serialization_on_top<tools::encrypt_chacha20_v2_in_filter, tools::encrypt_chacha20_v2_out_filter>();
+}
+
+
+TEST(chacha_stream_test, diversity_test_on_different_stream_behaviour_20_v2)
+{
+  do_diversity_test_on_different_stream_behaviour<tools::encrypt_chacha20_v2_in_filter, tools::encrypt_chacha20_v2_out_filter>(true);
+}
+
+
 
 TEST(chacha_stream_test, basic_test_with_serialization_on_top)
 {

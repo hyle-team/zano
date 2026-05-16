@@ -40,7 +40,9 @@ static const char sigma[] = "expand 32-byte k";
 
 DISABLE_GCC_AND_CLANG_WARNING(strict-aliasing)
 
-void chacha(int rounds_count, const void* data, size_t length, const uint8_t* key, const uint8_t* iv, char* cipher) {
+void chacha_with_counter(uint64_t block_counter, int rounds_count, const void* data, size_t length, const uint8_t* key, const uint8_t* iv, char* cipher) {
+
+
   uint32_t x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12, x13, x14, x15;
   uint32_t j0, j1, j2, j3, j4, j5, j6, j7, j8, j9, j10, j11, j12, j13, j14, j15;
   char* ctarget = 0;
@@ -61,10 +63,14 @@ void chacha(int rounds_count, const void* data, size_t length, const uint8_t* ke
   j9  = U8TO32_LITTLE(key + 20);
   j10 = U8TO32_LITTLE(key + 24);
   j11 = U8TO32_LITTLE(key + 28);
-  j12 = 0;
-  j13 = 0;
+  //j12 = 0;
+  //j13 = 0;
   j14 = U8TO32_LITTLE(iv + 0);
   j15 = U8TO32_LITTLE(iv + 4);
+
+  j12 = U32V(block_counter);
+  j13 = U32V(block_counter >> 32);
+
 
   for (;;) {
     if (length < 64) {
@@ -168,3 +174,10 @@ void chacha(int rounds_count, const void* data, size_t length, const uint8_t* ke
     data = (uint8_t*)data + 64;
   }
 }
+
+void chacha(int rounds_count, const void* data, size_t length, const uint8_t* key, const uint8_t* iv, char* cipher)
+{
+  chacha_with_counter(0, rounds_count, data, length, key, iv, cipher);
+}
+
+

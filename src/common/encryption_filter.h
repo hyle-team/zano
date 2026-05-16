@@ -198,6 +198,97 @@ namespace tools
     mutable uint64_t m_total_written = 0;
   };
 
+  /************************************************************************/
+/*  ChaCha20 processor base with domain separator support               */
+/************************************************************************/
+
+  class encrypt_chacha20_v2_processer_base
+  {
+  public:
+    typedef char                          char_type;
+    static const uint32_t block_size = 64; // ChaCha20 block size
+
+    encrypt_chacha20_v2_processer_base(std::string const& pass, const crypto::chacha_iv& iv, const char(&hdss)[32])
+      : m_total_written(0)
+      , m_base_iv(iv)
+    {
+      crypto::chacha_generate_key(hdss, pass.data(), pass.size(), 0, m_key);
+    }
+
+    ~encrypt_chacha20_v2_processer_base()
+    {
+      m_key = crypto::chacha_key{};
+      memset(&m_base_iv, 0, sizeof(m_base_iv));
+    }
+
+    template<typename cb_handler>
+    std::streamsize process(char_type const* const buf, std::streamsize const n, cb_handler cb) const
+    {
+      if (n == 0)
+        return 0;
+
+      if (n < 0)
+        throw std::runtime_error("Negative buffer size passed to ChaCha20 process");
+
+      const uint64_t input_size = static_cast<uint64_t>(n);
+
+      const uint64_t start_byte = m_total_written;
+      const uint64_t end_byte_exclusive = start_byte + input_size;
+
+      if (end_byte_exclusive < start_byte)
+        throw std::runtime_error("ChaCha20 byte counter overflow");
+
+      const uint64_t start_block_number = start_byte / block_size;
+      const uint64_t end_block_number = (end_byte_exclusive - 1) / block_size;
+
+      const size_t offset_in_start_block = static_cast<size_t>(start_byte % block_size);
+
+      const uint64_t block_count = end_block_number - start_block_number + 1;
+
+      const size_t keystream_size = static_cast<size_t>(block_count * block_size);
+
+      std::vector<char_type> keystream(keystream_size, 0);
+      generate_keystream_blocks(start_block_number, keystream.data(), keystream.size());
+
+      std::vector<char_type> local_buf(static_cast<size_t>(n));
+
+      for (size_t i = 0; i < static_cast<size_t>(n); ++i)
+      {
+        local_buf[i] =
+          static_cast<char_type>(
+            static_cast<uint8_t>(buf[i]) ^
+            static_cast<uint8_t>(keystream[offset_in_start_block + i]));
+      }
+
+      cb(local_buf.data(), n);
+
+      m_total_written += input_size;
+      return n;
+    }
+
+    template<typename cb_handler>
+    bool flush(cb_handler cb)
+    {
+      return true;
+    }
+
+  private:
+
+    void generate_keystream_blocks(uint64_t start_block_num, char_type* keystream, size_t keystream_size) const
+    {
+      crypto::chacha_iv block_iv = m_base_iv;
+
+      std::memset(keystream, 0, keystream_size);
+      crypto::chacha20(start_block_num, keystream, keystream_size, m_key, block_iv, keystream);
+    }
+
+    mutable crypto::chacha_iv m_base_iv;
+    crypto::chacha_key m_key{};
+    //mutable std::string m_buff;
+    mutable uint64_t m_total_written = 0;
+  };
+
+
 
   /************************************************************************/
   /*                                                                      */
@@ -393,8 +484,10 @@ namespace tools
 
   typedef encrypt_chacha_in_filter_t<encrypt_chacha8_processer_base> encrypt_chacha8_in_filter;
   typedef encrypt_chacha_in_filter_t<encrypt_chacha20_processer_base> encrypt_chacha20_in_filter;
+  typedef encrypt_chacha_in_filter_t<encrypt_chacha20_v2_processer_base> encrypt_chacha20_v2_in_filter;
 
   typedef encrypt_chacha_out_filter_t<encrypt_chacha8_processer_base> encrypt_chacha8_out_filter;
   typedef encrypt_chacha_out_filter_t<encrypt_chacha20_processer_base> encrypt_chacha20_out_filter;
+  typedef encrypt_chacha_out_filter_t<encrypt_chacha20_v2_processer_base> encrypt_chacha20_v2_out_filter;
 
 }

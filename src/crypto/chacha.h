@@ -30,6 +30,7 @@ namespace crypto
   {
 #endif
     void chacha(int rounds_count, const void* data, size_t length, const uint8_t* key, const uint8_t* iv, char* cipher);
+    void chacha_with_counter(uint64_t block_counter, int rounds_count, const void* data, size_t length, const uint8_t* key, const uint8_t* iv, char* cipher);
 #if defined(__cplusplus)
   }
 
@@ -70,6 +71,11 @@ namespace crypto
   inline void chacha20(const void* data, std::size_t length, const chacha_key& key, const chacha_iv& iv, void* cipher)
   {
     chacha(20, data, length, reinterpret_cast<const uint8_t*>(&key), reinterpret_cast<const uint8_t*>(&iv), reinterpret_cast<char*>(cipher));
+  }
+
+  inline void chacha20(uint64_t block_counter, const void* data, std::size_t length, const chacha_key& key, const chacha_iv& iv, void* cipher)
+  {
+    chacha_with_counter(block_counter, 20, data, length, reinterpret_cast<const uint8_t*>(&key), reinterpret_cast<const uint8_t*>(&iv), reinterpret_cast<char*>(cipher));
   }
 
   inline void chacha_generate_key_and_iv(const char(&hdss)[32], const void* p_data, size_t data_size, uint64_t index, chacha_key& key, chacha_iv& iv)
