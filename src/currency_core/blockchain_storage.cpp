@@ -7217,9 +7217,6 @@ bool blockchain_storage::validate_pos_block(const block& b,
   }
   TIME_MEASURE_FINISH_PD(pos_validate_ki_search);
 
-  // HF activation decisions for this PoS block must be made against the block's own height,
-  // not the main-chain tip — otherwise alt-chain blocks straddling a hardfork boundary would
-  // be routed to the wrong validation branch.
   const uint64_t validating_height = for_altchain ? (split_height + alt_chain.size()) : m_db_blocks.size();
 
   if (!is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, validating_height))
