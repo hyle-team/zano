@@ -98,7 +98,7 @@ namespace crypto {
     static void generate_signature(const hash &, const public_key &, const secret_key &, signature &);
     friend void generate_signature(const hash &, const public_key &, const secret_key &, signature &);
     static bool check_signature(const hash &, const public_key &, const signature &);
-    friend bool check_signature(const hash &, const public_key &, const signature &);
+    friend bool check_signature(const hash &, const public_key &, const signature &) noexcept;
     static void generate_key_image(const public_key &, const secret_key &, key_image &);
     friend void generate_key_image(const public_key &, const secret_key &, key_image &);
     static void generate_ring_signature(const hash &, const key_image &,
@@ -207,8 +207,16 @@ namespace crypto {
   inline void generate_signature(const hash &prefix_hash, const public_key &pub, const secret_key &sec, signature &sig) {
     crypto_ops::generate_signature(prefix_hash, pub, sec, sig);
   }
-  inline bool check_signature(const hash &prefix_hash, const public_key &pub, const signature &sig) {
-    return crypto_ops::check_signature(prefix_hash, pub, sig);
+  inline bool check_signature(const hash &prefix_hash, const public_key &pub, const signature &sig) noexcept
+  {
+    try
+    {
+      return crypto_ops::check_signature(prefix_hash, pub, sig);
+    }
+    catch(...)
+    {
+      return false;
+    }
   }
 
   /* To send money to a key:
