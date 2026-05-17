@@ -6997,16 +6997,17 @@ bool wallet2::accept_ionic_swap_proposal(const wallet_public::ionic_swap_proposa
 // Signing and auth
 bool wallet2::sign_buffer(const std::string& buff, crypto::signature& sig)
 {
-  crypto::hash h = crypto::cn_fast_hash(buff.data(), buff.size());
+  crypto::hash data_hash = crypto::cn_fast_hash(buff.data(), buff.size());
+  crypto::hash h = crypto::hash_helper_t::h(CRYPTO_HDS_WALLET_GENERIC_SIGN_WITH_SPK, data_hash);
   crypto::generate_signature(h, m_account.get_public_address().spend_public_key, m_account.get_keys().spend_secret_key, sig);
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::validate_sign(const std::string& buff, const crypto::signature& sig, const crypto::public_key& pkey)
-{
-  crypto::hash h = crypto::cn_fast_hash(buff.data(), buff.size());
-  return crypto::check_signature(h, pkey, sig);
-}
+//bool wallet2::validate_sign(const std::string& buff, const crypto::signature& sig, const crypto::public_key& pkey)
+//{
+//  crypto::hash h = crypto::cn_fast_hash(buff.data(), buff.size());
+//  return crypto::check_signature(h, pkey, sig);
+//}
 //----------------------------------------------------------------------------------------------------
 namespace 
 {

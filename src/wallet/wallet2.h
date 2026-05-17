@@ -794,7 +794,7 @@ namespace tools
 
     // Signing and auth
     bool sign_buffer(const std::string& buff, crypto::signature& sig);
-    bool validate_sign(const std::string& buff, const crypto::signature& sig, const crypto::public_key& pkey);
+    //bool validate_sign(const std::string& buff, const crypto::signature& sig, const crypto::public_key& pkey);
     bool encrypt_buffer(const std::string& buff, std::string& res_buff);
     bool decrypt_buffer(const std::string& buff, std::string& res_buff);
     bool decrypt_buffer_legacy(const std::string& buff, std::string& res_buff); // don't use it, deprecated -- sowle

@@ -646,12 +646,8 @@ namespace currency
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_validate_signature(const COMMAND_VALIDATE_SIGNATURE::request& req, COMMAND_VALIDATE_SIGNATURE::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
-    if (!m_p2p.get_connections_count())
-    {
-      res.status = API_RETURN_CODE_DISCONNECTED;
-      return true;
-    }
-    std::string buff = epee::string_encoding::base64_decode(req.buff);    
+    CHECK_CORE_READY();
+
     crypto::public_key pkey = req.pkey;
 
     if(pkey == currency::null_pkey)
@@ -666,12 +662,22 @@ namespace currency
       pkey = eaeb.m_address.spend_public_key;
     }
 
-    crypto::hash h = crypto::cn_fast_hash(buff.data(), buff.size());
+    crypto::hash data_hash = crypto::cn_fast_hash(req.buff.data(), req.buff.size());
+    crypto::hash h = crypto::hash_helper_t::h(CRYPTO_HDS_WALLET_GENERIC_SIGN_WITH_SPK, data_hash);
+
+    res.sig_format = "v2";
     bool sig_check_res = crypto::check_signature(h, pkey, req.sig);
     if (!sig_check_res)
     {
-      res.status = API_RETURN_CODE_FAIL;
-      return true;
+      // fallback to old-style validation without HDS
+      res.sig_format = "legacy";
+      sig_check_res = crypto::check_signature(data_hash, pkey, req.sig);
+      if (!sig_check_res)
+      {
+        res.sig_format = "";
+        res.status = API_RETURN_CODE_FAIL;
+        return true;
+      }
     }
     res.status = API_RETURN_CODE_OK;
     return true;

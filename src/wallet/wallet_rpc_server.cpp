@@ -1763,8 +1763,7 @@ namespace tools
   bool wallet_rpc_server::on_sign_message(const wallet_public::COMMAND_SIGN_MESSAGE::request& req, wallet_public::COMMAND_SIGN_MESSAGE::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
     WALLET_RPC_BEGIN_TRY_ENTRY();    
-    std::string buff = epee::string_encoding::base64_decode(req.buff);
-    w.get_wallet()->sign_buffer(buff, res.sig);
+    w.get_wallet()->sign_buffer(req.buff, res.sig);
     res.pkey = w.get_wallet()->get_account().get_public_address().spend_public_key;
     return true;
     WALLET_RPC_CATCH_TRY_ENTRY();

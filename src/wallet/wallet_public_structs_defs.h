@@ -1818,14 +1818,14 @@ namespace tools::wallet_public
 
   struct COMMAND_SIGN_MESSAGE
   {
-    DOC_COMMAND("Trivially sign base64 encoded data message using wallet spend key")
+    DOC_COMMAND("Sign a base64-encoded message using the wallet's spend key.")
 
     struct request
     {
       std::string buff; //base64 encoded data
       
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(buff)        DOC_DSCR("base64 encoded data message to be signed")    DOC_EXMP("ZGNjc2Ztc2xrZm12O2xrZm12OydlbGtmdm0nbGtmbXY=")  DOC_END
+        KV_SERIALIZE_BLOB_AS_BASE64_STRING(buff)        DOC_DSCR("Base64-encoded message to be signed.")    DOC_EXMP("ZGNjc2Ztc2xrZm12O2xrZm12OydlbGtmdm0nbGtmbXY=")  DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
