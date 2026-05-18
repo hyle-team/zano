@@ -1730,6 +1730,8 @@ namespace tools::wallet_public
     bool is_auditable;
     bool is_watch_only;
     bool has_bare_unspent_outputs;
+    uint64_t current_pos_attempts;              //every attempt happens every 2 seconds
+    uint64_t est_iterations_per_pos_block;      //estimated iterations for PoS block, valid only if balances valid, 
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(balances)                    DOC_DSCR("Balances hold by this wallet") DOC_EXMP_AUTO(1) DOC_END
@@ -1740,6 +1742,8 @@ namespace tools::wallet_public
       KV_SERIALIZE(is_auditable)                DOC_DSCR("Flag indicating whether the wallet is auditable")             DOC_EXMP(false) DOC_END
       KV_SERIALIZE(is_watch_only)               DOC_DSCR("Flag indicating whether the wallet is watch-only")            DOC_EXMP(false) DOC_END
       KV_SERIALIZE(has_bare_unspent_outputs)    DOC_DSCR("Flag indicating whether the wallet has bare unspent outputs(pre-zarcanum outputs)") DOC_EXMP(false) DOC_END
+      KV_SERIALIZE(current_pos_attempts)        DOC_DSCR("Current POS iterations that reset after PoS block found, used to calculate estimation of the next PoS block time(attempt is happening every 2 seconds)") DOC_EXMP(12344) DOC_END
+      KV_SERIALIZE(est_iterations_per_pos_block)DOC_DSCR("Estimated iterations needed to find PoS block with given balance, valid only if balances valid") DOC_EXMP(464400000) DOC_END
     END_KV_SERIALIZE_MAP()
   };
 

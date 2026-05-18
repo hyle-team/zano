@@ -5444,6 +5444,7 @@ bool wallet2::try_mint_pos(const currency::account_public_address& miner_address
   }
 
   std::atomic<bool> stop(false);
+  m_pos_attempts_count++;
   scan_pos(ctx, stop, [this]() {
     size_t blocks_fetched;
     refresh(blocks_fetched);
@@ -5459,6 +5460,8 @@ bool wallet2::try_mint_pos(const currency::account_public_address& miner_address
   if (ctx.status == API_RETURN_CODE_OK)
   {
     res = build_minted_block(ctx, miner_address);
+    if(res)
+      m_pos_attempts_count = 0; // reset attempts count after successful minting
   }
   TIME_MEASURE_FINISH_MS(mining_duration_ms);
 
