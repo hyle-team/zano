@@ -86,6 +86,7 @@ namespace tools
     const static command_line::arg_descriptor<std::string> arg_miner_text_info;
     const static command_line::arg_descriptor<bool>        arg_deaf_mode;
     const static command_line::arg_descriptor<std::string> arg_jwt_secret;
+    const static command_line::arg_descriptor<bool>        arg_unsecure_no_auth;
     const static command_line::arg_descriptor<bool>        arg_allow_legacy_decrypt;
 
 

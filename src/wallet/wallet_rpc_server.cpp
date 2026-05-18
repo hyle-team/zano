@@ -92,6 +92,7 @@ namespace tools
   const command_line::arg_descriptor<std::string> wallet_rpc_server::arg_miner_text_info      ("miner-text-info",     "Set block extra text info");
   const command_line::arg_descriptor<bool>        wallet_rpc_server::arg_deaf_mode            ("deaf",                "Put wallet into 'deaf' mode make it ignore any rpc commands(usable for safe PoS mining)");
   const command_line::arg_descriptor<std::string> wallet_rpc_server::arg_jwt_secret           ("jwt-secret",          "Enables JWT auth over secret string provided");
+  const command_line::arg_descriptor<bool>        wallet_rpc_server::arg_unsecure_no_auth     ("unsecure-no-auth",    "Acknowledge running the RPC server without authentication. Use only use when you understand the risk.");
   const command_line::arg_descriptor<bool>        wallet_rpc_server::arg_allow_legacy_decrypt ("allow-legacy-decrypt","Allows deprecated legacy decrypt RPC. Don't use it unless you know what you're doing.");
 
   void wallet_rpc_server::init_options(boost::program_options::options_description& desc)
@@ -101,6 +102,7 @@ namespace tools
     command_line::add_arg(desc, arg_miner_text_info);
     command_line::add_arg(desc, arg_deaf_mode);
     command_line::add_arg(desc, arg_jwt_secret);
+    command_line::add_arg(desc, arg_unsecure_no_auth);
     command_line::add_arg(desc, arg_allow_legacy_decrypt);
     command_line::add_arg(desc, command_line::arg_allow_legacy_payment_id_size);
   }
@@ -233,11 +235,18 @@ namespace tools
     {
       m_jwt_secret = command_line::get_arg(vm, arg_jwt_secret);
     }
-    
+
     bool do_server_init = true;
     int port_num = 0;
     if (epee::string_tools::string_to_num_fast(m_port, port_num) && port_num == 0)
       do_server_init = false;
+
+    if (do_server_init && m_jwt_secret.empty() && !m_deaf && !command_line::has_arg(vm, arg_unsecure_no_auth))
+    {
+      LOG_PRINT_RED("Running wallet RPC server without --jwt-secret is INSECURE: every endpoint would be reachable without authentication." << ENDL
+        << "Use --jwt-secret <secret> to enable JWT auth, --deaf to disable all handlers, or --unsecure-no-auth to acknowledge the risk.", LOG_LEVEL_0);
+      return false;
+    }
 
     if (do_server_init)
       r = epee::http_server_impl_base<wallet_rpc_server, connection_context>::init(m_port, m_bind_ip);
