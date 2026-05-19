@@ -504,7 +504,7 @@ namespace currency
     }
 
     return true;
-    CATCH_ENTRY_L0_RED(LOCATION_CSTR, false);
+    CATCH_ENTRY_L0_RED(LOCATION_SS, false);
   }
 
 

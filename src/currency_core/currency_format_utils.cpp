@@ -468,7 +468,7 @@ namespace currency
     }
 
     return true;
-    CATCH_ENTRY_L0_RED(LOCATION_CSTR, false);
+    CATCH_ENTRY_L0_RED(LOCATION_SS, false);
   }
   //--------------------------------------------------------------------------------
   bool generate_asset_surjection_proof(const crypto::hash& context_hash, bool has_non_zc_inputs, tx_generation_context& ogc, transaction& tx_to_add_proof_to)

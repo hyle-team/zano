@@ -502,7 +502,7 @@ int main(int argc, char* argv[])
   LOG_PRINT("Node stopped.", LOG_LEVEL_0);
   return EXIT_SUCCESS;
 
-      CATCH_ENTRY_L0(__func__, EXIT_FAILURE);
+      CATCH_ENTRY_L0(LOCATION_SS, EXIT_FAILURE);
     }
   catch (...)
     {

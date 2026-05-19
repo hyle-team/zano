@@ -4091,7 +4091,7 @@ int main(int argc, char* argv[])
     }
   }
 
-  CATCH_ENTRY_L0(__func__, EXIT_FAILURE);
+  CATCH_ENTRY_L0(LOCATION_SS, EXIT_FAILURE);
   return EXIT_SUCCESS;
 }
 

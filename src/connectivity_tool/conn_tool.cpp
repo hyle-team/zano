@@ -1307,7 +1307,7 @@ int main(int argc, char* argv[])
     std::cerr << desc_all << ENDL;
   }
 
-      CATCH_ENTRY_L0(__func__, EXIT_FAILURE);
+      CATCH_ENTRY_L0(LOCATION_SS, EXIT_FAILURE);
     }
   catch (...)
     {

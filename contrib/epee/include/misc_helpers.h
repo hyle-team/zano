@@ -39,9 +39,8 @@
 #define UNUSED_ATTRIBUTE __attribute__((unused))
 #endif 
 
-#define LOCATION_SS "[" << LOCAL_FUNCTION_DEF__ << ("] @ " __FILE__ ":" STR(__LINE__))
+#define LOCATION_SS "[" << LOCAL_FUNCTION_DEF__ << "] @ " __FILE__ ":" STR(__LINE__)
 #define LOCATION_STR (std::string("[") + LOCAL_FUNCTION_DEF__ + "] @ " __FILE__ ":" STR(__LINE__))
-#define LOCATION_CSTR "[" LOCAL_FUNCTION_DEF__ "] @ " __FILE__ ":" STR(__LINE__)
 
 
 //
@@ -56,13 +55,13 @@
 { \
   (void)(ex); \
   custom_code; \
-  log_op("Exception at [" << location << "], what=" << ex.what()); \
+  log_op("Exception at [" location "], what=" << ex.what()); \
   return return_val; \
 } \
   catch(...) \
 { \
   custom_code; \
-  log_op("Exception at [" << location << "], generic exception \"...\""); \
+  log_op("Exception at [" location "], generic exception \"...\""); \
   return return_val; \
 }
 
