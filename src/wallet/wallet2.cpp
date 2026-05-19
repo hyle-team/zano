@@ -4600,12 +4600,12 @@ void wallet2::submit_transfer_files(const std::string& signed_tx_file, currency:
   submit_transfer(signed_tx_blob, tx);
 }
 //----------------------------------------------------------------------------------------------------
-uint64_t wallet2::get_recent_transfers_total_count()
+uint64_t wallet2::get_recent_transfers_total_count() const
 {
   return m_transfer_history.size();
 }
 //----------------------------------------------------------------------------------------------------
-uint64_t wallet2::get_transfer_entries_count()
+uint64_t wallet2::get_transfer_entries_count() const
 {
   return m_transfers.size();
 }
@@ -8372,7 +8372,7 @@ void wallet2::transfer(construct_tx_param& ctp,
 }
 
 //----------------------------------------------------------------------------------------------------
-void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public_address& destination_addr, uint64_t threshold_amount, const currency::payment_id_t& payment_id,
+void wallet2::sweep_below(const crypto::public_key& asset_id, size_t fake_outs_count, const currency::account_public_address& destination_addr, uint64_t threshold_amount, const currency::payment_id_t& payment_id,
   uint64_t fee, size_t& outs_total, uint64_t& amount_total, size_t& outs_swept, uint64_t& amount_swept, currency::transaction* p_result_tx /* = nullptr */, std::string* p_filename_or_unsigned_tx_blob_str /* = nullptr */)
 {
   bool r = false;
@@ -8381,24 +8381,41 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
   outs_swept = 0;
   amount_swept = 0;
 
+  bool sweeping_asset = asset_id != native_coin_asset_id;
+
   std::vector<uint64_t> selected_transfers;
   std::unordered_map<size_t, size_t> fake_outs_for_selected_transfers; // tr index -> fake outs count
   selected_transfers.reserve(m_transfers.size());
   fake_outs_for_selected_transfers.reserve(m_transfers.size());
+  struct {
+    uint64_t amount;
+    size_t tid;
+    uint64_t fake_outs_count;
+  } selected_native_for_fee{};
   for (const auto& tr : m_transfers)
   {
     uint64_t i = tr.first;
     const transfer_details& td = tr.second;
     size_t fake_outs_count_for_td = is_auditable() ? 0 : (td.is_zc() ? m_core_runtime_config.hf4_minimum_mixins : fake_outs_count);
     uint64_t amount = td.amount();
-    if (amount < threshold_amount && td.is_native_coin() &&
-      is_transfer_ready_to_go(td, fake_outs_count_for_td))
+    if (is_transfer_ready_to_go(td, fake_outs_count_for_td))
     {
-      selected_transfers.push_back(i);
-      r = fake_outs_for_selected_transfers.insert(std::make_pair(i, fake_outs_count_for_td)).second;
-      WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(r, "unable to insert: " << i << ", " << fake_outs_count_for_td);
-      outs_total += 1;
-      amount_total += amount;
+      if (amount < threshold_amount && td.get_asset_id() == asset_id)
+      {
+        selected_transfers.push_back(i);
+        r = fake_outs_for_selected_transfers.insert(std::make_pair(i, fake_outs_count_for_td)).second;
+        WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(r, "unable to insert: " << i << ", " << fake_outs_count_for_td);
+        outs_total += 1;
+        amount_total += amount;
+      }
+      if (sweeping_asset && td.is_native_coin() && amount >= fee && (selected_native_for_fee.amount == 0 || selected_native_for_fee.amount > amount))
+      {
+        selected_native_for_fee.amount = amount;
+        selected_native_for_fee.tid = i;
+        selected_native_for_fee.fake_outs_count = fake_outs_count_for_td;
+        r = fake_outs_for_selected_transfers.insert(std::make_pair(i, fake_outs_count_for_td)).second; // many inserts possible, but that shouldn't be an issue
+        WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(r, "unable to insert: " << i << ", " << fake_outs_count_for_td);
+      }
     }
   }
 
@@ -8406,6 +8423,12 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
 
   // sort by amount descending in order to spend bigger outputs first
   std::sort(selected_transfers.begin(), selected_transfers.end(), [this](uint64_t a, uint64_t b) { return m_transfers.at(b).amount() < m_transfers.at(a).amount(); });
+
+  if (sweeping_asset)
+  {
+    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(selected_native_for_fee.amount != 0, "There's no native coin UTXO >= fee which is required when sweeping an asset. Transfer some native coins to this wallet.");
+    selected_transfers.insert(selected_transfers.begin(), selected_native_for_fee.tid);
+  }
 
   // limit RPC request with reasonable number of sources
   if (selected_transfers.size() > CURRENCY_TX_MAX_ALLOWED_INPUTS)
@@ -8424,10 +8447,10 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
   typedef COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry out_entry;
   typedef currency::tx_source_entry::output_entry tx_output_entry;
 
-  COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::response rpc_get_random_outs_resp = AUTO_VAL_INIT(rpc_get_random_outs_resp);
+  COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::response rpc_get_random_outs_resp{};
   if (max_fake_outs_count > 0)
   {
-    COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::request req = AUTO_VAL_INIT(req);
+    COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::request req{};
     req.height_upper_limit = m_last_pow_block_h;
     req.use_forced_mix_outs = false;
     req.decoys_count = max_fake_outs_count + 1;
@@ -8451,7 +8474,7 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
     THROW_IF_FALSE_WALLET_EX(scanty_outs.empty(), error::not_enough_outs_to_mix, scanty_outs, max_fake_outs_count);
   }
 
-  currency::finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
+  currency::finalize_tx_param ftp{};
   ftp.tx_version = get_current_tx_version_and_hardfork_id(ftp.tx_hardfork_id);
   bool is_hf4 = this->is_in_hardfork_zone(ZANO_HARDFORK_04_ZARCANUM);
   if (!payment_id.empty())
@@ -8465,7 +8488,7 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
   // ftp.multisig_id -- not required
   // ftp.prepared_destinations -- will be filled by prepare_tx_destinations
   // ftp.selected_transfers -- needed only at stage of broadcasting or storing unsigned tx
-  ftp.shuffle = false;
+  ftp.shuffle = true;
   // ftp.sources -- will be filled in try_construct_tx
   ftp.spend_pub_key = m_account.get_public_address().spend_public_key; // needed for offline signing
   ftp.tx_outs_attr = CURRENCY_TO_KEY_OUT_RELAXED;
@@ -8475,9 +8498,10 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
   auto get_result_t_str = [](try_construct_result_t t) -> const char*
     { return t == rc_ok ? "rc_ok" : t == rc_too_few_outputs ? "rc_too_few_outputs" : t == rc_too_many_outputs ? "rc_too_many_outputs" : t == rc_create_tx_failed ? "rc_create_tx_failed" : "unknown"; };
 
-  auto try_construct_tx = [this, &selected_transfers, &rpc_get_random_outs_resp, &fake_outs_for_selected_transfers, &fee, &destination_addr]
+  auto try_construct_tx = [this, &selected_transfers, &rpc_get_random_outs_resp, &fake_outs_for_selected_transfers, &fee, &destination_addr, &asset_id, sweeping_asset]
   (size_t st_index_upper_boundary, currency::finalize_tx_param& ftp, uint64_t& amount_swept) -> try_construct_result_t
     {
+      uint64_t native_coin_amount = 0;
       amount_swept = 0;
       ftp.gen_context = tx_generation_context{};
       ftp.sources.clear();
@@ -8493,7 +8517,10 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
         transfer_details& td = m_transfers.at(tr_index);
         src.transfer_index = tr_index;
         src.amount = td.amount();
-        amount_swept += src.amount;
+        if (sweeping_asset && td.is_native_coin())
+          native_coin_amount += src.amount;
+        else
+          amount_swept += src.amount;
 
         // populate src.outputs with mix-ins
         if (rpc_get_random_outs_resp.outs.size())
@@ -8517,7 +8544,7 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
               return static_cast<bool>(boost::get<uint64_t>(a.out_reference) >= td.m_global_output_index);
             return false; // TODO: implement deterministics real output placement in case there're ref_by_id outs
           });
-        tx_output_entry real_oe = AUTO_VAL_INIT(real_oe);
+        tx_output_entry real_oe{};
         txout_ref_v out_reference = td.m_global_output_index; // TODO: use ref_by_id when neccessary
         std::vector<tx_output_entry>::iterator interted_it = src.outputs.end();
         VARIANT_SWITCH_BEGIN(td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index]);
@@ -8546,18 +8573,32 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
         src.real_output_in_tx_index = td.m_internal_output_index;
       }
 
-      if (amount_swept <= fee)
-        return rc_too_few_outputs;
-
       // try to construct a transaction
 
       assets_selection_context needed_money_map;
-      needed_money_map[currency::native_coin_asset_id] = {};
-      const std::vector<currency::tx_destination_entry> dsts({ tx_destination_entry(amount_swept - fee, destination_addr) });
+      std::vector<currency::tx_destination_entry> dsts;
+      if (sweeping_asset)
+      {
+        // TODO: consider enforcing sweep_below to always produce 3-outs tx to avoid leaking asset sweep in some cases
+        needed_money_map[currency::native_coin_asset_id] = {};
+        needed_money_map[asset_id] = {};
+        WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(native_coin_amount >= fee, "native_coin_amount = " << native_coin_amount << ", too low, smth went wrong");
+        if (native_coin_amount > fee)
+          dsts.emplace_back(native_coin_amount - fee, m_account.get_public_address()); // native change always goes back
+        dsts.emplace_back(amount_swept, destination_addr, asset_id);
+      }
+      else
+      {
+        if (amount_swept <= fee)
+          return rc_too_few_outputs;
+        needed_money_map[currency::native_coin_asset_id] = {};
+        dsts.emplace_back(amount_swept - fee, destination_addr);
+      }
+
       prepare_tx_destinations(needed_money_map, get_current_split_strategy(), tools::tx_dust_policy(), dsts, ftp.flags, ftp.prepared_destinations);
 
-      currency::transaction tx = AUTO_VAL_INIT(tx);
-      crypto::secret_key tx_key = AUTO_VAL_INIT(tx_key);
+      currency::transaction tx{};
+      crypto::secret_key tx_key{};
       try
       {
         finalize_transaction(ftp, tx, tx_key, false, false);
@@ -8635,7 +8676,7 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
   for (size_t i = 0; i < ftp.sources.size(); ++i)
     ftp.selected_transfers.push_back(ftp.sources[i].transfer_index);
 
-  outs_swept = ftp.sources.size();
+  outs_swept = sweeping_asset ? ftp.sources.size() - 1 : ftp.sources.size();
 
 
   if (m_watch_only)

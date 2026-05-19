@@ -327,7 +327,7 @@ simple_wallet::simple_wallet()
   m_cmd_binder.set_handler("scan_transfers_for_id", boost::bind(&simple_wallet::scan_transfers_for_id, this,ph::_1), "Rescan transfers for tx_id");
   m_cmd_binder.set_handler("scan_transfers_for_ki", boost::bind(&simple_wallet::scan_transfers_for_ki, this,ph::_1), "Rescan transfers for key image");
   m_cmd_binder.set_handler("print_utxo_distribution", boost::bind(&simple_wallet::print_utxo_distribution, this,ph::_1), "Prints utxo distribution");
-  m_cmd_binder.set_handler("sweep_below", boost::bind(&simple_wallet::sweep_below, this,ph::_1), "sweep_below <mixin_count> <address> <amount_lower_limit> [payment_id] -  Tries to transfers all coins with amount below the given limit to the given address");
+  m_cmd_binder.set_handler("sweep_below", boost::bind(&simple_wallet::sweep_below, this,ph::_1), "sweep_below <mixin_count | asset_id> <address|self> <amount_lower_limit> - Sweep UTXOs of an asset with amount below the limit to the given address. First arg: integer mixin count (= sweep native coin) or asset_id (= sweep that asset with default mixin). Asset sweeps also consume one native UTXO >= fee to pay the fee.");
   m_cmd_binder.set_handler("sweep_bare_outs", boost::bind(&simple_wallet::sweep_bare_outs, this,ph::_1), "sweep_bare_outs - Transfers all bare unspent outputs to itself. Uses several txs if necessary.");
   
   m_cmd_binder.set_handler("address", boost::bind(&simple_wallet::print_address, this,ph::_1), "Show current wallet public address");
@@ -2880,56 +2880,50 @@ bool simple_wallet::sweep_below(const std::vector<std::string> &args)
   CONFIRM_WITH_PASSWORD();
   SIMPLE_WALLET_BEGIN_TRY_ENTRY();
   bool r = false;
-  if (args.size() < 3 || args.size() > 4)
+  if (args.size() != 3)
   {
-    fail_msg_writer() << "invalid agruments count: " << args.size() << ", expected 3 or 4";
+    fail_msg_writer() << "invalid arguments count: " << args.size() << ", expected 3";
     return true;
   }
 
-  size_t fake_outs_count = 0;
+  size_t decimal_point = CURRENCY_DISPLAY_DECIMAL_POINT;
+  crypto::public_key asset_id = native_coin_asset_id;
+  size_t fake_outs_count = CURRENCY_HF4_MANDATORY_DECOY_SET_SIZE;
   if (!string_tools::get_xtype_from_string(fake_outs_count, args[0]))
   {
-    fail_msg_writer() << "mixin_count should be non-negative integer, got " << args[0];
-    return true;
-  }
-
-  // parse payment_id
-  currency::payment_id_t payment_id;
-  if (args.size() == 4)
-  {
-    const std::string &payment_id_str = args.back();
-    r = parse_payment_id_from_hex_str(payment_id_str, payment_id);
-    if (!r)
+    if (!epee::string_tools::parse_tpod_from_hex_string(args[0], asset_id))
     {
-      fail_msg_writer() << "payment id has invalid format: \"" << payment_id_str << "\", expected hex string";
+      fail_msg_writer() << "mixin_count/asset_id parse error: " << args[0];
       return true;
     }
+
+    currency::asset_descriptor_base adb{};
+    uint32_t asset_info_flags{};
+    if (!m_wallet->get_asset_info(asset_id, adb, asset_info_flags))
+    {
+      fail_msg_writer() << "unknown asset: " << args[0];
+      return true;
+    }
+    decimal_point = adb.decimal_point;
   }
 
   currency::account_public_address addr;
   currency::payment_id_t integrated_payment_id;
   if (!m_wallet->get_transfer_address(args[1], addr, integrated_payment_id))
   {
-    fail_msg_writer() << "wrong address: " << args[1];
-    return true;
-  }
-
-  // handle integrated payment id
-  if (!integrated_payment_id.empty())
-  {
-    if (!payment_id.empty())
+    if (args[1] == "self")
     {
-      fail_msg_writer() << "address " << args[1] << " has integrated payment id " << epee::string_tools::buff_to_hex_nodelimer(integrated_payment_id) <<
-        " which is incompatible with payment id " << epee::string_tools::buff_to_hex_nodelimer(payment_id) << " that was already assigned to this transfer";
+      addr = m_wallet->get_account().get_public_address();
+    }
+    else
+    {
+      fail_msg_writer() << "wrong address: " << args[1];
       return true;
     }
-
-    payment_id = integrated_payment_id; // remember integrated payment id as the main payment id
-    success_msg_writer() << "NOTE: using payment id " << epee::string_tools::buff_to_hex_nodelimer(payment_id) << " from integrated address " << args[1];
   }
 
   uint64_t amount = 0;
-  r = currency::parse_amount(args[2], amount);
+  r = currency::parse_amount(args[2], amount, decimal_point);
   if (!r || amount == 0)
   {
     fail_msg_writer() << "incorrect amount: " << args[2];
@@ -2940,12 +2934,12 @@ bool simple_wallet::sweep_below(const std::vector<std::string> &args)
   uint64_t fee = m_wallet->get_core_runtime_config().tx_default_fee;
   size_t outs_total = 0, outs_swept = 0;
   uint64_t amount_total = 0, amount_swept = 0;
-  currency::transaction result_tx = AUTO_VAL_INIT(result_tx);
+  currency::transaction result_tx{};
   std::string filename = "zano_tx_unsigned";
-  m_wallet->sweep_below(fake_outs_count, addr, amount, payment_id, fee, outs_total, amount_total, outs_swept, amount_swept, &result_tx, &filename);
+  m_wallet->sweep_below(asset_id, fake_outs_count, addr, amount, integrated_payment_id, fee, outs_total, amount_total, outs_swept, amount_swept, &result_tx, &filename);
 
-  success_msg_writer(false) << outs_swept << " outputs (" << print_money_brief(amount_swept) << " coins) of " << outs_total << " total (" << print_money_brief(amount_total)
-    << ") below the specified limit of " << print_money_brief(amount) << " were successfully swept";
+  success_msg_writer(false) << outs_swept << " outputs (" << print_money_brief(amount_swept, decimal_point) << " coins) of " << outs_total << " total (" << print_money_brief(amount_total, decimal_point)
+    << ") below the specified limit of " << print_money_brief(amount, decimal_point) << " were successfully swept";
 
   if (m_wallet->is_watch_only())
     success_msg_writer(true) << "Transaction prepared for signing and saved into \"" << filename << "\" file, use full wallet to sign transfer and then use \"submit_transfer\" on this wallet to broadcast the transaction to the network";
