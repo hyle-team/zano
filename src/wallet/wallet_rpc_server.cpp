@@ -526,7 +526,7 @@ namespace tools
     amounts.reserve(wlt.get_transfer_entries_count());
     wlt.enumerate_transfers([&](uint64_t tid, const tools::transfer_details& td)
       {
-        if (!td.is_spent())
+        if (td.is_spent())
           return true; // continue
 
         const crypto::public_key asset_id = td.get_asset_id();
