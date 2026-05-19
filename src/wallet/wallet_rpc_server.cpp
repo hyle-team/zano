@@ -907,11 +907,10 @@ namespace tools
   bool wallet_rpc_server::on_sweep_below(const wallet_public::COMMAND_SWEEP_BELOW::request& req, wallet_public::COMMAND_SWEEP_BELOW::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
     WALLET_RPC_BEGIN_TRY_ENTRY();
-    currency::payment_id_t payment_id;
-    if (!req.payment_id_hex.empty() && !currency::parse_payment_id_from_hex_str(req.payment_id_hex, payment_id))
+    if (!req.payment_id_hex.empty())
     {
       er.code = WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID;
-      er.message = std::string("Invalid payment id: ") + req.payment_id_hex;
+      er.message = std::string("tx-wide payment id you provided is now deprecated: ") + req.payment_id_hex;
       return false;
     }
 
@@ -924,18 +923,6 @@ namespace tools
       return false;
     }
 
-    if (!integrated_payment_id.empty())
-    {
-      if (!payment_id.empty())
-      {
-        er.code = WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID;
-        er.message = std::string("address ") + req.address + " has integrated payment id " + epee::string_tools::buff_to_hex_nodelimer(integrated_payment_id) +
-          " which is incompatible with payment id " + epee::string_tools::buff_to_hex_nodelimer(payment_id) + " that was already assigned to this transfer";
-        return false;
-      }
-      payment_id = integrated_payment_id;
-    }
-
     if (req.fee < w.get_wallet()->get_core_runtime_config().tx_pool_min_fee)
     {
       er.code = WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT;
@@ -943,17 +930,18 @@ namespace tools
       return false;
     }
 
-    currency::transaction tx = AUTO_VAL_INIT(tx);
+    currency::transaction tx{};
     size_t outs_total = 0, outs_swept = 0;
     uint64_t amount_total = 0, amount_swept = 0;
 
     std::string unsigned_tx_blob_str;
-    w.get_wallet()->sweep_below(req.mixin, addr, req.amount, payment_id, req.fee, outs_total, amount_total, outs_swept, amount_swept, &tx, &unsigned_tx_blob_str);
+    w.get_wallet()->sweep_below(req.asset_id, req.mixin, addr, req.amount, integrated_payment_id, req.fee, outs_total, amount_total, outs_swept, amount_swept, &tx, &unsigned_tx_blob_str);
 
     res.amount_swept = amount_swept;
     res.amount_total = amount_total;
     res.outs_swept = outs_swept;
     res.outs_total = outs_total;
+    res.asset_id = req.asset_id;
 
     if (w.get_wallet()->is_watch_only())
     {

@@ -1120,13 +1120,15 @@ namespace tools::wallet_public
       uint64_t    amount;
       std::string payment_id_hex;
       uint64_t    fee;
+      crypto::public_key asset_id = currency::native_coin_asset_id;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(mixin)              DOC_DSCR("Number of outputs from the blockchain to mix with when sending a transaction to improve privacy.") DOC_EXMP(15) DOC_END
         KV_SERIALIZE(address)            DOC_DSCR("Public address for sending or receiving native coins.") DOC_EXMP("ZxBvJDuQjMG9R2j4WnYUhBYNrwZPwuyXrC7FHdVmWqaESgowDvgfWtiXeNGu8Px9B24pkmjsA39fzSSiEQG1ekB225ZnrMTBp") DOC_END
         KV_SERIALIZE(amount)             DOC_DSCR("Threshold amount of native coins to sweep.") DOC_EXMP(1000000000000) DOC_END
-        KV_SERIALIZE(payment_id_hex)     DOC_DSCR("Payment ID associated with the transaction in hexadecimal format.") DOC_EXMP("1dfe5a88ff9effb3") DOC_END
+        KV_SERIALIZE(payment_id_hex)     DOC_DSCR("[deprecated] Legacy tx-wide hex-encoded payment_id, that normally used for user database by exchanges") DOC_EXMP_AUTO("")     DOC_END
         KV_SERIALIZE(fee)                DOC_DSCR("Transaction fee required for processing the transaction.") DOC_EXMP(10000000000) DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(asset_id) DOC_DSCR("[optional] Asset ID to filter outputs. Native coin if not specified.") DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
@@ -1138,6 +1140,7 @@ namespace tools::wallet_public
       uint64_t      amount_total;
       uint64_t      outs_swept;
       uint64_t      amount_swept;
+      crypto::public_key asset_id;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(tx_hash)            DOC_DSCR("Transaction ID (hash) format.") DOC_EXMP("01220e8304d46b940a86e383d55ca5887b34f158a7365bbcdd17c5a305814a93")  DOC_END
@@ -1146,6 +1149,7 @@ namespace tools::wallet_public
         KV_SERIALIZE(amount_total)       DOC_DSCR("Total amount of native coins involved in the transaction.") DOC_EXMP(100000000000) DOC_END
         KV_SERIALIZE(outs_swept)         DOC_DSCR("Number of outputs swept in the transaction.") DOC_EXMP(112) DOC_END
         KV_SERIALIZE(amount_swept)       DOC_DSCR("Amount of native coins swept in the transaction.") DOC_EXMP(101000000000) DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(asset_id) DOC_DSCR("Asset ID used to filter outputs.") DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
       END_KV_SERIALIZE_MAP()
     };
   };

@@ -3814,7 +3814,7 @@ bool wallet_and_sweep_below::c1(currency::core& c, size_t ev_index, const std::v
   size_t outs_swept = 0;
   size_t amount_swept = 0;
   transaction tx{};
-  miner_wlt->sweep_below(10 /* <- decoys */, m_accounts[ALICE_ACC_IDX].get_public_address(), COIN + 1, payment_id_t(), TESTS_DEFAULT_FEE, outs_total, amount_total, outs_swept, amount_swept, &tx);
+  miner_wlt->sweep_below(native_coin_asset_id, 10 /* <- decoys */, m_accounts[ALICE_ACC_IDX].get_public_address(), COIN + 1, payment_id_t(), TESTS_DEFAULT_FEE, outs_total, amount_total, outs_swept, amount_swept, &tx);
 
   CHECK_AND_ASSERT_MES(amount_swept == amount_total, false, "amount_swept != amount_total");
   CHECK_AND_ASSERT_MES(amount_swept == COIN * (2 * CURRENCY_MINED_MONEY_UNLOCK_WINDOW), false, "amount_swept = " << amount_swept);
