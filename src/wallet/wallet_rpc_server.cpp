@@ -733,11 +733,33 @@ namespace tools
       return false;
     }*/
 
-    currency::finalized_tx result = AUTO_VAL_INIT(result);
+    currency::finalized_tx result{};
     std::string unsigned_tx_blob_str;
     ctp.fee = req.fee;
     ctp.fake_outputs_count = req.mixin;
+
+    if (!req.out_ids_to_spend.empty())
+    {
+      tools::transfer_details td{};
+      for(uint64_t oid : req.out_ids_to_spend)
+      {
+        if (!w.get_wallet()->get_transfer_info_by_index(oid, td))
+        {
+          er.code = WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT;
+          er.message = "out_ids_to_spend has incorrect output index: " + epst::num_to_string_fast(oid);
+          return false;
+        }
+      }
+      w.get_wallet()->set_tids_to_be_only_used_in_the_next_transfer(req.out_ids_to_spend);
+    }
+    auto slh = epee::misc_utils::create_scope_leave_handler([&](){
+      if (!req.out_ids_to_spend.empty())
+        w.get_wallet()->set_tids_to_be_only_used_in_the_next_transfer(std::vector<uint64_t>()); // reset    
+    });
+
     w.get_wallet()->transfer(ctp, result, true, &unsigned_tx_blob_str);
+    res.used_out_ids = result.ftp.selected_transfers;
+
     if (w.get_wallet()->is_watch_only())
     {
       res.tx_unsigned_hex = epee::string_tools::buff_to_hex_nodelimer(unsigned_tx_blob_str); // watch-only wallets could not sign and relay transactions

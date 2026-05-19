@@ -918,24 +918,25 @@ namespace tools::wallet_public
       std::list<currency::transfer_destination> destinations;
       uint64_t fee;
       uint64_t mixin;
-      //uint64_t unlock_time;
       std::string payment_id; // hex-encoded
       std::string comment; 
       bool push_payer;
       bool hide_receiver;
-      std::vector<currency::tx_service_attachment> service_entries;
       bool service_entries_permanent;
+      std::vector<currency::tx_service_attachment> service_entries;
+      std::vector<uint64_t> out_ids_to_spend;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(destinations)     DOC_DSCR("List of destinations") DOC_EXMP_AUTO(1)     DOC_END
         KV_SERIALIZE(fee)              DOC_DSCR("Fee to be paid on behalf of sender's wallet(paid in native coins)") DOC_EXMP_AUTO(10000000000)     DOC_END
-        KV_SERIALIZE(mixin)            DOC_DSCR("Specifies number of mixins(decoys) that would be used to create input, actual for pre-zarcanum outputs, for post-zarcanum outputs instead of this option, number that is defined by network hard rules(15+)") DOC_EXMP(15)     DOC_END
+        KV_SERIALIZE(mixin)            DOC_DSCR("Specifies number of mixins (decoys) that would be used to create input, actual for pre-Zarcanum outputs, for post-Zarcanum outputs instead of this option, number that is defined by network hard rules (15+)") DOC_EXMP(15)     DOC_END
         KV_SERIALIZE(payment_id)       DOC_DSCR("[deprecated] Legacy tx-wide hex-encoded payment_id, that normally used for user database by exchanges") DOC_EXMP_AUTO("")     DOC_END
         KV_SERIALIZE(comment)          DOC_DSCR("Text comment that is displayed in UI") DOC_EXMP_AUTO("Thanks for the coffe")     DOC_END
         KV_SERIALIZE(push_payer)       DOC_DSCR("[deprecated] Reveal information about sender of this transaction, basically add sender address to transaction in encrypted way, so only receiver can see who sent transaction") DOC_EXMP(false)     DOC_END
         KV_SERIALIZE(hide_receiver)    DOC_DSCR("[deprecated] This add to transaction information about remote address(destination), might be needed when the wallet restored from seed phrase and fully resynched, if this option were true, then sender won't be able to see remote address for sent transactions anymore.") DOC_EXMP(true)     DOC_END
         KV_SERIALIZE(service_entries)  DOC_DSCR("Service entries that might be used by different apps that works on top of Zano network, not part of consensus") DOC_EXMP_AUTO(1)     DOC_END
         KV_SERIALIZE(service_entries_permanent) DOC_DSCR("Point to wallet that service_entries should be placed to 'extra' section of transaction(which won't be pruned after checkpoints)") DOC_EXMP_AUTO(1)     DOC_END
+        KV_SERIALIZE(out_ids_to_spend) DOC_DSCR("[optional] List of output IDs that should only be used for this transfer. If empty or not present -- no restriction (default).") DOC_EXMP_AGGR({10, 15, 305}) DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
@@ -945,12 +946,14 @@ namespace tools::wallet_public
       std::string tx_unsigned_hex; // for cold-signing process
       uint64_t tx_size;
       std::optional<wallet_transfer_info> tx_details;
+      std::vector<uint64_t> used_out_ids;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(tx_hash)           DOC_DSCR("Has of the generated transaction(if succeded)") DOC_EXMP("01220e8304d46b940a86e383d55ca5887b34f158a7365bbcdd17c5a305814a93")     DOC_END
         KV_SERIALIZE(tx_unsigned_hex)   DOC_DSCR("Has unsigned tx blob in hex encoding") DOC_EXMP("e383d55ca5887b34f158a7365bbcd01220e8304d46b940a86e383d55ca5887b34f158a7365bbcdd17c5a305814a9301220e8304d46b940a86e383d55ca5887b34f158a7365bbcdd17c5a305814a9301220e8304d46b940a86e383d55ca5887b34f158a7365bbcdd17c5a305814a93")     DOC_END
         KV_SERIALIZE(tx_size)           DOC_DSCR("Transaction size in bytes") DOC_EXMP(1234)     DOC_END
         KV_SERIALIZE(tx_details)        DOC_DSCR("Tx details[optional]")      DOC_EXMP_AGGR()    DOC_END
+        KV_SERIALIZE(used_out_ids)      DOC_DSCR("Output IDs that were actually spent.") DOC_EXMP_AGGR({10, 15, 305})    DOC_END
       END_KV_SERIALIZE_MAP()
     };
   };
