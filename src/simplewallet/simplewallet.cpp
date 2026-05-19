@@ -319,7 +319,7 @@ simple_wallet::simple_wallet()
   m_cmd_binder.set_handler("wallet_bc_height", boost::bind(&simple_wallet::show_wallet_bcheight, this,ph::_1), "Show blockchain height");
 
   m_cmd_binder.set_handler("transfer", boost::bind(&simple_wallet::transfer, this,ph::_1), "transfer <mixin_count> [asset_id_1:]<addr_1> <amount_1> [ [asset_id_2:]<addr_2> <amount_2> ... [asset_id_N:]<addr_N> <amount_N>] - Transfer <amount_1>,... <amount_N> to <address_1>,... <address_N>, respectively. <mixin_count> is the number of transactions yours is indistinguishable from (from 0 to maximum available)");
-  m_cmd_binder.set_handler("transfer_so", boost::bind(&simple_wallet::transfer_so, this, ph::_1), "transfer_so <out_idx,out_idx,...> <fee> <mixin_count> [asset_id_1:]<addr_1> <amount_1> [ [asset_id_2:]<addr_2> <amount_2> ... [asset_id_N:]<addr_N> <amount_N>] - Transfer funds spending only specified outputs (use list_outputs command to get outputs' indecies)");
+  m_cmd_binder.set_handler("transfer_so", boost::bind(&simple_wallet::transfer_so, this, ph::_1), "transfer_so <out_idx,out_idx,...> <fee> <mixin_count> [asset_id_1:]<addr_1> <amount_1> [ [asset_id_2:]<addr_2> <amount_2> ... [asset_id_N:]<addr_N> <amount_N>] - Transfer funds spending only specified outputs (use list_outputs command to get outputs' indices)");
 
   m_cmd_binder.set_handler("set_log", boost::bind(&simple_wallet::set_log, this,ph::_1), "set_log <level> - Change current log detalisation level, <level> is a number 0-4");
   m_cmd_binder.set_handler("enable_console_logger", boost::bind(&simple_wallet::enable_console_logger, this,ph::_1), "Enables console logging");
@@ -2092,7 +2092,7 @@ bool simple_wallet::transfer_so(const std::vector<std::string> &args)
   // 1st arg: outs
   if (args.size() <= 0)
   {
-    fail_msg_writer() << "invalid agruments, can't parse outputs index array, 'out_idx,out_idx,...' format is expected";
+    fail_msg_writer() << "invalid arguments, can't parse outputs index array, 'out_idx,out_idx,...' format is expected";
     return true;
   }
 
@@ -2133,7 +2133,7 @@ bool simple_wallet::transfer_so(const std::vector<std::string> &args)
   // 2nd arg: fee
   if (args.size() <= 1)
   {
-    fail_msg_writer() << "invalid agruments: can't parse fee";
+    fail_msg_writer() << "invalid arguments: can't parse fee";
     return true;
   }
 
@@ -2141,7 +2141,7 @@ bool simple_wallet::transfer_so(const std::vector<std::string> &args)
   r = currency::parse_amount(args[1], fee);
   if (!r || fee < TX_MINIMUM_FEE)
   {
-    fail_msg_writer() << "invalid agruments: given fee is invalid or too small: " << args[1] << ", minimum fee: " << print_money_brief(TX_MINIMUM_FEE);
+    fail_msg_writer() << "invalid arguments: given fee is invalid or too small: " << args[1] << ", minimum fee: " << print_money_brief(TX_MINIMUM_FEE);
     return true;
   }
 
@@ -2491,6 +2491,8 @@ bool simple_wallet::list_outputs(const std::vector<std::string> &args)
       arg_unknown_assets = true, show_only_unknown = true;
     else if (!arg_ticker_filer && (arg.find("ticker=") == 0 || arg.find("t=") == 0))
       arg_ticker_filer = true, filter_asset_ticker = boost::erase_all_copy(boost::erase_all_copy(arg, "ticker="), "t=");
+    else if (!arg_ticker_filer && (arg == "native" || arg == "n"))
+      arg_ticker_filer = true, filter_asset_ticker = get_native_coin_asset_descriptor().ticker;
     else if (!show_ki_instead_of_aid && (arg == "ki" || arg == "kis" || arg == "keyimage" || arg == "keyimages"))
       show_ki_instead_of_aid = true;
     else
@@ -3211,7 +3213,7 @@ bool simple_wallet::sweep_bare_outs(const std::vector<std::string> &args)
 
   if (args.size() > 1)
   {
-    fail_msg_writer() << "Invalid number of agruments given";
+    fail_msg_writer() << "Invalid number of arguments given";
     return true;
   }
 
