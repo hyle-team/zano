@@ -1593,6 +1593,11 @@ std::string wallets_manager::transfer(uint64_t wallet_id, const view::transfer_p
     {
       return API_RETURN_CODE_BAD_ARG_INVALID_ADDRESS;
     }
+
+    // note: don't merge back the following 3 lines into develop -- sowle
+    bool self_directed_destination = dsts.back().addr.back() == w->get()->get_account().get_public_address();
+    if (self_directed_destination && embedded_payment_id.size() != 0)
+      return API_RETURN_CODE_BAD_ARG_INVALID_ADDRESS;
     
     size_t decimal_point = 0;
     if (!w->get()->get_asset_decimal_point(d.asset_id, &decimal_point))

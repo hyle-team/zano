@@ -200,6 +200,7 @@ namespace currency
     bool m_offline_mode;
     bool m_disable_tor;
     bool m_do_not_unlock_reserved_on_idle = false;
+    bool m_do_resync_and_exit = false;
     std::string m_restore_wallet;
     std::string m_voting_config_file;
     bool m_no_password_confirmations = false;

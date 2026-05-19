@@ -387,7 +387,7 @@ namespace tools
     void generate(const std::wstring& path, const std::string& password, bool auditable_wallet);
     void restore(const std::wstring& path, const std::string& pass, const std::string& seed_or_tracking_seed, bool tracking_wallet, const std::string& seed_password);
     void restore(const std::wstring& path, const std::string& pass, const std::string& secret_derivation, bool is_auditabe_wallet, uint64_t creation_timestamp);
-    void load(const std::wstring& path, const std::string& password);
+    void load(const std::wstring& path, const std::string& password, bool skip_pending_ki_load = false);
     void store();
     void store(const std::wstring& path);
     void store(const std::wstring& path, const std::string& password);
@@ -400,8 +400,8 @@ namespace tools
 
     void get_recent_transfers_history(std::vector<wallet_public::wallet_transfer_info>& trs, size_t offset, size_t count, uint64_t& total, uint64_t& last_item_index, bool exclude_mining_txs = false, bool start_from_end = true);
     bool is_defragmentation_transaction(const wallet_public::wallet_transfer_info& wti);
-    uint64_t get_recent_transfers_total_count();
-    uint64_t get_transfer_entries_count();
+    uint64_t get_recent_transfers_total_count() const;
+    uint64_t get_transfer_entries_count() const;
     void get_unconfirmed_transfers(std::vector<wallet_public::wallet_transfer_info>& trs, bool exclude_mining_txs = false);
     void init(const std::string& daemon_address = "http://localhost:8080");
     bool deinit();
@@ -605,12 +605,17 @@ namespace tools
     bool fill_mining_context(mining_context& ctx);
     
     void get_transfers(transfer_container& incoming_transfers) const;
-    std::string get_transfers_str(bool include_spent = true, bool include_unspent = true, bool show_only_unknown = false, const std::string& filter_asset_ticker = std::string{}) const;
+    std::string get_transfers_str(bool include_spent = true, bool include_unspent = true, bool show_only_unknown = false, const std::string& filter_asset_ticker = std::string{}, bool show_ki_instead_of_aid = false) const;
     std::string get_balance_str() const;
     std::string get_balance_str_raw() const;
 
     // Returns all payments by given id in unspecified order
     void get_payments(const std::string& payment_id, std::list<payment_details>& payments, uint64_t min_height = 0) const;
+
+    // callback: (uint64_t tid, const tools::transfer_details& td) -> bool, true -- continue, false -- stop
+    // TODO: consider renaming to enumerate_outputs
+    template<typename callback_t>
+    void enumerate_transfers(callback_t cb) const;
 
     // callback: (const wallet_public::wallet_transfer_info& wti) -> bool, true -- continue, false -- stop
     template<typename callback_t>
@@ -636,7 +641,7 @@ namespace tools
     void restore_key_images_in_wo_wallet(const std::wstring& filename, const std::string& password) const;
     void clear_utxo_cold_sig_reservation(std::vector<uint64_t>& affected_transfer_ids);
 
-    void sweep_below(size_t fake_outs_count, const currency::account_public_address& destination_addr, uint64_t threshold_amount, const currency::payment_id_t& payment_id,
+    void sweep_below(const crypto::public_key& asset_id, size_t fake_outs_count, const currency::account_public_address& destination_addr, uint64_t threshold_amount, const currency::payment_id_t& payment_id,
       uint64_t fee, size_t& outs_total, uint64_t& amount_total, size_t& outs_swept, uint64_t& amount_swept, currency::transaction* p_result_tx = nullptr, std::string* p_filename_or_unsigned_tx_blob_str = nullptr);
 
     bool get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id);
@@ -683,6 +688,7 @@ namespace tools
     bool build_minted_block(const mining_context& cxt, const currency::account_public_address& miner_address);
     std::string get_extra_text_for_block(uint64_t new_block_expected_height);
     bool reset_history();
+    bool reset_pending_keyimages();
     bool is_transfer_unlocked(const transfer_details& td) const;
     bool is_transfer_unlocked(const transfer_details& td, bool for_pos_mining, uint64_t& stake_lock_time) const;
     void get_mining_history(wallet_public::mining_history& hist, uint64_t timestamp_from = 0);
@@ -908,7 +914,7 @@ private:
 
 
     void init_log_prefix();
-    void load_keys2ki(bool create_if_not_exist, bool& need_to_resync);
+    void load_keys2ki(bool create_if_not_exist, bool skip_loading_ki_from_file, bool& need_to_resync);
 
     void send_transaction_to_network(const currency::transaction& tx);
     void add_sent_tx_detailed_info(const currency::transaction& tx, 
@@ -1250,6 +1256,14 @@ namespace tools
     }
     cxt.status = API_RETURN_CODE_NOT_FOUND;
     return false;
+  }
+
+  template<typename callback_t>
+  void wallet2::enumerate_transfers(callback_t cb) const
+  {
+    for(auto it = m_transfers.begin(); it != m_transfers.end(); ++it)
+      if (!cb(it->first, it->second))
+        break;
   }
 
   template<typename callback_t>

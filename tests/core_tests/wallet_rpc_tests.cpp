@@ -1891,7 +1891,7 @@ bool wallet_rpc_and_tx_unlock_time::c1(currency::core& c, size_t ev_index, const
   std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Tx pool is not empty: " << c.get_pool_transactions_count());
-  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt, MK_TEST_COINS(1)), false, "");
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt, 0), false, "");
 
   tools::wallet_rpc_server alice_wlt_rpc(alice_wlt);
 
@@ -1905,8 +1905,7 @@ bool wallet_rpc_and_tx_unlock_time::c1(currency::core& c, size_t ev_index, const
   r = invoke_text_json_for_rpc(alice_wlt_rpc, "search_for_transactions", st_req, st_resp);
   CHECK_AND_ASSERT_MES(r, false, "RPC search_for_transactions failed ");
 
-  CHECK_AND_ASSERT_EQ(st_resp.in.size(), 1);
-  CHECK_AND_ASSERT_EQ(st_resp.in.front().unlock_time, 11);
+  CHECK_AND_ASSERT_EQ(st_resp.in.size(), 0);
 
 
   return true;

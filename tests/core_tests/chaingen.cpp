@@ -2399,7 +2399,7 @@ bool make_tx_multisig_to_key(const currency::transaction& source_tx,
   tx_destination_entry de(se.amount - fee, target_address);
 
   currency::account_keys keys = AUTO_VAL_INIT(keys);
-  bool r = construct_tx(keys, std::vector<tx_source_entry>({ se }), std::vector<tx_destination_entry>({ de }), empty_attachment, tx, 0, CURRENCY_TO_KEY_OUT_RELAXED, true);
+  bool r = construct_tx(keys, std::vector<tx_source_entry>({ se }), std::vector<tx_destination_entry>({ de }), empty_attachment, tx, 0, 0, 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
 
   bool tx_fully_signed = false;
