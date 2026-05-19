@@ -345,8 +345,9 @@ namespace currency
     return true;
   }
   //------------------------------------------------------------------
-  bool verify_balance_proof_hf6(const transaction& tx, const crypto::hash& tx_id, uint64_t additional_inputs_amount_and_fees_for_mining_tx /* = 0 */)
+  bool verify_balance_proof_hf6(const transaction& tx, const crypto::hash& tx_id, uint64_t additional_inputs_amount_and_fees_for_mining_tx /* = 0 */) noexcept
   {
+    TRY_ENTRY()
     bool r = false;
     CHECK_AND_ASSERT_MES(tx.version >= TRANSACTION_VERSION_POST_HF6, false, "unexpected tx version: " << tx.version);
 
@@ -503,6 +504,7 @@ namespace currency
     }
 
     return true;
+    CATCH_ENTRY_L0_RED(LOCATION_CSTR, false);
   }
 
 

@@ -360,8 +360,9 @@ namespace currency
     return true;
   }
   //--------------------------------------------------------------------------------
-  bool verify_asset_surjection_proof_hf6(const transaction& tx, const crypto::hash& tx_id)
+  bool verify_asset_surjection_proof_hf6(const transaction& tx, const crypto::hash& tx_id) noexcept
   {
+    TRY_ENTRY()
     CHECK_AND_ASSERT_MES(tx.version >= TRANSACTION_VERSION_POST_HF6, false, "unexpected tx version: " << tx.version);
 
     std::vector<crypto::point_t> pseudo_outs_blinded_asset_ids;
@@ -467,6 +468,7 @@ namespace currency
     }
 
     return true;
+    CATCH_ENTRY_L0_RED(LOCATION_CSTR, false);
   }
   //--------------------------------------------------------------------------------
   bool generate_asset_surjection_proof(const crypto::hash& context_hash, bool has_non_zc_inputs, tx_generation_context& ogc, transaction& tx_to_add_proof_to)
