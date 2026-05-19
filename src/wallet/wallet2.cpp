@@ -9002,6 +9002,21 @@ void wallet2::sweep_below(const crypto::public_key& asset_id, size_t fake_outs_c
 
   outs_swept = sweeping_asset ? ftp.sources.size() - 1 : ftp.sources.size();
 
+  // double check balance change correctness before final steps
+  std::unordered_map<crypto::public_key, crypto::mp::int128_t> balance_check, balance_check_destination;
+  const address_v addr_v_destination = destination_addr;
+  for(auto& el : ftp.sources)
+    balance_check[el.asset_id] -= el.amount;
+  for(auto& el : ftp.prepared_destinations)
+  {
+    balance_check[el.asset_id] += el.amount;
+    if (el.addr.size() == 1 && el.addr.front() == addr_v_destination)
+      balance_check_destination[el.asset_id] += el.amount;
+  }
+  WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(balance_check[native_coin_asset_id] + fee == 0, "sweep_below: balance check 0 failed: " << balance_check[native_coin_asset_id] << ", " << fee);
+  WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(balance_check_destination[asset_id] == (sweeping_asset ? amount_swept : amount_swept - fee), "sweep_below: balance check 1 failed: " << balance_check_destination[asset_id] << ", " << amount_swept << ", " << fee);
+  WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(!sweeping_asset || balance_check[asset_id] == 0, "sweep_below: balance check 2 failed: " << balance_check[asset_id]);
+
 
   if (m_watch_only)
   {
