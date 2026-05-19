@@ -1291,7 +1291,8 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY(before_hard_fork_1_cumulative_difficulty);
     GENERATE_AND_PLAY(inthe_middle_hard_fork_1_cumulative_difficulty);
     GENERATE_AND_PLAY(after_hard_fork_1_cumulative_difficulty);
-    GENERATE_AND_PLAY(hard_fork_1_locked_mining_test);
+    // disabled because we skip non coinbase unlick_time tx in wallet
+    //GENERATE_AND_PLAY(hard_fork_1_locked_mining_test);
     GENERATE_AND_PLAY(hard_fork_1_bad_pos_source);
     GENERATE_AND_PLAY(hard_fork_1_unlock_time_2_in_normal_tx);
     GENERATE_AND_PLAY(hard_fork_1_unlock_time_2_in_coinbase);

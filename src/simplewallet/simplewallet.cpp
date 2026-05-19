@@ -704,6 +704,7 @@ void simple_wallet::handle_command_line(const boost::program_options::variables_
   m_no_whitelist = command_line::get_arg(vm, arg_no_whitelist);
   m_restore_ki_in_wo_wallet = command_line::get_arg(vm, arg_restore_ki_in_wo_wallet);
   m_do_not_unlock_reserved_on_idle = command_line::get_arg(vm, arg_no_idle_unlock_spent);
+  m_do_resync_and_exit = command_line::get_arg(vm, arg_resync_and_exit);
   m_concise_mode    = command_line::get_arg(vm, arg_concise_mode) == 1;
 
   m_allow_legacy_payment_id_size = command_line::has_arg(vm, command_line::arg_allow_legacy_payment_id_size);
