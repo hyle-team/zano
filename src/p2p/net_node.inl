@@ -902,6 +902,12 @@ namespace nodetool
   void node_server<t_payload_net_handler>::cache_connect_fail_info(const net_address& addr)
   {
     CRITICAL_REGION_LOCAL(m_conn_fails_cache_lock);
+    if (m_conn_fails_cache.size() >= P2P_FAILED_ADDR_CACHE_MAX_SIZE && m_conn_fails_cache.find(addr) == m_conn_fails_cache.end())
+    {
+      auto oldest = std::min_element(m_conn_fails_cache.begin(), m_conn_fails_cache.end(),
+        [](const std::pair<const net_address, time_t>& a, const std::pair<const net_address, time_t>& b) { return a.second < b.second; });
+      m_conn_fails_cache.erase(oldest);
+    }
     m_conn_fails_cache[addr] = time(NULL);
   }
   //-----------------------------------------------------------------------------------
