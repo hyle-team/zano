@@ -935,9 +935,9 @@ namespace currency
     }
 
     if (scan_context.check_hf4_coinage_rule && m_core_runtime_config.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, this->get_current_blockchain_size()))
-    {
+    { 
       //with hard fork 4 make it network rule to have at least 10 confirmations
-
+      
       if (this->get_current_blockchain_size() - max_related_block_height < CURRENCY_HF4_MANDATORY_MIN_COINAGE)
       {
         LOG_ERROR("Coinage rule is broken (mainblock): current blockchain size = " << this->get_current_blockchain_size() << ", max_related_block_height = " << max_related_block_height << ", tx: " << get_transaction_hash(validated_tx));
