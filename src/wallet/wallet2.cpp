@@ -411,6 +411,9 @@ void wallet2::process_ado_in_new_transaction(const currency::asset_descriptor_op
       wallet_own_asset_context& asset_context = m_own_asset_descriptors[asset_id];
       epee::misc_utils::cast_assign_a_to_b(*ado.opt_descriptor, asset_context);
 
+      if (ado.opt_descriptor->owner == m_account.get_public_address().spend_public_key && ptc.spent_own_outs_in_inputs)
+        m_custom_assets[asset_id] = *ado.opt_descriptor;
+
       std::stringstream ss;
       ss << "New Asset Registered:"
         << ENDL << "asset id:         " << asset_id
@@ -2980,6 +2983,7 @@ void wallet2::operator()(const asset_register_event& e)
   auto it = m_own_asset_descriptors.find(e.asset_id);
   WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(it != m_own_asset_descriptors.end(), "asset_id " << e.asset_id << "not found during rolling asset_register_event");
   m_own_asset_descriptors.erase(it);
+  m_custom_assets.erase(e.asset_id);
 }
 void wallet2::operator()(const asset_update_event& e)
 {
