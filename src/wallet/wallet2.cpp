@@ -8934,6 +8934,9 @@ void wallet2::sweep_below(const crypto::public_key& asset_id, size_t fake_outs_c
 
       prepare_tx_destinations(needed_money_map, get_current_split_strategy(), tools::tx_dust_policy(), dsts, ftp.flags, ftp.prepared_destinations);
 
+      if (m_watch_only)
+        return rc_ok;
+
       currency::transaction tx{};
       crypto::secret_key tx_key{};
       try
