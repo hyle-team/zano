@@ -162,3 +162,41 @@ struct wallet_rpc_and_tx_unlock_time : public wallet_test
   bool generate(std::vector<test_event_entry>& events) const;
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };
+
+struct wallet_rpc_sweep_below : public wallet_test
+{
+  wallet_rpc_sweep_below();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};
+
+struct wallet_rpc_sweep_below_wo_native : public wallet_test
+{
+  wallet_rpc_sweep_below_wo_native();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+
+  mutable std::wstring m_wallet_filename = L"~coretests.wallet_rpc_sweep_below_wo_native.file.tmp";
+  mutable std::string  m_wallet_password = "espresso-doppio";
+};
+
+struct wallet_rpc_sweep_below_wo_reservation : public wallet_test
+{
+  wallet_rpc_sweep_below_wo_reservation();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};
+
+struct wallet_rpc_sweep_below_double_sweep : public wallet_test
+{
+  wallet_rpc_sweep_below_double_sweep();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};
+
+struct wallet_rpc_sweep_below_wo_multi_asset : public wallet_test
+{
+  wallet_rpc_sweep_below_wo_multi_asset();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};

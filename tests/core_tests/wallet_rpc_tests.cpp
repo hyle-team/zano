@@ -3682,3 +3682,1048 @@ bool wallet_rpc_and_tx_unlock_time::c1(currency::core& c, size_t ev_index, const
 
   return true;
 }
+
+//------------------------------------------------------------------------------
+
+wallet_rpc_sweep_below::wallet_rpc_sweep_below()
+{
+  REGISTER_CALLBACK_METHOD(wallet_rpc_sweep_below, c1);
+}
+
+bool wallet_rpc_sweep_below::generate(std::vector<test_event_entry>& events) const
+{
+  uint64_t ts = test_core_time::get_time();
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
+  account_base& bob_acc   = m_accounts[BOB_ACC_IDX];   bob_acc.generate();   bob_acc.set_createtime(ts);
+  account_base& carol_acc = m_accounts[CAROL_ACC_IDX]; carol_acc.generate(); carol_acc.set_createtime(ts);
+  account_base& dan_acc   = m_accounts[DAN_ACC_IDX];   dan_acc.generate();   dan_acc.set_createtime(ts);
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
+  DO_CALLBACK(events, "configure_core");
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 3);
+
+  DO_CALLBACK(events, "c1");
+  return true;
+}
+
+namespace
+{
+  // simple rpc wrap for best dev expirience:)
+  int call_sweep_below(tools::wallet_rpc_server& rpc, const tools::wallet_public::COMMAND_SWEEP_BELOW::request& req, tools::wallet_public::COMMAND_SWEEP_BELOW::response& res)
+  {
+    epee::json_rpc::error je{};
+    tools::wallet_rpc_server::connection_context ctx{};
+    bool ok = rpc.on_sweep_below(req, res, je, ctx);
+    return ok ? 0 : je.code;
+  }
+}
+
+bool wallet_rpc_sweep_below::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  bool r = false;
+
+  std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
+  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
+  std::shared_ptr<tools::wallet2> bob_wlt   = init_playtime_test_wallet(events, c, BOB_ACC_IDX);
+  std::shared_ptr<tools::wallet2> carol_wlt = init_playtime_test_wallet(events, c, CAROL_ACC_IDX);
+
+  miner_wlt->refresh();
+
+  const bool use_assets = c.get_blockchain_storage().is_hardfork_active(ZANO_HARDFORK_04_ZARCANUM);
+  CHECK_AND_ASSERT_MES(use_assets, false, "test requires HF4 (Zarcanum) to be active for asset sweep path");
+
+  // deploy a custom asset, give miner some asset UTXOs
+  crypto::public_key custom_asset_id{};
+  const size_t asset_decimal_point = 6;
+  // 1000 SBTA total cap, 100 SBTA per emitted UTXO
+  const uint64_t asset_total_max_supply = 1000ull * 1000000ull;
+  const uint64_t asset_emit_per_destination = 100ull * 1000000ull;
+
+  {
+    currency::asset_descriptor_base adb{};
+    adb.total_max_supply = asset_total_max_supply;
+    adb.full_name = "Sweep Below Test Asset";
+    adb.ticker = "SBTA";
+    adb.decimal_point = asset_decimal_point;
+
+    // 6 destinations, all to miner: 6 separate asset UTXOs of 100 SBTA each
+    std::vector<currency::tx_destination_entry> dsts;
+    for (size_t i = 0; i < 6; ++i)
+    {
+      currency::tx_destination_entry d{};
+      d.addr.push_back(miner_wlt->get_account().get_public_address());
+      d.amount = asset_emit_per_destination;
+      d.asset_id = currency::null_pkey;
+      dsts.push_back(d);
+    }
+
+    currency::transaction tx{};
+    miner_wlt->deploy_new_asset(adb, dsts, tx, custom_asset_id);
+    LOG_PRINT_L0("deployed asset: " << custom_asset_id);
+  }
+
+  // confirm asset deploy and unlock its outs
+  r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
+
+  miner_wlt->refresh();
+  const uint64_t miner_asset_balance_initial = miner_wlt->balance(custom_asset_id);
+  CHECK_AND_ASSERT_MES(miner_asset_balance_initial == 6 * asset_emit_per_destination, false,
+    "miner asset balance: got " << miner_asset_balance_initial << ", expected " << (6 * asset_emit_per_destination));
+
+  // build Alice for sweep_below tests
+  // native: 5 UTXOs of MK_TEST_COINS(2) each = 10 small UTXOs of native (each one is less than fee*100 but more than fee)
+  const uint64_t small_native = MK_TEST_COINS(2);
+  for (size_t i = 0; i < 5; ++i)
+    miner_wlt->transfer(small_native, alice_wlt->get_account().get_public_address(), currency::native_coin_asset_id);
+
+  // native: 1 "fat" UTXO of MK_TEST_COINS(100) to ensure asset sweep has a fee-source available
+  const uint64_t fat_native = MK_TEST_COINS(100);
+  miner_wlt->transfer(fat_native, alice_wlt->get_account().get_public_address(), currency::native_coin_asset_id);
+
+  r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
+
+  // asset: 5 separate UTXOs of 20 SBTA each - small ones for the threshold logic
+  const uint64_t small_asset = 20ull * 1000000ull;
+  for (size_t i = 0; i < 5; ++i)
+    miner_wlt->transfer(small_asset, alice_wlt->get_account().get_public_address(), custom_asset_id);
+
+  // asset: 1 "fat" UTXO of 80 SBTA - above-threshold one, must NOT be swept
+  const uint64_t fat_asset = 80ull * 1000000ull;
+  miner_wlt->transfer(fat_asset, alice_wlt->get_account().get_public_address(), custom_asset_id);
+
+  r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
+
+  alice_wlt->refresh();
+  const uint64_t alice_native_initial = alice_wlt->balance(currency::native_coin_asset_id);
+  CHECK_AND_ASSERT_MES(alice_native_initial == 5 * small_native + fat_native, false, "Alice native balance unexpected: " << alice_native_initial);
+  const uint64_t alice_asset_initial = alice_wlt->balance(custom_asset_id);
+  CHECK_AND_ASSERT_MES(alice_asset_initial == 5 * small_asset + fat_asset, false, "Alice asset balance unexpected: " << alice_asset_initial);
+
+  // case D: invalid destination address -> WRONG_ADDRESS
+  {
+    tools::wallet_rpc_server alice_rpc(alice_wlt);
+    tools::wallet_public::COMMAND_SWEEP_BELOW::request req{};
+    req.mixin = 15;
+    req.address = "this-is-not-a-valid-zano-address";
+    req.amount = small_native + 1;
+    req.fee = TESTS_DEFAULT_FEE;
+    tools::wallet_public::COMMAND_SWEEP_BELOW::response res{};
+    int code = call_sweep_below(alice_rpc, req, res);
+    CHECK_AND_ASSERT_MES(code == WALLET_RPC_ERROR_CODE_WRONG_ADDRESS, false, "case D: expected WRONG_ADDRESS (" << WALLET_RPC_ERROR_CODE_WRONG_ADDRESS << "), got " << code);
+  }
+
+  // case E: fee below tx_pool_min_fee -> WRONG_ARGUMENT
+  {
+    tools::wallet_rpc_server alice_rpc(alice_wlt);
+    tools::wallet_public::COMMAND_SWEEP_BELOW::request req{};
+    req.mixin = 15;
+    req.address = m_accounts[BOB_ACC_IDX].get_public_address_str();
+    req.amount = small_native + 1;
+    req.fee = 1; // way below min
+    tools::wallet_public::COMMAND_SWEEP_BELOW::response res{};
+    int code = call_sweep_below(alice_rpc, req, res);
+    CHECK_AND_ASSERT_MES(code == WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT, false, "case E: expected WRONG_ARGUMENT (" << WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT << "), got " << code);
+  }
+
+  // case C: payment_id_hex is now deprecated - any non-empty value must fail with WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID
+  {
+    tools::wallet_rpc_server alice_rpc(alice_wlt);
+    tools::wallet_public::COMMAND_SWEEP_BELOW::request req{};
+    req.mixin = 15;
+    req.address = m_accounts[BOB_ACC_IDX].get_public_address_str();
+    req.amount = small_native + 1;
+    req.fee = TESTS_DEFAULT_FEE;
+    req.payment_id_hex = "abc123def4567890"; // any non-empty hex must be rejected now
+    tools::wallet_public::COMMAND_SWEEP_BELOW::response res{};
+    int code = call_sweep_below(alice_rpc, req, res);
+    CHECK_AND_ASSERT_MES(code == WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID, false, "case C: expected WRONG_PAYMENT_ID (" << WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID << "), got " << code);
+
+    // garbage that wouldn't have parsed in the old code must also be rejected
+    req.payment_id_hex = "not_hex_at_all";
+    res = tools::wallet_public::COMMAND_SWEEP_BELOW::response{};
+    code = call_sweep_below(alice_rpc, req, res);
+    CHECK_AND_ASSERT_MES(code == WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID, false, "case C garbage pid: expected WRONG_PAYMENT_ID, got " << code);
+  }
+
+  // case B & A: empty payment_id_hex on a native sweep - must succeed
+  // sweep all "small" native UTXOs (amount < small_native + 1 = 5 UTXOs of small_native) to Bob the fat UTXO must NOT be touched
+  {
+    const uint64_t bob_native_before = 0;
+    bob_wlt->refresh();
+    CHECK_AND_ASSERT_MES(bob_wlt->balance(currency::native_coin_asset_id) == bob_native_before, false, "bob native balance must start at 0");
+
+    tools::wallet_rpc_server alice_rpc(alice_wlt);
+    tools::wallet_public::COMMAND_SWEEP_BELOW::request req{};
+    req.mixin =  15;
+    req.address = m_accounts[BOB_ACC_IDX].get_public_address_str();
+    req.amount = small_native + 1; // threshold: only the 5 small UTXOs qualify
+    req.fee = TESTS_DEFAULT_FEE;
+    req.payment_id_hex = "";
+    // req.asset_id is defaulted to native_coin_asset_id by struct init
+
+    tools::wallet_public::COMMAND_SWEEP_BELOW::response res{};
+    int code = call_sweep_below(alice_rpc, req, res);
+    CHECK_AND_ASSERT_MES(code == 0, false, "case A/B: native sweep failed, code=" << code);
+
+    // response sanity
+    CHECK_AND_ASSERT_MES(res.asset_id == currency::native_coin_asset_id, false, "case A: response asset_id must be native");
+    CHECK_AND_ASSERT_MES(res.outs_total == 5, false, "case A: outs_total=" << res.outs_total << ", expected 5");
+    CHECK_AND_ASSERT_MES(res.outs_swept == 5, false, "case A: outs_swept=" << res.outs_swept << ", expected 5");
+    CHECK_AND_ASSERT_MES(res.amount_total == 5 * small_native, false, "case A: amount_total=" << res.amount_total << ", expected " << (5 * small_native));
+    CHECK_AND_ASSERT_MES(res.amount_swept == res.amount_total, false, "case A: amount_swept != amount_total");
+    CHECK_AND_ASSERT_MES(!res.tx_hash.empty(), false, "case A: tx_hash is empty");
+
+    CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "case A: tx must be in the pool, got " << c.get_pool_transactions_count());
+
+    r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+    CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
+    CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "tx pool not empty after mining");
+
+    // bob received (5 * small_native - fee)
+    bob_wlt->refresh();
+    const uint64_t bob_native_after = bob_wlt->balance(currency::native_coin_asset_id);
+    CHECK_AND_ASSERT_MES(bob_native_after == 5 * small_native - TESTS_DEFAULT_FEE, false, "case A: Bob got " << bob_native_after << ", expected " << (5 * small_native - TESTS_DEFAULT_FEE));
+
+    // Alice's fat native UTXO must remain - i.e. her native balance is exactly the fat one
+    alice_wlt->refresh();
+    const uint64_t alice_native_after = alice_wlt->balance(currency::native_coin_asset_id);
+    CHECK_AND_ASSERT_MES(alice_native_after == fat_native, false, "case A: Alice native left=" << alice_native_after << ", expected " << fat_native);
+    // asset balance must be unchanged
+    CHECK_AND_ASSERT_MES(alice_wlt->balance(custom_asset_id) == alice_asset_initial, false, "case A: Alice asset balance changed unexpectedly");
+  }
+
+  // cases for assets sweep_below
+  // sweep all asset UTXOs with amount < (small_asset + 1) = 5 asset UTXOs, send them to Carol
+  // Verify:
+  //  - response.asset_id == custom_asset_id
+  //  - outs_swept == 5 (asset UTXOs only, fee UTXO is not counted)
+  //  - amount_swept == 5 * small_asset
+  //  - Carol receives exactly 5 * small_asset of the asset
+  //  - Alice asset balance is reduced by exactly 5 * small_asset (fat asset remains)
+  //  - Alice native balance decreased by exactly TESTS_DEFAULT_FEE (i.e. native change of the consumed fee UTXO returned to Alice)
+  uint64_t alice_native_before_asset_sweep = 0;
+  uint64_t alice_asset_before_asset_sweep = 0;
+  {
+    alice_wlt->refresh();
+    alice_native_before_asset_sweep = alice_wlt->balance(currency::native_coin_asset_id);
+    alice_asset_before_asset_sweep  = alice_wlt->balance(custom_asset_id);
+
+    carol_wlt->refresh();
+    const uint64_t carol_asset_before = carol_wlt->balance(custom_asset_id);
+    const uint64_t carol_native_before = carol_wlt->balance(currency::native_coin_asset_id);
+    CHECK_AND_ASSERT_MES(carol_asset_before == 0, false, "case F: Carol asset balance must start at 0");
+    CHECK_AND_ASSERT_MES(carol_native_before == 0, false, "case F: Carol native balance must start at 0");
+
+    tools::wallet_rpc_server alice_rpc(alice_wlt);
+    tools::wallet_public::COMMAND_SWEEP_BELOW::request req{};
+    req.mixin = 15;
+    req.address = m_accounts[CAROL_ACC_IDX].get_public_address_str();
+    req.amount = small_asset + 1; // threshold: small_asset UTXOs qualify, fat does not
+    req.fee = TESTS_DEFAULT_FEE;
+    req.asset_id = custom_asset_id;
+    tools::wallet_public::COMMAND_SWEEP_BELOW::response res{};
+    int code = call_sweep_below(alice_rpc, req, res);
+    CHECK_AND_ASSERT_MES(code == 0, false, "case F: asset sweep failed, code=" << code);
+
+    // response asset_id mirrors request asset_id
+    CHECK_AND_ASSERT_MES(res.asset_id == custom_asset_id, false, "case H: response asset_id mismatch: " << res.asset_id);
+
+    // outs_swept counts asset UTXOs only (fee UTXO not included)
+    CHECK_AND_ASSERT_MES(res.outs_total == 5, false, "case G: outs_total=" << res.outs_total);
+    CHECK_AND_ASSERT_MES(res.outs_swept == 5, false, "case G: outs_swept=" << res.outs_swept << ", expected 5");
+
+    // total/swept amounts are in asset units, fat asset NOT included
+    CHECK_AND_ASSERT_MES(res.amount_total == 5 * small_asset, false, "case F: amount_total=" << res.amount_total);
+    CHECK_AND_ASSERT_MES(res.amount_swept == 5 * small_asset, false, "case F: amount_swept=" << res.amount_swept);
+
+    CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "case F: tx must be in the pool");
+
+    r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+    CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
+
+    // Carol receives the asset, but no native
+    carol_wlt->refresh();
+    const uint64_t carol_asset_after = carol_wlt->balance(custom_asset_id);
+    const uint64_t carol_native_after = carol_wlt->balance(currency::native_coin_asset_id);
+    CHECK_AND_ASSERT_MES(carol_asset_after == 5 * small_asset, false, "case N: Carol asset balance=" << carol_asset_after << ", expected " << (5 * small_asset));
+    CHECK_AND_ASSERT_MES(carol_native_after == 0, false, "case N (privacy/funds): Carol must NOT receive any native coin, got " << carol_native_after);
+
+    //Alice's asset balance is reduced by exactly the swept amount, native balance is reduced by exactly the fee
+    alice_wlt->refresh();
+    const uint64_t alice_asset_after_sweep = alice_wlt->balance(custom_asset_id);
+    const uint64_t alice_native_after_sweep = alice_wlt->balance(currency::native_coin_asset_id);
+    CHECK_AND_ASSERT_MES(alice_asset_after_sweep == fat_asset, false, "case M: Alice asset after sweep=" << alice_asset_after_sweep << ", expected " << fat_asset);
+    CHECK_AND_ASSERT_MES(alice_native_after_sweep == alice_native_before_asset_sweep - TESTS_DEFAULT_FEE, false, "case M: Alice native after asset sweep=" << alice_native_after_sweep
+      << ", expected " << (alice_native_before_asset_sweep - TESTS_DEFAULT_FEE));
+  }
+
+  // Case: threshold semantics - strict less-than
+  // at this point Alice still has the fat asset UTXO (80 SBTA) sweep_below with threshold == fat_asset must NOT include it (strict <)
+  // sweep_below with threshold == fat_asset + 1 must include it
+  {
+    tools::wallet_rpc_server alice_rpc(alice_wlt);
+
+    tools::wallet_public::COMMAND_SWEEP_BELOW::request req{};
+    req.mixin = 15;
+    req.address = m_accounts[CAROL_ACC_IDX].get_public_address_str();
+    req.amount = fat_asset; // strict-less-than: should match nothing
+    req.fee = TESTS_DEFAULT_FEE;
+    req.asset_id = custom_asset_id;
+    tools::wallet_public::COMMAND_SWEEP_BELOW::response res{};
+    int code = call_sweep_below(alice_rpc, req, res);
+    CHECK_AND_ASSERT_MES(code != 0, false, "case K strict-less: sweep with threshold == fat_asset must fail, code=" << code);
+    CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "case K strict-less: nothing should have been broadcast");
+  }
+
+  // case: asset sweep with no native UTXO >= fee available
+  // spend all of Alice's native first, leaving only a tiny dust amount < fee then try to asset-sweep - must fail
+  // funds must not be lost (transfers remain marked unspent)
+  {
+    // move all Alice native to Bob, leaving a known small amount via change first
+    alice_wlt->refresh();
+    const uint64_t alice_native_currently = alice_wlt->balance(currency::native_coin_asset_id);
+    CHECK_AND_ASSERT_MES(alice_native_currently > 2 * TESTS_DEFAULT_FEE, false, "case I prep: Alice native should be > 2*fee");
+
+    // send (balance - 2*fee) to Bob after fee
+    const uint64_t to_send = alice_native_currently - TESTS_DEFAULT_FEE - (TESTS_DEFAULT_FEE / 2);
+    // change after fee = native - to_send - fee = fee/2  (< fee)
+    currency::transaction drain_tx{};
+    alice_wlt->transfer(to_send, m_accounts[BOB_ACC_IDX].get_public_address(), drain_tx, currency::native_coin_asset_id);
+
+    r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+    CHECK_AND_ASSERT_MES(r, false, "case I prep: mine failed");
+
+    alice_wlt->refresh();
+    const uint64_t alice_native_dust = alice_wlt->balance(currency::native_coin_asset_id);
+    CHECK_AND_ASSERT_MES(alice_native_dust > 0 && alice_native_dust < TESTS_DEFAULT_FEE, false,
+      "case I prep: Alice native dust=" << alice_native_dust << ", expected 0<dust<fee");
+    const uint64_t alice_asset_dust_phase = alice_wlt->balance(custom_asset_id);
+    CHECK_AND_ASSERT_MES(alice_asset_dust_phase == fat_asset, false,
+      "case I prep: Alice asset balance changed unexpectedly");
+
+    // now attempt asset sweep - must fail because no native UTXO >= fee exists
+    tools::wallet_rpc_server alice_rpc(alice_wlt);
+    tools::wallet_public::COMMAND_SWEEP_BELOW::request req{};
+    req.mixin = 15;
+    req.address = m_accounts[CAROL_ACC_IDX].get_public_address_str();
+    req.amount = fat_asset + 1; // would match the fat UTXO if it had a fee source
+    req.fee = TESTS_DEFAULT_FEE;
+    req.asset_id = custom_asset_id;
+    tools::wallet_public::COMMAND_SWEEP_BELOW::response res{};
+    int code = call_sweep_below(alice_rpc, req, res);
+    CHECK_AND_ASSERT_MES(code != 0, false, "case I: asset sweep without native fee UTXO must fail, code=" << code);
+    CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "case I: nothing should have been broadcast");
+
+    // funds preserved: balances unchanged
+    alice_wlt->refresh();
+    CHECK_AND_ASSERT_MES(alice_wlt->balance(custom_asset_id) == fat_asset, false, "case I: Alice asset balance must be preserved after the failed sweep");
+    CHECK_AND_ASSERT_MES(alice_wlt->balance(currency::native_coin_asset_id) == alice_native_dust, false, "case I: Alice native balance must be preserved after the failed sweep");
+
+    // now refill Alice with a native UTXO and verify the recovery path works
+    miner_wlt->refresh();
+    miner_wlt->transfer(MK_TEST_COINS(10), alice_wlt->get_account().get_public_address(), currency::native_coin_asset_id);
+    r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+    CHECK_AND_ASSERT_MES(r, false, "case I recovery: mine failed");
+    alice_wlt->refresh();
+  }
+
+  // case: non-existent asset_id -> "no spendable outputs meet the criterion"
+  {
+    crypto::public_key bogus_asset_id{};
+    // a random non-zero, non-native pubkey; nonexistent in Alice's transfers
+    for (size_t i = 0; i < sizeof(bogus_asset_id); ++i)
+      reinterpret_cast<uint8_t*>(&bogus_asset_id)[i] = static_cast<uint8_t>(0xA0 + (i & 0x0F));
+
+    tools::wallet_rpc_server alice_rpc(alice_wlt);
+    tools::wallet_public::COMMAND_SWEEP_BELOW::request req{};
+    req.mixin = 15;
+    req.address = m_accounts[CAROL_ACC_IDX].get_public_address_str();
+    req.amount = UINT64_MAX;
+    req.fee = TESTS_DEFAULT_FEE;
+    req.asset_id = bogus_asset_id;
+    tools::wallet_public::COMMAND_SWEEP_BELOW::response res{};
+    int code = call_sweep_below(alice_rpc, req, res);
+    CHECK_AND_ASSERT_MES(code != 0, false,
+      "case J: sweep with non-existent asset_id must fail, code=" << code);
+    CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false,
+      "case J: nothing should have been broadcast");
+  }
+
+  // case: sweep to an integrated address - payment_id is honoured
+  //  we use Carol as the receiver via an integrated address generated by her wallet after the sweep, Carol must be able to find the payment by its payment_id
+  {
+    miner_wlt->refresh();
+    miner_wlt->transfer(small_asset, alice_wlt->get_account().get_public_address(), custom_asset_id);
+    r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+    CHECK_AND_ASSERT_MES(r, false, "case L prep: mine failed");
+    alice_wlt->refresh();
+  }
+
+  std::string integrated_payment_id_hex;
+  std::string integrated_address;
+  {
+    tools::wallet_rpc_server carol_rpc(carol_wlt);
+    carol_rpc.set_flag_allow_legacy_payment_id_size(true);
+    tools::wallet_public::COMMAND_RPC_MAKE_INTEGRATED_ADDRESS::request mia_req{};
+    // empty payment_id -> server generates one
+    tools::wallet_public::COMMAND_RPC_MAKE_INTEGRATED_ADDRESS::response mia_res{};
+    epee::json_rpc::error je{};
+    tools::wallet_rpc_server::connection_context ctx{};
+    bool ok = carol_rpc.on_make_integrated_address(mia_req, mia_res, je, ctx);
+    CHECK_AND_ASSERT_MES(ok, false, "case L: make_integrated_address failed: " << je.message);
+    integrated_payment_id_hex = mia_res.payment_id;
+    integrated_address = mia_res.integrated_address;
+    CHECK_AND_ASSERT_MES(!integrated_payment_id_hex.empty(), false, "case L: empty payment_id");
+    CHECK_AND_ASSERT_MES(!integrated_address.empty(), false, "case L: empty integrated address");
+  }
+
+  {
+    tools::wallet_rpc_server alice_rpc(alice_wlt);
+    tools::wallet_public::COMMAND_SWEEP_BELOW::request req{};
+    req.mixin = 15;
+    req.address = integrated_address;
+    req.amount = small_asset + 1; // matches the freshly added small asset UTXO
+    req.fee = TESTS_DEFAULT_FEE;
+    req.asset_id = custom_asset_id;
+    // payment_id_hex must remain empty here; the payment id is sourced from the integrated address
+    tools::wallet_public::COMMAND_SWEEP_BELOW::response res{};
+    int code = call_sweep_below(alice_rpc, req, res);
+    CHECK_AND_ASSERT_MES(code == 0, false, "case L: sweep into integrated addr failed, code=" << code);
+    CHECK_AND_ASSERT_MES(res.outs_swept >= 1, false, "case L: outs_swept=" << res.outs_swept);
+    CHECK_AND_ASSERT_MES(res.amount_swept == small_asset, false, "case L: amount_swept=" << res.amount_swept << ", expected " << small_asset);
+
+    r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+    CHECK_AND_ASSERT_MES(r, false, "case L: mine failed");
+
+    // Carol's wallet should see a payment under the integrated payment id
+    carol_wlt->refresh();
+    std::string payment_id_binary;
+    CHECK_AND_ASSERT_MES(epee::string_tools::parse_hexstr_to_binbuff(integrated_payment_id_hex, payment_id_binary),
+      false, "case L: parse payment_id_hex failed");
+
+    std::list<tools::payment_details> payments;
+    carol_wlt->get_payments(payment_id_binary, payments);
+    CHECK_AND_ASSERT_MES(!payments.empty(), false, "case L: Carol must see a payment with integrated payment id " << integrated_payment_id_hex);
+  }
+
+  // case: confirm default asset_id (caller doesn't send the field at all)
+  // means native sweep we just send a request whose asset_id was left default-initialized = native this is the "old client" backward-compat case
+  {
+    // top up Alice with a few extra small native UTXOs of a unique-ish amount
+    const uint64_t a2_unit = MK_TEST_COINS(1);
+    miner_wlt->refresh();
+    for (size_t i = 0; i < 3; ++i)
+      miner_wlt->transfer(a2_unit, alice_wlt->get_account().get_public_address(), currency::native_coin_asset_id);
+    r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+    CHECK_AND_ASSERT_MES(r, false, "case A2 prep: mine failed");
+
+    bob_wlt->refresh();
+    const uint64_t bob_native_before_a2 = bob_wlt->balance(currency::native_coin_asset_id);
+
+    alice_wlt->refresh();
+    tools::wallet_rpc_server alice_rpc(alice_wlt);
+    tools::wallet_public::COMMAND_SWEEP_BELOW::request req{};
+    req.mixin = 15;
+    req.address = m_accounts[BOB_ACC_IDX].get_public_address_str();
+    req.amount = a2_unit + 1;
+    req.fee = TESTS_DEFAULT_FEE;
+    tools::wallet_public::COMMAND_SWEEP_BELOW::response res{};
+    int code = call_sweep_below(alice_rpc, req, res);
+    CHECK_AND_ASSERT_MES(code == 0, false, "case A2: default-asset_id native sweep failed, code=" << code);
+    CHECK_AND_ASSERT_MES(res.asset_id == currency::native_coin_asset_id, false, "case A2: response asset_id must default to native");
+    CHECK_AND_ASSERT_MES(res.outs_swept >= 3, false, "case A2: outs_swept=" << res.outs_swept << ", expected at least 3 (the freshly added small UTXOs)");
+    CHECK_AND_ASSERT_MES(res.amount_swept == res.amount_total, false, "case A2: amount_swept != amount_total");
+    CHECK_AND_ASSERT_MES(res.amount_swept >= 3 * a2_unit, false, "case A2: amount_swept=" << res.amount_swept << ", expected at least " << (3 * a2_unit));
+
+    r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+    CHECK_AND_ASSERT_MES(r, false, "case A2: mine failed");
+
+    bob_wlt->refresh();
+    const uint64_t bob_native_after_a2 = bob_wlt->balance(currency::native_coin_asset_id);
+    CHECK_AND_ASSERT_MES(bob_native_after_a2 - bob_native_before_a2 == res.amount_swept - TESTS_DEFAULT_FEE, false,
+      "case A2: Bob delta=" << (bob_native_after_a2 - bob_native_before_a2) << ", expected " << (res.amount_swept - TESTS_DEFAULT_FEE));
+  }
+
+  // Case watch-only: cold-signing path for asset sweep
+  {
+    // new account Dan here because a watch-only wallet
+    std::shared_ptr<tools::wallet2> dan_wlt = init_playtime_test_wallet(events, c, DAN_ACC_IDX);
+
+    // Top up Dan with 2 small asset UTXOs to sweep + 1 native UTXO for the fee
+    miner_wlt->refresh();
+    for (size_t i = 0; i < 2; ++i)
+      miner_wlt->transfer(small_asset, dan_wlt->get_account().get_public_address(), custom_asset_id);
+    miner_wlt->transfer(MK_TEST_COINS(10), dan_wlt->get_account().get_public_address(), currency::native_coin_asset_id);
+    r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+    CHECK_AND_ASSERT_MES(r, false, "case WO prep: mine failed");
+    dan_wlt->refresh();
+
+    const uint64_t dan_asset_initial  = dan_wlt->balance(custom_asset_id);
+    const uint64_t dan_native_initial = dan_wlt->balance(currency::native_coin_asset_id);
+    CHECK_AND_ASSERT_MES(dan_asset_initial == 2 * small_asset, false, "case WO: Dan asset balance=" << dan_asset_initial << ", expected " << (2 * small_asset));
+    CHECK_AND_ASSERT_MES(dan_native_initial == MK_TEST_COINS(10), false, "case WO: Dan native balance=" << dan_native_initial << ", expected " << MK_TEST_COINS(10));
+
+    // build Dan's watch-only twin from Dan's pub keys Dan has never spent anything yet, so the WO sees the same set of unspent outputs as the full wallet
+    account_base dan_acc_wo = m_accounts[DAN_ACC_IDX];
+    dan_acc_wo.make_account_watch_only();
+    std::shared_ptr<tools::wallet2> dan_wlt_wo = init_playtime_test_wallet(events, c, dan_acc_wo);
+    dan_wlt_wo->refresh();
+    CHECK_AND_ASSERT_MES(dan_wlt_wo->balance(custom_asset_id) == dan_wlt->balance(custom_asset_id), false, "case WO: balances don't match between WO and full wallet (asset)");
+    CHECK_AND_ASSERT_MES(dan_wlt_wo->balance(currency::native_coin_asset_id) == dan_wlt->balance(currency::native_coin_asset_id), false, "case WO: balances don't match between WO and full wallet (native)");
+
+    tools::wallet_rpc_server dan_rpc_wo(dan_wlt_wo);
+    tools::wallet_rpc_server dan_rpc(dan_wlt);
+
+    // WO calls sweep_below
+    tools::wallet_public::COMMAND_SWEEP_BELOW::request req{};
+    req.mixin = 15;
+    req.address = m_accounts[CAROL_ACC_IDX].get_public_address_str();
+    req.amount = small_asset + 1; // matches the 2 small asset UTXOs in Dan's wallet
+    req.fee = TESTS_DEFAULT_FEE;
+    req.asset_id = custom_asset_id;
+    tools::wallet_public::COMMAND_SWEEP_BELOW::response res{};
+    int code = call_sweep_below(dan_rpc_wo, req, res);
+    CHECK_AND_ASSERT_MES(code == 0, false, "case WO: sweep_below in WO wallet failed, code=" << code);
+
+    // WO response: tx_hash is empty, tx_unsigned_hex is filled
+    CHECK_AND_ASSERT_MES(res.tx_hash.empty(), false, "case WO: WO must not return final tx_hash");
+    CHECK_AND_ASSERT_MES(!res.tx_unsigned_hex.empty(), false, "case WO: WO must return non-empty tx_unsigned_hex");
+    CHECK_AND_ASSERT_MES(res.outs_swept == 2, false, "case WO: outs_swept=" << res.outs_swept);
+    CHECK_AND_ASSERT_MES(res.amount_swept == 2 * small_asset, false, "case WO: amount_swept=" << res.amount_swept);
+    CHECK_AND_ASSERT_MES(res.asset_id == custom_asset_id, false, "case WO: response asset_id mismatch");
+
+    // Full wallet signs
+    tools::wallet_public::COMMAND_SIGN_TRANSFER::request sign_req{};
+    sign_req.tx_unsigned_hex = res.tx_unsigned_hex;
+    tools::wallet_public::COMMAND_SIGN_TRANSFER::response sign_res{};
+    epee::json_rpc::error je{};
+    tools::wallet_rpc_server::connection_context ctx{};
+    bool ok = dan_rpc.on_sign_transfer(sign_req, sign_res, je, ctx);
+    CHECK_AND_ASSERT_MES(ok, false, "case WO: sign_transfer failed: " << je.message);
+    CHECK_AND_ASSERT_MES(!sign_res.tx_signed_hex.empty(), false, "case WO: empty signed hex");
+
+    // WO submits
+    tools::wallet_public::COMMAND_SUBMIT_TRANSFER::request submit_req{};
+    submit_req.tx_signed_hex = sign_res.tx_signed_hex;
+    tools::wallet_public::COMMAND_SUBMIT_TRANSFER::response submit_res{};
+    je = epee::json_rpc::error{};
+    ok = dan_rpc_wo.on_submit_transfer(submit_req, submit_res, je, ctx);
+    CHECK_AND_ASSERT_MES(ok, false, "case WO: submit_transfer failed: " << je.message);
+    CHECK_AND_ASSERT_MES(!submit_res.tx_hash.empty(), false, "case WO: empty tx_hash in submit");
+    CHECK_AND_ASSERT_MES(submit_res.tx_hash == sign_res.tx_hash, false, "case WO: tx_hash mismatch between sign and submit");
+
+    // mine and verify Carol received
+    carol_wlt->refresh();
+    const uint64_t carol_asset_before = carol_wlt->balance(custom_asset_id);
+    r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+    CHECK_AND_ASSERT_MES(r, false, "case WO: mine failed");
+    carol_wlt->refresh();
+    const uint64_t carol_asset_after = carol_wlt->balance(custom_asset_id);
+    CHECK_AND_ASSERT_MES(carol_asset_after == carol_asset_before + 2 * small_asset, false,
+      "case WO: Carol asset delta=" << (carol_asset_after - carol_asset_before) << ", expected " << (2 * small_asset));
+  }
+
+  return true;
+}
+
+// WO native sweep + store/reload between each cold-signing step
+wallet_rpc_sweep_below_wo_native::wallet_rpc_sweep_below_wo_native()
+{
+  REGISTER_CALLBACK_METHOD(wallet_rpc_sweep_below_wo_native, c1);
+}
+
+bool wallet_rpc_sweep_below_wo_native::generate(std::vector<test_event_entry>& events) const
+{
+  uint64_t ts = test_core_time::get_time();
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
+  account_base& bob_acc   = m_accounts[BOB_ACC_IDX];   bob_acc.generate();   bob_acc.set_createtime(ts);
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
+  DO_CALLBACK(events, "configure_core");
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 3);
+  DO_CALLBACK(events, "c1");
+  return true;
+}
+
+namespace
+{
+  // store WO wallet to disk and load it back fresh
+  void wo_reload(std::shared_ptr<tools::wallet2>& w, std::shared_ptr<tools::wallet_rpc_server>& rpc, const std::wstring& filename, const std::string& password, currency::core& c, std::shared_ptr<tools::i_core_proxy> proxy)
+  {
+    w->reset_password(password);
+    w->store(filename);
+    rpc.reset();
+    w.reset(new tools::wallet2);
+    w->load(filename, password);
+    w->set_core_proxy(proxy);
+    w->set_core_runtime_config(c.get_blockchain_storage().get_core_runtime_config());
+    w->set_disable_tor_relay(true);
+    w->set_concise_mode(false);
+    w->set_use_assets_whitelisting(false);
+    rpc.reset(new tools::wallet_rpc_server(w));
+  }
+}
+
+bool wallet_rpc_sweep_below_wo_native::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  bool r = false;
+  std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
+  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
+  std::shared_ptr<tools::wallet2> bob_wlt = init_playtime_test_wallet(events, c, BOB_ACC_IDX);
+  miner_wlt->refresh();
+
+  // 5 small UTXOs to sweep + 1 fat one to stay
+  const uint64_t small_native = MK_TEST_COINS(2);
+  const uint64_t fat_native   = MK_TEST_COINS(100);
+  for (size_t i = 0; i < 5; ++i)
+    miner_wlt->transfer(small_native, alice_wlt->get_account().get_public_address(), currency::native_coin_asset_id);
+  miner_wlt->transfer(fat_native, alice_wlt->get_account().get_public_address(), currency::native_coin_asset_id);
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+  CHECK_AND_ASSERT_MES(r, false, "prep: mine failed");
+
+  alice_wlt->refresh();
+  const uint64_t alice_native_initial = alice_wlt->balance(currency::native_coin_asset_id);
+  CHECK_AND_ASSERT_MES(alice_native_initial == 5 * small_native + fat_native, false, "Alice native balance unexpected: " << alice_native_initial);
+
+  // WO twin
+  account_base alice_acc_wo = m_accounts[ALICE_ACC_IDX];
+  alice_acc_wo.make_account_watch_only();
+  std::shared_ptr<tools::wallet2> alice_wlt_wo = init_playtime_test_wallet(events, c, alice_acc_wo);
+  alice_wlt_wo->refresh();
+  CHECK_AND_ASSERT_MES(alice_wlt_wo->balance(currency::native_coin_asset_id) == alice_native_initial, false, "WO balance != full balance: " << alice_wlt_wo->balance(currency::native_coin_asset_id));
+
+  boost::filesystem::remove(epee::string_tools::cut_off_extension(m_wallet_filename) + L".outkey2ki");
+  std::shared_ptr<tools::wallet_rpc_server> alice_rpc_wo;
+  wo_reload(alice_wlt_wo, alice_rpc_wo, m_wallet_filename, m_wallet_password, c, m_core_proxy);
+
+  size_t blocks_fetched = 0;
+  bool stub0{}, stub1{};
+  std::atomic_bool stub2{};
+  alice_wlt_wo->refresh(blocks_fetched, stub0, stub1, stub2);
+  CHECK_AND_ASSERT_MES(alice_wlt_wo->balance(currency::native_coin_asset_id) == alice_native_initial, false, "WO balance after reload mismatch");
+
+  // WO builds unsigned blob
+  tools::wallet_public::COMMAND_SWEEP_BELOW::request req{};
+  req.mixin = 15;
+  req.address = m_accounts[BOB_ACC_IDX].get_public_address_str();
+  req.amount = small_native + 1; // strict < ; only the 5 small UTXOs match
+  req.fee = TESTS_DEFAULT_FEE;
+  tools::wallet_public::COMMAND_SWEEP_BELOW::response res{};
+  int code = call_sweep_below(*alice_rpc_wo, req, res);
+  CHECK_AND_ASSERT_MES(code == 0, false, "WO sweep_below failed, code=" << code);
+  CHECK_AND_ASSERT_MES(res.tx_hash.empty(), false, "WO must not return tx_hash");
+  CHECK_AND_ASSERT_MES(!res.tx_unsigned_hex.empty(), false, "empty tx_unsigned_hex");
+  CHECK_AND_ASSERT_MES(res.outs_swept == 5, false, "outs_swept=" << res.outs_swept);
+  CHECK_AND_ASSERT_MES(res.amount_swept == 5 * small_native, false, "amount_swept=" << res.amount_swept);
+  CHECK_AND_ASSERT_MES(res.asset_id == currency::native_coin_asset_id, false, "response asset_id must be native");
+
+  const std::string unsigned_hex_snapshot = res.tx_unsigned_hex;
+
+  // reload between sweep_below and sign_transfer
+  wo_reload(alice_wlt_wo, alice_rpc_wo, m_wallet_filename, m_wallet_password, c, m_core_proxy);
+  alice_wlt_wo->refresh(blocks_fetched, stub0, stub1, stub2);
+
+  // full wallet signs the snapshot
+  tools::wallet_rpc_server alice_rpc(alice_wlt);
+  tools::wallet_public::COMMAND_SIGN_TRANSFER::request sign_req{};
+  sign_req.tx_unsigned_hex = unsigned_hex_snapshot;
+  tools::wallet_public::COMMAND_SIGN_TRANSFER::response sign_res{};
+  epee::json_rpc::error je{};
+  tools::wallet_rpc_server::connection_context ctx{};
+  bool ok = alice_rpc.on_sign_transfer(sign_req, sign_res, je, ctx);
+  CHECK_AND_ASSERT_MES(ok, false, "sign_transfer failed: " << je.message);
+  CHECK_AND_ASSERT_MES(!sign_res.tx_signed_hex.empty(), false, "empty signed hex");
+
+  // reload between sign and submit
+  wo_reload(alice_wlt_wo, alice_rpc_wo, m_wallet_filename, m_wallet_password, c, m_core_proxy);
+
+  tools::wallet_public::COMMAND_SUBMIT_TRANSFER::request submit_req{};
+  submit_req.tx_signed_hex = sign_res.tx_signed_hex;
+  tools::wallet_public::COMMAND_SUBMIT_TRANSFER::response submit_res{};
+  je = epee::json_rpc::error{};
+  ok = alice_rpc_wo->on_submit_transfer(submit_req, submit_res, je, ctx);
+  CHECK_AND_ASSERT_MES(ok, false, "submit_transfer failed: " << je.message);
+  CHECK_AND_ASSERT_MES(submit_res.tx_hash == sign_res.tx_hash, false, "tx_hash mismatch");
+
+  // Bob = (5*small - fee), Alice keeps fat
+  bob_wlt->refresh();
+  const uint64_t bob_before = bob_wlt->balance(currency::native_coin_asset_id);
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+  CHECK_AND_ASSERT_MES(r, false, "mine failed");
+  bob_wlt->refresh();
+  const uint64_t bob_after = bob_wlt->balance(currency::native_coin_asset_id);
+  CHECK_AND_ASSERT_MES(bob_after - bob_before == 5 * small_native - TESTS_DEFAULT_FEE, false,
+    "Bob delta=" << (bob_after - bob_before) << ", expected " << (5 * small_native - TESTS_DEFAULT_FEE));
+
+  alice_wlt->refresh();
+  CHECK_AND_ASSERT_MES(alice_wlt->balance(currency::native_coin_asset_id) == fat_native, false,
+    "Alice native left=" << alice_wlt->balance(currency::native_coin_asset_id) << ", expected " << fat_native);
+
+  return true;
+}
+
+// WO sweep_below reserves UTXOs; clear_utxo_cold_sig_reservation releases them
+wallet_rpc_sweep_below_wo_reservation::wallet_rpc_sweep_below_wo_reservation()
+{
+  REGISTER_CALLBACK_METHOD(wallet_rpc_sweep_below_wo_reservation, c1);
+}
+
+bool wallet_rpc_sweep_below_wo_reservation::generate(std::vector<test_event_entry>& events) const
+{
+  uint64_t ts = test_core_time::get_time();
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
+  account_base& bob_acc   = m_accounts[BOB_ACC_IDX];   bob_acc.generate();   bob_acc.set_createtime(ts);
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
+  DO_CALLBACK(events, "configure_core");
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 3);
+  DO_CALLBACK(events, "c1");
+  return true;
+}
+
+bool wallet_rpc_sweep_below_wo_reservation::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  bool r = false;
+  std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
+  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
+  std::shared_ptr<tools::wallet2> bob_wlt   = init_playtime_test_wallet(events, c, BOB_ACC_IDX);
+  miner_wlt->refresh();
+
+  const uint64_t small_native = MK_TEST_COINS(2);
+  for (size_t i = 0; i < 4; ++i)
+    miner_wlt->transfer(small_native, alice_wlt->get_account().get_public_address(), currency::native_coin_asset_id);
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+  CHECK_AND_ASSERT_MES(r, false, "prep: mine failed");
+
+  alice_wlt->refresh();
+  CHECK_AND_ASSERT_MES(alice_wlt->balance(currency::native_coin_asset_id) == 4 * small_native, false, "Alice unexpected native balance");
+
+  account_base alice_acc_wo = m_accounts[ALICE_ACC_IDX];
+  alice_acc_wo.make_account_watch_only();
+  std::shared_ptr<tools::wallet2> alice_wlt_wo = init_playtime_test_wallet(events, c, alice_acc_wo);
+  alice_wlt_wo->refresh();
+  CHECK_AND_ASSERT_MES(alice_wlt_wo->balance(currency::native_coin_asset_id) == 4 * small_native, false, "WO balance mismatch");
+
+  tools::wallet_rpc_server alice_rpc_wo(alice_wlt_wo);
+  tools::wallet_rpc_server alice_rpc(alice_wlt);
+
+  // first sweep: reserves all 4 UTXOs
+  tools::wallet_public::COMMAND_SWEEP_BELOW::request req{};
+  req.mixin = 15;
+  req.address = m_accounts[BOB_ACC_IDX].get_public_address_str();
+  req.amount = small_native + 1;
+  req.fee = TESTS_DEFAULT_FEE;
+  tools::wallet_public::COMMAND_SWEEP_BELOW::response res1{};
+  int code = call_sweep_below(alice_rpc_wo, req, res1);
+  CHECK_AND_ASSERT_MES(code == 0, false, "first sweep_below failed, code=" << code);
+  CHECK_AND_ASSERT_MES(res1.outs_swept == 4, false, "outs_swept=" << res1.outs_swept);
+  CHECK_AND_ASSERT_MES(!res1.tx_unsigned_hex.empty(), false, "empty unsigned hex (1)");
+
+  // second sweep without clear must fail — UTXOs are reserved
+  tools::wallet_public::COMMAND_SWEEP_BELOW::response res2{};
+  code = call_sweep_below(alice_rpc_wo, req, res2);
+  CHECK_AND_ASSERT_MES(code != 0, false, "second sweep_below must fail on reserved UTXOs, code=" << code);
+  CHECK_AND_ASSERT_MES(res2.tx_unsigned_hex.empty(), false, "failed sweep_below must not return blob");
+
+  // clear releases them
+  tools::wallet_public::COMMAND_CLEAR_UTXO_COLD_SIG_RESERVATION::request clear_req{};
+  tools::wallet_public::COMMAND_CLEAR_UTXO_COLD_SIG_RESERVATION::response clear_res{};
+  epee::json_rpc::error je{};
+  tools::wallet_rpc_server::connection_context ctx{};
+  bool ok = alice_rpc_wo.on_clear_utxo_cold_sig_reservation(clear_req, clear_res, je, ctx);
+  CHECK_AND_ASSERT_MES(ok, false, "clear failed: " << je.message);
+  CHECK_AND_ASSERT_MES(clear_res.affected_outputs.size() == 4, false, "clear released " << clear_res.affected_outputs.size() << ", expected 4");
+
+  // sweep works again
+  tools::wallet_public::COMMAND_SWEEP_BELOW::response res3{};
+  code = call_sweep_below(alice_rpc_wo, req, res3);
+  CHECK_AND_ASSERT_MES(code == 0, false, "third sweep_below after clear failed, code=" << code);
+  CHECK_AND_ASSERT_MES(res3.outs_swept == 4, false, "outs_swept=" << res3.outs_swept);
+  CHECK_AND_ASSERT_MES(!res3.tx_unsigned_hex.empty(), false, "empty unsigned hex (3)");
+
+  // full-keys wallet must refuse clear
+  je = epee::json_rpc::error{};
+  ok = alice_rpc.on_clear_utxo_cold_sig_reservation(clear_req, clear_res, je, ctx);
+  CHECK_AND_ASSERT_MES(!ok, false, "clear must fail on full-keys wallet");
+
+  // sign + submit, Bob must actually receive the money
+  tools::wallet_public::COMMAND_SIGN_TRANSFER::request sign_req{};
+  sign_req.tx_unsigned_hex = res3.tx_unsigned_hex;
+  tools::wallet_public::COMMAND_SIGN_TRANSFER::response sign_res{};
+  je = epee::json_rpc::error{};
+  ok = alice_rpc.on_sign_transfer(sign_req, sign_res, je, ctx);
+  CHECK_AND_ASSERT_MES(ok, false, "sign_transfer failed: " << je.message);
+
+  tools::wallet_public::COMMAND_SUBMIT_TRANSFER::request submit_req{};
+  submit_req.tx_signed_hex = sign_res.tx_signed_hex;
+  tools::wallet_public::COMMAND_SUBMIT_TRANSFER::response submit_res{};
+  je = epee::json_rpc::error{};
+  ok = alice_rpc_wo.on_submit_transfer(submit_req, submit_res, je, ctx);
+  CHECK_AND_ASSERT_MES(ok, false, "submit_transfer failed: " << je.message);
+
+  bob_wlt->refresh();
+  const uint64_t bob_before = bob_wlt->balance(currency::native_coin_asset_id);
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+  CHECK_AND_ASSERT_MES(r, false, "mine failed");
+  bob_wlt->refresh();
+  CHECK_AND_ASSERT_MES(bob_wlt->balance(currency::native_coin_asset_id) - bob_before == 4 * small_native - TESTS_DEFAULT_FEE, false,
+    "Bob delta=" << (bob_wlt->balance(currency::native_coin_asset_id) - bob_before) << ", expected " << (4 * small_native - TESTS_DEFAULT_FEE));
+
+  return true;
+}
+
+// repeated sweep_below on the same UTXO set must fail (full-keys path)
+wallet_rpc_sweep_below_double_sweep::wallet_rpc_sweep_below_double_sweep()
+{
+  REGISTER_CALLBACK_METHOD(wallet_rpc_sweep_below_double_sweep, c1);
+}
+
+bool wallet_rpc_sweep_below_double_sweep::generate(std::vector<test_event_entry>& events) const
+{
+  uint64_t ts = test_core_time::get_time();
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
+  account_base& bob_acc   = m_accounts[BOB_ACC_IDX];   bob_acc.generate();   bob_acc.set_createtime(ts);
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
+  DO_CALLBACK(events, "configure_core");
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 3);
+  DO_CALLBACK(events, "c1");
+  return true;
+}
+
+bool wallet_rpc_sweep_below_double_sweep::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  bool r = false;
+  std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
+  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
+  std::shared_ptr<tools::wallet2> bob_wlt   = init_playtime_test_wallet(events, c, BOB_ACC_IDX);
+  miner_wlt->refresh();
+
+  const uint64_t small_native = MK_TEST_COINS(2);
+  for (size_t i = 0; i < 3; ++i)
+    miner_wlt->transfer(small_native, alice_wlt->get_account().get_public_address(), currency::native_coin_asset_id);
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+  CHECK_AND_ASSERT_MES(r, false, "prep: mine failed");
+  alice_wlt->refresh();
+  CHECK_AND_ASSERT_MES(alice_wlt->balance(currency::native_coin_asset_id) == 3 * small_native, false,
+    "Alice unexpected native balance");
+
+  tools::wallet_rpc_server alice_rpc(alice_wlt);
+
+  // first sweep broadcasts the tx
+  tools::wallet_public::COMMAND_SWEEP_BELOW::request req{};
+  req.mixin = 15;
+  req.address = m_accounts[BOB_ACC_IDX].get_public_address_str();
+  req.amount = small_native + 1;
+  req.fee = TESTS_DEFAULT_FEE;
+  tools::wallet_public::COMMAND_SWEEP_BELOW::response res1{};
+  int code = call_sweep_below(alice_rpc, req, res1);
+  CHECK_AND_ASSERT_MES(code == 0, false, "first sweep_below failed, code=" << code);
+  CHECK_AND_ASSERT_MES(!res1.tx_hash.empty(), false, "first sweep must return tx_hash");
+  CHECK_AND_ASSERT_MES(res1.outs_swept == 3, false, "outs_swept=" << res1.outs_swept);
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "tx must be in pool");
+
+  // before mining: UTXOs are already flagged spent locally → must fail
+  tools::wallet_public::COMMAND_SWEEP_BELOW::response res2{};
+  code = call_sweep_below(alice_rpc, req, res2);
+  CHECK_AND_ASSERT_MES(code != 0, false, "sweep_below before mining must fail, code=" << code);
+
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+  CHECK_AND_ASSERT_MES(r, false, "mine failed");
+  alice_wlt->refresh();
+  CHECK_AND_ASSERT_MES(alice_wlt->balance(currency::native_coin_asset_id) == 0, false,
+    "Alice native after sweep should be 0, got " << alice_wlt->balance(currency::native_coin_asset_id));
+
+  // after mining: nothing left below threshold -> still fails
+  tools::wallet_public::COMMAND_SWEEP_BELOW::response res3{};
+  code = call_sweep_below(alice_rpc, req, res3);
+  CHECK_AND_ASSERT_MES(code != 0, false, "sweep_below on empty balance must fail, code=" << code);
+
+  // top up -> sweep works again
+  miner_wlt->refresh();
+  for (size_t i = 0; i < 2; ++i)
+    miner_wlt->transfer(small_native, alice_wlt->get_account().get_public_address(), currency::native_coin_asset_id);
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+  CHECK_AND_ASSERT_MES(r, false, "top-up mine failed");
+  alice_wlt->refresh();
+
+  tools::wallet_public::COMMAND_SWEEP_BELOW::response res4{};
+  code = call_sweep_below(alice_rpc, req, res4);
+  CHECK_AND_ASSERT_MES(code == 0, false, "sweep after top-up failed, code=" << code);
+  CHECK_AND_ASSERT_MES(res4.outs_swept == 2, false, "outs_swept=" << res4.outs_swept);
+
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+  CHECK_AND_ASSERT_MES(r, false, "final mine failed");
+
+  return true;
+}
+
+// WO sweep_below(A) when WO holds two distinct custom assets - B must stay intact
+wallet_rpc_sweep_below_wo_multi_asset::wallet_rpc_sweep_below_wo_multi_asset()
+{
+  REGISTER_CALLBACK_METHOD(wallet_rpc_sweep_below_wo_multi_asset, c1);
+}
+
+bool wallet_rpc_sweep_below_wo_multi_asset::generate(std::vector<test_event_entry>& events) const
+{
+  uint64_t ts = test_core_time::get_time();
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
+  account_base& bob_acc   = m_accounts[BOB_ACC_IDX];   bob_acc.generate();   bob_acc.set_createtime(ts);
+  account_base& carol_acc = m_accounts[CAROL_ACC_IDX]; carol_acc.generate(); carol_acc.set_createtime(ts);
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
+  DO_CALLBACK(events, "configure_core");
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 3);
+  DO_CALLBACK(events, "c1");
+  return true;
+}
+
+bool wallet_rpc_sweep_below_wo_multi_asset::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  bool r = false;
+  CHECK_AND_ASSERT_MES(c.get_blockchain_storage().is_hardfork_active(ZANO_HARDFORK_04_ZARCANUM), false,
+    "multi-asset WO test requires HF4");
+
+  std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
+  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
+  std::shared_ptr<tools::wallet2> carol_wlt = init_playtime_test_wallet(events, c, CAROL_ACC_IDX);
+  miner_wlt->refresh();
+
+  const size_t dec = 6;
+  const uint64_t per_unit = 100ull * 1000000ull;
+  const uint64_t total_supply = 1000ull * 1000000ull;
+
+  crypto::public_key asset_A{};
+  crypto::public_key asset_B{};
+  {
+    currency::asset_descriptor_base adb{};
+    adb.total_max_supply = total_supply;
+    adb.full_name = "Multi Asset A";
+    adb.ticker = "MAA";
+    adb.decimal_point = dec;
+    std::vector<currency::tx_destination_entry> dsts;
+    for (size_t i = 0; i < 4; ++i)
+    {
+      currency::tx_destination_entry d{};
+      d.addr.push_back(miner_wlt->get_account().get_public_address());
+      d.amount = per_unit;
+      d.asset_id = currency::null_pkey;
+      dsts.push_back(d);
+    }
+    currency::transaction tx{};
+    miner_wlt->deploy_new_asset(adb, dsts, tx, asset_A);
+  }
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+  CHECK_AND_ASSERT_MES(r, false, "deploy A: mine failed");
+
+  {
+    currency::asset_descriptor_base adb{};
+    adb.total_max_supply = total_supply;
+    adb.full_name = "Multi Asset B";
+    adb.ticker = "MAB";
+    adb.decimal_point = dec;
+    std::vector<currency::tx_destination_entry> dsts;
+    for (size_t i = 0; i < 4; ++i)
+    {
+      currency::tx_destination_entry d{};
+      d.addr.push_back(miner_wlt->get_account().get_public_address());
+      d.amount = per_unit;
+      d.asset_id = currency::null_pkey;
+      dsts.push_back(d);
+    }
+    currency::transaction tx{};
+    miner_wlt->deploy_new_asset(adb, dsts, tx, asset_B);
+  }
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+  CHECK_AND_ASSERT_MES(r, false, "deploy B: mine failed");
+
+  miner_wlt->refresh();
+  CHECK_AND_ASSERT_MES(miner_wlt->balance(asset_A) == 4 * per_unit, false, "miner asset_A balance wrong");
+  CHECK_AND_ASSERT_MES(miner_wlt->balance(asset_B) == 4 * per_unit, false, "miner asset_B balance wrong");
+
+  // 3x small A + 2x small B + native for fee
+  const uint64_t small_a = 20ull * 1000000ull;
+  const uint64_t small_b = 30ull * 1000000ull;
+  for (size_t i = 0; i < 3; ++i)
+    miner_wlt->transfer(small_a, alice_wlt->get_account().get_public_address(), asset_A);
+  for (size_t i = 0; i < 2; ++i)
+    miner_wlt->transfer(small_b, alice_wlt->get_account().get_public_address(), asset_B);
+  miner_wlt->transfer(MK_TEST_COINS(10), alice_wlt->get_account().get_public_address(), currency::native_coin_asset_id);
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+  CHECK_AND_ASSERT_MES(r, false, "fund Alice: mine failed");
+
+  alice_wlt->refresh();
+  CHECK_AND_ASSERT_MES(alice_wlt->balance(asset_A) == 3 * small_a, false, "Alice asset_A balance wrong");
+  CHECK_AND_ASSERT_MES(alice_wlt->balance(asset_B) == 2 * small_b, false, "Alice asset_B balance wrong");
+  CHECK_AND_ASSERT_MES(alice_wlt->balance(currency::native_coin_asset_id) == MK_TEST_COINS(10), false, "Alice native balance wrong");
+
+  account_base alice_acc_wo = m_accounts[ALICE_ACC_IDX];
+  alice_acc_wo.make_account_watch_only();
+  std::shared_ptr<tools::wallet2> alice_wlt_wo = init_playtime_test_wallet(events, c, alice_acc_wo);
+  alice_wlt_wo->refresh();
+  CHECK_AND_ASSERT_MES(alice_wlt_wo->balance(asset_A) == alice_wlt->balance(asset_A), false, "WO asset_A != full");
+  CHECK_AND_ASSERT_MES(alice_wlt_wo->balance(asset_B) == alice_wlt->balance(asset_B), false, "WO asset_B != full");
+
+  tools::wallet_rpc_server alice_rpc_wo(alice_wlt_wo);
+  tools::wallet_rpc_server alice_rpc(alice_wlt);
+
+  // sweep A only - B must stay untouched
+  tools::wallet_public::COMMAND_SWEEP_BELOW::request req{};
+  req.mixin = 15;
+  req.address = m_accounts[CAROL_ACC_IDX].get_public_address_str();
+  req.amount = small_a + 1;
+  req.fee = TESTS_DEFAULT_FEE;
+  req.asset_id = asset_A;
+  tools::wallet_public::COMMAND_SWEEP_BELOW::response res{};
+  int code = call_sweep_below(alice_rpc_wo, req, res);
+  CHECK_AND_ASSERT_MES(code == 0, false, "sweep_below(A) failed, code=" << code);
+  CHECK_AND_ASSERT_MES(res.asset_id == asset_A, false, "response asset_id mismatch");
+  CHECK_AND_ASSERT_MES(res.outs_swept == 3, false, "outs_swept=" << res.outs_swept);
+  CHECK_AND_ASSERT_MES(res.amount_swept == 3 * small_a, false, "amount_swept=" << res.amount_swept);
+  CHECK_AND_ASSERT_MES(res.tx_hash.empty() && !res.tx_unsigned_hex.empty(), false, "WO must return blob, no tx_hash");
+
+  tools::wallet_public::COMMAND_SIGN_TRANSFER::request sign_req{};
+  sign_req.tx_unsigned_hex = res.tx_unsigned_hex;
+  tools::wallet_public::COMMAND_SIGN_TRANSFER::response sign_res{};
+  epee::json_rpc::error je{};
+  tools::wallet_rpc_server::connection_context ctx{};
+  bool ok = alice_rpc.on_sign_transfer(sign_req, sign_res, je, ctx);
+  CHECK_AND_ASSERT_MES(ok, false, "sign_transfer failed: " << je.message);
+
+  tools::wallet_public::COMMAND_SUBMIT_TRANSFER::request submit_req{};
+  submit_req.tx_signed_hex = sign_res.tx_signed_hex;
+  tools::wallet_public::COMMAND_SUBMIT_TRANSFER::response submit_res{};
+  je = epee::json_rpc::error{};
+  ok = alice_rpc_wo.on_submit_transfer(submit_req, submit_res, je, ctx);
+  CHECK_AND_ASSERT_MES(ok, false, "submit_transfer failed: " << je.message);
+
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+  CHECK_AND_ASSERT_MES(r, false, "mine failed");
+
+  carol_wlt->refresh();
+  CHECK_AND_ASSERT_MES(carol_wlt->balance(asset_A) == 3 * small_a, false, "Carol asset_A=" << carol_wlt->balance(asset_A));
+  CHECK_AND_ASSERT_MES(carol_wlt->balance(asset_B) == 0, false, "Carol must not get asset_B");
+  CHECK_AND_ASSERT_MES(carol_wlt->balance(currency::native_coin_asset_id) == 0, false, "Carol must not get native");
+
+  alice_wlt->refresh();
+  CHECK_AND_ASSERT_MES(alice_wlt->balance(asset_A) == 0, false, "Alice asset_A leftover=" << alice_wlt->balance(asset_A));
+  CHECK_AND_ASSERT_MES(alice_wlt->balance(asset_B) == 2 * small_b, false, "Alice asset_B touched: " << alice_wlt->balance(asset_B));
+  CHECK_AND_ASSERT_MES(alice_wlt->balance(currency::native_coin_asset_id) == MK_TEST_COINS(10) - TESTS_DEFAULT_FEE, false,
+    "Alice native after fee=" << alice_wlt->balance(currency::native_coin_asset_id));
+
+  return true;
+}
+

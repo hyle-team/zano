@@ -1144,6 +1144,11 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY_HF(wallet_rpc_gateway_reorg_receive, "6-*");
     GENERATE_AND_PLAY_HF(wallet_rpc_gateway_owner_change_altchain, "6-*");
     GENERATE_AND_PLAY_HF(wallet_rpc_and_tx_unlock_time, "5-*");
+    GENERATE_AND_PLAY_HF(wallet_rpc_sweep_below, "4-*");
+    GENERATE_AND_PLAY_HF(wallet_rpc_sweep_below_wo_native, "4-*");
+    GENERATE_AND_PLAY_HF(wallet_rpc_sweep_below_wo_reservation, "4-*");
+    GENERATE_AND_PLAY_HF(wallet_rpc_sweep_below_double_sweep, "4-*");
+    GENERATE_AND_PLAY_HF(wallet_rpc_sweep_below_wo_multi_asset, "4-*");
 
     // GENERATE_AND_PLAY(emission_test); // simulate 1 year of blockchain, too long run (1 y ~= 1 hr), by demand only
     // LOG_ERROR2("print_reward_change_first_blocks.log", currency::print_reward_change_first_blocks(525601).str()); // outputs first 1 year of blocks' rewards (simplier)
