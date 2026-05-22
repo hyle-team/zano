@@ -740,14 +740,14 @@ namespace tools
         return ss.str();
       }
 
-      wallet_error_with_rpc_code(std::string&& loc, int64_t rpc_error_code, const std::string& rpc_error_message)
+      wallet_error_with_rpc_code(std::string&& loc, const std::string& rpc_error_message, int64_t rpc_error_code)
         : wallet_logic_error(std::move(loc), rpc_error_message)
         , m_rpc_error_code(rpc_error_code)
         , m_rpc_error_message(rpc_error_message)
       {
       }
 
-      wallet_error_with_rpc_code(std::string&& loc, int64_t rpc_error_code, const std::string& rpc_error_message, const std::string& message)
+      wallet_error_with_rpc_code(std::string&& loc, const std::string& message, const std::string& rpc_error_message, int64_t rpc_error_code)
         : wallet_logic_error(std::move(loc), message)
         , m_rpc_error_code(rpc_error_code)
         , m_rpc_error_message(rpc_error_message)

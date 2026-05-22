@@ -4468,7 +4468,7 @@ void wallet2::submit_transfer(const std::string& signed_tx_blob, currency::trans
         std::stringstream ss;
         ss <<"submit_transfer seems to be abused: " << (i < ft.outs_key_images.size() ? "output key image " : "input key image ") << *it << " of tx " << tx_hash << " is already spent, according to daemon";
         WLT_LOG_RED(ss.str(), LOG_LEVEL_0);
-        throw error::wallet_error_with_rpc_code(LOCATION_STR, WALLET_RPC_ERROR_CODE_KEY_IMAGE_ALREADY_SPENT, ss.str());
+        throw error::wallet_error_with_rpc_code(LOCATION_STR, ss.str(), WALLET_RPC_ERROR_CODE_KEY_IMAGE_ALREADY_SPENT);
       }
       ++it;
       ++i;
@@ -8756,14 +8756,14 @@ void wallet2::sweep_below(const crypto::public_key& asset_id, size_t fake_outs_c
     }
   }
 
-  WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(!selected_transfers.empty(), "No spendable outputs meet the criterion");
+  WLT_THROW_IF_FALSE_WALLET_EX_MES(!selected_transfers.empty(), error::wallet_error_with_rpc_code, "No spendable outputs meet the criterion", WALLET_RPC_ERROR_CODE_NOTHING_TO_DO);
 
   // sort by amount descending in order to spend bigger outputs first
   std::sort(selected_transfers.begin(), selected_transfers.end(), [this](uint64_t a, uint64_t b) { return m_transfers.at(b).amount() < m_transfers.at(a).amount(); });
 
   if (sweeping_asset)
   {
-    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(selected_native_for_fee.amount != 0, "There's no native coin UTXO >= fee which is required when sweeping an asset. Transfer some native coins to this wallet.");
+    WLT_THROW_IF_FALSE_WALLET_EX_MES(selected_native_for_fee.amount != 0, error::wallet_error_with_rpc_code, "There's no native coin UTXO >= fee which is required when sweeping an asset. Transfer some native coins to this wallet.", WALLET_RPC_ERROR_CODE_NOT_ENOUGH_MONEY);
     selected_transfers.insert(selected_transfers.begin(), selected_native_for_fee.tid);
   }
 
