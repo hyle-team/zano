@@ -19,6 +19,7 @@
 #include "common/callstack_helper.h"
 
 #define TX_BLOBSIZE_CHECKER_LOG_FILENAME "get_object_blobsize(tx).log"
+#define BLOCK_STATS_LOG_FILENAME         "coretests_block_stats.log"
 
 using namespace chaingen_args;
 
@@ -33,6 +34,9 @@ namespace
   coretests_shm::shared_state* g_shm_state = nullptr;
   std::unique_ptr<boost::interprocess::mapped_region> g_shm_region;
   thread_local int32_t g_current_job_idx = -1;
+  bool g_report_block_stats = false;
+  std::vector<std::pair<std::string, test_block_stats>> g_test_block_stats;
+  thread_local std::string g_current_test_name;
 }
 
 #define GENERATE(filename, genclass) \
@@ -243,8 +247,12 @@ bool generate_and_play(const char* const genclass_name, size_t hardfork_id = SIZ
       LOG_PRINT_MAGENTA(std::string(100, '=') << std::endl <<
         "#TEST# >>>> " << genclass_name << " <<<< start replaying events" << std::endl <<
         std::string(100, '=') << std::endl, LOG_LEVEL_0);
-      
+
+      if (g_report_block_stats)
+        g_current_test_name = genclass_name;
       result = do_replay_events(events, g);
+      if (g_report_block_stats)
+        g_current_test_name.clear();
     }
   }
   catch (const std::exception& ex)
@@ -329,7 +337,11 @@ bool gen_and_play_intermitted_by_blockchain_saveload(const char* const genclass_
   uint64_t core_time = test_core_time::get_time();
   {
     random_state_test_restorer random_restorer; // use it to achive equal random generator's state before Stage 1 and before Stage 2
+    if (g_report_block_stats)
+      g_current_test_name = genclass_name;
     r = do_replay_events(events, g, 0, SIZE_MAX, false, [](currency::core&) {}, [&core_state_before](currency::core& c) { core_state_before.fill(c); });
+    if (g_report_block_stats)
+      g_current_test_name.clear();
     if (!r)
       return false;
     std::cout << concolor::green << "#TEST# " << genclass_name << ": STAGE 1: Succeeded (all events were played back normally)" << concolor::normal << std::endl;
@@ -792,6 +804,39 @@ inline bool do_replay_events(const std::vector<test_event_entry>& events, t_test
   }
 
   before_deinit_cb(c);
+
+  // сapture end-of-test block stats when the feature is enabled --report-block-stats
+  if (g_report_block_stats && !g_current_test_name.empty())
+  {
+    test_block_stats stats;
+    stats.blockchain_size  = c.get_blockchain_storage().get_current_blockchain_size();
+    stats.top_block_height = c.get_blockchain_storage().get_top_block_height();
+    stats.alt_blocks_count = c.get_blockchain_storage().get_alternative_blocks_count();
+    stats.pool_tx_count    = c.get_pool_transactions_count();
+
+    bool replaced = false;
+    for (auto& p : g_test_block_stats)
+    {
+      if (p.first == g_current_test_name)
+      {
+        p.second = stats;
+        replaced = true;
+        break;
+      }
+    }
+    if (!replaced)
+      g_test_block_stats.emplace_back(g_current_test_name, stats);
+
+    const int32_t wid = command_line::get_arg(g_vm, chaingen_args::arg_worker_id);
+    LOG_PRINT2(BLOCK_STATS_LOG_FILENAME,
+      "#TEST# " << g_current_test_name
+      << (wid >= 0 ? " [w" + std::to_string(wid) + "]" : std::string())
+      << "  chain_size=" << stats.blockchain_size
+      << "  top_height=" << stats.top_block_height
+      << "  alt_blocks=" << stats.alt_blocks_count
+      << "  pool_txs="   << stats.pool_tx_count,
+      LOG_LEVEL_0);
+  }
 
   c.deinit(); // always deinitialize the core
   protocol_handler.deinit();
@@ -1455,6 +1500,7 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_options, arg_run_multiple_tests);
   command_line::add_arg(desc_options, arg_enable_debug_asserts);
   command_line::add_arg(desc_options, arg_stop_on_fail);
+  command_line::add_arg(desc_options, arg_report_block_stats);
   command_line::add_arg(desc_options, command_line::arg_data_dir, std::string("."));
   command_line::add_arg(desc_options, command_line::arg_stop_after_height);
   command_line::add_arg(desc_options, command_line::arg_disable_ntp);
@@ -1495,6 +1541,8 @@ int main(int argc, char* argv[])
   {
     stop_on_first_fail = command_line::get_arg(g_vm, arg_stop_on_fail);
   }
+
+  g_report_block_stats = command_line::has_arg(g_vm, arg_report_block_stats) && command_line::get_arg(g_vm, arg_report_block_stats);
 
   const int32_t worker_id = command_line::get_arg(g_vm, arg_worker_id);
   const bool is_worker = (worker_id >= 0);
@@ -1657,6 +1705,8 @@ int main(int argc, char* argv[])
       rep.tests_running_time = tests_running_time;
       rep.failed_tests = failed_tests;
       rep.skip_all_till_the_end = skip_all_till_the_end;
+      if (g_report_block_stats)
+        rep.block_stats = g_test_block_stats;
       rep.exit_code = (serious_failures_count == 0 ? 0 : 1);
 
       if (g_runner)
@@ -1692,6 +1742,22 @@ int main(int argc, char* argv[])
       }
 
       std::cout << concolor::normal << std::endl;
+
+      if (g_report_block_stats)
+      {
+        LOG_PRINT2(BLOCK_STATS_LOG_FILENAME, "===== FINAL BLOCK STATS REPORT (" << g_test_block_stats.size() << " tests) =====", LOG_LEVEL_0);
+        for (const auto& p : g_test_block_stats)
+        {
+          LOG_PRINT2(BLOCK_STATS_LOG_FILENAME,
+            p.first
+            << "  chain_size=" << p.second.blockchain_size
+            << "  top_height=" << p.second.top_block_height
+            << "  alt_blocks=" << p.second.alt_blocks_count
+            << "  pool_txs="   << p.second.pool_tx_count,
+            LOG_LEVEL_0);
+        }
+        print_block_stats_table(g_test_block_stats);
+      }
     }
   }
 
