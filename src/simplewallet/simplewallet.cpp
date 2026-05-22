@@ -3976,8 +3976,8 @@ int main(int argc, char* argv[])
         
         wal.callback(callback);
 
-        if (!offline_mode)
-          wal.refresh();
+        //if (!offline_mode)
+        //  wal.refresh();
         LOG_PRINT_GREEN("Loaded ok", LOG_LEVEL_0);
       }
       catch (const std::exception& e)
