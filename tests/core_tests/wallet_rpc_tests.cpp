@@ -4228,6 +4228,83 @@ bool wallet_rpc_sweep_below::c1(currency::core& c, size_t ev_index, const std::v
       "case WO: Carol asset delta=" << (carol_asset_after - carol_asset_before) << ", expected " << (2 * small_asset));
   }
 
+  // cases for max_inputs / min_outputs
+  const uint64_t mio_unit = MK_TEST_COINS(7); // distinctive amount to avoid collision with leftover UTXOs
+  miner_wlt->refresh();
+  for (size_t i = 0; i < 4; ++i)
+    miner_wlt->transfer(mio_unit, alice_wlt->get_account().get_public_address());
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+  CHECK_AND_ASSERT_MES(r, false, "mio prep #1: mine failed");
+  alice_wlt->refresh();
+
+  // case: min_outputs above the allowed maximum -> WRONG_ARGUMENT
+  {
+    tools::wallet_rpc_server alice_rpc(alice_wlt);
+    tools::wallet_public::COMMAND_SWEEP_BELOW::request req{};
+    req.mixin = 15;
+    req.address = m_accounts[BOB_ACC_IDX].get_public_address_str();
+    req.amount = mio_unit + 1;
+    req.fee = TESTS_DEFAULT_FEE;
+    req.min_outputs = CURRENCY_TX_MAX_ALLOWED_OUTS + 1;
+    tools::wallet_public::COMMAND_SWEEP_BELOW::response res{};
+    int code = call_sweep_below(alice_rpc, req, res);
+    CHECK_AND_ASSERT_MES(code == WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT, false, "case min_outputs>MAX: expected WRONG_ARGUMENT (" << WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT << "), got " << code);
+    CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "unexpected pool txs count: " << c.get_pool_transactions_count());
+  }
+
+  // case: min_outputs = 4 forces the tx to have exactly 4 outputs
+  {
+    tools::wallet_rpc_server alice_rpc(alice_wlt);
+    tools::wallet_public::COMMAND_SWEEP_BELOW::request req{};
+    req.mixin = 15;
+    req.address = m_accounts[BOB_ACC_IDX].get_public_address_str();
+    req.amount = mio_unit + 1;
+    req.fee = TESTS_DEFAULT_FEE;
+    req.min_outputs = 4;
+    tools::wallet_public::COMMAND_SWEEP_BELOW::response res{};
+    int code = call_sweep_below(alice_rpc, req, res);
+    CHECK_AND_ASSERT_MES(code == 0, false, "case min_outputs=4: sweep failed, code=" << code);
+    CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "unexpected pool txs count: " << c.get_pool_transactions_count());
+
+    std::list<transaction> pool_txs;
+    r = c.get_pool_transactions(pool_txs);
+    CHECK_AND_ASSERT_MES(r && pool_txs.size() == 1, false, "get_pool_transactions failed");
+    CHECK_AND_ASSERT_MES(pool_txs.front().vout.size() == 4, false, "case min_outputs=4: vout.size()=" << pool_txs.front().vout.size() << ", expected 4");
+
+    r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+    CHECK_AND_ASSERT_MES(r, false, "case min_outputs=4: mine failed");
+    CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "tx pool not empty after mining");
+  }
+
+  // top up Alice with 4 more native UTXOs for the max_inputs case
+  miner_wlt->refresh();
+  for (size_t i = 0; i < 4; ++i)
+    miner_wlt->transfer(mio_unit, alice_wlt->get_account().get_public_address(), currency::native_coin_asset_id);
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+  CHECK_AND_ASSERT_MES(r, false, "mio prep #2: mine failed");
+  alice_wlt->refresh();
+
+  // case: max_inputs caps the number of inputs selected
+  {
+    tools::wallet_rpc_server alice_rpc(alice_wlt);
+    tools::wallet_public::COMMAND_SWEEP_BELOW::request req{};
+    req.mixin = 15;
+    req.address = m_accounts[BOB_ACC_IDX].get_public_address_str();
+    req.amount = mio_unit + 1;
+    req.fee = TESTS_DEFAULT_FEE;
+    req.max_inputs = 2;
+    tools::wallet_public::COMMAND_SWEEP_BELOW::response res{};
+    int code = call_sweep_below(alice_rpc, req, res);
+    CHECK_AND_ASSERT_MES(code == 0, false, "case max_inputs=2: sweep failed, code=" << code);
+    CHECK_AND_ASSERT_MES(res.outs_total == 4, false, "case max_inputs=2: outs_total=" << res.outs_total << ", expected 4");
+    CHECK_AND_ASSERT_MES(res.outs_swept == 2, false, "case max_inputs=2: outs_swept=" << res.outs_swept << ", expected 2");
+    CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "unexpected pool txs count: " << c.get_pool_transactions_count());
+
+    r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+    CHECK_AND_ASSERT_MES(r, false, "case max_inputs=2: mine failed");
+    CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "tx pool not empty after mining");
+  }
+
   return true;
 }
 
