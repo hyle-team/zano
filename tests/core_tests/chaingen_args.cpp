@@ -14,6 +14,7 @@ namespace chaingen_args
   command_line::arg_descriptor<std::string> arg_run_multiple_tests           ("run-multiple-tests", "comma-separated list of tests to run, OR text file <@filename> containing list of tests");
   command_line::arg_descriptor<bool>        arg_enable_debug_asserts         ("enable-debug-asserts", "" );
   command_line::arg_descriptor<bool>        arg_stop_on_fail                 ("stop-on-fail", "");
+  command_line::arg_descriptor<bool>        arg_report_block_stats           ("report-block-stats", "Capture an end-of-test blockchain snapshot (chain size, top height, alt blocks, pool tx count) for every coretest and print a summary table at the end. Propagates to workers in --multiprocess-run mode.");
   command_line::arg_descriptor<uint32_t>    arg_processes                    ("multiprocess-run", "Run tests in parallel using the specified number of worker processes", 1);
   command_line::arg_descriptor<int32_t>     arg_worker_id                    ("multiprocess-worker-id", "Internal: index of the worker process (assigned automatically by parent)", -1);
   command_line::arg_descriptor<std::string> arg_run_root                     ("multiprocess-run-root", "Internal: directory used by parent and workers to store run artifacts and reports", "");
