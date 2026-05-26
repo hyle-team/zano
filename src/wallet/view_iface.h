@@ -194,14 +194,18 @@ public:
     std::list<tools::wallet_public::asset_balance_entry> balances;
     uint64_t minied_total;
     bool has_bare_unspent_outputs;
+    uint64_t current_pos_attempts;
+    uint64_t est_iterations_per_pos_block;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_CHAIN_BASE(wallet_status_info_base)
       KV_SERIALIZE(balances)
       KV_SERIALIZE(minied_total)
       KV_SERIALIZE(has_bare_unspent_outputs)
+      KV_SERIALIZE(current_pos_attempts)
+      KV_SERIALIZE(est_iterations_per_pos_block)
     END_KV_SERIALIZE_MAP()
-  };  
+  };
   
   typedef tools::wallet_public::wallet_info wallet_info;
   typedef tools::wallet_public::wallet_info_extra wallet_info_extra;
