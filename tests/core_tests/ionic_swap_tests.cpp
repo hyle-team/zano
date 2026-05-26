@@ -452,3 +452,159 @@ bool ionic_swap_exact_amounts_test::c1(currency::core& c, size_t ev_index, const
 
   return true;
 }
+
+//----------------------------------------------------------------------------------------------------
+
+ionic_swap_overflow_check_test::ionic_swap_overflow_check_test()
+{
+  REGISTER_CALLBACK_METHOD(ionic_swap_overflow_check_test, c1);
+}
+
+bool ionic_swap_overflow_check_test::generate(std::vector<test_event_entry>& events) const
+{
+  uint64_t ts = test_core_time::get_time();
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
+  account_base& bob_acc   = m_accounts[BOB_ACC_IDX];   bob_acc.generate();   bob_acc.set_createtime(ts);
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
+  DO_CALLBACK(events, "configure_core");
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 3);
+
+  DO_CALLBACK(events, "c1");
+  return true;
+}
+
+bool ionic_swap_overflow_check_test::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  // Covers the overflow checking arithmetic two paths the check protects:
+  //  legitimate swap with per-asset amounts near UINT64_MAX/2 - must succeed
+  //  proposal with garbage/truncated/empty encrypted_context - must fail gracefully
+  bool r = false;
+  std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
+  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
+  std::shared_ptr<tools::wallet2> bob_wlt   = init_playtime_test_wallet(events, c, BOB_ACC_IDX);
+  miner_wlt->refresh();
+
+  CHECK_AND_ASSERT_MES(c.get_blockchain_storage().is_hardfork_active(ZANO_HARDFORK_04_ZARCANUM), false, "test requires HF4 (Zarcanum)");
+
+  // asset with max supply Alice gets 2 UTXOs UINT64_MAX/4 each so the proposal sums them
+  // into ammounts_to_b[asset_id] - exactly the path that overflow-checks o.amount accumulation
+  asset_descriptor_base adb{};
+  adb.total_max_supply = UINT64_MAX;
+  adb.full_name = "Overflow Asset";
+  adb.ticker = "OFA";
+  adb.decimal_point = 0;
+
+  const uint64_t big_amount  = UINT64_MAX / 4;
+  const uint64_t alice_total = 2 * big_amount;
+  const uint64_t bob_total   = UINT64_MAX - alice_total; // supply == total_max_supply exactly
+
+  miner_wlt->transfer(MK_TEST_COINS(10), alice_wlt->get_account().get_public_address(), currency::native_coin_asset_id);
+  miner_wlt->transfer(MK_TEST_COINS(10), bob_wlt->get_account().get_public_address(),   currency::native_coin_asset_id);
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+  CHECK_AND_ASSERT_MES(r, false, "mine after fee-seeding failed");
+  miner_wlt->refresh();
+
+  // deploy: 2 OFA UTXOs to Alice + 1 to Bob, summing to total_max_supply
+  std::vector<currency::tx_destination_entry> deploy_dsts;
+  deploy_dsts.emplace_back(big_amount, alice_wlt->get_account().get_public_address(), null_pkey);
+  deploy_dsts.emplace_back(big_amount, alice_wlt->get_account().get_public_address(), null_pkey);
+  deploy_dsts.emplace_back(bob_total,  bob_wlt->get_account().get_public_address(),   null_pkey);
+  currency::transaction deploy_tx{};
+  crypto::public_key asset_id = null_pkey;
+  miner_wlt->deploy_new_asset(adb, deploy_dsts, deploy_tx, asset_id);
+
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+  CHECK_AND_ASSERT_MES(r, false, "mine after deploy failed");
+  alice_wlt->refresh();
+  bob_wlt->refresh();
+
+  CHECK_AND_ASSERT_MES(alice_wlt->balance(asset_id) == alice_total, false, "Alice OFA=" << alice_wlt->balance(asset_id));
+  CHECK_AND_ASSERT_MES(bob_wlt->balance(asset_id)   == bob_total,   false, "Bob OFA="   << bob_wlt->balance(asset_id));
+
+  // legitimate large amount swap
+  // alice gives away all alice_total OFA (= 2 * big_amount, accumulated via assign_add_with_overflow_check) for 1 native coin from Bob
+  tools::wallet_public::ionic_swap_proposal proposal{};
+  {
+    view::ionic_swap_proposal_info details{};
+    details.fee_paid_by_a = TESTS_DEFAULT_FEE;
+    details.to_finalizer.push_back(view::asset_funds{ asset_id, alice_total });
+    details.to_initiator.push_back(view::asset_funds{ currency::native_coin_asset_id, MK_TEST_COINS(1) });
+
+    r = alice_wlt->create_ionic_swap_proposal(details, m_accounts[BOB_ACC_IDX].get_public_address(), proposal);
+    CHECK_AND_ASSERT_MES(r, false, "create_ionic_swap_proposal failed");
+
+    // Bob decodes - this is the path overflow-checks protect must not false-positive
+    view::ionic_swap_proposal_info decoded{};
+    r = bob_wlt->get_ionic_swap_proposal_info(proposal, decoded);
+    CHECK_AND_ASSERT_MES(r, false, "get_ionic_swap_proposal_info rejected legitimate large-amount swap");
+    CHECK_AND_ASSERT_MES(decoded.to_finalizer == details.to_finalizer, false, "decoded.to_finalizer mismatch");
+    CHECK_AND_ASSERT_MES(decoded.to_initiator == details.to_initiator, false, "decoded.to_initiator mismatch");
+    CHECK_AND_ASSERT_MES(decoded.fee_paid_by_a == details.fee_paid_by_a, false, "decoded.fee_paid_by_a mismatch");
+
+    currency::transaction settle_tx{};
+    r = bob_wlt->accept_ionic_swap_proposal(proposal, settle_tx);
+    CHECK_AND_ASSERT_MES(r, false, "accept_ionic_swap_proposal failed");
+  }
+
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+  CHECK_AND_ASSERT_MES(r, false, "mine after settle failed");
+  alice_wlt->refresh();
+  bob_wlt->refresh();
+  CHECK_AND_ASSERT_MES(alice_wlt->balance(asset_id) == 0, false, "Alice OFA after swap=" << alice_wlt->balance(asset_id));
+  CHECK_AND_ASSERT_MES(bob_wlt->balance(asset_id) == bob_total + alice_total, false, "Bob OFA after swap=" << bob_wlt->balance(asset_id));
+
+  // bad encrypted_context must be rejected gracefully
+  {
+    bob_wlt->refresh();
+    view::ionic_swap_proposal_info fresh_details{};
+    fresh_details.fee_paid_by_a = TESTS_DEFAULT_FEE;
+    fresh_details.to_finalizer.push_back(view::asset_funds{ asset_id, big_amount });
+    fresh_details.to_initiator.push_back(view::asset_funds{ currency::native_coin_asset_id, MK_TEST_COINS(1) });
+
+    tools::wallet_public::ionic_swap_proposal fresh{};
+    r = bob_wlt->create_ionic_swap_proposal(fresh_details, m_accounts[ALICE_ACC_IDX].get_public_address(), fresh);
+    CHECK_AND_ASSERT_MES(r, false, "create fresh proposal for tamper test failed");
+
+    // sanity: untouched proposal must decode
+    {
+      view::ionic_swap_proposal_info dec{};
+      r = alice_wlt->get_ionic_swap_proposal_info(fresh, dec);
+      CHECK_AND_ASSERT_MES(r, false, "untampered proposal failed to decode - test setup is broken");
+    }
+
+    // helper: each variant must either return false or throw - never crash
+    auto expect_rejected = [&](const tools::wallet_public::ionic_swap_proposal& p, const char* label) -> bool {
+      try
+      {
+        view::ionic_swap_proposal_info dec{};
+        bool ok = alice_wlt->get_ionic_swap_proposal_info(p, dec);
+        CHECK_AND_ASSERT_MES(!ok, false, label << ": malformed proposal accepted");
+      }
+      catch (const std::exception&)
+      {
+        //expected
+      }
+      return true;
+    };
+
+    // encrypted_context replaced with random bytes of the same length
+    tools::wallet_public::ionic_swap_proposal tampered = fresh;
+    crypto::generate_random_bytes(tampered.encrypted_context.size(), &tampered.encrypted_context[0]);
+    CHECK_AND_ASSERT_MES(expect_rejected(tampered, "random-bytes"), false, "");
+
+    // encrypted_context truncated to a few bytes
+    tools::wallet_public::ionic_swap_proposal truncated = fresh;
+    truncated.encrypted_context.resize(4);
+    CHECK_AND_ASSERT_MES(expect_rejected(truncated, "truncated"), false, "");
+
+    // encrypted_context cleared
+    tools::wallet_public::ionic_swap_proposal emptied = fresh;
+    emptied.encrypted_context.clear();
+    CHECK_AND_ASSERT_MES(expect_rejected(emptied, "empty"), false, "");
+  }
+
+  return true;
+}

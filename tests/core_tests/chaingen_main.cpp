@@ -1194,6 +1194,8 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY_HF(wallet_rpc_sweep_below_wo_reservation, "4-*");
     GENERATE_AND_PLAY_HF(wallet_rpc_sweep_below_double_sweep, "4-*");
     GENERATE_AND_PLAY_HF(wallet_rpc_sweep_below_wo_multi_asset, "4-*");
+    GENERATE_AND_PLAY_HF(wallet_rpc_get_outputs_and_utxo_stats, "4-*");
+    GENERATE_AND_PLAY(wallet_rpc_sign_message_with_alias);
 
     // GENERATE_AND_PLAY(emission_test); // simulate 1 year of blockchain, too long run (1 y ~= 1 hr), by demand only
     // LOG_ERROR2("print_reward_change_first_blocks.log", currency::print_reward_change_first_blocks(525601).str()); // outputs first 1 year of blocks' rewards (simplier)
@@ -1394,6 +1396,7 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY_HF(multiassets_basic_test, "4-*");
     GENERATE_AND_PLAY_HF(ionic_swap_basic_test, "4-*");
     GENERATE_AND_PLAY_HF(ionic_swap_exact_amounts_test, "4-*");
+    GENERATE_AND_PLAY_HF(ionic_swap_overflow_check_test, "4-*");
     GENERATE_AND_PLAY(zarcanum_test_n_inputs_validation);
     GENERATE_AND_PLAY(zarcanum_gen_time_balance);
     GENERATE_AND_PLAY(zarcanum_txs_with_big_shuffled_decoy_set_shuffled);
