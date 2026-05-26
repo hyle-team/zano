@@ -653,7 +653,7 @@ namespace tools
     void clear_utxo_cold_sig_reservation(std::vector<uint64_t>& affected_transfer_ids);
 
     void sweep_below(const crypto::public_key& asset_id, size_t fake_outs_count, const currency::account_public_address& destination_addr, uint64_t threshold_amount, const currency::payment_id_t& payment_id,
-      uint64_t fee, size_t& outs_total, uint64_t& amount_total, size_t& outs_swept, uint64_t& amount_swept, currency::transaction* p_result_tx = nullptr, std::string* p_filename_or_unsigned_tx_blob_str = nullptr);
+      uint64_t fee, uint64_t inputs_max, uint64_t outputs_min, size_t& outs_total, uint64_t& amount_total, size_t& outs_swept, uint64_t& amount_swept, currency::transaction* p_result_tx = nullptr, std::string* p_filename_or_unsigned_tx_blob_str = nullptr);
 
     bool get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id);
     bool get_transfer_address(const std::string& adr_str, currency::address_v& addr, std::string& payment_id);
@@ -881,6 +881,7 @@ private:
     void prepare_tx_destinations(const assets_selection_context& needed_money_map,
       detail::split_strategy_id_t destination_split_strategy_id,
       const tx_dust_policy& dust_policy,
+      size_t outs_number_min,
       const std::vector<currency::tx_destination_entry>& dsts,
       uint8_t tx_flags,
       std::vector<currency::tx_destination_entry>& final_destinations);

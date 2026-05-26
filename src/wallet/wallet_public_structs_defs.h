@@ -1123,6 +1123,8 @@ namespace tools::wallet_public
       uint64_t    amount;
       std::string payment_id_hex;
       uint64_t    fee;
+      uint64_t    max_inputs;
+      uint64_t    min_outputs;
       crypto::public_key asset_id = currency::native_coin_asset_id;
 
       BEGIN_KV_SERIALIZE_MAP()
@@ -1131,6 +1133,8 @@ namespace tools::wallet_public
         KV_SERIALIZE(amount)             DOC_DSCR("Threshold amount of native coins to sweep.") DOC_EXMP(1000000000000) DOC_END
         KV_SERIALIZE(payment_id_hex)     DOC_DSCR("[deprecated] Legacy tx-wide hex-encoded payment_id, that normally used for user database by exchanges") DOC_EXMP_AUTO("")     DOC_END
         KV_SERIALIZE(fee)                DOC_DSCR("Transaction fee required for processing the transaction.") DOC_EXMP(10000000000) DOC_END
+        KV_SERIALIZE(max_inputs)         DOC_DSCR("[optional] Maximum number of inputs in sweeping transaction. Default is the maximum possible.") DOC_EXMP(5) DOC_END
+        KV_SERIALIZE(min_outputs)        DOC_DSCR("[optional] Minimum number of outputs in sweeping transaction. Default is the minimum possible.") DOC_EXMP(3) DOC_END
         KV_SERIALIZE_POD_AS_HEX_STRING(asset_id) DOC_DSCR("[optional] Asset ID to filter outputs. Native coin if not specified.") DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
       END_KV_SERIALIZE_MAP()
     };

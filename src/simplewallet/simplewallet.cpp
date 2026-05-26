@@ -331,7 +331,7 @@ simple_wallet::simple_wallet()
   m_cmd_binder.set_handler("scan_transfers_for_id", boost::bind(&simple_wallet::scan_transfers_for_id, this,ph::_1), "Rescan transfers for tx_id");
   m_cmd_binder.set_handler("scan_transfers_for_ki", boost::bind(&simple_wallet::scan_transfers_for_ki, this,ph::_1), "Rescan transfers for key image");
   m_cmd_binder.set_handler("print_utxo_distribution", boost::bind(&simple_wallet::print_utxo_distribution, this,ph::_1), "Prints utxo distribution");
-  m_cmd_binder.set_handler("sweep_below", boost::bind(&simple_wallet::sweep_below, this,ph::_1), "sweep_below <mixin_count | asset_id> <address|self> <amount_lower_limit> - Sweep UTXOs of an asset with amount below the limit to the given address. First arg: integer mixin count (= sweep native coin) or asset_id (= sweep that asset with default mixin). Asset sweeps also consume one native UTXO >= fee to pay the fee.");
+  m_cmd_binder.set_handler("sweep_below", boost::bind(&simple_wallet::sweep_below, this,ph::_1), "sweep_below <mixin_count | asset_id> <address|self> <amount_lower_limit> [max_inputs [min_outputs]] - Sweep UTXOs of an asset with amount below the limit to the given address. First arg: integer mixin count (= sweep native coin) or asset_id (= sweep that asset with default mixin). Asset sweeps also consume one native UTXO >= fee to pay the fee. max_inputs and min_outputs can override defaults (~88 and 2 resp.)");
   m_cmd_binder.set_handler("sweep_bare_outs", boost::bind(&simple_wallet::sweep_bare_outs, this,ph::_1), "sweep_bare_outs - Transfers all bare unspent outputs to itself. Uses several txs if necessary.");
   
   m_cmd_binder.set_handler("address", boost::bind(&simple_wallet::print_address, this,ph::_1), "Show current wallet public address");
@@ -3133,9 +3133,9 @@ bool simple_wallet::sweep_below(const std::vector<std::string> &args)
     return true;
 
   bool r = false;
-  if (args.size() != 3)
+  if (args.size() < 3 || args.size() > 5)
   {
-    fail_msg_writer() << "invalid arguments count: " << args.size() << ", expected 3";
+    fail_msg_writer() << "invalid arguments count: " << args.size() << ", expected 3..5";
     return true;
   }
 
@@ -3183,13 +3183,31 @@ bool simple_wallet::sweep_below(const std::vector<std::string> &args)
     return true;
   }
 
+  size_t max_inputs = 0;
+  if (args.size() >= 4)
+  {
+    if (!string_tools::get_xtype_from_string(max_inputs, args[3]))
+    {
+      fail_msg_writer() << "max_inputs is incorrect: " << args[3];
+      return true;
+    }
+  }
+  size_t min_outputs = 0;
+  if (args.size() >= 5)
+  {
+    if (!string_tools::get_xtype_from_string(min_outputs, args[4]) || min_outputs < CURRENCY_TX_MIN_ALLOWED_OUTS || min_outputs > CURRENCY_TX_MAX_ALLOWED_OUTS)
+    {
+      fail_msg_writer() << "min_outputs is incorrect: " << args[4];
+      return true;
+    }
+  }
 
   uint64_t fee = m_wallet->get_core_runtime_config().tx_default_fee;
   size_t outs_total = 0, outs_swept = 0;
   uint64_t amount_total = 0, amount_swept = 0;
   currency::transaction result_tx{};
   std::string filename = "zano_tx_unsigned";
-  m_wallet->sweep_below(asset_id, fake_outs_count, addr, amount, integrated_payment_id, fee, outs_total, amount_total, outs_swept, amount_swept, &result_tx, &filename);
+  m_wallet->sweep_below(asset_id, fake_outs_count, addr, amount, integrated_payment_id, fee, max_inputs, min_outputs, outs_total, amount_total, outs_swept, amount_swept, &result_tx, &filename);
 
   success_msg_writer(false) << outs_swept << " outputs (" << print_money_brief(amount_swept, decimal_point) << " coins) of " << outs_total << " total (" << print_money_brief(amount_total, decimal_point)
     << ") below the specified limit of " << print_money_brief(amount, decimal_point) << " were successfully swept";

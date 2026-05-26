@@ -2258,7 +2258,7 @@ bool wallet2::sweep_bare_unspent_outputs(const currency::account_public_address&
     assets_selection_context needed_money_map{ std::make_pair(native_coin_asset_id, selection_for_amount{group.total_amount + group.additional_tid_amount, group.total_amount + group.additional_tid_amount, group.total_amount + group.additional_tid_amount}) };
     try
     {
-      prepare_tx_destinations(needed_money_map, get_current_split_strategy(), tx_dust_policy{}, destinations, 0 /* tx_flags */, ftp.prepared_destinations);
+      prepare_tx_destinations(needed_money_map, get_current_split_strategy(), tx_dust_policy{}, CURRENCY_TX_MIN_ALLOWED_OUTS, destinations, 0 /* tx_flags */, ftp.prepared_destinations);
     }
     catch (...)
     {
@@ -8224,6 +8224,7 @@ void wallet2::clear_utxo_cold_sig_reservation(std::vector<uint64_t>& affected_tr
 void wallet2::prepare_tx_destinations(const assets_selection_context& needed_money_map,
   detail::split_strategy_id_t destination_split_strategy_id,
   const tx_dust_policy& dust_policy,
+  size_t outs_number_min,
   const std::vector<currency::tx_destination_entry>& dsts,
   uint8_t tx_flags,
   std::vector<currency::tx_destination_entry>& final_destinations)
@@ -8265,21 +8266,21 @@ void wallet2::prepare_tx_destinations(const assets_selection_context& needed_mon
     {
       if (final_destinations.empty())
       {
-        // if there's no destinations -- make CURRENCY_TX_MIN_ALLOWED_OUTS empty destinations
-        for (size_t i = 0; i < CURRENCY_TX_MIN_ALLOWED_OUTS; ++i)
+        // if there's no destinations -- make outs_number_min empty destinations
+        for (size_t i = 0; i < outs_number_min; ++i)
           final_destinations.emplace_back(0, m_account.get_public_address());
       }
-      else if (final_destinations.size() < CURRENCY_TX_MIN_ALLOWED_OUTS)
+      else if (final_destinations.size() < outs_number_min)
       {
         // if there's not ehough destinations items (i.e. outputs), split the last one
         tx_destination_entry de = final_destinations.back();
         final_destinations.pop_back();
-        size_t items_to_be_added = CURRENCY_TX_MIN_ALLOWED_OUTS - final_destinations.size();
+        size_t items_to_be_added = outs_number_min - final_destinations.size();
         // TODO: consider allowing to set them somewhere
         size_t num_digits_to_keep = CURRENCY_TX_OUTS_RND_SPLIT_DIGITS_TO_KEEP;
         decompose_amount_randomly(de.amount, [&](uint64_t amount) { de.amount = amount; final_destinations.push_back(de); }, items_to_be_added, num_digits_to_keep);
-        WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(final_destinations.size() == CURRENCY_TX_MIN_ALLOWED_OUTS,
-          "can't get necessary number of outputs using decompose_amount_randomly(), got " << final_destinations.size() << " while mininum is " << CURRENCY_TX_MIN_ALLOWED_OUTS);
+        WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(final_destinations.size() == outs_number_min,
+          "can't get necessary number of outputs using decompose_amount_randomly(), got " << final_destinations.size() << " while minimum is " << outs_number_min);
       }
     }
   }
@@ -8387,7 +8388,7 @@ bool wallet2::prepare_transaction(construct_tx_param& ctp, currency::finalize_tx
   TIME_MEASURE_FINISH_MS(prepare_tx_sources_time);
 
   TIME_MEASURE_START_MS(prepare_tx_destinations_time);
-  prepare_tx_destinations(needed_money_map, static_cast<detail::split_strategy_id_t>(ctp.split_strategy_id), ctp.dust_policy, ctp.dsts, ctp.flags, ftp.prepared_destinations);
+  prepare_tx_destinations(needed_money_map, static_cast<detail::split_strategy_id_t>(ctp.split_strategy_id), ctp.dust_policy, CURRENCY_TX_MIN_ALLOWED_OUTS, ctp.dsts, ctp.flags, ftp.prepared_destinations);
   TIME_MEASURE_FINISH_MS(prepare_tx_destinations_time);
 
 
@@ -8710,7 +8711,7 @@ void wallet2::transfer(construct_tx_param& ctp,
 
 //----------------------------------------------------------------------------------------------------
 void wallet2::sweep_below(const crypto::public_key& asset_id, size_t fake_outs_count, const currency::account_public_address& destination_addr, uint64_t threshold_amount, const currency::payment_id_t& payment_id,
-  uint64_t fee, size_t& outs_total, uint64_t& amount_total, size_t& outs_swept, uint64_t& amount_swept, currency::transaction* p_result_tx /* = nullptr */, std::string* p_filename_or_unsigned_tx_blob_str /* = nullptr */)
+  uint64_t fee, uint64_t inputs_max, uint64_t outputs_min, size_t& outs_total, uint64_t& amount_total, size_t& outs_swept, uint64_t& amount_swept, currency::transaction* p_result_tx /* = nullptr */, std::string* p_filename_or_unsigned_tx_blob_str /* = nullptr */)
 {
   bool r = false;
   outs_total = 0;
@@ -8719,6 +8720,9 @@ void wallet2::sweep_below(const crypto::public_key& asset_id, size_t fake_outs_c
   amount_swept = 0;
 
   bool sweeping_asset = asset_id != native_coin_asset_id;
+  if (outputs_min < CURRENCY_TX_MIN_ALLOWED_OUTS)
+    outputs_min = CURRENCY_TX_MIN_ALLOWED_OUTS;
+  WLT_THROW_IF_FALSE_WALLET_EX_MES(outputs_min <= CURRENCY_TX_MAX_ALLOWED_OUTS, error::wallet_error_with_rpc_code, "Outputs minimum exceeds allowed maximum (" STR(CURRENCY_TX_MAX_ALLOWED_OUTS) ")", WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT);
 
   std::vector<uint64_t> selected_transfers;
   std::unordered_map<size_t, size_t> fake_outs_for_selected_transfers; // tr index -> fake outs count
@@ -8835,7 +8839,7 @@ void wallet2::sweep_below(const crypto::public_key& asset_id, size_t fake_outs_c
   auto get_result_t_str = [](try_construct_result_t t) -> const char*
     { return t == rc_ok ? "rc_ok" : t == rc_too_few_outputs ? "rc_too_few_outputs" : t == rc_too_many_outputs ? "rc_too_many_outputs" : t == rc_create_tx_failed ? "rc_create_tx_failed" : "unknown"; };
 
-  auto try_construct_tx = [this, &selected_transfers, &rpc_get_random_outs_resp, &fake_outs_for_selected_transfers, &fee, &destination_addr, &asset_id, sweeping_asset]
+  auto try_construct_tx = [this, &selected_transfers, &rpc_get_random_outs_resp, &fake_outs_for_selected_transfers, &fee, &destination_addr, &asset_id, sweeping_asset, outputs_min]
   (size_t st_index_upper_boundary, currency::finalize_tx_param& ftp, uint64_t& amount_swept) -> try_construct_result_t
     {
       uint64_t native_coin_amount = 0;
@@ -8932,7 +8936,7 @@ void wallet2::sweep_below(const crypto::public_key& asset_id, size_t fake_outs_c
         dsts.emplace_back(amount_swept - fee, destination_addr);
       }
 
-      prepare_tx_destinations(needed_money_map, get_current_split_strategy(), tools::tx_dust_policy(), dsts, ftp.flags, ftp.prepared_destinations);
+      prepare_tx_destinations(needed_money_map, get_current_split_strategy(), tools::tx_dust_policy(), outputs_min, dsts, ftp.flags, ftp.prepared_destinations);
 
       if (m_watch_only)
         return rc_ok;
@@ -8956,6 +8960,9 @@ void wallet2::sweep_below(const crypto::public_key& asset_id, size_t fake_outs_c
     };
 
   size_t st_index_upper_boundary = std::min(selected_transfers.size(), estimated_max_inputs);
+  if (inputs_max > 0 && st_index_upper_boundary > inputs_max)
+    st_index_upper_boundary = inputs_max;
+
   try_construct_result_t res = try_construct_tx(st_index_upper_boundary, ftp, amount_swept);
 
   WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(res != rc_too_few_outputs, st_index_upper_boundary << " biggest unspent outputs have total amount of " << print_money_brief(amount_swept)
