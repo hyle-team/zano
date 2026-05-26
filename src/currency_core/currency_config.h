@@ -141,8 +141,11 @@
 #ifdef BUILD_TESTS
 #  define DIFFICULTY_POS_STARTER                        1
 #else
-#  define DIFFICULTY_POS_STARTER                        5'000'000'000'000'000'000ULL
+static_assert(CURRENCY_FORMATION_VERSION == 103)
+#  define DIFFICULTY_POS_STARTER                        5'000'000'000'000'000'000ULL // remove this branch after CURRENCY_FORMATION_VERSION > 103 in the testnet
 #endif
+#define DIFFICULTY_POS_STARTER_TESTNET                  5'000'000'000'000'000'000ULL // mininum possible difficulty after DIFFICULTY_POS_STARTER_TESTNET_HEIGHT
+#define DIFFICULTY_POS_STARTER_TESTNET_HEIGHT           200
 #endif
 
 #define P2P_NETWORK_ID_VER                              (CURRENCY_FORMATION_VERSION+0)

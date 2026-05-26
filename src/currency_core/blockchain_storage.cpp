@@ -1514,6 +1514,14 @@ wide_difficulty_type blockchain_storage::calc_diff_at_h_from_timestamps(std::vec
   if (m_core_runtime_config.is_hardfork_active_for_height(1, h))
   {
     dif = next_difficulty_2(timestamps, commulative_difficulties, pos ? global_difficulty_pos_target : global_difficulty_pow_target, pos ? global_difficulty_pos_starter : global_difficulty_pow_starter);
+#if defined(TESTNET) && (CURRENCY_FORMATION_VERSION > 103)
+    if (pos && h > DIFFICULTY_POS_STARTER_TESTNET_HEIGHT)
+    {
+      if (dif < DIFFICULTY_POS_STARTER_TESTNET)
+        dif = DIFFICULTY_POS_STARTER_TESTNET;
+    }
+#endif 
+
   }
   else
   {
