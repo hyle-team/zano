@@ -2000,6 +2000,8 @@ void wallets_manager::prepare_wallet_status_info(wallet_vs_options& wo, view::wa
   wsi.is_alias_operations_available = !wo.has_related_alias_in_unconfirmed;
   wo.w->get()->balance(wsi.balances, wsi.minied_total);
   wsi.has_bare_unspent_outputs = wo.w->get()->has_bare_unspent_outputs();
+  wsi.current_pos_attempts = wo.w->get()->get_current_pos_attempts();
+  wsi.est_iterations_per_pos_block = tools::estimate_iterations_per_pos_block(wsi.balances);
 }
 std::string wallets_manager::check_available_sources(uint64_t wallet_id, std::list<uint64_t>& amounts)
 {
@@ -2359,7 +2361,7 @@ void wallets_manager::wallet_vs_options::worker_func()
       //mining zone
       if (do_mining && *plast_daemon_network_state == currency::COMMAND_RPC_GET_INFO::daemon_network_state_online)
       {
-        pos_minin_interval.do_call([this](){
+        pos_minin_interval.do_call([this, &wsi](){
           TIME_MEASURE_START_MS(mining_duration_ms);
           tools::wallet2::mining_context ctx = AUTO_VAL_INIT(ctx);
           LOG_PRINT_L1(get_log_prefix() + " Starting PoS mint iteration");
@@ -2383,6 +2385,11 @@ void wallets_manager::wallet_vs_options::worker_func()
           }
           TIME_MEASURE_FINISH_MS(mining_duration_ms);
           LOG_PRINT_L1(get_log_prefix() << " PoS GUI mining: " << ctx.iterations_processed << " iterations finished (" << std::fixed << std::setprecision(2) << (mining_duration_ms / 1000.0f) << "s), status: " << ctx.status << ", " << ctx.total_items_checked << " entries with total amount: " << currency::print_money_brief(ctx.total_amount_checked));
+
+          // notify GUI about updated PoS attempts counter and estimation
+          prepare_wallet_status_info(*this, wsi);
+          pview->update_wallet_status(wsi);
+
           return true;
         });
       }
