@@ -475,6 +475,7 @@ namespace currency
   std::string get_word_from_timestamp(uint64_t timestamp, bool use_password);
   uint64_t get_timestamp_from_word(std::string word, bool& password_used, const std::string& buff);
   uint64_t get_timestamp_from_word(std::string word, bool& password_used);
+  uint64_t round_timestamp_to_brain_date_quantum(uint64_t timestamp);
   bool parse_vote(const std::string& buff, std::list<std::pair<std::string, bool>>& votes);
   void prepare_wti_decrypted_attachments(tools::wallet_public::wallet_transfer_info& wti, const std::vector<currency::payload_items_v>& decrypted_att);
   bool validate_ado_update_allowed(const asset_descriptor_base& a, const asset_descriptor_base& b);

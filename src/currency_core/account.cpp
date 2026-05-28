@@ -52,7 +52,7 @@ namespace currency
       throw std::runtime_error("Failed to create public view key");
 
 
-    m_creation_timestamp = time(NULL);
+    m_creation_timestamp = round_timestamp_to_brain_date_quantum(static_cast<uint64_t>(time(NULL)));
   }
   //-----------------------------------------------------------------
   const account_keys& account_base::get_keys() const

@@ -1797,7 +1797,7 @@ uint64_t wallet2::get_wallet_minimum_height()
 
   currency::COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE::request req = AUTO_VAL_INIT(req);
   currency::COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE::response res = AUTO_VAL_INIT(res);
-  req.timestamp = m_account.get_createtime();
+  req.timestamp = currency::round_timestamp_to_brain_date_quantum(m_account.get_createtime());
   bool r = m_core_proxy->call_COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE(req, res);
   THROW_IF_FALSE_WALLET_EX(r, error::no_connection_to_daemon, "call_COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE");
   WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(res.status == API_RETURN_CODE_OK, "FAILED TO CALL COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE");
