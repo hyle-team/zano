@@ -5231,6 +5231,11 @@ bool wallet_rpc_sign_message_with_alias::c1(currency::core& c, size_t ev_index, 
 
   miner_wlt->refresh();
 
+  miner_wlt->transfer(MK_TEST_COINS(10), alice_wlt->get_account().get_public_address(), currency::native_coin_asset_id);
+  r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+  CHECK_AND_ASSERT_MES(r, false, "mine after funding Alice failed");
+  alice_wlt->refresh();
+
   // miner registers an alias pointing at Alice's address
   const std::string ALIAS_NAME = "alicepub";
   {
@@ -5366,14 +5371,15 @@ bool wallet_rpc_sign_message_with_alias::c1(currency::core& c, size_t ev_index, 
   }
 
   // after update_alias -> Bob, validating Alice's signature via the same alias must fail
-  // (the alias now resolves to Bob's pkey), while Bob's signature via the alias must succeed
+  // (the alias now resolves to Bob's pkey), while Bob's signature via the alias must succeed.
   {
+    alice_wlt->refresh();
     tools::wallet_public::COMMAND_RPC_UPDATE_ALIAS::request req{};
     tools::wallet_public::COMMAND_RPC_UPDATE_ALIAS::response rsp{};
     req.al.alias = ALIAS_NAME;
     req.al.details.address = bob_wlt->get_account().get_public_address_str();
     req.al.details.comment = "Bob now";
-    r = invoke_text_json_for_wallet(miner_wlt, "update_alias", req, rsp);
+    r = invoke_text_json_for_wallet(alice_wlt, "update_alias", req, rsp);
     CHECK_AND_ASSERT_MES(r, false, "update_alias failed");
   }
   r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, 3);
