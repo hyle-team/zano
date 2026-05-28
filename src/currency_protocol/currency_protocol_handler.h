@@ -79,6 +79,7 @@ namespace currency
     bool is_remote_client_version_allowed(int build_number, size_t min_allowed_build_number = SIZE_MAX) const;
     bool is_remote_client_version_allowed(const std::string& client_version) const;
     void check_all_client_versions_are_okay();
+    bool is_hardfork_active(size_t hardfork_id) const;
 
   private:
     //----------------- commands handlers ----------------------------------------------
