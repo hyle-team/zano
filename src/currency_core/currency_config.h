@@ -23,6 +23,7 @@
 #define CURRENCY_TX_MAX_ALLOWED_OUTS                    32            // soft rule, but matches BPP aggregation values limit; hard rule since HF6
 #define CURRENCY_TX_MAX_ALLOWED_OUTS_PRE_HF4            2000
 #define CURRENCY_TX_MIN_ALLOWED_OUTS                    2             // effective starting HF4 Zarcanum
+#define CURRENCY_TX_PRACTICAL_MAX_INPUTS                80            // limited by current tx size limit and typical input size; used in wallet to limit number of inputs in a single tx
 
 #define CURRENCY_PUBLIC_ADDRESS_BASE58_PREFIX           0xc5          // addresses start with 'Zx'
 #define CURRENCY_PUBLIC_INTEG_ADDRESS_BASE58_PREFIX     0x3678        // integrated addresses start with 'iZ'

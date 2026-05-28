@@ -7151,6 +7151,10 @@ bool wallet2::prepare_tx_sources(assets_selection_context& needed_money_map, siz
   try
   {
     select_transfers(needed_money_map, fake_outputs_count, dust_threshold, selected_indicies); // always returns true, TODO consider refactoring -- sowle
+    
+    THROW_IF_FALSE_WALLET_EX_MES(selected_indicies.size() < CURRENCY_TX_PRACTICAL_MAX_INPUTS, error::tx_too_big, 
+      "Transaction inputs number[" << selected_indicies.size() << "] is too big, transaction soft inputs number limit: " << CURRENCY_TX_PRACTICAL_MAX_INPUTS << ". Run sweep_below cycle, for more details see \"Keeping Your Wallet's UTXO Set Healthy\" article in documentation.");
+
     return prepare_tx_sources(fake_outputs_count, sources, selected_indicies);
   }
   catch (...)
@@ -8461,7 +8465,7 @@ void wallet2::finalize_transaction(currency::finalize_tx_param& ftp, currency::f
   //TIME_MEASURE_FINISH_MS(sign_ms_input_time);
 
   size_t tx_blob_size = tx_to_blob(result.tx).size();
-  THROW_IF_FALSE_WALLET_EX_MES(tx_blob_size < CURRENCY_MAX_TRANSACTION_BLOB_SIZE, error::tx_too_big, "Transaction size: " << tx_blob_size << " bytes, transaction size limit: " << CURRENCY_MAX_TRANSACTION_BLOB_SIZE << " bytes.");
+  THROW_IF_FALSE_WALLET_EX_MES(tx_blob_size < CURRENCY_MAX_TRANSACTION_BLOB_SIZE, error::tx_too_big, "Transaction size: " << tx_blob_size << " bytes, transaction size limit: " << CURRENCY_MAX_TRANSACTION_BLOB_SIZE << " bytes. Run sweep_below cycle, for more details see \"Keeping Your Wallet's UTXO Set Healthy\" article in documentation.");
 
   if (store_tx_secret_key)
     m_tx_keys.insert(std::make_pair(result.tx_id, result.one_time_key));
