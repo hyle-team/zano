@@ -1148,6 +1148,12 @@ namespace currency
   }
   //------------------------------------------------------------------------------------------------------------------------
   template<class t_core>
+  bool t_currency_protocol_handler<t_core>::is_hardfork_active(size_t hardfork_id) const
+  {
+    return m_core.get_blockchain_storage().is_hardfork_active(hardfork_id);
+  }
+  //------------------------------------------------------------------------------------------------------------------------
+  template<class t_core>
   void t_currency_protocol_handler<t_core>::check_all_client_versions_are_okay()
   {
     size_t min_allowed_build_number = m_core.get_blockchain_storage().get_core_runtime_config().get_min_allowed_build_version_for_height(m_core.get_top_block_height() + 1);
