@@ -385,6 +385,7 @@ bool wallets_manager::init(view::i_view* pview_handler)
     //LOG_PRINT("Module folder: " << argv[0], LOG_LEVEL_0);
   }
 
+#ifndef MOBILE_WALLET_BUILD
   {
     tools::socks5::socks5_proxy_settings socks_cfg{};
 
@@ -449,7 +450,7 @@ bool wallets_manager::init(view::i_view* pview_handler)
 
     m_socks5_cfg = socks_cfg;
   }
-  
+#endif
   m_pview->init(path_to_html);
 
   return true;
