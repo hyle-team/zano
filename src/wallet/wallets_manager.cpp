@@ -2362,31 +2362,13 @@ void wallets_manager::wallet_vs_options::worker_func()
       if (do_mining && *plast_daemon_network_state == currency::COMMAND_RPC_GET_INFO::daemon_network_state_online)
       {
         pos_minin_interval.do_call([this, &wsi](){
-          TIME_MEASURE_START_MS(mining_duration_ms);
-          tools::wallet2::mining_context ctx = AUTO_VAL_INIT(ctx);
-          LOG_PRINT_L1(get_log_prefix() + " Starting PoS mint iteration");
-          if (!w->get()->fill_mining_context(ctx))
-          {
-            LOG_PRINT_L1(get_log_prefix() + " cannot obtain PoS mining context, skip iteration");
-            return true;
-          }
+          w->get()->do_one_pos_mining_cycle(break_mining_loop,
+            [this]() -> bool
+            {
+              return *plast_daemon_network_state == currency::COMMAND_RPC_GET_INFO::daemon_network_state_online &&  *plast_daemon_height == last_wallet_synch_height;
+            },
+            core_conf);
 
-          //uint64_t pos_entries_amount = 0;
-          //for (auto& ent : ctx.sp.pos_entries)
-          //  pos_entries_amount += ent.amount;
-
-          w->get()->scan_pos(ctx, break_mining_loop, [this](){
-            return *plast_daemon_network_state == currency::COMMAND_RPC_GET_INFO::daemon_network_state_online &&  *plast_daemon_height == last_wallet_synch_height;
-          }, core_conf);
-
-          if (ctx.status == API_RETURN_CODE_OK)
-          {
-            w->get()->build_minted_block(ctx);
-          }
-          TIME_MEASURE_FINISH_MS(mining_duration_ms);
-          LOG_PRINT_L1(get_log_prefix() << " PoS GUI mining: " << ctx.iterations_processed << " iterations finished (" << std::fixed << std::setprecision(2) << (mining_duration_ms / 1000.0f) << "s), status: " << ctx.status << ", " << ctx.total_items_checked << " entries with total amount: " << currency::print_money_brief(ctx.total_amount_checked));
-
-          // notify GUI about updated PoS attempts counter and estimation
           prepare_wallet_status_info(*this, wsi);
           pview->update_wallet_status(wsi);
 
