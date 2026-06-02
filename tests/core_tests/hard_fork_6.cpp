@@ -1932,3 +1932,81 @@ bool hard_fork_6_coinbase_size_rules::c1(currency::core& c, size_t ev_index, con
   return true;
 }
 
+//------------------------------------------------------------------------------
+
+bool hard_fork_6_gw_incompatible_with_mode_separate::generate(std::vector<test_event_entry>& events) const
+{
+  // Test idea: make sure gateway ins/outs are rejected in TX_FLAG_SIGNATURE_MODE_SEPARATE txs (HF6+).
+
+  bool r = false;
+  uint64_t ts = test_core_time::get_time();
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
+  DO_CALLBACK(events, "configure_core");
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+
+  // register a gateway address (gw outputs require it)
+  keypair gw_view  = keypair::generate();
+  keypair gw_spend = keypair::generate();
+  gateway_address_descriptor_operation gwdo{};
+  gateway_address_descriptor_operation_register gwdo_reg{};
+  gwdo_reg.view_pub_key = gw_view.pub;
+  gwdo_reg.descriptor.meta_info = "it's giving unencrypted balance vibes";
+  gwdo_reg.descriptor.owner_key = gw_spend.pub;
+  gwdo.operation = gwdo_reg;
+  MAKE_TX_EXTRA_ATTACH_FEE(events, tx_reg, miner_acc, miner_acc, 0, CURRENCY_GATEWAY_ADDRESS_REGISTRATION_FEE, blk_0r, std::vector<extra_v>({ gwdo }), empty_attachment);
+  MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_reg);
+  REWIND_BLOCKS_N(events, blk_1r, blk_1, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  // both txs below send the same gateway output (miner -> gw addr); the only difference is the separate-mode flag
+
+  // 1/2, error: gateway output in a complete separate-mode (consolidated) tx must be rejected
+  std::vector<tx_source_entry> sources;
+  r = fill_tx_sources(sources, events, blk_1r, miner_acc.get_keys(), MK_TEST_COINS(13) + TESTS_DEFAULT_FEE, 10);
+  CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources failed");
+  uint64_t change = get_sources_total_amount(sources) - MK_TEST_COINS(13) - TESTS_DEFAULT_FEE;
+  sources.back().separately_signed_tx_complete = true; // requires TX_FLAG_SIGNATURE_MODE_SEPARATE
+
+  std::vector<tx_destination_entry> destinations;
+  destinations.emplace_back(MK_TEST_COINS(13), gw_view.pub); // gateway output
+  if (change != 0)
+    destinations.push_back(tx_destination_entry(change, miner_acc.get_public_address()));
+
+  size_t tx_hardfork_id{};
+  uint64_t tx_version = get_tx_version_and_harfork_id_from_events(events, tx_hardfork_id);
+  crypto::secret_key one_time{};
+  tx_generation_context gen_context{};
+  transaction tx{};
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_extra, empty_attachment, tx, tx_version, tx_hardfork_id, one_time,
+    0, 0, 0, true, TX_FLAG_SIGNATURE_MODE_SEPARATE, TESTS_DEFAULT_FEE, gen_context);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
+
+  DO_CALLBACK(events, "mark_invalid_tx");
+  ADD_CUSTOM_EVENT(events, tx);
+
+  // 2/2, control: the exact same flow without TX_FLAG_SIGNATURE_MODE_SEPARATE is accepted
+  sources.clear();
+  r = fill_tx_sources(sources, events, blk_1r, miner_acc.get_keys(), MK_TEST_COINS(13) + TESTS_DEFAULT_FEE, 10);
+  CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources failed");
+  change = get_sources_total_amount(sources) - MK_TEST_COINS(13) - TESTS_DEFAULT_FEE;
+
+  destinations.clear();
+  destinations.emplace_back(MK_TEST_COINS(13), gw_view.pub); // gateway output
+  if (change != 0)
+    destinations.push_back(tx_destination_entry(change, miner_acc.get_public_address()));
+
+  gen_context = {};
+  tx = {};
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_extra, empty_attachment, tx, tx_version, tx_hardfork_id, one_time,
+    0, 0, 0, true, 0 /* no TX_FLAG_SIGNATURE_MODE_SEPARATE */, TESTS_DEFAULT_FEE, gen_context);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
+
+  ADD_CUSTOM_EVENT(events, tx);
+  MAKE_NEXT_BLOCK_TX1(events, blk_2, blk_1r, miner_acc, tx);
+  DO_CALLBACK_PARAMS_STR(events, "check_gw_balance", t_serializable_object_to_blob(gw_address_balance_check_param{ gw_view.pub, MK_TEST_COINS(13) }));
+
+  return true;
+}
+
