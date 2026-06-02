@@ -21,8 +21,8 @@ namespace tools
   };
 
 #ifndef TESTNET
-  static constexpr pre_download_entry c_pre_download_mdbx             = { "https://f005.backblazeb2.com/file/zano-predownload/zano_mdbx_95_3451000.pak", "1e05d3382e7c371575ffc131287d635fa07f00c910d869db704ffb1ded86cd98", 12956227561, 18790195200 };
-  static constexpr pre_download_entry c_pre_download_lmdb             = { "https://f005.backblazeb2.com/file/zano-predownload/zano_lmdb_95_3451000.pak", "dc08ff57e9d376958c8d30ec6d2b3623e6de1fe6403047cc983dfb5f460c1b1b", 15343628413, 18730594304 };
+  static constexpr pre_download_entry c_pre_download_mdbx             = { "https://f005.backblazeb2.com/file/zano-predownload/zano_mdbx_95_3709300.pak", "32d28b3bb088664dbb3f31be3f8eee83ff1884ea2155de9b1dce5f418444bff7", 16859240784, 24158822400 };
+  static constexpr pre_download_entry c_pre_download_lmdb             = { "https://f005.backblazeb2.com/file/zano-predownload/zano_lmdb_95_3709300.pak", "aaf79cce3d12bad67e9fe717292597c5aab0d29d4cd3b54b7ce928f513d45227", 19684422713, 23986065408 };
   static constexpr pre_download_entry c_pre_download_mdbx_unpruned    = { "https://f005.backblazeb2.com/file/zano-predownload/zano_mdbx_95_3451000_unpruned.pak", "3756d41abac7936e2423fe97fb88beea0ade2055f10587457da809aa0aebe816", 13872491244, 20132352000 };
   static constexpr pre_download_entry c_pre_download_lmdb_unpruned    = { "https://f005.backblazeb2.com/file/zano-predownload/zano_lmdb_95_3451000_unpruned.pak", "66e32a6668354122d0ffac8fb74e04b1c7ffc0b32c07df908697c5d6cccb5b16", 16443645725, 19882643456 };
 #else
