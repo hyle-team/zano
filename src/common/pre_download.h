@@ -23,8 +23,8 @@ namespace tools
 #ifndef TESTNET
   static constexpr pre_download_entry c_pre_download_mdbx             = { "https://f005.backblazeb2.com/file/zano-predownload/zano_mdbx_95_3709300.pak", "32d28b3bb088664dbb3f31be3f8eee83ff1884ea2155de9b1dce5f418444bff7", 16859240784, 24158822400 };
   static constexpr pre_download_entry c_pre_download_lmdb             = { "https://f005.backblazeb2.com/file/zano-predownload/zano_lmdb_95_3709300.pak", "aaf79cce3d12bad67e9fe717292597c5aab0d29d4cd3b54b7ce928f513d45227", 19684422713, 23986065408 };
-  static constexpr pre_download_entry c_pre_download_mdbx_unpruned    = { "https://f005.backblazeb2.com/file/zano-predownload/zano_mdbx_95_3451000_unpruned.pak", "3756d41abac7936e2423fe97fb88beea0ade2055f10587457da809aa0aebe816", 13872491244, 20132352000 };
-  static constexpr pre_download_entry c_pre_download_lmdb_unpruned    = { "https://f005.backblazeb2.com/file/zano-predownload/zano_lmdb_95_3451000_unpruned.pak", "66e32a6668354122d0ffac8fb74e04b1c7ffc0b32c07df908697c5d6cccb5b16", 16443645725, 19882643456 };
+  static constexpr pre_download_entry c_pre_download_mdbx_unpruned    = { "https://f005.backblazeb2.com/file/zano-predownload/zano_mdbx_95_3709300_unpruned.pak", "d9e43d8eb01eeace563b9ccef24829837ad9aae19a426e735e527b30a8b422c9", 17773590319, 25232547840 };
+  static constexpr pre_download_entry c_pre_download_lmdb_unpruned    = { "https://f005.backblazeb2.com/file/zano-predownload/zano_lmdb_95_3709300_unpruned.pak", "8a3da1f1b6c7e0114ca8b492a3ec5e1fdd3dcd523ad789af123bf9011fd236c0", 20782901824, 25138483200 };
 #else
   static constexpr pre_download_entry c_pre_download_mdbx             = { "https://f005.backblazeb2.com/file/zano-predownload/zano_testnet_mdbx_95_37800.pak", "fb300b1b810983f30b60b5afe7c490e1a0a0208de130d3dbee26ff821193aa46", 197913560, 536862720 };
   static constexpr pre_download_entry c_pre_download_lmdb             = { "https://f005.backblazeb2.com/file/zano-predownload/zano_testnet_lmdb_95_37800.pak", "9a27ae32d33483d9a225e979577870156d9da07a0dc8ea8bc4d7fe4d789b3197", 224593297, 412372992 };
