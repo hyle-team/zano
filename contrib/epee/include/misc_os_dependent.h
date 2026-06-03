@@ -41,9 +41,7 @@
 #include <mach/clock.h>
 #include <mach/mach.h>
 #endif
-#ifndef ANDROID_BUILD
-  #include <boost/stacktrace.hpp>
-#endif
+#include <boost/stacktrace.hpp>
 
 
 #pragma once 
