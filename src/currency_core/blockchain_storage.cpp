@@ -7068,6 +7068,8 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
   
   // TODO @#@# consider: 1) tx.proofs, 2) new proof data structures
 
+  bool mode_separate = (get_tx_flags(tx) & TX_FLAG_SIGNATURE_MODE_SEPARATE) != 0;
+
   bool var_is_after_hardfork_4_zone = m_core_runtime_config.is_hardfork_active_for_height(4, block_height);
   if (var_is_after_hardfork_4_zone)
   {    
@@ -7085,7 +7087,6 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
     {
       return false;
     }
-    bool mode_separate = get_tx_flags(tx) & TX_FLAG_SIGNATURE_MODE_SEPARATE? true:false;
     if (is_coinbase(tx) && mode_separate)
     {
       LOG_ERROR("TX_FLAG_SIGNATURE_MODE_SEPARATE not allowed for coinbase tx");
@@ -7142,6 +7143,13 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
     // enforce explicitly existing soft limits (s.a. tx_memory_pool::add_tx) and implicit hard limits (verify_BGE_proof etc.)
     CHECK_AND_ASSERT_MES(tx.vin.size() <= CURRENCY_TX_MAX_ALLOWED_INPUTS, false, "transaction has too many inputs = " << tx.vin.size());
     CHECK_AND_ASSERT_MES(tx.vout.size() <= CURRENCY_TX_MAX_ALLOWED_OUTS,  false, "transaction has too many outputs = " << tx.vout.size());
+
+    if (mode_separate)
+    {
+      bool has_gw_ins  = std::any_of(tx.vin.begin(),  tx.vin.end(),  [](const txin_v& o)   { return o.type() == typeid(txin_gateway); });
+      bool has_gw_outs = std::any_of(tx.vout.begin(), tx.vout.end(), [](const tx_out_v& o) { return o.type() == typeid(tx_out_gateway); });
+      CHECK_AND_ASSERT_MES(!has_gw_ins && !has_gw_outs, false, "TX_FLAG_SIGNATURE_MODE_SEPARATE is incompatible with gw ins/outs");
+    }
   }
 
 
