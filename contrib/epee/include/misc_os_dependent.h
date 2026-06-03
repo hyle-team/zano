@@ -119,11 +119,7 @@ namespace misc_utils
     {
       std::stringstream ss;
       ss << std::endl << "STACK" << std::endl;
-#ifdef ANDROID_BUILD
-      ss << "(stacktrace is not supported on this platform)" << std::endl;
-#else
       ss << boost::stacktrace::stacktrace() << std::endl;
-#endif
       return ss.str();
     }
     catch(...)
