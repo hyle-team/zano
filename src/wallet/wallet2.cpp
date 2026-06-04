@@ -5439,10 +5439,38 @@ bool wallet2::try_mint_pos()
 //------------------------------------------------------------------
 bool wallet2::try_mint_pos(const currency::account_public_address& miner_address)
 {
+  std::atomic<bool> stop(false);
+  return do_one_pos_mining_cycle(stop,
+    [this]() -> bool
+    {
+      size_t blocks_fetched;
+      refresh(blocks_fetched);
+      if (blocks_fetched)
+      {
+        WLT_LOG_L0("Detected new block, minting interrupted");
+        return false;
+      }
+      return true;
+    },
+    m_core_runtime_config,
+    miner_address);
+}
+//------------------------------------------------------------------
+bool wallet2::do_one_pos_mining_cycle(std::atomic<bool>& stop, std::function<bool()> idle_condition_cb, const currency::core_runtime_config& runtime_config)
+{
+  return do_one_pos_mining_cycle(stop, idle_condition_cb, runtime_config, m_account.get_public_address());
+}
+//------------------------------------------------------------------
+bool wallet2::do_one_pos_mining_cycle(std::atomic<bool>& stop, std::function<bool()> idle_condition_cb, const currency::core_runtime_config& runtime_config, const currency::account_public_address& miner_address)
+{
   TIME_MEASURE_START_MS(mining_duration_ms);
   mining_context ctx = AUTO_VAL_INIT(ctx);
   WLT_LOG_L2("Starting PoS mining iteration");
-  fill_mining_context(ctx);
+  if (!fill_mining_context(ctx))
+  {
+    WLT_LOG_L1("Cannot obtain PoS mining context, skipping iteration");
+    return true;
+  }
 
   if (!ctx.is_pos_allowed)
   {
@@ -5456,18 +5484,8 @@ bool wallet2::try_mint_pos(const currency::account_public_address& miner_address
     return true;
   }
 
-  std::atomic<bool> stop(false);
   m_pos_attempts_count++;
-  scan_pos(ctx, stop, [this]() {
-    size_t blocks_fetched;
-    refresh(blocks_fetched);
-    if (blocks_fetched)
-    {
-      WLT_LOG_L0("Detected new block, minting interrupted");
-      return false;
-    }
-    return true;
-    }, m_core_runtime_config);
+  scan_pos(ctx, stop, idle_condition_cb, runtime_config);
 
   bool res = true;
   if (ctx.status == API_RETURN_CODE_OK)

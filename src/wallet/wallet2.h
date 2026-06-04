@@ -676,9 +676,11 @@ namespace tools
     bool select_indices_for_transfer(assets_selection_context& needed_money_map, uint64_t fake_outputs_count, std::vector<uint64_t>& selected_indexes);
 
     //PoS
-    //synchronous version of function 
+    //synchronous version of function
     bool try_mint_pos();
     bool try_mint_pos(const currency::account_public_address& miner_address); // block reward will be sent to miner_address, stake will be returned back to the wallet
+    bool do_one_pos_mining_cycle(std::atomic<bool>& stop, std::function<bool()> idle_condition_cb, const currency::core_runtime_config& runtime_config);
+    bool do_one_pos_mining_cycle(std::atomic<bool>& stop, std::function<bool()> idle_condition_cb, const currency::core_runtime_config& runtime_config, const currency::account_public_address& miner_address);
     //for unit tests
     friend class ::test_generator;
     
