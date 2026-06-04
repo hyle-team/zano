@@ -200,3 +200,17 @@ struct wallet_rpc_sweep_below_wo_multi_asset : public wallet_test
   bool generate(std::vector<test_event_entry>& events) const;
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };
+
+struct wallet_rpc_get_outputs_and_utxo_stats : public wallet_test
+{
+  wallet_rpc_get_outputs_and_utxo_stats();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};
+
+struct wallet_rpc_sign_message_with_alias : public wallet_test
+{
+  wallet_rpc_sign_message_with_alias();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};

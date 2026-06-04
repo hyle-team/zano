@@ -3,6 +3,9 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include <numeric>
+#include <set>
+
 #include "chaingen.h"
 #include "wallet_rpc_tests.h"
 #include "wallet_test_core_proxy.h"
@@ -4800,6 +4803,616 @@ bool wallet_rpc_sweep_below_wo_multi_asset::c1(currency::core& c, size_t ev_inde
   CHECK_AND_ASSERT_MES(alice_wlt->balance(asset_B) == 2 * small_b, false, "Alice asset_B touched: " << alice_wlt->balance(asset_B));
   CHECK_AND_ASSERT_MES(alice_wlt->balance(currency::native_coin_asset_id) == MK_TEST_COINS(10) - TESTS_DEFAULT_FEE, false,
     "Alice native after fee=" << alice_wlt->balance(currency::native_coin_asset_id));
+
+  return true;
+}
+//------------------------------------------------------------------------------
+
+wallet_rpc_get_outputs_and_utxo_stats::wallet_rpc_get_outputs_and_utxo_stats()
+{
+  REGISTER_CALLBACK_METHOD(wallet_rpc_get_outputs_and_utxo_stats, c1);
+}
+
+bool wallet_rpc_get_outputs_and_utxo_stats::generate(std::vector<test_event_entry>& events) const
+{
+  uint64_t ts = test_core_time::get_time();
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
+  account_base& bob_acc   = m_accounts[BOB_ACC_IDX];   bob_acc.generate();   bob_acc.set_createtime(ts);
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
+  DO_CALLBACK(events, "configure_core");
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 3);
+  DO_CALLBACK(events, "c1");
+  return true;
+}
+
+bool wallet_rpc_get_outputs_and_utxo_stats::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  // Covers wallet RPCs 'get_outputs' and 'get_utxo_stats'
+  // Tests filter combinations (output_type, asset_id), spent/unspent transitions, per-output fields, and bucket distribution of UTXO statistics
+  bool r = false;
+  std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
+  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
+  std::shared_ptr<tools::wallet2> bob_wlt   = init_playtime_test_wallet(events, c, BOB_ACC_IDX);
+  miner_wlt->refresh();
+
+  const bool use_assets = c.get_blockchain_storage().is_hardfork_active(ZANO_HARDFORK_04_ZARCANUM);
+  CHECK_AND_ASSERT_MES(use_assets, false, "test requires HF4 (Zarcanum) to be active for asset path");
+
+  // deploy a custom asset with several UTXOs going to the miner
+  crypto::public_key custom_asset_id{};
+  const uint64_t asset_total_max_supply = 1000ull * 1000000ull;
+  const uint64_t asset_emit_per_destination = 100ull * 1000000ull;
+  {
+    currency::asset_descriptor_base adb{};
+    adb.total_max_supply = asset_total_max_supply;
+    adb.full_name = "Get Utxo Stats";
+    adb.ticker = "GUS";
+    adb.decimal_point = 6;
+
+    std::vector<currency::tx_destination_entry> dsts;
+    for (size_t i = 0; i < 4; ++i)
+    {
+      currency::tx_destination_entry d{};
+      d.addr.push_back(miner_wlt->get_account().get_public_address());
+      d.amount = asset_emit_per_destination;
+      d.asset_id = currency::null_pkey;
+      dsts.push_back(d);
+    }
+
+    currency::transaction tx{};
+    miner_wlt->deploy_new_asset(adb, dsts, tx, custom_asset_id);
+  }
+  r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+  CHECK_AND_ASSERT_MES(r, false, "mine after asset deploy failed");
+  miner_wlt->refresh();
+
+  // seed Alice with a spread of native UTXOs so utxo_stats buckets are non-trivial
+  //   amounts: 3, 7, 25, 90, 300 - one UTXO per amount
+  const std::vector<uint64_t> alice_native_amounts =
+  {
+    MK_TEST_COINS(3), MK_TEST_COINS(7), MK_TEST_COINS(25), MK_TEST_COINS(90), MK_TEST_COINS(300)
+  };
+  for (uint64_t a : alice_native_amounts)
+    miner_wlt->transfer(a, alice_wlt->get_account().get_public_address(), currency::native_coin_asset_id);
+
+  // seed Alice with two custom asset UTXOs of different magnitude so we exercise asset filtering as well
+  const uint64_t alice_asset_small = 5ull * 1000000ull;
+  const uint64_t alice_asset_big   = 80ull * 1000000ull;
+  miner_wlt->transfer(alice_asset_small, alice_wlt->get_account().get_public_address(), custom_asset_id);
+  miner_wlt->transfer(alice_asset_big,   alice_wlt->get_account().get_public_address(), custom_asset_id);
+
+  r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+  CHECK_AND_ASSERT_MES(r, false, "mine after seeding Alice failed");
+  alice_wlt->refresh();
+
+  // sanity check on balances
+  CHECK_AND_ASSERT_MES(alice_wlt->balance(currency::native_coin_asset_id) == std::accumulate(alice_native_amounts.begin(), alice_native_amounts.end(), uint64_t{0}),
+    false, "Alice native balance mismatch");
+  CHECK_AND_ASSERT_MES(alice_wlt->balance(custom_asset_id) == alice_asset_small + alice_asset_big, false, "Alice asset balance mismatch");
+
+  tools::wallet_rpc_server alice_rpc(alice_wlt);
+  epee::json_rpc::error je{};
+  tools::wallet_rpc_server::connection_context ctx{};
+
+  // get_outputs no filters
+  {
+    tools::wallet_public::COMMAND_RPC_GET_OUTPUTS::request req{};
+    tools::wallet_public::COMMAND_RPC_GET_OUTPUTS::response res{};
+    bool ok = alice_rpc.on_get_outputs(req, res, je, ctx);
+    CHECK_AND_ASSERT_MES(ok, false, "on_get_outputs (default) failed: " << je.message);
+    // 5 native + 2 asset = 7
+    CHECK_AND_ASSERT_MES(res.outputs.size() == alice_native_amounts.size() + 2, false,
+      "default get_outputs returned " << res.outputs.size() << ", expected " << (alice_native_amounts.size() + 2));
+
+    // out_id values must be unique within a single response
+    std::set<uint64_t> out_ids;
+    for (const auto& od : res.outputs)
+    {
+      auto ins = out_ids.insert(od.out_id);
+      CHECK_AND_ASSERT_MES(ins.second, false, "duplicate out_id=" << od.out_id);
+    }
+
+    // verify per-field invariants on freshly-received outputs
+    size_t native_count = 0, asset_count = 0;
+    for (const auto& od : res.outputs)
+    {
+      CHECK_AND_ASSERT_MES(!od.spent, false, "unexpected spent=true for freshly-received output, out_id=" << od.out_id);
+      CHECK_AND_ASSERT_MES(od.spendable, false, "unexpected spendable=false for freshly-received output, out_id=" << od.out_id);
+      CHECK_AND_ASSERT_MES(od.spent_height == 0, false, "spent_height must be 0 for unspent, out_id=" << od.out_id);
+      CHECK_AND_ASSERT_MES((od.flags & WALLET_TRANSFER_DETAIL_FLAG_SPENT) == 0, false, "WALLET_TRANSFER_DETAIL_FLAG_SPENT must be clear, out_id=" << od.out_id);
+      CHECK_AND_ASSERT_MES(od.block_height != 0, false, "block_height must be set, out_id=" << od.out_id);
+      CHECK_AND_ASSERT_MES(od.pub_key != currency::null_pkey, false, "pub_key must be set, out_id=" << od.out_id);
+      CHECK_AND_ASSERT_MES(od.tx_id != currency::null_hash, false, "tx_id must be set, out_id=" << od.out_id);
+      if (od.native_coin)
+      {
+        CHECK_AND_ASSERT_MES(od.asset_id == currency::native_coin_asset_id, false, "native_coin=true but asset_id is not native");
+        ++native_count;
+      }
+      else
+      {
+        CHECK_AND_ASSERT_MES(od.asset_id == custom_asset_id, false, "non-native asset_id mismatch for out_id=" << od.out_id);
+        ++asset_count;
+      }
+    }
+    CHECK_AND_ASSERT_MES(native_count == alice_native_amounts.size(), false, "native count=" << native_count);
+    CHECK_AND_ASSERT_MES(asset_count  == 2, false, "asset count=" << asset_count);
+  }
+
+  // get_outputs explicit 'unspent' and 'spent' alias -> 'unavailable' must be empty here
+  for (const std::string& type : {std::string("unspent"), std::string("available")})
+  {
+    tools::wallet_public::COMMAND_RPC_GET_OUTPUTS::request req{};
+    req.output_type = type;
+    tools::wallet_public::COMMAND_RPC_GET_OUTPUTS::response res{};
+    bool ok = alice_rpc.on_get_outputs(req, res, je, ctx);
+    CHECK_AND_ASSERT_MES(ok, false, "on_get_outputs(" << type << ") failed: " << je.message);
+    CHECK_AND_ASSERT_MES(res.outputs.size() == alice_native_amounts.size() + 2, false,
+      "get_outputs(" << type << ") returned " << res.outputs.size());
+  }
+  for (const std::string& type : {std::string("spent"), std::string("unavailable")})
+  {
+    tools::wallet_public::COMMAND_RPC_GET_OUTPUTS::request req{};
+    req.output_type = type;
+    tools::wallet_public::COMMAND_RPC_GET_OUTPUTS::response res{};
+    bool ok = alice_rpc.on_get_outputs(req, res, je, ctx);
+    CHECK_AND_ASSERT_MES(ok, false, "on_get_outputs(" << type << ") failed: " << je.message);
+    CHECK_AND_ASSERT_MES(res.outputs.empty(), false,
+      "get_outputs(" << type << ") returned " << res.outputs.size() << ", expected 0 (nothing spent yet)");
+  }
+
+  // get_outputs asset_id filter
+  {
+    tools::wallet_public::COMMAND_RPC_GET_OUTPUTS::request req{};
+    req.asset_id = custom_asset_id;
+    tools::wallet_public::COMMAND_RPC_GET_OUTPUTS::response res{};
+    bool ok = alice_rpc.on_get_outputs(req, res, je, ctx);
+    CHECK_AND_ASSERT_MES(ok, false, "on_get_outputs(asset_id=custom) failed: " << je.message);
+    CHECK_AND_ASSERT_MES(res.outputs.size() == 2, false, "asset filter returned " << res.outputs.size() << ", expected 2");
+    uint64_t sum = 0;
+    for (const auto& od : res.outputs)
+    {
+      CHECK_AND_ASSERT_MES(od.asset_id == custom_asset_id, false, "asset_id filter leaked a foreign output");
+      CHECK_AND_ASSERT_MES(!od.native_coin, false, "native_coin must be false for custom asset");
+      sum += od.amount;
+    }
+    CHECK_AND_ASSERT_MES(sum == alice_asset_small + alice_asset_big, false, "asset sum=" << sum);
+  }
+  {
+    tools::wallet_public::COMMAND_RPC_GET_OUTPUTS::request req{};
+    req.asset_id = currency::native_coin_asset_id;
+    tools::wallet_public::COMMAND_RPC_GET_OUTPUTS::response res{};
+    bool ok = alice_rpc.on_get_outputs(req, res, je, ctx);
+    CHECK_AND_ASSERT_MES(ok, false, "on_get_outputs(asset_id=native) failed: " << je.message);
+    CHECK_AND_ASSERT_MES(res.outputs.size() == alice_native_amounts.size(), false,
+      "native filter returned " << res.outputs.size());
+    for (const auto& od : res.outputs)
+      CHECK_AND_ASSERT_MES(od.native_coin && od.asset_id == currency::native_coin_asset_id, false, "native filter leaked");
+  }
+
+  // get_outputs unknown asset id -> empty response, not an error
+  {
+    tools::wallet_public::COMMAND_RPC_GET_OUTPUTS::request req{};
+    crypto::secret_key dummy_sk{};
+    crypto::generate_keys(req.asset_id, dummy_sk); // random pkey, definitely not in wallet
+    tools::wallet_public::COMMAND_RPC_GET_OUTPUTS::response res{};
+    bool ok = alice_rpc.on_get_outputs(req, res, je, ctx);
+    CHECK_AND_ASSERT_MES(ok, false, "on_get_outputs(random asset) failed: " << je.message);
+    CHECK_AND_ASSERT_MES(res.outputs.empty(), false, "random asset filter must yield 0 outputs, got " << res.outputs.size());
+  }
+
+  // get_utxo_stats: native coin
+  // expected buckets for alice_native_amounts = {3, 7, 25, 90, 300}:
+  //   [10^10..10^11-1]  -> {3, 7},        count=2, sum=1 = 1
+  //   [10^11..10^12-1]  -> {25, 90},      count=2, sum=115 = 1.15
+  //   [10^12..10^13-1]  -> {300 = 3},     count=1, sum=3
+  // all other buckets must be omitted from the response the implementation pops empty buckets
+  {
+    tools::wallet_public::COMMAND_RPC_GET_UTXO_STATS::request req{};
+    // req.asset_id defaults to native_coin_asset_id
+    tools::wallet_public::COMMAND_RPC_GET_UTXO_STATS::response res{};
+    bool ok = alice_rpc.on_get_utxo_stats(req, res, je, ctx);
+    CHECK_AND_ASSERT_MES(ok, false, "on_get_utxo_stats (native) failed: " << je.message);
+    CHECK_AND_ASSERT_MES(res.asset_id == currency::native_coin_asset_id, false, "asset_id echoed back must be native");
+    CHECK_AND_ASSERT_MES(res.buckets.size() == 3, false, "expected 3 non-empty buckets, got " << res.buckets.size());
+
+    // verify each bucket's contents
+    uint64_t total_utxo_sum = 0, total_amount_sum = 0;
+    for (const auto& b : res.buckets)
+    {
+      CHECK_AND_ASSERT_MES(b.total_utxo > 0, false, "empty bucket must have been popped: [" << b.lower_bound << "," << b.upper_bound << "]");
+      CHECK_AND_ASSERT_MES(b.lower_bound <= b.upper_bound, false, "bad bucket bounds");
+      total_utxo_sum   += b.total_utxo;
+      total_amount_sum += b.total_amount;
+
+      if (b.lower_bound == 10000000000ull) // 10^10
+      {
+        CHECK_AND_ASSERT_MES(b.total_utxo == 2, false, "bucket [1e10..) total_utxo=" << b.total_utxo);
+        CHECK_AND_ASSERT_MES(b.total_amount == MK_TEST_COINS(3) + MK_TEST_COINS(7), false, "bucket [1e10..) total_amount=" << b.total_amount);
+      }
+      else if (b.lower_bound == 100000000000ull) // 10^11
+      {
+        CHECK_AND_ASSERT_MES(b.total_utxo == 2, false, "bucket [1e11..) total_utxo=" << b.total_utxo);
+        CHECK_AND_ASSERT_MES(b.total_amount == MK_TEST_COINS(25) + MK_TEST_COINS(90), false, "bucket [1e11..) total_amount=" << b.total_amount);
+      }
+      else if (b.lower_bound == 1000000000000ull) // 10^12
+      {
+        CHECK_AND_ASSERT_MES(b.total_utxo == 1, false, "bucket [1e12..) total_utxo=" << b.total_utxo);
+        CHECK_AND_ASSERT_MES(b.total_amount == MK_TEST_COINS(300), false, "bucket [1e12..) total_amount=" << b.total_amount);
+      }
+      else
+      {
+        CHECK_AND_ASSERT_MES(false, false, "unexpected bucket lower_bound=" << b.lower_bound);
+      }
+    }
+    CHECK_AND_ASSERT_MES(total_utxo_sum == alice_native_amounts.size(), false, "total UTXO sum=" << total_utxo_sum);
+    CHECK_AND_ASSERT_MES(total_amount_sum == alice_wlt->balance(currency::native_coin_asset_id), false, "total amount sum mismatch");
+  }
+
+  // get_utxo_stats: custom asset
+  {
+    tools::wallet_public::COMMAND_RPC_GET_UTXO_STATS::request req{};
+    req.asset_id = custom_asset_id;
+    tools::wallet_public::COMMAND_RPC_GET_UTXO_STATS::response res{};
+    bool ok = alice_rpc.on_get_utxo_stats(req, res, je, ctx);
+    CHECK_AND_ASSERT_MES(ok, false, "on_get_utxo_stats (asset) failed: " << je.message);
+    CHECK_AND_ASSERT_MES(res.asset_id == custom_asset_id, false, "asset_id echoed back must match request");
+    // 5 GUS (5e6) lands in [10^6..10^7-1]; 80 GUS (8e7) lands in [10^7..10^8-1]
+    CHECK_AND_ASSERT_MES(res.buckets.size() == 2, false, "expected 2 asset buckets, got " << res.buckets.size());
+    for (const auto& b : res.buckets)
+    {
+      if (b.lower_bound == 1000000ull) // 10^6
+      {
+        CHECK_AND_ASSERT_MES(b.total_utxo == 1 && b.total_amount == alice_asset_small, false, "asset bucket [1e6..) wrong");
+      }
+      else if (b.lower_bound == 10000000ull) // 10^7
+      {
+        CHECK_AND_ASSERT_MES(b.total_utxo == 1 && b.total_amount == alice_asset_big, false, "asset bucket [1e7..) wrong");
+      }
+      else
+      {
+        CHECK_AND_ASSERT_MES(false, false, "unexpected asset bucket lower_bound=" << b.lower_bound);
+      }
+    }
+  }
+
+  // get_utxo_stats: unknown asset -> empty bucket list, no error
+  {
+    tools::wallet_public::COMMAND_RPC_GET_UTXO_STATS::request req{};
+    crypto::secret_key dummy_sk{};
+    crypto::generate_keys(req.asset_id, dummy_sk);
+    tools::wallet_public::COMMAND_RPC_GET_UTXO_STATS::response res{};
+    bool ok = alice_rpc.on_get_utxo_stats(req, res, je, ctx);
+    CHECK_AND_ASSERT_MES(ok, false, "on_get_utxo_stats(random asset) failed: " << je.message);
+    CHECK_AND_ASSERT_MES(res.buckets.empty(), false, "random asset must yield 0 buckets, got " << res.buckets.size());
+  }
+
+  // empty wallet (Bob, never received anything): both RPCs must succeed and return empty
+  {
+    tools::wallet_rpc_server bob_rpc(bob_wlt);
+    bob_wlt->refresh();
+
+    tools::wallet_public::COMMAND_RPC_GET_OUTPUTS::request go_req{};
+    tools::wallet_public::COMMAND_RPC_GET_OUTPUTS::response go_res{};
+    bool ok = bob_rpc.on_get_outputs(go_req, go_res, je, ctx);
+    CHECK_AND_ASSERT_MES(ok, false, "Bob on_get_outputs failed: " << je.message);
+    CHECK_AND_ASSERT_MES(go_res.outputs.empty(), false, "Bob must have no outputs, got " << go_res.outputs.size());
+
+    tools::wallet_public::COMMAND_RPC_GET_UTXO_STATS::request gs_req{};
+    tools::wallet_public::COMMAND_RPC_GET_UTXO_STATS::response gs_res{};
+    ok = bob_rpc.on_get_utxo_stats(gs_req, gs_res, je, ctx);
+    CHECK_AND_ASSERT_MES(ok, false, "Bob on_get_utxo_stats failed: " << je.message);
+    CHECK_AND_ASSERT_MES(gs_res.buckets.empty(), false, "Bob must have no buckets, got " << gs_res.buckets.size());
+    CHECK_AND_ASSERT_MES(gs_res.asset_id == currency::native_coin_asset_id, false, "Bob default asset_id must be native");
+  }
+
+  // spend one of Alices native UTXOs, then verify spent/unspent partitioning
+  alice_wlt->set_concise_mode(false);
+
+  const uint64_t outgoing_native = MK_TEST_COINS(1); // amount + fee == 2 any of Alices UTXOs is bigger
+  alice_wlt->transfer(outgoing_native, bob_wlt->get_account().get_public_address(), currency::native_coin_asset_id);
+  r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+  CHECK_AND_ASSERT_MES(r, false, "mine after spend failed");
+  alice_wlt->refresh();
+
+  // after the spend: at least one Alice native input is now spent
+  uint64_t spent_count = 0, unspent_count = 0;
+  uint64_t spent_block_height = 0;
+  {
+    tools::wallet_public::COMMAND_RPC_GET_OUTPUTS::request req{};
+    tools::wallet_public::COMMAND_RPC_GET_OUTPUTS::response res{};
+    bool ok = alice_rpc.on_get_outputs(req, res, je, ctx);
+    CHECK_AND_ASSERT_MES(ok, false, "post-spend get_outputs failed: " << je.message);
+    for (const auto& od : res.outputs)
+    {
+      if (od.spent)
+      {
+        ++spent_count;
+        CHECK_AND_ASSERT_MES(od.spent_height != 0, false, "spent output must have spent_height != 0, out_id=" << od.out_id);
+        CHECK_AND_ASSERT_MES((od.flags & WALLET_TRANSFER_DETAIL_FLAG_SPENT) != 0, false, "spent flag must be set, out_id=" << od.out_id);
+        CHECK_AND_ASSERT_MES(!od.spendable, false, "spent output must not be spendable, out_id=" << od.out_id);
+        spent_block_height = od.spent_height;
+      }
+      else
+      {
+        ++unspent_count;
+      }
+    }
+    CHECK_AND_ASSERT_MES(spent_count >= 1, false, "expected at least 1 spent output after the transfer");
+    CHECK_AND_ASSERT_MES(unspent_count >= 1, false, "expected change/leftover unspent outputs");
+  }
+
+  // 'unspent' filter must match the previous unspent count
+  {
+    tools::wallet_public::COMMAND_RPC_GET_OUTPUTS::request req{};
+    req.output_type = "unspent";
+    tools::wallet_public::COMMAND_RPC_GET_OUTPUTS::response res{};
+    bool ok = alice_rpc.on_get_outputs(req, res, je, ctx);
+    CHECK_AND_ASSERT_MES(ok, false, "post-spend get_outputs(unspent) failed: " << je.message);
+    CHECK_AND_ASSERT_MES(res.outputs.size() == unspent_count, false, "unspent size mismatch: " << res.outputs.size() << " vs " << unspent_count);
+    for (const auto& od : res.outputs)
+      CHECK_AND_ASSERT_MES(!od.spent, false, "unspent filter leaked a spent output");
+  }
+
+  // 'spent' filter must match the spent count and report sane fields
+  {
+    tools::wallet_public::COMMAND_RPC_GET_OUTPUTS::request req{};
+    req.output_type = "spent";
+    tools::wallet_public::COMMAND_RPC_GET_OUTPUTS::response res{};
+    bool ok = alice_rpc.on_get_outputs(req, res, je, ctx);
+    CHECK_AND_ASSERT_MES(ok, false, "post-spend get_outputs(spent) failed: " << je.message);
+    CHECK_AND_ASSERT_MES(res.outputs.size() == spent_count, false, "spent size mismatch: " << res.outputs.size() << " vs " << spent_count);
+    for (const auto& od : res.outputs)
+    {
+      CHECK_AND_ASSERT_MES(od.spent, false, "spent filter leaked an unspent output");
+      CHECK_AND_ASSERT_MES(od.spent_height == spent_block_height, false, "spent_height mismatch across spent outputs (we did 1 spend tx)");
+    }
+  }
+
+  // utxo_stats must only count unspent native outputs after the spend
+  {
+    tools::wallet_public::COMMAND_RPC_GET_UTXO_STATS::request req{};
+    tools::wallet_public::COMMAND_RPC_GET_UTXO_STATS::response res{};
+    bool ok = alice_rpc.on_get_utxo_stats(req, res, je, ctx);
+    CHECK_AND_ASSERT_MES(ok, false, "post-spend get_utxo_stats failed: " << je.message);
+    uint64_t utxo_total = 0, amount_total = 0;
+    for (const auto& b : res.buckets)
+    {
+      utxo_total   += b.total_utxo;
+      amount_total += b.total_amount;
+    }
+    CHECK_AND_ASSERT_MES(utxo_total == unspent_count - 2, false, // -2 because asset outputs aren't native
+      "post-spend utxo_total=" << utxo_total << ", expected " << (unspent_count - 2));
+    CHECK_AND_ASSERT_MES(amount_total == alice_wlt->balance(currency::native_coin_asset_id), false,
+      "post-spend amount_total mismatch");
+  }
+
+  return true;
+}
+//------------------------------------------------------------------------------
+
+wallet_rpc_sign_message_with_alias::wallet_rpc_sign_message_with_alias()
+{
+  REGISTER_CALLBACK_METHOD(wallet_rpc_sign_message_with_alias, configure_core);
+  REGISTER_CALLBACK_METHOD(wallet_rpc_sign_message_with_alias, c1);
+
+  m_hardforks.set_hardfork_height(1, 1);
+  m_hardforks.set_hardfork_height(2, 1);
+  m_hardforks.set_hardfork_height(3, 1);
+  m_hardforks.set_hardfork_height(4, 1);
+}
+
+bool wallet_rpc_sign_message_with_alias::generate(std::vector<test_event_entry>& events) const
+{
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate();
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate();
+  account_base& bob_acc   = m_accounts[BOB_ACC_IDX];   bob_acc.generate();
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  DO_CALLBACK(events, "configure_core");
+  set_hard_fork_heights_to_generator(generator);
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 6);
+
+  DO_CALLBACK(events, "c1");
+  return true;
+}
+
+bool wallet_rpc_sign_message_with_alias::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  // covers the alias-based path of core RPC 'validate_signature'
+  // The unit test in tests/unit_tests/wallet_misc_tests.cpp covers everything but the alias resolution, since aliases require a live blockchain.
+  bool r = false;
+  std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
+  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
+  std::shared_ptr<tools::wallet2> bob_wlt   = init_playtime_test_wallet(events, c, BOB_ACC_IDX);
+
+  miner_wlt->refresh();
+
+  miner_wlt->transfer(MK_TEST_COINS(10), alice_wlt->get_account().get_public_address(), currency::native_coin_asset_id);
+  r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+  CHECK_AND_ASSERT_MES(r, false, "mine after funding Alice failed");
+  alice_wlt->refresh();
+
+  // miner registers an alias pointing at Alice's address
+  const std::string ALIAS_NAME = "alicepub";
+  {
+    tools::wallet_public::COMMAND_RPC_REGISTER_ALIAS::request req{};
+    tools::wallet_public::COMMAND_RPC_REGISTER_ALIAS::response rsp{};
+    req.al.alias = ALIAS_NAME;
+    req.al.details.address = alice_wlt->get_account().get_public_address_str();
+    req.al.details.comment = "Alice";
+    r = invoke_text_json_for_wallet(miner_wlt, "register_alias", req, rsp);
+    CHECK_AND_ASSERT_MES(r, false, "register_alias failed");
+  }
+  r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, 3);
+  CHECK_AND_ASSERT_MES(r, false, "mine after register_alias failed");
+
+  {
+    currency::COMMAND_RPC_GET_ALIAS_DETAILS::request req{};
+    currency::COMMAND_RPC_GET_ALIAS_DETAILS::response rsp{};
+    req.alias = ALIAS_NAME;
+    r = invoke_text_json_for_core(c, "get_alias_details", req, rsp);
+    CHECK_AND_ASSERT_MES(r, false, "get_alias_details failed");
+    CHECK_AND_ASSERT_MES(rsp.status == API_RETURN_CODE_OK, false, "get_alias_details status=" << rsp.status);
+    CHECK_AND_ASSERT_MES(rsp.alias_details.address == alice_wlt->get_account().get_public_address_str(), false,
+      "alias points at " << rsp.alias_details.address << ", expected Alice's address");
+  }
+
+  // Alice signs a payload mix of binary / non-ASCII / NUL bytes to verify raw-buffer handling
+  std::string payload(150, '\0');
+  crypto::generate_random_bytes(payload.size(), &payload[0]);
+
+  crypto::signature alice_sig{};
+  crypto::public_key alice_pkey{};
+  {
+    tools::wallet_rpc_server alice_rpc(alice_wlt);
+    tools::wallet_public::COMMAND_SIGN_MESSAGE::request  req{};
+    tools::wallet_public::COMMAND_SIGN_MESSAGE::response rsp{};
+    epee::json_rpc::error je{};
+    tools::wallet_rpc_server::connection_context cntx{};
+    req.buff = payload;
+    bool ok = alice_rpc.on_sign_message(req, rsp, je, cntx);
+    CHECK_AND_ASSERT_MES(ok, false, "sign_message failed: " << je.message);
+    CHECK_AND_ASSERT_MES(rsp.pkey == alice_wlt->get_account().get_public_address().spend_public_key, false,
+      "sign_message returned pkey that doesn't match Alice's spend pkey");
+    alice_sig = rsp.sig;
+    alice_pkey = rsp.pkey;
+  }
+
+  // happy path: alias resolves to Alices spend pkey, v2 signature validates
+  {
+    COMMAND_VALIDATE_SIGNATURE::request req{};
+    COMMAND_VALIDATE_SIGNATURE::response rsp{};
+    req.buff = payload;
+    req.sig = alice_sig;
+    req.alias = ALIAS_NAME;
+    r = invoke_text_json_for_core(c, "validate_signature", req, rsp);
+    CHECK_AND_ASSERT_MES(r, false, "validate_signature (alias) call failed");
+    CHECK_AND_ASSERT_MES(rsp.status == API_RETURN_CODE_OK, false, "validate_signature(alias) status=" << rsp.status);
+    CHECK_AND_ASSERT_MES(rsp.sig_format == "v2", false, "sig_format=" << rsp.sig_format << ", expected v2");
+  }
+
+  // unknown alias -> failure, no pkey to look up
+  {
+    COMMAND_VALIDATE_SIGNATURE::request req{};
+    COMMAND_VALIDATE_SIGNATURE::response rsp{};
+    req.buff = payload;
+    req.sig = alice_sig;
+    req.alias = "noexistalias";
+    r = invoke_text_json_for_core(c, "validate_signature", req, rsp);
+    CHECK_AND_ASSERT_MES(r, false, "validate_signature (unknown alias) call failed");
+    CHECK_AND_ASSERT_MES(rsp.status != API_RETURN_CODE_OK, false, "validate_signature(unknown alias) accepted: " << rsp.status);
+    CHECK_AND_ASSERT_MES(rsp.sig_format.empty(), false, "sig_format=" << rsp.sig_format << ", expected empty on failure");
+  }
+
+  // wrong-data via alias path: tamper the payload, signature must no longer validate
+  {
+    COMMAND_VALIDATE_SIGNATURE::request req{};
+    COMMAND_VALIDATE_SIGNATURE::response rsp{};
+    req.buff = payload;
+    req.buff[0] ^= 0x01;
+    req.sig = alice_sig;
+    req.alias = ALIAS_NAME;
+    r = invoke_text_json_for_core(c, "validate_signature", req, rsp);
+    CHECK_AND_ASSERT_MES(r, false, "validate_signature (tampered) call failed");
+    CHECK_AND_ASSERT_MES(rsp.status != API_RETURN_CODE_OK, false, "tampered payload accepted via alias path");
+    CHECK_AND_ASSERT_MES(rsp.sig_format.empty(), false, "tampered path sig_format=" << rsp.sig_format);
+  }
+
+  // alias points at Alice but signature is from Bob -> must reject
+  {
+    crypto::signature bob_sig{};
+    bob_wlt->sign_buffer(payload, bob_sig);
+
+    COMMAND_VALIDATE_SIGNATURE::request req{};
+    COMMAND_VALIDATE_SIGNATURE::response rsp{};
+    req.buff = payload;
+    req.sig = bob_sig;
+    req.alias = ALIAS_NAME;
+    r = invoke_text_json_for_core(c, "validate_signature", req, rsp);
+    CHECK_AND_ASSERT_MES(r, false, "validate_signature (alias-from-other-wallet) call failed");
+    CHECK_AND_ASSERT_MES(rsp.status != API_RETURN_CODE_OK, false, "Bob's signature accepted as Alice via alias");
+    CHECK_AND_ASSERT_MES(rsp.sig_format.empty(), false, "wrong-signer sig_format=" << rsp.sig_format);
+  }
+
+  // legacy signature format (pre-HDS) must validate via alias as well, reporting sig_format="legacy"
+  {
+    crypto::signature legacy_sig{};
+    crypto::hash h = crypto::cn_fast_hash(payload.data(), payload.size());
+    crypto::generate_signature(h, alice_pkey, m_accounts[ALICE_ACC_IDX].get_keys().spend_secret_key, legacy_sig);
+
+    COMMAND_VALIDATE_SIGNATURE::request req{};
+    COMMAND_VALIDATE_SIGNATURE::response rsp{};
+    req.buff = payload;
+    req.sig = legacy_sig;
+    req.alias = ALIAS_NAME;
+    r = invoke_text_json_for_core(c, "validate_signature", req, rsp);
+    CHECK_AND_ASSERT_MES(r, false, "validate_signature (legacy via alias) call failed");
+    CHECK_AND_ASSERT_MES(rsp.status == API_RETURN_CODE_OK, false, "legacy signature via alias rejected: " << rsp.status);
+    CHECK_AND_ASSERT_MES(rsp.sig_format == "legacy", false, "legacy sig_format=" << rsp.sig_format << ", expected 'legacy'");
+  }
+
+  // both pkey and alias provided: per implementation, the explicit pkey wins and alias is not consulted
+  // verify by setting alias to a value that would otherwise fail (unknown), and pkey to the correct one
+  {
+    COMMAND_VALIDATE_SIGNATURE::request req{};
+    COMMAND_VALIDATE_SIGNATURE::response rsp{};
+    req.buff = payload;
+    req.sig = alice_sig;
+    req.pkey = alice_pkey;
+    req.alias = "noexistalias";
+    r = invoke_text_json_for_core(c, "validate_signature", req, rsp);
+    CHECK_AND_ASSERT_MES(r, false, "validate_signature (pkey+bad alias) call failed");
+    CHECK_AND_ASSERT_MES(rsp.status == API_RETURN_CODE_OK, false, "explicit pkey did not override alias lookup: " << rsp.status);
+    CHECK_AND_ASSERT_MES(rsp.sig_format == "v2", false, "sig_format=" << rsp.sig_format);
+  }
+
+  // after update_alias -> Bob, validating Alice's signature via the same alias must fail
+  // (the alias now resolves to Bob's pkey), while Bob's signature via the alias must succeed.
+  {
+    alice_wlt->refresh();
+    tools::wallet_public::COMMAND_RPC_UPDATE_ALIAS::request req{};
+    tools::wallet_public::COMMAND_RPC_UPDATE_ALIAS::response rsp{};
+    req.al.alias = ALIAS_NAME;
+    req.al.details.address = bob_wlt->get_account().get_public_address_str();
+    req.al.details.comment = "Bob now";
+    r = invoke_text_json_for_wallet(alice_wlt, "update_alias", req, rsp);
+    CHECK_AND_ASSERT_MES(r, false, "update_alias failed");
+  }
+  r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, 3);
+  CHECK_AND_ASSERT_MES(r, false, "mine after update_alias failed");
+
+  // Alices signature should no longer validate under ALIAS_NAME (alias now resolves to Bobs pkey)
+  {
+    COMMAND_VALIDATE_SIGNATURE::request req{};
+    COMMAND_VALIDATE_SIGNATURE::response rsp{};
+    req.buff = payload;
+    req.sig = alice_sig;
+    req.alias = ALIAS_NAME;
+    r = invoke_text_json_for_core(c, "validate_signature", req, rsp);
+    CHECK_AND_ASSERT_MES(r, false, "validate_signature post-update (Alice) call failed");
+    CHECK_AND_ASSERT_MES(rsp.status != API_RETURN_CODE_OK, false, "Alice's sig still accepted after alias re-pointed to Bob");
+    CHECK_AND_ASSERT_MES(rsp.sig_format.empty(), false, "post-update sig_format=" << rsp.sig_format);
+  }
+
+  // Bobs signature under the same alias should validate
+  {
+    crypto::signature bob_sig{};
+    bob_wlt->sign_buffer(payload, bob_sig);
+
+    COMMAND_VALIDATE_SIGNATURE::request req{};
+    COMMAND_VALIDATE_SIGNATURE::response rsp{};
+    req.buff = payload;
+    req.sig = bob_sig;
+    req.alias = ALIAS_NAME;
+    r = invoke_text_json_for_core(c, "validate_signature", req, rsp);
+    CHECK_AND_ASSERT_MES(r, false, "validate_signature post-update (Bob) call failed");
+    CHECK_AND_ASSERT_MES(rsp.status == API_RETURN_CODE_OK, false, "Bob's sig rejected via re-pointed alias: " << rsp.status);
+    CHECK_AND_ASSERT_MES(rsp.sig_format == "v2", false, "Bob's sig_format=" << rsp.sig_format << ", expected v2");
+  }
 
   return true;
 }
