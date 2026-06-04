@@ -1145,12 +1145,13 @@ std::string wallets_manager::open_wallet(const std::wstring& path, const std::st
   {
 #ifndef MOBILE_WALLET_BUILD
     w->set_core_proxy(std::shared_ptr<tools::i_core_proxy>(new tools::core_fast_rpc_proxy(m_rpc_server)));
-    if(m_socks5_cfg.transactions || m_socks5_cfg.blocks)
-      w->configure_socks_relay(m_socks5_cfg);
-#else 
+#else
     LOG_ERROR("Unexpected location reached");
 #endif
   }
+
+  if(m_socks5_cfg.transactions || m_socks5_cfg.blocks)
+    w->configure_socks_relay(m_socks5_cfg);
 
   w->set_votes_config_path(m_data_dir + "/" + CURRENCY_VOTING_CONFIG_DEFAULT_FILENAME);
 
