@@ -2122,8 +2122,6 @@ bool wallet2::has_related_alias_entry_unconfirmed(const currency::transaction& t
 //----------------------------------------------------------------------------------------------------
 bool wallet2::has_bare_unspent_outputs() const
 {
-  // Internal logic vs. a fixed network event: precise second matters. A wallet created
-  // a few seconds after HF04 must NOT be misclassified as pre-HF04 by week-flooring.
   if (m_account.get_createtime_precise() > ZANO_HARDFORK_04_TIMESTAMP_ACTUAL)
     return false;
 
