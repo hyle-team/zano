@@ -1713,7 +1713,7 @@ void wallet2::process_new_blockchain_entry(const currency::block& b, const curre
 
   //optimization: seeking only for blocks that are not older then the wallet creation time plus 1 day. 1 day is for possible user incorrect time setup
   const std::vector<uint64_t>* pglobal_index = nullptr;
-  if (get_block_height(b) > get_wallet_minimum_height()) // b.timestamp + 60 * 60 * 24 > m_account.get_createtime())
+  if (get_block_height(b) > get_wallet_minimum_height()) // b.timestamp + 60 * 60 * 24 > m_account.get_createtime_precise())
   {
     pglobal_index = nullptr;
     if (bche.coinbase_ptr.get())
@@ -1741,7 +1741,7 @@ void wallet2::process_new_blockchain_entry(const currency::block& b, const curre
   }
   else
   {
-    WLT_LOG_L3("Skipped block by timestamp, height: " << height << ", block time " << b.timestamp << ", account time " << m_account.get_createtime());
+    WLT_LOG_L3("Skipped block by timestamp, height: " << height << ", block time " << b.timestamp << ", account time " << m_account.get_createtime_precise());
   }
   m_chain.push_new_block_id(bl_id, height); //m_blockchain.push_back(bl_id);
   m_last_bc_timestamp = b.timestamp;
@@ -1797,7 +1797,7 @@ uint64_t wallet2::get_wallet_minimum_height()
 
   currency::COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE::request req = AUTO_VAL_INIT(req);
   currency::COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE::response res = AUTO_VAL_INIT(res);
-  req.timestamp = m_account.get_createtime();
+  req.timestamp = m_account.get_createtime_rounded();
   bool r = m_core_proxy->call_COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE(req, res);
   THROW_IF_FALSE_WALLET_EX(r, error::no_connection_to_daemon, "call_COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE");
   WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(res.status == API_RETURN_CODE_OK, "FAILED TO CALL COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE");
@@ -2122,7 +2122,7 @@ bool wallet2::has_related_alias_entry_unconfirmed(const currency::transaction& t
 //----------------------------------------------------------------------------------------------------
 bool wallet2::has_bare_unspent_outputs() const
 {
-  if (m_account.get_createtime() > ZANO_HARDFORK_04_TIMESTAMP_ACTUAL)
+  if (m_account.get_createtime_precise() > ZANO_HARDFORK_04_TIMESTAMP_ACTUAL)
     return false;
 
   [[maybe_unused]] uint64_t bal = 0;

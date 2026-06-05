@@ -3290,8 +3290,17 @@ namespace currency
       password_used = false;
     }
     uint64_t timestamp = count_of_weeks * WALLET_BRAIN_DATE_QUANTUM + WALLET_BRAIN_DATE_OFFSET;
-    
+
     return timestamp;
+  }
+  //---------------------------------------------------------------
+  uint64_t round_timestamp_to_brain_date_quantum(uint64_t timestamp)
+  {
+    if (timestamp <= WALLET_BRAIN_DATE_OFFSET)
+      return WALLET_BRAIN_DATE_OFFSET;
+    uint64_t date_offset = timestamp - WALLET_BRAIN_DATE_OFFSET;
+    uint64_t weeks_count = date_offset / WALLET_BRAIN_DATE_QUANTUM;
+    return weeks_count * WALLET_BRAIN_DATE_QUANTUM + WALLET_BRAIN_DATE_OFFSET;
   }
   //---------------------------------------------------------------
   bool parse_vote(const std::string& json_, std::list<std::pair<std::string, bool>>& votes)

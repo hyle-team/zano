@@ -55,6 +55,11 @@ namespace currency
     m_creation_timestamp = time(NULL);
   }
   //-----------------------------------------------------------------
+  uint64_t account_base::get_createtime_rounded() const
+  {
+    return round_timestamp_to_brain_date_quantum(m_creation_timestamp);
+  }
+  //-----------------------------------------------------------------
   const account_keys& account_base::get_keys() const
   {
     return m_keys;
