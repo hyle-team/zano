@@ -3,6 +3,8 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include <unordered_set>
+
 #include "chaingen.h"
 #include "multiassets_test.h"
 #include "wallet_test_core_proxy.h"
@@ -1869,6 +1871,28 @@ bool eth_signed_asset_via_rpc::c1(currency::core& c, size_t ev_index, const std:
   CHECK_AND_ASSERT_EQ(pado->opt_descriptor->owner_eth_pub_key.has_value(), true);
   CHECK_AND_ASSERT_EQ(pado->opt_descriptor->owner_eth_pub_key.get(), eth_pk_2); // the most important condition for an ownership transfer
   // other fileds of pado->descriptor may also be checked here
+
+  // duplicate outputs_addresses must not fail decrypt
+  {
+    const std::vector<std::string>& bridge_outputs_addresses = to_resp.data_for_external_signing->outputs_addresses;
+
+    std::unordered_set<std::string> unique_outputs_addresses(bridge_outputs_addresses.begin(), bridge_outputs_addresses.end());
+    CHECK_AND_ASSERT_GREATER(bridge_outputs_addresses.size(), unique_outputs_addresses.size());
+
+    currency::COMMAND_RPC_DECRYPT_TX_DETAILS::request decrypt_dup_req{};
+    decrypt_dup_req.strict_output_addresses_match = false;
+    decrypt_dup_req.tx_secret_key = to_resp.data_for_external_signing->tx_secret_key;
+    decrypt_dup_req.tx_blob = epee::string_encoding::base64_encode(to_resp.data_for_external_signing->unsigned_tx);
+    decrypt_dup_req.outputs_addresses = bridge_outputs_addresses;
+    currency::COMMAND_RPC_DECRYPT_TX_DETAILS::response decrypt_dup_resp{};
+    r = core_rpc_wrapper.on_decrypt_tx_details(decrypt_dup_req, decrypt_dup_resp, jerr, ctx);
+    CHECK_AND_ASSERT_MES(r, false, "RPC on_decrypt_tx_details failed on duplicated outputs_addresses: " << jerr.message);
+
+    // the result must match the decryption done above with a single (already deduplicated) address - no failure, no doubling
+    CHECK_AND_ASSERT_EQ(decrypt_dup_resp.verified_tx_id, to_resp.tx_id);
+    CHECK_AND_ASSERT_EQ(decrypt_dup_resp.decoded_outputs.size(), to_tx.vout.size());
+    CHECK_AND_ASSERT_EQ(decrypt_dup_resp.decoded_outputs.size(), decrypt_resp.decoded_outputs.size());
+  }
 
   //
   // as everything is allright, sign to_tx with ETH signature.
