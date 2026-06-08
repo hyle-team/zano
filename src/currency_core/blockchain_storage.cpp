@@ -6488,6 +6488,7 @@ bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, 
   crypto::hash tx_hash_for_signature = prepare_prefix_hash_for_sign(tx, in_index, tx_prefix_hash);
   CHECK_AND_ASSERT_MES(tx_hash_for_signature != null_hash, false, "prepare_prefix_hash_for_sign failed");
 
+  CHECK_AND_ASSERT_MES(in_index < tx.signatures.size(), false, "tx.signatures.size (" << tx.signatures.size() << ") is less than or equal to in_index (" << in_index << ")");
   CHECK_AND_ASSERT_MES(tx.signatures[in_index].type() == typeid(gateway_sig), false, "Gateway input validation failed: tx.signatures[in_index].type() != typeid(gateway_sig)");
 
   const gateway_sig& sig = boost::get<gateway_sig>(tx.signatures[in_index]);
