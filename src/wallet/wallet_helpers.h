@@ -33,7 +33,11 @@ namespace tools
   //this number estimated based on the staking performance of the dev fund wallet during last month,
   //and is used to give users some rough estimation of how many iterations they need to do to mint a block
   //with their current stake; of course, it can be very different for different wallets, but at least it gives some reference point
+#ifndef TESTNET
 #define ITERATIONS_NEEDED_PER_ONE_COIN_MAGIC_NUMBER 464400000
+#else
+#define ITERATIONS_NEEDED_PER_ONE_COIN_MAGIC_NUMBER 283000 // testnet = mainnet * (pos_diff_testnet / pos_diff_mainnet)
+#endif
 
   inline uint64_t estimate_iterations_per_pos_block(const std::list<tools::wallet_public::asset_balance_entry>& balances)
   {
