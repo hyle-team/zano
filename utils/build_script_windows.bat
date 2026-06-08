@@ -190,7 +190,9 @@ IF %ERRORLEVEL% NEQ 0 (
 )
 call :sha256 %build_zip_path% build_zip_checksum
 
-set mail_msg="New %build_prefix% %TESTNET_LABEL%build for win-x64:<br>INST: <a href='https://build.zano.org/builds/%installer_file%'>https://build.zano.org/builds/%installer_file%</a> <br>sha256: %installer_checksum%<br><br>ZIP:  <a href='https://build.zano.org/builds/%build_zip_filename%'>https://build.zano.org/builds/%build_zip_filename%</a> <br>sha256: %build_zip_checksum%<br>"
+for /f "delims=" %%i in ('python ..\utils\build_changelog.py') do set "changelog=%%i"
+
+set mail_msg="New %build_prefix% %TESTNET_LABEL%build for win-x64:<br>INST: <a href='https://build.zano.org/builds/%installer_file%'>https://build.zano.org/builds/%installer_file%</a> <br>sha256: %installer_checksum%<br><br>ZIP:  <a href='https://build.zano.org/builds/%build_zip_filename%'>https://build.zano.org/builds/%build_zip_filename%</a> <br>sha256: %build_zip_checksum%<br><br>%changelog%"
 
 echo %mail_msg%
 
