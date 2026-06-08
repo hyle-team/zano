@@ -1128,7 +1128,7 @@ namespace crypto {
       "  spend public key: " << acc.get_public_address().spend_public_key << std::endl <<
       "  view  secret key: " << acc.get_keys().view_secret_key << std::endl <<
       "  view  public key: " << acc.get_public_address().view_public_key << std::endl <<
-      "  timestamp:        " << acc.get_createtime();
+      "  timestamp:        " << acc.get_createtime_precise();
   }
 }
 
