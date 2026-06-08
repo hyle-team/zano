@@ -19,6 +19,19 @@
 
 namespace tools
 {
+
+  inline uint64_t get_native_entry_balance(const std::list<tools::wallet_public::asset_balance_entry>& balances)
+  {
+    for (const auto& b : balances)
+    {
+      if (b.asset_info.asset_id == currency::native_coin_asset_id)
+        return b.total;
+    }
+    return 0;
+  }
+
+
+
   inline bool get_wallet_info_unlocked(wallet2& w, view::wallet_info& wi)
   {
     wi = AUTO_VAL_INIT_T(view::wallet_info);
@@ -27,8 +40,14 @@ namespace tools
     wi.path = epee::string_encoding::wstring_to_utf8(w.get_wallet_path());
     wi.is_auditable = w.is_auditable();
     wi.is_watch_only = w.is_watch_only();
+    wi.current_pos_attempts = w.get_current_pos_attempts();
     return true;
   }
+
+  //this number estimated based on the staking performance of the dev fund wallet during last month,
+  //and is used to give users some rough estimation of how many iterations they need to do to mint a block 
+  //with their current stake; of course, it can be very different for different wallets, but at least it gives some reference point
+#define ITERATIONS_NEEDED_PER_ONE_COIN_MAGIC_NUMBER 464400000
 
   inline bool get_wallet_info(wallet2& w, view::wallet_info& wi)
   {
@@ -36,6 +55,16 @@ namespace tools
     get_wallet_info_unlocked(w, wi);
     w.balance(wi.balances, wi.mined_total);
     wi.has_bare_unspent_outputs = w.has_bare_unspent_outputs();
+
+    uint64_t native_amount = get_native_entry_balance(wi.balances);
+    //reduce it to decimal part of the coin, to avoid overflow
+    native_amount /= COIN;
+
+    if (native_amount)
+    {
+      wi.est_iterations_per_pos_block = ITERATIONS_NEEDED_PER_ONE_COIN_MAGIC_NUMBER / native_amount;
+    }
+    
     return true;
   }
 

@@ -180,6 +180,12 @@ void pos_block_builder::step4_generate_coinbase_tx(size_t median_size,
   for (size_t try_count = 0; try_count != 10; ++try_count)
   {
     m_block.miner_tx = transaction{};
+    if (m_miner_tx_hardfork_id >= ZANO_HARDFORK_06)
+    {
+      etc_coinbase_block_cumulative_size ecbs = AUTO_VAL_INIT(ecbs);
+      ecbs.v = m_txs_total_size;
+      m_block.miner_tx.extra.push_back(ecbs);
+    }
     r = construct_miner_tx(m_height, median_size, already_generated_coins, estimated_block_size, m_total_fee,
       reward_receiver_address, stakeholder_address, m_block.miner_tx, block_reward_without_fee, m_block_reward, m_miner_tx_version, m_miner_tx_hardfork_id,
       extra_nonce, max_outs, true, pe, &m_miner_tx_tgc, tx_one_time_key_to_use);
@@ -277,22 +283,16 @@ void pos_block_builder::step5_sign(const currency::tx_source_entry& se, const cu
     // proofs for miner_tx
 
     // asset surjection proof
-    currency::zc_asset_surjection_proof asp{};
-    r = generate_asset_surjection_proof(miner_tx_id, false, m_miner_tx_tgc, asp);  // has_non_zc_inputs == false because after the HF4 PoS mining is only allowed for ZC stakes inputs 
+    r = generate_asset_surjection_proof(miner_tx_id, false, m_miner_tx_tgc, m_block.miner_tx);  // has_non_zc_inputs == false because after the HF4 PoS mining is only allowed for ZC stakes inputs 
     CHECK_AND_ASSERT_THROW_MES(r, "generete_asset_surjection_proof failed");
-    m_block.miner_tx.proofs.emplace_back(std::move(asp));
 
     // range proofs
-    currency::zc_outs_range_proof range_proofs{};
-    r = generate_zc_outs_range_proof(miner_tx_id, m_miner_tx_tgc, m_block.miner_tx.vout, range_proofs);
+    r = generate_zc_outs_range_proof(miner_tx_id, m_miner_tx_tgc, m_block.miner_tx);
     CHECK_AND_ASSERT_THROW_MES(r, "Failed to generate zc_outs_range_proof()");
-    m_block.miner_tx.proofs.emplace_back(std::move(range_proofs));
 
     // balance proof
-    currency::zc_balance_proof balance_proof{};
-    r = generate_tx_balance_proof(m_block.miner_tx, miner_tx_id, m_miner_tx_tgc, m_block_reward, balance_proof);
+    r = generate_tx_balance_proof(miner_tx_id, m_miner_tx_tgc, m_block_reward, m_block.miner_tx);
     CHECK_AND_ASSERT_THROW_MES(r, "generate_tx_balance_proof failed");
-    m_block.miner_tx.proofs.emplace_back(std::move(balance_proof));
 
     //err = 0;
     //r = crypto::zarcanum_verify_proof(hash_for_zarcanum_sig, m_context.kernel_hash, ring, m_context.last_pow_block_id_hashed, m_context.sk.kimage, m_context.basic_diff, sig, &err);

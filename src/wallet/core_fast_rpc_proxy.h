@@ -5,7 +5,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #pragma  once
 #include "rpc/core_rpc_server.h"
-#include "wallet/core_rpc_proxy.h"
+#include "wallet/i_core_rpc_proxy.h"
 #include "currency_core/alias_helper.h"
 namespace tools
 {
@@ -15,7 +15,7 @@ namespace tools
     core_fast_rpc_proxy(currency::core_rpc_server& rpc_srv) :m_rpc(rpc_srv)
     {}
     //------------------------------------------------------------------------------------------------------------------------------
-    virtual bool is_daemon_inbox() 
+    virtual bool is_daemon_inbox() override
     {
       return true; 
     }
@@ -66,6 +66,11 @@ namespace tools
     bool call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3(const currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::request& req, currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::response& res) override
     {
       return m_rpc.on_get_random_outs3(req, res, m_cntxt_stub);
+    }
+    //------------------------------------------------------------------------------------------------------------------------------
+    bool call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4(const currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request& req, currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::response& res) override
+    {
+      return m_rpc.on_get_random_outs4(req, res, m_cntxt_stub);
     }
     //------------------------------------------------------------------------------------------------------------------------------
     bool call_COMMAND_RPC_SEND_RAW_TX(const currency::COMMAND_RPC_SEND_RAW_TX::request& req, currency::COMMAND_RPC_SEND_RAW_TX::response& res) override
@@ -168,11 +173,16 @@ namespace tools
       response_code = response.m_response_code;
       return res;
     }
-    //------------------------------------------------------------------------------------------------------------------------------
-    virtual bool get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id) override
-    {
-      return tools::get_transfer_address(adr_str, addr, payment_id, this);
-    }
+//     //------------------------------------------------------------------------------------------------------------------------------
+//     virtual bool get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id) override
+//     {
+//       return tools::get_transfer_address(adr_str, addr, payment_id, this);
+//     }
+//     //------------------------------------------------------------------------------------------------------------------------------
+//     bool get_transfer_address(const std::string& adr_str, address_v& addr, std::string& payment_id) override
+//     {
+//       return tools::get_transfer_address(adr_str, addr, payment_id, this);
+//     }
     //------------------------------------------------------------------------------------------------------------------------------
     virtual time_t get_last_success_interract_time() override
     { 

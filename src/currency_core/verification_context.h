@@ -18,6 +18,7 @@ namespace currency
     bool m_verification_impossible; //the transaction is related to alternative blockchain
     bool m_added_to_pool; 
     bool m_already_existed = false;
+    std::string m_error_code;
   };
 
   struct block_verification_context
@@ -28,9 +29,14 @@ namespace currency
     bool m_already_exists;
     bool m_added_to_altchain;
     uint64_t m_height_difference;
+    bool m_major_db_failure;
     //this is work like a first-level cache for transactions while block is getting handled. It lets transactions 
     //associated with the block to get handled directly to core without being handled by tx_pool(which makes full
     //inputs validation, including signatures check)
     transactions_map m_onboard_transactions;
+    
+    //Do not validate PoW/S, just make sure transactions are fit to be included in block and do not cause block to be rejected. 
+    //This is used for miner to check if block is valid before doing PoW/S.
+    bool do_just_simulation = false; 
   };
 }

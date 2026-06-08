@@ -50,8 +50,11 @@ MACRO(ENABLE_SHARED_PCH_EXECUTABLE target)
 ENDMACRO(ENABLE_SHARED_PCH_EXECUTABLE)
 #####  End of Precompiled Headers macros  ######
 
-
-
+if(UNIX AND NOT APPLE)
+  add_compile_definitions(BOOST_STACKTRACE_USE_BACKTRACE)
+  link_libraries(backtrace dl)
+  add_link_options(-rdynamic)
+endif()
 
 file(GLOB_RECURSE PCH pch/*)
 file(GLOB_RECURSE COMMON common/*)
@@ -141,10 +144,6 @@ else()
   ENABLE_SHARED_PCH(wallet WALLET)
 endif()
 
-if(NOT DISABLE_TOR)
-  target_link_libraries(wallet tor-connect)
-endif()
-
 
 
 
@@ -207,6 +206,7 @@ if(BUILD_GUI)
   set(CMAKE_INCLUDE_CURRENT_DIR ON)
   SET(MACOSX_BUNDLE_ICON_FILE app.icns)
   add_executable(Zano WIN32 MACOSX_BUNDLE ${QTDAEMON} )
+  add_dependencies(Zano version html_content_hash)
 
   #####  embed html into resources  ######
   set(HTML_DIR ${CMAKE_CURRENT_SOURCE_DIR}/gui/qt-daemon/layout/html)

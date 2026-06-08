@@ -423,33 +423,6 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
   return true;
 }
 
-//------------------------------------------------------------------------------
-//@#@  TODO: subject for refactoring: this fill_ado*/fill_adb* are copy/paste clones of wallet's, need to be implemented in one place at some point
-//----------------------------------------------------------------------------------------------------
-void fill_ado_version_based_onhardfork(currency::asset_descriptor_operation& asset_reg_info, size_t current_latest_hf)
-{
-  if (current_latest_hf < ZANO_HARDFORK_05)
-  {
-    asset_reg_info.version = ASSET_DESCRIPTOR_OPERATION_HF4_VER;
-  }
-  else
-  {
-    asset_reg_info.version = ASSET_DESCRIPTOR_OPERATION_LAST_VER;
-  }
-}
-
-void fill_adb_version_based_onhardfork(currency::asset_descriptor_base& asset_base, size_t current_latest_hf)
-{
-  if (current_latest_hf < ZANO_HARDFORK_05)
-  {
-    asset_base.version = ASSET_DESCRIPTOR_BASE_HF4_VER;
-  }
-  else
-  {
-    asset_base.version = ASSET_DESCRIPTOR_BASE_LAST_VER;
-  }
-}
-
 //----------------------------------------------------------------------------------------------------
 
 
@@ -1122,7 +1095,7 @@ bool asset_operation_and_hardfork_checks::generate(
   CHECK_AND_ASSERT_MES(success, false, "fail to construct tx_2");
 
   DO_CALLBACK(events, "mark_invalid_tx");
-  ADD_CUSTOM_EVENT(events, tx_2);
+  ADD_CUSTOM_EVENT(events, tx_2); // event 67
 
   sources.clear();
   destinations.clear();
@@ -1162,7 +1135,9 @@ bool asset_operation_and_hardfork_checks::generate(
 
   CHECK_AND_ASSERT_MES(success, false, "fail to construct tx_3");
 
-  ADD_CUSTOM_EVENT(events, tx_3);
+  if (hf_n >= ZANO_HARDFORK_06)
+    DO_CALLBACK(events, "mark_invalid_tx"); // tx_3 is invalid in HF6 since data items that go into payload containers are whitelisted
+  ADD_CUSTOM_EVENT(events, tx_3); // event 68
   DO_CALLBACK(events, "c2");
 
   sources.clear();
@@ -1204,9 +1179,16 @@ bool asset_operation_and_hardfork_checks::generate(
 
   CHECK_AND_ASSERT_MES(success, false, "fail to construct tx_4");
 
+  if (hf_n >= ZANO_HARDFORK_06)
+    DO_CALLBACK(events, "mark_invalid_tx"); // tx_4 is invalid in HF6 since data items that go into payload containers are whitelisted
   ADD_CUSTOM_EVENT(events, tx_4);
   DO_CALLBACK(events, "c2");
   DO_CALLBACK(events, "c1");
+
+  if (hf_n < ZANO_HARDFORK_06)
+  {
+    MAKE_NEXT_BLOCK_TX_LIST(events, blk_3, blk_2r, miner, std::list<transaction>({ tx_3, tx_4 }));
+  }
 
   return true;
 }
@@ -1673,7 +1655,8 @@ bool eth_signed_asset_via_rpc::c1(currency::core& c, size_t ev_index, const std:
   nodetool::node_server<currency::t_currency_protocol_handler<currency::core> > p2p(m_cprotocol);
   bc_services::bc_offers_service of(nullptr);
   currency::core_rpc_server core_rpc_wrapper(c, p2p, of);
-  core_rpc_wrapper.set_ignore_connectivity_status(true);
+  core_rpc_wrapper.set_ignore_connectivity_status(true); 
+  core_rpc_wrapper.set_enabled_admin_api(true);
 
   // asset description
   asset_descriptor_base adb{};
@@ -1690,7 +1673,7 @@ bool eth_signed_asset_via_rpc::c1(currency::core& c, size_t ev_index, const std:
 
   tools::wallet_public::COMMAND_ASSETS_DEPLOY::request deploy_req{};
   deploy_req.asset_descriptor = adb;
-  deploy_req.destinations.push_back(tools::wallet_public::transfer_destination{initial_register_amount, m_accounts[ALICE_ACC_IDX].get_public_address_str(), null_pkey});
+  deploy_req.destinations.push_back(currency::transfer_destination{initial_register_amount, m_accounts[ALICE_ACC_IDX].get_public_address_str(), null_pkey});
   deploy_req.do_not_split_destinations = false;
   tools::wallet_public::COMMAND_ASSETS_DEPLOY::response deploy_resp{};
   r = miner_wlt_rpc.on_asset_deploy(deploy_req, deploy_resp, jerr, ctx);
@@ -1724,7 +1707,7 @@ bool eth_signed_asset_via_rpc::c1(currency::core& c, size_t ev_index, const std:
 
   tools::wallet_public::COMMAND_ASSETS_EMIT::request emit_req{};
   emit_req.asset_id = asset_id;
-  emit_req.destinations.push_back(tools::wallet_public::transfer_destination{additional_emit_amount, m_accounts[ALICE_ACC_IDX].get_public_address_str(), asset_id});
+  emit_req.destinations.push_back(currency::transfer_destination{additional_emit_amount, m_accounts[ALICE_ACC_IDX].get_public_address_str(), asset_id});
   emit_req.do_not_split_destinations = false;
 
   tools::wallet_public::COMMAND_ASSETS_EMIT::response emit_resp{};
@@ -1750,12 +1733,12 @@ bool eth_signed_asset_via_rpc::c1(currency::core& c, size_t ev_index, const std:
   // decrypt emission transaction outputs prior to ETH signing to make sure it's valid
   //
   currency::COMMAND_RPC_DECRYPT_TX_DETAILS::request decrypt_req{};
+  decrypt_req.strict_output_addresses_match = false; // request not to strictly match output addresses with outs
   decrypt_req.tx_secret_key = emit_resp.data_for_external_signing->tx_secret_key;
   decrypt_req.tx_blob = epee::string_encoding::base64_encode(emit_resp.data_for_external_signing->unsigned_tx);
   // note: decrypt_req.outputs_addresses can be populated using emit_resp.data_for_external_signing->outputs_addresses but we fill it manually here
   decrypt_req.outputs_addresses.push_back(m_accounts[MINER_ACC_IDX].get_public_address_str()); // we expect that the first output is the cashback and addressed to miner
-  for(size_t i = 0, size = emit_tx.vout.size() - 1; i < size; ++i)
-    decrypt_req.outputs_addresses.push_back(m_accounts[ALICE_ACC_IDX].get_public_address_str()); // we expect all other outputs are asset emission and addresses to Alice
+  decrypt_req.outputs_addresses.push_back(m_accounts[ALICE_ACC_IDX].get_public_address_str()); // we expect all other outputs are asset emission and addresses to Alice
   currency::COMMAND_RPC_DECRYPT_TX_DETAILS::response decrypt_resp{};
   r = core_rpc_wrapper.on_decrypt_tx_details(decrypt_req, decrypt_resp, jerr, ctx);
   CHECK_AND_ASSERT_MES(r, false, "RPC on_decrypt_tx_details failed: " << jerr.message);
@@ -1854,11 +1837,11 @@ bool eth_signed_asset_via_rpc::c1(currency::core& c, size_t ev_index, const std:
   // decrypt ownership transfer transaction prior to ETH signing to make sure it's valid
   //
   decrypt_req = currency::COMMAND_RPC_DECRYPT_TX_DETAILS::request{};
+  decrypt_req.strict_output_addresses_match = false; // request not to strictly match output addresses with outs
   decrypt_req.tx_secret_key = to_resp.data_for_external_signing->tx_secret_key;
   decrypt_req.tx_blob = epee::string_encoding::base64_encode(to_resp.data_for_external_signing->unsigned_tx);
   // note: decrypt_req.outputs_addresses can be populated using to_resp.data_for_external_signing->outputs_addresses but we fill it manually here
-  for(size_t i = 0, size = to_tx.vout.size(); i < size; ++i)
-    decrypt_req.outputs_addresses.push_back(m_accounts[MINER_ACC_IDX].get_public_address_str()); // we expect all outputs goes to Miner
+  decrypt_req.outputs_addresses.push_back(m_accounts[MINER_ACC_IDX].get_public_address_str()); // we expect all outputs goes to Miner
   decrypt_resp = currency::COMMAND_RPC_DECRYPT_TX_DETAILS::response{};
   r = core_rpc_wrapper.on_decrypt_tx_details(decrypt_req, decrypt_resp, jerr, ctx);
   CHECK_AND_ASSERT_MES(r, false, "RPC on_decrypt_tx_details failed: " << jerr.message);
@@ -1932,7 +1915,7 @@ bool eth_signed_asset_via_rpc::c1(currency::core& c, size_t ev_index, const std:
 
   emit_req = tools::wallet_public::COMMAND_ASSETS_EMIT::request{};
   emit_req.asset_id = asset_id;
-  emit_req.destinations.push_back(tools::wallet_public::transfer_destination{additional_emit_amount, m_accounts[BOB_ACC_IDX].get_public_address_str(), asset_id});
+  emit_req.destinations.push_back(currency::transfer_destination{additional_emit_amount, m_accounts[BOB_ACC_IDX].get_public_address_str(), asset_id});
   emit_req.do_not_split_destinations = false;
 
   emit_resp = tools::wallet_public::COMMAND_ASSETS_EMIT::response{};
@@ -1958,12 +1941,12 @@ bool eth_signed_asset_via_rpc::c1(currency::core& c, size_t ev_index, const std:
   // decrypt emission transaction outputs prior to ETH signing to make sure it's valid
   //
   decrypt_req = currency::COMMAND_RPC_DECRYPT_TX_DETAILS::request{};
+  decrypt_req.strict_output_addresses_match = false; // request not to strictly match output addresses with outs
   decrypt_req.tx_secret_key = emit_resp.data_for_external_signing->tx_secret_key;
   decrypt_req.tx_blob = epee::string_encoding::base64_encode(emit_resp.data_for_external_signing->unsigned_tx);
   // note: decrypt_req.outputs_addresses can be populated using emit_resp.data_for_external_signing->outputs_addresses but we fill it manually here
-  decrypt_req.outputs_addresses.push_back(m_accounts[MINER_ACC_IDX].get_public_address_str()); // we expect that the first output is the cashback and addressed to miner
-  for(size_t i = 0, size = emit_tx.vout.size() - 1; i < size; ++i)
-    decrypt_req.outputs_addresses.push_back(m_accounts[BOB_ACC_IDX].get_public_address_str()); // we expect all other outputs are asset emission and addresses to Bob
+  decrypt_req.outputs_addresses.push_back(m_accounts[MINER_ACC_IDX].get_public_address_str());
+  decrypt_req.outputs_addresses.push_back(m_accounts[BOB_ACC_IDX].get_public_address_str());
   decrypt_resp = currency::COMMAND_RPC_DECRYPT_TX_DETAILS::response{};
   r = core_rpc_wrapper.on_decrypt_tx_details(decrypt_req, decrypt_resp, jerr, ctx);
   CHECK_AND_ASSERT_MES(r, false, "RPC on_decrypt_tx_details failed: " << jerr.message);

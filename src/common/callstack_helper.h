@@ -1,4 +1,4 @@
-// Copyright (c) 2019-2025 Zano Project
+// Copyright (c) 2019-2026 Zano Project
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #pragma once
@@ -19,6 +19,11 @@ namespace tools
 #else
     return "";
 #endif
+  }
+
+  inline std::string get_empty_callstack() noexcept
+  {
+    return "";
   }
 
 } // namespace tools

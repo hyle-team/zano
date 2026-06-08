@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2026 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -57,16 +57,6 @@ namespace boost
     }
 
     template <class Archive>
-    inline void serialize(Archive &a, currency::txout_htlc &x, const boost::serialization::version_type ver)
-    {
-      a & x.expiration;
-      a & x.flags;
-      a & x.htlc_hash;
-      a & x.pkey_redeem;
-      a & x.pkey_refund;
-    }
-
-    template <class Archive>
     inline void serialize(Archive &a, currency::txin_gen &x, const boost::serialization::version_type ver)
     {
       a & x.height;
@@ -91,16 +81,6 @@ namespace boost
       a & x.key_offsets;
       a & x.k_image;
       a & x.etc_details;
-    }
-
-    template <class Archive>
-    inline void serialize(Archive &a, currency::txin_htlc &x, const boost::serialization::version_type ver)
-    {
-      a & x.amount;
-      a & x.etc_details;
-      a & x.hltc_origin;
-      a & x.k_image;
-      a & x.key_offsets;
     }
 
     template <class Archive>

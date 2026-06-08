@@ -1246,5 +1246,166 @@ namespace db_test
     close_contaier_test<db::mdbx_db_backend>();
   }
 
+  //////////////////////////////////////////////////////////////////////////////
+  // key_value_prefix_enum_multithread_test  (backend::enumerate_prefix, MT)
+  //////////////////////////////////////////////////////////////////////////////
+  template<typename db_backend_t>
+  void key_value_prefix_enum_multithread_test()
+  {
+    const std::string table_name("aliases_prefix_mt_test");
+    const std::string prefix = "al";
 
+    std::shared_ptr<db_backend_t> backend_ptr = std::make_shared<db_backend_t>();
+    epee::shared_recursive_mutex db_lock;
+    db::basic_db_accessor dbb(backend_ptr, db_lock);
+
+    ASSERT_TRUE(dbb.open("key_value_prefix_enum_multithread_test"));
+
+    db::container_handle tid;
+    ASSERT_TRUE(backend_ptr->open_container(table_name, tid));
+    ASSERT_TRUE(backend_ptr->begin_transaction());
+    ASSERT_TRUE(backend_ptr->clear(tid));
+    ASSERT_TRUE(backend_ptr->commit_transaction());
+
+    const std::vector<std::string> prefix_keys = { "albert", "alice", "alex", "ally" };
+    const std::vector<std::string> other_keys = { "bob", "beta", "charlie" };
+
+    ASSERT_TRUE(backend_ptr->begin_transaction());
+    auto put = [&](const std::string& key, const std::string& value)
+    {
+      bool r = backend_ptr->set(
+        tid,
+        key.data(),   key.size(),
+        value.data(), value.size()
+      );
+      ASSERT_TRUE(r);
+    };
+
+    for (const auto& k : other_keys)
+      put(k, "other:" + k);
+
+    ASSERT_TRUE(backend_ptr->commit_transaction());
+
+    std::atomic<bool> error_flag(false);
+
+    struct prefix_enum_cb : public db::i_db_callback
+    {
+      std::string prefix;
+      std::atomic<bool>* p_error_flag;
+      uint64_t count = 0;
+
+      virtual bool on_enum_item(uint64_t i, const void* key_data, uint64_t key_size, const void* value_data, uint64_t value_size) override
+      {
+        if (p_error_flag->load(std::memory_order_relaxed))
+          return false;
+
+        std::string key(static_cast<const char*>(key_data), key_size);
+
+        if (key.rfind(prefix, 0) != 0) // not starts_with(prefix)
+        {
+          *p_error_flag = true;
+          return false;
+        }
+
+        ++count;
+        (void)value_data;
+        (void)value_size;
+        return true;
+      }
+    };
+
+    auto writer_thread = [&]()
+    {
+      const size_t iterations = 1000;
+
+      for (size_t it = 0; it < iterations && !error_flag.load(); ++it)
+      {
+        const std::string& key = prefix_keys[it % prefix_keys.size()];
+        const std::string  val = "val_" + key;
+
+        bool r = backend_ptr->begin_transaction();
+        if (!r)
+        {
+          error_flag = true;
+          break;
+        }
+
+        std::string out;
+        if (backend_ptr->get(tid, key.data(), key.size(), out))
+        {
+          r = backend_ptr->erase(tid, key.data(), key.size());
+          if (!r)
+          {
+            error_flag = true;
+            backend_ptr->abort_transaction();
+            break;
+          }
+        }
+        else
+        {
+          r = backend_ptr->set(tid, key.data(), key.size(), val.data(), val.size());
+          if (!r)
+          {
+            error_flag = true;
+            backend_ptr->abort_transaction();
+            break;
+          }
+        }
+
+        r = backend_ptr->commit_transaction();
+        if (!r)
+        {
+          error_flag = true;
+          break;
+        }
+      }
+    };
+
+    auto reader_thread = [&]() {
+      const size_t iterations = 1000;
+
+      for (size_t it = 0; it < iterations && !error_flag.load(); ++it)
+      {
+        prefix_enum_cb cb;
+        cb.prefix = prefix;
+        cb.p_error_flag = &error_flag;
+
+        bool ok = backend_ptr->enumerate_prefix(tid, prefix, /*limit=*/100, &cb);
+        if (!ok)
+        {
+          error_flag = true;
+          break;
+        }
+
+        if (error_flag.load())
+          break;
+      }
+    };
+
+    std::thread writer(writer_thread);
+
+    const size_t readers_count = 4;
+    std::vector<std::thread> readers;
+    readers.reserve(readers_count);
+    for (size_t i = 0; i < readers_count; ++i)
+      readers.emplace_back(reader_thread);
+
+    writer.join();
+    for (auto& t : readers)
+      t.join();
+
+    ASSERT_FALSE(error_flag.load());
+
+    ASSERT_TRUE(dbb.close());
+  }
+
+  TEST(lmdb, key_value_prefix_enum_multithread_test)
+  {
+    key_value_prefix_enum_multithread_test<db::lmdb_db_backend>();
+  }
+
+  TEST(mdbx, key_value_prefix_enum_multithread_test)
+  {
+    key_value_prefix_enum_multithread_test<db::mdbx_db_backend>();
+  }
 } // namespace lmdb_test

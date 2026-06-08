@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019 Zano Project
+// Copyright (c) 2018-2026 Zano Project
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -211,12 +211,6 @@ namespace currency
         result = boost::get<txin_to_key>(in_v).k_image;
         return true;
       }
-    
-      if (in_v.type() == typeid(txin_htlc))
-      {
-        result = boost::get<txin_htlc>(in_v).k_image;
-        return true;
-      }
     }
     catch(...)
     {
@@ -235,9 +229,6 @@ namespace currency
     if (in_v.type() == typeid(txin_to_key))
       return boost::get<txin_to_key>(in_v).k_image;
     
-    if (in_v.type() == typeid(txin_htlc))
-      return boost::get<txin_htlc>(in_v).k_image;
-
     CHECK_AND_ASSERT_THROW_MES(false, "[get_key_image_from_txin_v] Wrong type: " << in_v.type().name());
   }
   //---------------------------------------------------------------
@@ -250,9 +241,6 @@ namespace currency
     if (in_v.type() == typeid(txin_to_key))
       return boost::get<txin_to_key>(in_v).key_offsets;
     
-    if (in_v.type() == typeid(txin_htlc))
-      return boost::get<txin_htlc>(in_v).key_offsets;
-
     CHECK_AND_ASSERT_THROW_MES(false, "[get_key_offsets_from_txin_v] Wrong type: " << in_v.type().name());
   }
   //---------------------------------------------------------------
@@ -314,7 +302,11 @@ namespace currency
     return false;
   }
   //---------------------------------------------------------------
-  //, txin_htlc, txin_zc_input
+  inline bool compare_variant_by_types(const txin_gateway& left, const txin_gateway& right)
+  {
+    return (left.gateway_addr < right.gateway_addr);
+  }
+  //---------------------------------------------------------------
   inline bool compare_variant_by_types(const txin_multisig& left, const txin_multisig& right)
   {
     return (left.multisig_out_id < right.multisig_out_id);
@@ -322,7 +314,7 @@ namespace currency
   //---------------------------------------------------------------
   inline bool compare_variant_by_types(const txin_gen& left, const txin_gen& right)
   {
-    //actually this should never happen, should we leave it in case it happen in unit tests? @sowle 
+    //actually this should never happen, should we` leave it in case it happen in unit tests? @sowle 
     return (left.height < right.height);
   }
   //---------------------------------------------------------------
@@ -476,7 +468,7 @@ namespace currency
 
   //---------------------------------------------------------------
   size_t get_object_blobsize(const transaction& t);
-  size_t get_object_blobsize(const transaction& t, uint64_t prefix_blob_size);
+  size_t get_object_blobsize_legacy(const transaction& t, uint64_t prefix_blob_size);
 
 
   inline

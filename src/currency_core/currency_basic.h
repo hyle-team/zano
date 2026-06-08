@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2024 Zano Project
+// Copyright (c) 2014-2026 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Copyright (c) 2014-2015 The Boolberry developers
@@ -42,10 +42,13 @@
 #include "crypto/range_proofs.h"
 #include "crypto/zarcanum.h"
 #include "crypto/eth_signature.h"
+#include "crypto/eddsa_signature.h"
 #include "misc_language.h"
 #include "block_flags.h"
 #include "etc_custom_serialization.h"
 #include "difficulty.h"
+#include "common/boost_chain_to_crypto_serialization.h"
+
 
 namespace currency
 {
@@ -150,8 +153,41 @@ namespace currency
 #pragma pack(pop)
 
 
-  const static account_public_address null_pub_addr = AUTO_VAL_INIT(null_pub_addr);
+  /************************************************************************/
+  /* gateway address                                                      */
+  /************************************************************************/
+  
+  typedef crypto::public_key gateway_address_id_type;
+  typedef boost::variant<crypto::public_key, crypto::eth_public_key, crypto::eddsa_public_key> gateway_owner_key_v;
+  typedef boost::variant<crypto::generic_schnorr_sig_s, crypto::eth_signature, crypto::eddsa_signature> gateway_owner_signature_v;
+  typedef boost::variant<account_public_address, gateway_address_id_type> address_v;
+  const static account_public_address null_pub_addr = {};
 
+  struct gateway_address_serialized_to_str
+  {
+    uint8_t version;
+    gateway_address_id_type gateway_addr;
+    boost::optional<uint64_t> o_payment_id;
+
+    BEGIN_VERSIONED_SERIALIZE(0, version)
+      FIELD(gateway_addr)
+      FIELD(o_payment_id)
+    END_SERIALIZE()
+  };
+
+
+
+  struct gateway_address_ownership_proof
+  {
+    uint8_t version = 0;
+    gateway_owner_signature_v sign;
+
+    BEGIN_VERSIONED_SERIALIZE(0, version)
+      FIELD(sign)
+    END_SERIALIZE()
+  };
+  
+  
   typedef std::vector<crypto::signature> ring_signature;
 
   /************************************************************************/
@@ -249,12 +285,9 @@ namespace currency
     END_SERIALIZE()
   };
 
-  struct txin_htlc: public txin_to_key
+  struct txin_dummy // TODO: CZ, please replace it with gateway -- sowle
   {
-    std::string hltc_origin;
-    BEGIN_SERIALIZE_OBJECT()
-      FIELD(hltc_origin)
-      FIELDS(*static_cast<txin_to_key*>(this))
+    BEGIN_SERIALIZE()
     END_SERIALIZE()
   };
 
@@ -285,26 +318,7 @@ namespace currency
     END_SERIALIZE()
   };
 
-#define CURRENCY_TXOUT_HTLC_FLAGS_HASH_TYPE_MASK   0x01 // 0 - SHA256, 1 - RIPEMD160
-
-  struct txout_htlc
-  {
-    crypto::hash htlc_hash;
-    uint8_t flags;      //select type of the hash, may be some extra info in future
-    uint64_t expiration; 
-    crypto::public_key pkey_redeem; //works before expiration
-    crypto::public_key pkey_refund; //works after expiration
-
-    BEGIN_SERIALIZE_OBJECT()
-      FIELD(htlc_hash)
-      FIELD(flags)
-      VARINT_FIELD(expiration)
-      FIELD(pkey_redeem)
-      FIELD(pkey_refund)
-    END_SERIALIZE()
-  };
-
-  typedef boost::variant<txout_to_key, txout_multisig, txout_htlc> txout_target_v;
+  typedef boost::variant<txout_to_key, txout_multisig> txout_target_v;
 
   //typedef std::pair<uint64_t, txout> out_t;
   struct tx_out_bare
@@ -317,6 +331,44 @@ namespace currency
       FIELD(target)
     END_SERIALIZE()
   };
+
+
+
+  /////////////////////////////////////////////////////////////////////////////
+  // Gateway structures
+
+  struct txin_gateway
+  {
+    uint8_t version = 0;
+    gateway_address_id_type gateway_addr = null_pkey;
+    crypto::public_key asset_id = null_pkey;                     // premultiplied by 1/8
+    uint64_t amount = 0;
+
+    BEGIN_VERSIONED_SERIALIZE(0, version)
+      FIELD(gateway_addr)
+      FIELD(asset_id)
+      VARINT_FIELD(amount)
+      VARINT_FIELD(version) // do we really need it? -- sowle
+    END_SERIALIZE()
+
+  };
+
+  struct tx_out_gateway
+  {
+    uint8_t version = 0;
+    gateway_address_id_type gateway_addr = null_pkey;
+    crypto::public_key asset_id = null_pkey;                     // premultiplied by 1/8
+    uint64_t amount = 0;    
+    uint64_t payment_id = 0; 
+
+    BEGIN_VERSIONED_SERIALIZE(0, version)
+      FIELD(gateway_addr)
+      FIELD(asset_id)
+      VARINT_FIELD(amount)
+      FIELD(payment_id)
+    END_SERIALIZE()
+  };
+
 
 
   /////////////////////////////////////////////////////////////////////////////
@@ -340,45 +392,49 @@ namespace currency
       FIELD(etc_details)
     END_SERIALIZE()
 
-    BEGIN_BOOST_SERIALIZATION()
-      BOOST_SERIALIZE(key_offsets) // referring_input
-      BOOST_SERIALIZE(k_image)
-      BOOST_SERIALIZE(etc_details)
-    END_BOOST_SERIALIZATION()
+//     BEGIN_BOOST_SERIALIZATION()
+//       BOOST_SERIALIZE(key_offsets) // referring_input
+//       BOOST_SERIALIZE(k_image)
+//       BOOST_SERIALIZE(etc_details)
+//     END_BOOST_SERIALIZATION()
   };
+
+
+#define TX_OUT_ZARCANUM_CURRENT_VERSION    0
 
   struct tx_out_zarcanum
   {
-    tx_out_zarcanum() {}
-    
-    // Boost's Assignable concept
-    tx_out_zarcanum(const tx_out_zarcanum&)            = default;
-    tx_out_zarcanum& operator=(const tx_out_zarcanum&) = default;
-
-    crypto::public_key  stealth_address;
-    crypto::public_key  concealing_point;  // group element Q, see also Zarcanum paper, premultiplied by 1/8
-    crypto::public_key  amount_commitment; // premultiplied by 1/8
-    crypto::public_key  blinded_asset_id;  // group element T, premultiplied by 1/8
+    crypto::public_key  stealth_address = null_pkey;
+    crypto::public_key  concealing_point = null_pkey;  // group element Q, see also Zarcanum paper, premultiplied by 1/8
+    crypto::public_key  amount_commitment = null_pkey; // premultiplied by 1/8
+    crypto::public_key  blinded_asset_id = null_pkey;  // group element T, premultiplied by 1/8
     uint64_t            encrypted_amount = 0;
+    uint64_t            encrypted_payment_id = 0;
     uint8_t             mix_attr = 0;
+    uint8_t             version = TX_OUT_ZARCANUM_CURRENT_VERSION;
 
-    BEGIN_SERIALIZE_OBJECT()
+    BEGIN_VERSIONED_SERIALIZE(TX_OUT_ZARCANUM_CURRENT_VERSION, version)
       FIELD(stealth_address)
       FIELD(concealing_point)
       FIELD(amount_commitment)
       FIELD(blinded_asset_id)
       FIELD(encrypted_amount)
+      FIELD(encrypted_payment_id)
       FIELD(mix_attr)
     END_SERIALIZE()
 
-    BEGIN_BOOST_SERIALIZATION()
-      BOOST_SERIALIZE(stealth_address)
-      BOOST_SERIALIZE(concealing_point)
-      BOOST_SERIALIZE(amount_commitment)
-      BOOST_SERIALIZE(blinded_asset_id)
-      BOOST_SERIALIZE(encrypted_amount)
-      BOOST_SERIALIZE(mix_attr)
-    END_BOOST_SERIALIZATION()
+//     BOOST_SERIALIZATION_CURRENT_ARCHIVE_VER(1)
+//     BEGIN_BOOST_SERIALIZATION()
+//       BOOST_SERIALIZE(stealth_address)
+//       BOOST_SERIALIZE(concealing_point)
+//       BOOST_SERIALIZE(amount_commitment)
+//       BOOST_SERIALIZE(blinded_asset_id)
+//       BOOST_SERIALIZE(encrypted_amount)
+//       BOOST_SERIALIZE(mix_attr)
+//       BOOST_END_VERSION_UNDER(1)
+//       BOOST_SERIALIZE(encrypted_payment_id)
+//       BOOST_SERIALIZE(version)
+//     END_BOOST_SERIALIZATION_TOTAL_FIELDS(8)
   };
 
   struct zarcanum_tx_data_v1
@@ -389,9 +445,9 @@ namespace currency
       FIELD(fee)
     END_SERIALIZE()
 
-    BEGIN_BOOST_SERIALIZATION()
-      BOOST_SERIALIZE(fee)
-    END_BOOST_SERIALIZATION()
+//     BEGIN_BOOST_SERIALIZATION()
+//       BOOST_SERIALIZE(fee)
+//     END_BOOST_SERIALIZATION_TOTAL_FIELDS(1)
   };
 
   struct zc_asset_surjection_proof
@@ -402,9 +458,9 @@ namespace currency
       FIELD(bge_proofs)
     END_SERIALIZE()
 
-    BEGIN_BOOST_SERIALIZATION()
-      BOOST_SERIALIZE(bge_proofs)
-    END_BOOST_SERIALIZATION()
+//     BEGIN_BOOST_SERIALIZATION()
+//       BOOST_SERIALIZE(bge_proofs)
+//     END_BOOST_SERIALIZATION_TOTAL_FIELDS(1)
   };
 
   // non-consoditated txs must have one of this objects in the attachments (elements count == vout.size())
@@ -419,10 +475,10 @@ namespace currency
       FIELD(aggregation_proof)
     END_SERIALIZE()
 
-    BEGIN_BOOST_SERIALIZATION()
-      BOOST_SERIALIZE(bpp)
-      BOOST_SERIALIZE(aggregation_proof)
-    END_BOOST_SERIALIZATION()
+//     BEGIN_BOOST_SERIALIZATION()
+//       BOOST_SERIALIZE(bpp)
+//       BOOST_SERIALIZE(aggregation_proof)
+//     END_BOOST_SERIALIZATION_TOTAL_FIELDS(2)
   };
 
   // Zarcanum-aware CLSAG signature (one per ZC input)
@@ -438,11 +494,11 @@ namespace currency
       FIELD(clsags_ggx)
     END_SERIALIZE()
 
-    BEGIN_BOOST_SERIALIZATION()
-      BOOST_SERIALIZE(pseudo_out_amount_commitment)
-      BOOST_SERIALIZE(pseudo_out_blinded_asset_id)
-      BOOST_SERIALIZE(clsags_ggx)
-    END_BOOST_SERIALIZATION()
+//     BEGIN_BOOST_SERIALIZATION()
+//       BOOST_SERIALIZE(pseudo_out_amount_commitment)
+//       BOOST_SERIALIZE(pseudo_out_blinded_asset_id)
+//       BOOST_SERIALIZE(clsags_ggx)
+//     END_BOOST_SERIALIZATION_TOTAL_FIELDS(3)
   };
 
   // First part of a double Schnorr proof:
@@ -458,9 +514,22 @@ namespace currency
       FIELD(dss)
     END_SERIALIZE()
 
-    BEGIN_BOOST_SERIALIZATION()
-      BOOST_SERIALIZE(dss)
-    END_BOOST_SERIALIZATION()
+//     BEGIN_BOOST_SERIALIZATION()
+//       BOOST_SERIALIZE(dss)
+//     END_BOOST_SERIALIZATION_TOTAL_FIELDS(1)
+  };
+
+  // First part of a linear composition proof:
+  //   for txs without a ZC input AND with assets in OUTs: proves that balance point = lin(G, X)
+  // Second part:
+  //   proof of knowing transaction secret key (with respect to G)
+  struct zc_gw_balance_proof
+  {
+    crypto::generic_linear_composition_and_schnorr_sig_s lcss;
+
+    BEGIN_SERIALIZE_OBJECT()
+      FIELD(lcss)
+    END_SERIALIZE()
   };
 
 
@@ -482,28 +551,28 @@ namespace currency
       FIELD_N("clsag_ggxxg", (crypto::CLSAG_GGXXG_signature_serialized&)clsag_ggxxg);
     END_SERIALIZE()
 
-    BEGIN_BOOST_SERIALIZATION()
-      BOOST_SERIALIZE(d)
-      BOOST_SERIALIZE(C)
-      BOOST_SERIALIZE(C_prime);
-      BOOST_SERIALIZE(E);
-      BOOST_SERIALIZE(c);
-      BOOST_SERIALIZE(y0);
-      BOOST_SERIALIZE(y1);
-      BOOST_SERIALIZE(y2);
-      BOOST_SERIALIZE(y3);
-      BOOST_SERIALIZE(y4);
-      BOOST_SERIALIZE((crypto::bppe_signature_serialized&)E_range_proof);
-      BOOST_SERIALIZE(pseudo_out_amount_commitment);
-      BOOST_SERIALIZE((crypto::CLSAG_GGXXG_signature_serialized&)clsag_ggxxg);
-    END_BOOST_SERIALIZATION()
+//     BEGIN_BOOST_SERIALIZATION()
+//       BOOST_SERIALIZE(d)
+//       BOOST_SERIALIZE(C)
+//       BOOST_SERIALIZE(C_prime);
+//       BOOST_SERIALIZE(E);
+//       BOOST_SERIALIZE(c);
+//       BOOST_SERIALIZE(y0);
+//       BOOST_SERIALIZE(y1);
+//       BOOST_SERIALIZE(y2);
+//       BOOST_SERIALIZE(y3);
+//       BOOST_SERIALIZE(y4);
+//       BOOST_SERIALIZE((crypto::bppe_signature_serialized&)E_range_proof);
+//       BOOST_SERIALIZE(pseudo_out_amount_commitment);
+//       BOOST_SERIALIZE((crypto::CLSAG_GGXXG_signature_serialized&)clsag_ggxxg);
+//     END_BOOST_SERIALIZATION()
   };
 
 //#pragma pack(pop)
 
-  typedef boost::variant<txin_gen, txin_to_key, txin_multisig, txin_htlc, txin_zc_input> txin_v;
+  typedef boost::variant<txin_gen, txin_to_key, txin_multisig, txin_gateway, txin_zc_input> txin_v;
 
-  typedef boost::variant<tx_out_bare, tx_out_zarcanum> tx_out_v;
+  typedef boost::variant<tx_out_bare, tx_out_zarcanum, tx_out_gateway> tx_out_v;
 
 
   struct tx_comment
@@ -608,7 +677,7 @@ namespace currency
 #define TX_SERVICE_ATTACHMENT_ENCRYPT_BODY                    static_cast<uint8_t>(1 << 0)
 #define TX_SERVICE_ATTACHMENT_DEFLATE_BODY                    static_cast<uint8_t>(1 << 1)
 
-// with this flag enabled body encrypted/decrypted with the key created as a derivation from onetime key and "spend keys" of receiver
+// with this flag enabled body encrypted/decrypted with the key created as a derivation of tx public key and receiver's _spend_ secret key
 #define TX_SERVICE_ATTACHMENT_ENCRYPT_BODY_ISOLATE_AUDITABLE  static_cast<uint8_t>(1 << 2)  
 // add proof of content, without revealing secrete
 #define TX_SERVICE_ATTACHMENT_ENCRYPT_ADD_PROOF               static_cast<uint8_t>(1 << 3)  
@@ -711,8 +780,8 @@ namespace currency
       BEGIN_SERIALIZE() 
       END_SERIALIZE()
 
-      BEGIN_BOOST_SERIALIZATION()
-      END_BOOST_SERIALIZATION_TOTAL_FIELDS(0)
+//       BEGIN_BOOST_SERIALIZATION()
+//       END_BOOST_SERIALIZATION_TOTAL_FIELDS(0)
   };
 
   typedef boost::variant<dummy> asset_descriptor_base_etc_fields;
@@ -750,22 +819,10 @@ namespace currency
       FIELD(etc)
     END_SERIALIZE()
 
-    BOOST_SERIALIZATION_CURRENT_ARCHIVE_VER(2)
-    BEGIN_BOOST_SERIALIZATION()
-      BOOST_SERIALIZE(total_max_supply)
-      BOOST_SERIALIZE(current_supply)
-      BOOST_SERIALIZE(decimal_point)
-      BOOST_SERIALIZE(ticker)
-      BOOST_SERIALIZE(full_name)
-      BOOST_SERIALIZE(meta_info)
-      BOOST_SERIALIZE(owner)
-      BOOST_SERIALIZE(hidden_supply)
-      BOOST_END_VERSION_UNDER(1)
-      BOOST_SERIALIZE(owner_eth_pub_key)
-      BOOST_END_VERSION_UNDER(2)
-      BOOST_SERIALIZE(etc)
-      BOOST_SERIALIZE(version)
-    END_BOOST_SERIALIZATION_TOTAL_FIELDS(11)
+     BOOST_SERIALIZATION_CURRENT_ARCHIVE_VER(3)
+     BEGIN_BOOST_SERIALIZATION()
+      BOOST_CHAIN_TO_CRYPTO_SERIALIZATION()
+     END_BOOST_SERIALIZATION_TOTAL_FIELDS(11)
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(total_max_supply)  DOC_DSCR("Maximum possible supply for a given asset, cannot be changed after deployment.") DOC_EXMP(1000000000000000000)   DOC_END
@@ -779,6 +836,8 @@ namespace currency
       KV_SERIALIZE_POD_AS_HEX_STRING(owner_eth_pub_key) DOC_DSCR("[Optional] Owner's key in the case when ETH signature is used.") DOC_END
     END_KV_SERIALIZE_MAP()
   };
+
+  
 
 
   struct asset_descriptor_with_id: public asset_descriptor_base
@@ -836,19 +895,19 @@ namespace currency
       FIELD(etc)
     END_SERIALIZE()
 
-    BOOST_SERIALIZATION_CURRENT_ARCHIVE_VER(2)
-    BEGIN_BOOST_SERIALIZATION()
-      BOOST_CHAIN_TRANSITION_VER(1, asset_descriptor_operation_v1)
-      BOOST_CHAIN_TRANSITION_VER(0, asset_descriptor_operation_v1)
-      BOOST_SERIALIZE(version)
-      BOOST_SERIALIZE(operation_type)
-      BOOST_SERIALIZE(opt_amount_commitment)
-      BOOST_SERIALIZE(opt_asset_id)
-      BOOST_SERIALIZE(opt_descriptor)
-      BOOST_SERIALIZE(opt_amount)
-      BOOST_SERIALIZE(opt_asset_id_salt)
-      BOOST_SERIALIZE(etc)
-    END_BOOST_SERIALIZATION_TOTAL_FIELDS(8)
+//     BOOST_SERIALIZATION_CURRENT_ARCHIVE_VER(2)
+//     BEGIN_BOOST_SERIALIZATION()
+//       BOOST_CHAIN_TRANSITION_VER(1, asset_descriptor_operation_v1)
+//       BOOST_CHAIN_TRANSITION_VER(0, asset_descriptor_operation_v1)
+//       BOOST_SERIALIZE(version)
+//       BOOST_SERIALIZE(operation_type)
+//       BOOST_SERIALIZE(opt_amount_commitment)
+//       BOOST_SERIALIZE(opt_asset_id)
+//       BOOST_SERIALIZE(opt_descriptor)
+//       BOOST_SERIALIZE(opt_amount)
+//       BOOST_SERIALIZE(opt_asset_id_salt)
+//       BOOST_SERIALIZE(etc)
+//     END_BOOST_SERIALIZATION_TOTAL_FIELDS(8)
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(version)                                     DOC_DSCR("Asset operation type struct version") DOC_EXMP(2) DOC_END
@@ -875,13 +934,13 @@ namespace currency
       FIELD(opt_amount_commitment_g_proof)
     END_SERIALIZE()
 
-    BOOST_SERIALIZATION_CURRENT_ARCHIVE_VER(1)
-    BEGIN_BOOST_SERIALIZATION()
-      BOOST_SERIALIZE(opt_amount_commitment_composition_proof)
-      BOOST_SERIALIZE(opt_amount_commitment_g_proof)
-      BOOST_END_VERSION_UNDER(1)
-      BOOST_SERIALIZE(version)
-    END_BOOST_SERIALIZATION()
+    //BOOST_SERIALIZATION_CURRENT_ARCHIVE_VER(1)
+    //BEGIN_BOOST_SERIALIZATION()
+    //  BOOST_SERIALIZE(opt_amount_commitment_composition_proof)
+    //  BOOST_SERIALIZE(opt_amount_commitment_g_proof)
+    //  BOOST_END_VERSION_UNDER(1)
+    //  BOOST_SERIALIZE(version)
+    //END_BOOST_SERIALIZATION_TOTAL_FIELDS(3)
   };
 
 
@@ -895,11 +954,12 @@ namespace currency
     END_SERIALIZE()
 
     BOOST_SERIALIZATION_CURRENT_ARCHIVE_VER(1)
-    BEGIN_BOOST_SERIALIZATION()
-      BOOST_SERIALIZE(gss)
-      BOOST_END_VERSION_UNDER(1)
-      BOOST_SERIALIZE(version)
-    END_BOOST_SERIALIZATION()
+    
+    //BEGIN_BOOST_SERIALIZATION()
+    //  BOOST_SERIALIZE(gss)
+    //  BOOST_END_VERSION_UNDER(1)
+    //  BOOST_SERIALIZE(version)
+    //END_BOOST_SERIALIZATION_TOTAL_FIELDS(2)
   };
 
 
@@ -912,10 +972,10 @@ namespace currency
       FIELD(eth_sig)
     END_SERIALIZE()
 
-    BEGIN_BOOST_SERIALIZATION()
-      BOOST_SERIALIZE(eth_sig)
-      BOOST_SERIALIZE(version)
-    END_BOOST_SERIALIZATION()
+    //BEGIN_BOOST_SERIALIZATION()
+    //  BOOST_SERIALIZE(eth_sig)
+    //  BOOST_SERIALIZE(version)
+    //END_BOOST_SERIALIZATION_TOTAL_FIELDS(2)
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE_POD_AS_HEX_STRING(eth_sig)    DOC_DSCR("HEX-encoded ETH signature (64 bytes)") DOC_EXMP("674bb56a5b4fa562e679ccacc4e69455e63f4a581257382191de6856c2156630b3fba0db4bdd73ffcfb36b6add697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
@@ -987,10 +1047,85 @@ namespace currency
     END_SERIALIZE()
   };
 
-  typedef boost::mpl::vector23<
+
+  struct etc_coinbase_block_cumulative_size
+  {
+    uint64_t v;
+    BEGIN_SERIALIZE()
+      VARINT_FIELD(v)
+    END_SERIALIZE()
+  };
+
+
+  ///////////////////////////////////////////////////////////////////////////////////
+// Gateway addresses structures
+
+  typedef boost::variant<dummy> gateway_base_etc_fields;
+
+  struct gateway_address_descriptor_base
+  {
+    uint8_t                 version = 0;
+    gateway_owner_key_v     owner_key;
+    std::vector<gateway_base_etc_fields> etc;  //container for future use if we would be adding some optional parameters that is not known yet, but without mess related to format version
+    std::string             meta_info;  
+
+
+    BEGIN_VERSIONED_SERIALIZE(0, version)
+      FIELD(owner_key)
+      //  FIELD(view_key)
+      FIELD(etc)
+      FIELD(meta_info)
+    END_SERIALIZE()
+  };
+
+  struct gateway_address_descriptor_operation_register
+  {
+    uint8_t                         version = 0;
+    crypto::public_key              view_pub_key = null_pkey; // NOT premultiplied by 1/8, checked for the main subgroup
+    gateway_address_descriptor_base descriptor;
+
+    BEGIN_VERSIONED_SERIALIZE(0, version)
+      FIELD(view_pub_key)
+      FIELD(descriptor)
+      END_SERIALIZE()
+  };
+
+  struct gateway_address_descriptor_operation_update
+  {
+    uint8_t                         version = 0;
+    gateway_address_id_type         address_id = null_pkey;
+    gateway_address_descriptor_base descriptor;
+
+    BEGIN_VERSIONED_SERIALIZE(0, version)
+      FIELD(address_id)
+      FIELD(descriptor)
+      END_SERIALIZE()
+  };
+
+  typedef boost::variant<gateway_address_descriptor_operation_register, gateway_address_descriptor_operation_update> gateway_address_descriptor_operation_v;
+
+  struct gateway_address_descriptor_operation
+  {
+    uint8_t     version = 0;
+    gateway_address_descriptor_operation_v operation;
+
+    BEGIN_VERSIONED_SERIALIZE(0, version)
+      FIELD(operation)
+    END_SERIALIZE()
+  };
+
+
+
+
+
+
+  typedef boost::mpl::vector25<
     tx_service_attachment, tx_comment, tx_payer_old, tx_receiver_old, tx_derivation_hint, std::string, tx_crypto_checksum, etc_tx_time, etc_tx_details_unlock_time, etc_tx_details_expiration_time,
     etc_tx_details_flags, crypto::public_key, extra_attachment_info, extra_alias_entry_old, extra_user_data, extra_padding, etc_tx_flags16_t, etc_tx_details_unlock_time2,
-    tx_payer, tx_receiver, extra_alias_entry, zarcanum_tx_data_v1, asset_descriptor_operation
+    tx_payer, tx_receiver, extra_alias_entry, zarcanum_tx_data_v1, asset_descriptor_operation, 
+    //hf6
+    gateway_address_descriptor_operation, 
+    etc_coinbase_block_cumulative_size
   > all_payload_types;
   
   typedef boost::make_variant_over<all_payload_types>::type payload_items_v;
@@ -999,6 +1134,11 @@ namespace currency
 
 
 
+
+
+
+  ///////////////////////////////////////////////////////////////////////////////////
+  // Legacy structures
 
   //classic CryptoNote signature by Nicolas Van Saberhagen
   struct NLSAG_sig
@@ -1009,9 +1149,9 @@ namespace currency
       FIELD(s)
     END_SERIALIZE()
 
-    BEGIN_BOOST_SERIALIZATION()
-      BOOST_SERIALIZE(s)
-    END_BOOST_SERIALIZATION()
+    //BEGIN_BOOST_SERIALIZATION()
+    //  BOOST_SERIALIZE(s)
+    //END_BOOST_SERIALIZATION_TOTAL_FIELDS(1)
   };
 
   struct void_sig
@@ -1020,13 +1160,30 @@ namespace currency
     BEGIN_SERIALIZE_OBJECT()
     END_SERIALIZE()
 
-    BEGIN_BOOST_SERIALIZATION()
-    END_BOOST_SERIALIZATION()
+    //BEGIN_BOOST_SERIALIZATION()
+    //END_BOOST_SERIALIZATION_TOTAL_FIELDS(0)
   };
 
-  typedef boost::variant<NLSAG_sig, void_sig, ZC_sig, zarcanum_sig> signature_v;
+  typedef boost::variant<crypto::generic_schnorr_sig_s, crypto::eth_signature, crypto::eddsa_signature> gateway_signature_v;
 
-  typedef boost::variant<zc_asset_surjection_proof, zc_outs_range_proof, zc_balance_proof, asset_operation_proof, asset_operation_ownership_proof, asset_operation_ownership_proof_eth> proof_v;
+  struct gateway_sig
+  {
+    uint8_t version = 0;
+    gateway_signature_v s;
+
+    BEGIN_VERSIONED_SERIALIZE(0, version)
+      FIELD(s)
+    END_SERIALIZE()
+
+      //BEGIN_BOOST_SERIALIZATION()
+      //  BOOST_SERIALIZE(s)
+      //END_BOOST_SERIALIZATION_TOTAL_FIELDS(1)
+  };
+
+
+  typedef boost::variant<NLSAG_sig, void_sig, ZC_sig, zarcanum_sig, gateway_sig> signature_v;
+
+  typedef boost::variant<zc_asset_surjection_proof, zc_outs_range_proof, zc_balance_proof, asset_operation_proof, asset_operation_ownership_proof, asset_operation_ownership_proof_eth, gateway_address_ownership_proof, zc_gw_balance_proof> proof_v;
 
 
   //include backward compatibility defintions
@@ -1048,7 +1205,7 @@ namespace currency
       if(CURRENT_TRANSACTION_VERSION < version) return false;
       FIELD(vin)
       FIELD(extra)
-      FIELD(vout)
+      FIELD_TRANSITION_VER(TRANSACTION_VERSION_POST_HF6, vout, std::vector<tx_out_v_v1>) //FIELD(vout)
       if(version < TRANSACTION_VERSION_POST_HF5) return true;
       FIELD(hardfork_id)
     END_SERIALIZE()
@@ -1081,16 +1238,9 @@ namespace currency
     END_SERIALIZE()
 
 
-    BOOST_SERIALIZATION_CURRENT_ARCHIVE_VER(0)
+    BOOST_SERIALIZATION_CURRENT_ARCHIVE_VER(1)
     BEGIN_BOOST_SERIALIZATION()
-      BOOST_SERIALIZE(version)
-      BOOST_SERIALIZE(vin)
-      BOOST_SERIALIZE(vout)
-      BOOST_SERIALIZE(extra)
-      BOOST_SERIALIZE(signatures)
-      BOOST_SERIALIZE(attachment)
-      BOOST_END_VERSION_UNDER(1)
-      BOOST_SERIALIZE(proofs)
+      BOOST_CHAIN_TO_CRYPTO_SERIALIZATION()
     END_BOOST_SERIALIZATION()
   };
 
@@ -1207,14 +1357,16 @@ namespace currency
   bool operator ==(const currency::ZC_sig& a, const currency::ZC_sig& b);
   bool operator ==(const currency::zarcanum_sig& a, const currency::zarcanum_sig& b);
   bool operator ==(const currency::ref_by_id& a, const currency::ref_by_id& b);
+  bool operator ==(const currency::gateway_sig& a, const currency::gateway_sig& b);
 
   // TODO: REPLACE all of the following operators to "bool operator==(..) const = default" once we moved to C++20 -- sowle
   bool operator ==(const currency::signed_parts& a, const currency::signed_parts& b);
   bool operator ==(const currency::txin_gen& a, const currency::txin_gen& b);
   bool operator ==(const currency::txin_to_key& a, const currency::txin_to_key& b);
   bool operator ==(const currency::txin_multisig& a, const currency::txin_multisig& b);
-  bool operator ==(const currency::txin_htlc& a, const currency::txin_htlc& b);
+  bool operator ==(const currency::txin_dummy&, const currency::txin_dummy&);
   bool operator ==(const currency::txin_zc_input& a, const currency::txin_zc_input& b);
+  bool operator ==(const currency::txin_gateway& a, const currency::txin_gateway& b);
 } // namespace currency
 
 POD_MAKE_HASHABLE(currency, account_public_address);
@@ -1228,11 +1380,12 @@ BLOB_SERIALIZER(currency::txout_to_key);
 
 
 
-LOOP_BACK_BOOST_SERIALIZATION_VERSION(currency::asset_descriptor_operation);
+//LOOP_BACK_BOOST_SERIALIZATION_VERSION(currency::asset_descriptor_operation);
 LOOP_BACK_BOOST_SERIALIZATION_VERSION(currency::asset_descriptor_base);
-LOOP_BACK_BOOST_SERIALIZATION_VERSION(currency::asset_operation_proof);
-LOOP_BACK_BOOST_SERIALIZATION_VERSION(currency::asset_operation_ownership_proof);
-LOOP_BACK_BOOST_SERIALIZATION_VERSION(currency::transaction);
+//LOOP_BACK_BOOST_SERIALIZATION_VERSION(currency::asset_operation_proof);
+//LOOP_BACK_BOOST_SERIALIZATION_VERSION(currency::asset_operation_ownership_proof);
+//LOOP_BACK_BOOST_SERIALIZATION_VERSION(currency::transaction);
+//LOOP_BACK_BOOST_SERIALIZATION_VERSION(currency::tx_out_zarcanum);
 
 
 // txin_v variant currency
@@ -1282,14 +1435,14 @@ SET_VARIANT_TAGS(currency::tx_receiver, 32, "receiver2");
 SET_VARIANT_TAGS(currency::extra_alias_entry, 33, "alias_entry2");
 
 //htlc
-SET_VARIANT_TAGS(currency::txin_htlc, 34, "txin_htlc");
-SET_VARIANT_TAGS(currency::txout_htlc, 35, "txout_htlc");
+SET_VARIANT_TAGS(currency::txin_dummy, 34, "none"); // <- CZ, can be reused for gateway -- sowle
+//SET_VARIANT_TAGS(currency::txout_htlc, 35, "txout_htlc");
 
 SET_VARIANT_TAGS(currency::tx_out_bare, 36, "tx_out_bare");
 
 // Zarcanum
 SET_VARIANT_TAGS(currency::txin_zc_input, 37, "txin_zc_input");
-SET_VARIANT_TAGS(currency::tx_out_zarcanum, 38, "tx_out_zarcanum");
+SET_VARIANT_TAGS(currency::tx_out_zarcanum_v1, 38, "tx_out_zarcanum_v1");
 SET_VARIANT_TAGS(currency::zarcanum_tx_data_v1, 39, "zarcanum_tx_data_v1");
 SET_VARIANT_TAGS(crypto::bpp_signature_serialized, 40, "bpp_signature_serialized");
 SET_VARIANT_TAGS(crypto::bppe_signature_serialized, 41, "bppe_signature_serialized");
@@ -1309,6 +1462,29 @@ SET_VARIANT_TAGS(currency::asset_operation_ownership_proof_eth, 52, "asset_opera
 SET_VARIANT_TAGS(crypto::eth_public_key, 60, "eth_public_key");
 //SET_VARIANT_TAGS(crypto::eth_signature, 61, "eth_signature");
 SET_VARIANT_TAGS(currency::dummy, 62, "dummy");
+SET_VARIANT_TAGS(currency::tx_out_zarcanum, 63, "tx_out_zarcanum");
+
+//Gateway addresses
+SET_VARIANT_TAGS(currency::txin_gateway, 65, "txin_gateway");
+SET_VARIANT_TAGS(currency::tx_out_gateway, 66, "tx_out_gateway");
+SET_VARIANT_TAGS(currency::gateway_sig, 67, "gateway_signature");
+SET_VARIANT_TAGS(crypto::eddsa_signature, 68, "eddsa_signature");
+SET_VARIANT_TAGS(crypto::eddsa_public_key, 69, "eddsa_public_key");
+SET_VARIANT_TAGS(crypto::signature, 70, "schnorr_signature");
+SET_VARIANT_TAGS(crypto::eth_signature, 71, "eth_signature");
+
+SET_VARIANT_TAGS(currency::account_public_address, 72, "account_public_address");
+SET_VARIANT_TAGS(currency::gateway_address_descriptor_operation, 73, "gateway_address_descriptor_operation");
+
+SET_VARIANT_TAGS(currency::gateway_address_descriptor_operation_register, 74, "gateway_address_descriptor_operation_register");
+SET_VARIANT_TAGS(currency::gateway_address_descriptor_operation_update, 75, "gateway_address_descriptor_operation_update"); 
+
+SET_VARIANT_TAGS(currency::gateway_address_ownership_proof, 76, "gateway_address_ownership_proof");
+SET_VARIANT_TAGS(crypto::generic_schnorr_sig_s, 70, "generic_schnorr_sig_s");
+SET_VARIANT_TAGS(currency::zc_gw_balance_proof, 77, "zc_gw_balance_proof");
+
+SET_VARIANT_TAGS(currency::etc_coinbase_block_cumulative_size, 78, "etc_coinbase_block_cumulative_size");
+
 
 
 

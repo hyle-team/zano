@@ -24,4 +24,21 @@ namespace currency
       KV_SERIALIZE(v)
     END_KV_SERIALIZE_MAP()
   };
+
+  struct transfer_destination
+  {
+    uint64_t amount = 0;
+    std::string address;
+    crypto::public_key asset_id = currency::native_coin_asset_id;
+    uint64_t payment_id = 0;
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(amount)                      DOC_DSCR("Amount to transfer to destination") DOC_EXMP(10000000000000)     DOC_END
+      KV_SERIALIZE(address)                     DOC_DSCR("Destination address") DOC_EXMP("ZxBvJDuQjMG9R2j4WnYUhBYNrwZPwuyXrC7FHdVmWqaESgowDvgfWtiXeNGu8Px9B24pkmjsA39fzSSiEQG1ekB225ZnrMTBp")     DOC_END
+      KV_SERIALIZE_POD_AS_HEX_STRING(asset_id)  DOC_DSCR("Asset id to transfer") DOC_EXMP("cc608f59f8080e2fbfe3c8c80eb6e6a953d47cf2d6aebd345bada3a1cab99852")     DOC_END
+      KV_SERIALIZE(payment_id)                  DOC_DSCR("[optional] Intrinsic 8-byte payment id for this destination. Incompatible with integrated addresses.") DOC_EXMP(1020394) DOC_END
+    END_KV_SERIALIZE_MAP()
+  };
+
+
+
 }

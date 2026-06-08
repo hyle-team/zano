@@ -76,7 +76,7 @@ namespace epee
     template<class serializible_type, class t_storage>
     static bool unserialize_t_obj(serializible_type& obj, t_storage& stg, typename t_storage::hsection hparent_section, const char* pname)
     {
-      typename t_storage::hsection	hchild_section = stg.open_section(pname, hparent_section, true);
+      typename t_storage::hsection	hchild_section = stg.open_section(pname, hparent_section, false);
       if(!hchild_section) return false;
       return obj._load(stg, hchild_section);
     }
@@ -403,6 +403,10 @@ namespace epee
       static bool serialize_ephemeral(t_type& d, t_storage& stg, typename t_storage::hsection hparent_section, const char* pname, cb_serialize cb_s)
       {
         //just a stub here
+        t_type_stored a{};
+        bool r = epee::serialization::selector<false>::serialize(a, stg, hparent_section, pname);
+        if (r)
+          throw std::runtime_error(std::string("KV unserialize: loading ephemeral ") + pname);
         return true;
       }
     };

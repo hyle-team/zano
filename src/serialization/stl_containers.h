@@ -1,5 +1,6 @@
 // Copyright (c) 2014-2017 The The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
+// Copyright (c) 2014-2026 Zano Project
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -14,10 +15,10 @@
 
 
 //#include "serialization.h"
-template <template <bool> class Archive, class T>
-bool do_serialize(Archive<false> &ar, std::vector<T> &v);
-template <template <bool> class Archive, class T>
-bool do_serialize(Archive<true> &ar, std::vector<T> &v);
+//template <template <bool> class Archive, class T>
+//bool do_serialize(Archive<false> &ar, std::vector<T> &v);
+//template <template <bool> class Archive, class T>
+//bool do_serialize(Archive<true> &ar, std::vector<T> &v);
 
 namespace serialization
 {
@@ -38,10 +39,12 @@ namespace serialization
   }
 }
 
-template <template <bool> class Archive, class T>
-bool do_serialize(Archive<false> &ar, std::vector<T> &v)
+//template <template <bool> class Archive, class T>
+template<class Archive, class T,
+  typename std::enable_if<!Archive::is_saving::value, int>::type = 0>
+bool do_serialize(Archive& ar, std::vector<T> &v)
 {
-  size_t cnt;
+  size_t cnt = 0;
   ar.begin_array(cnt);
   if (!ar.stream().good())
     return false;
@@ -75,8 +78,9 @@ bool do_serialize(Archive<false> &ar, std::vector<T> &v)
   return true;
 }
 
-template <template <bool> class Archive, class T>
-bool do_serialize(Archive<true> &ar, std::vector<T> &v)
+template<class Archive, class T,
+  typename std::enable_if<Archive::is_saving::value, int>::type = 0>
+bool do_serialize(Archive &ar, std::vector<T> &v)
 {
   size_t cnt = v.size();
   ar.begin_array(cnt);
@@ -97,7 +101,7 @@ bool do_serialize(Archive<true> &ar, std::vector<T> &v)
 template <template <bool> class Archive, class T>
 bool do_serialize(Archive<false> &ar, std::list<T> &v)
 {
-  size_t cnt;
+  size_t cnt = 0;
   ar.begin_array(cnt);
   if (!ar.stream().good())
     return false;
@@ -145,7 +149,7 @@ bool do_serialize(Archive<true> &ar, std::list<T> &v)
 template <template <bool> class Archive, class T>
 bool do_serialize(Archive<false> &ar, std::set<T> &v)
 {
-  size_t cnt;
+  size_t cnt = 0;
   ar.begin_array(cnt);
   if (!ar.stream().good())
     return false;
@@ -192,6 +196,82 @@ bool do_serialize(Archive<true> &ar, std::set<T> &v)
   ar.end_array();
   return true;
 }
+
+template <template <bool> class Archive, class T, class K>
+bool do_serialize(Archive<false>& ar, std::unordered_map<K, T>& v)
+{
+  size_t cnt = 0;
+  ar.begin_array(cnt);
+  if (!ar.stream().good())
+    return false;
+  v.clear();
+
+  // very basic sanity check
+  if (ar.remaining_bytes() < cnt) {
+    ar.stream().setstate(std::ios::failbit);
+    return false;
+  }
+
+  for (size_t i = 0; i < cnt; i++)
+  {
+    if (i > 0)
+      ar.delimit_array();
+    
+    typename std::unordered_map<K, T>::value_type vt{};
+    
+    const K& k = vt.first;
+    T& t = vt.second;
+    if (!::do_serialize(ar, const_cast<K&>(k)))
+      return false;
+    if (!ar.stream().good())
+      return false;
+
+    if (!::do_serialize(ar, t))
+      return false;
+    if (!ar.stream().good())
+      return false;
+
+    auto res = v.insert(vt);
+    if(res.second == false)
+      return false;
+  }
+  ar.end_array();
+  return true;
+}
+
+template <template <bool> class Archive, class T, class K>
+bool do_serialize(Archive<true>& ar, std::unordered_map<K, T>& v_)
+{
+  std::list<std::pair<K, T>> v(v_.begin(), v_.end());
+
+  v.sort([](const std::pair<K, T>& a, const std::pair<K, T>& b) -> bool { return a.first < b.first; });
+
+  size_t cnt = v.size();
+  ar.begin_array(cnt);
+  for (auto it = v.begin(); it != v.end(); it++)
+  {
+    if (!ar.stream().good())
+      return false;
+    if (it != v.begin())
+      ar.delimit_array();
+    //TODO: refactoring needed to remove const_cast 
+    if (!::do_serialize(ar, const_cast<K&>(it->first)))
+      return false;
+    if (!ar.stream().good())
+      return false;
+
+    //TODO: refactoring needed to remove const_cast 
+    if (!do_serialize(ar, const_cast<T&>(it->second)))
+      return false;
+    if (!ar.stream().good())
+      return false;
+
+
+  }
+  ar.end_array();
+  return true;
+}
+
 
 template <template <bool> class Archive, class A, class B>
 bool do_serialize(Archive<false> &ar, std::pair<A, B> &v)
@@ -276,3 +356,12 @@ bool do_serialize(Archive<true> &ar, std::vector<bool> &v)
   ar.end_array();
   return true;
 }
+
+template<typename Archive, typename T>
+struct serializer<Archive, std::vector<T>>
+{
+  static bool serialize(Archive& ar, std::vector<T>& v)
+  {
+    return ::do_serialize(ar, v);
+  }
+};

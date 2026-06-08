@@ -28,6 +28,45 @@ bool sign_an_offer(const transaction &offer_source_tx, size_t offer_tx_index, co
   return true;
 }
 
+static std::string create_zlib_body(uint64_t decompressed_size)
+{
+  z_stream zstream = {};
+  deflateInit(&zstream, Z_DEFAULT_COMPRESSION);
+
+  std::string compressed;
+  const size_t CHUNK = 64 * 1024;
+  std::vector<Bytef> in_buf(CHUNK, 'A');
+  std::vector<Bytef> out_buf(CHUNK);
+
+  uint64_t remaining = decompressed_size;
+
+  while (remaining > 0)
+  {
+    uInt to_feed = static_cast<uInt>(std::min<uint64_t>(remaining, CHUNK));
+    zstream.next_in = in_buf.data();
+    zstream.avail_in = to_feed;
+    int flush = (remaining <= CHUNK) ? Z_FINISH : Z_NO_FLUSH;
+
+    do
+    {
+      zstream.next_out = out_buf.data();
+      zstream.avail_out = static_cast<uInt>(out_buf.size());
+      deflate(&zstream, flush);
+      size_t have = out_buf.size() - zstream.avail_out;
+      compressed.append(reinterpret_cast<char*>(out_buf.data()), have);
+    } while (zstream.avail_out == 0);
+
+    remaining -= to_feed;
+  }
+
+  deflateEnd(&zstream);
+
+  if (compressed.size() > 2)
+    compressed.erase(0, 2);
+
+  return compressed;
+}
+
 //------------------------------------------------------------------------------
 
 bool fill_default_offer(bc_services::offer_details& od)
@@ -1402,5 +1441,53 @@ bool offer_cancellation_with_zero_fee::c1(currency::core& c, size_t ev_index, co
   // Make sure balance was no chaged by incorrect offer cancellation
   CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("offer has been cancelled, ", "Miner", miner_wlt, miner_start_balance - od.fee, true, 0), false, "");
 
+  return true;
+}
+
+offers_decompression_test::offers_decompression_test()
+{
+  REGISTER_CALLBACK_METHOD(offers_decompression_test, check_offers);
+}
+
+bool offers_decompression_test::generate(std::vector<test_event_entry>& events) const
+{
+  uint64_t ts_start = 1338224400;
+
+  GENERATE_ACCOUNT(miner_account);
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_account, ts_start);
+  MAKE_NEXT_BLOCK(events, blk_1, blk_0, miner_account);
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_1r, blk_1, miner_account, 10);
+
+  const uint64_t decompressed_size = 100ULL * 1024 * 1024; // 100MiB, but exceeds CURRENCY_MAX_TRANSACTION_BLOB_SIZE decompressed
+  std::string body = create_zlib_body(decompressed_size);
+
+  LOG_PRINT_L0("large: compressed body = " << body.size() << " bytes, decompresses to " << decompressed_size
+    << " bytes (" << (decompressed_size / (1024 * 1024)) << " MiB)" << ", CURRENCY_MAX_TRANSACTION_BLOB_SIZE = " << CURRENCY_MAX_TRANSACTION_BLOB_SIZE);
+
+  currency::tx_service_attachment tsa = AUTO_VAL_INIT(tsa);
+  tsa.service_id = BC_OFFERS_SERVICE_ID;
+  tsa.instruction = BC_OFFERS_SERVICE_INSTRUCTION_ADD;
+  tsa.body = body;
+  tsa.flags = 0;
+  std::vector<currency::attachment_v> attachments;
+  attachments.push_back(tsa);
+
+  MAKE_TX_LIST_START_WITH_ATTACHS(events, txs_blk, miner_account, miner_account, MK_TEST_COINS(1), blk_1r, attachments);
+
+  const currency::transaction& large_tx = txs_blk.back();
+  LOG_PRINT_L0("TX blob size estimate: body in attachment = " << body.size() << " bytes");
+
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_2, blk_1r, miner_account, txs_blk);
+
+  DO_CALLBACK(events, "check_offers");
+  return true;
+}
+
+bool offers_decompression_test::check_offers(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  std::list<bc_services::offer_details_ex> offers;
+  get_all_offers(c, offers);
+  CHECK_AND_ASSERT_MES(offers.empty(), false, "offer should have been rejected by pre-unpack size check, but " << offers.size() << " offers were added");
+  LOG_PRINT_L0("decompression body was rejected by pre-unpack size check");
   return true;
 }

@@ -365,7 +365,7 @@ namespace pre_hf4_api
 
   struct payment_details
   {
-    std::string payment_id;
+    std::string payment_id; // hex-encoded
     std::string tx_hash;
     uint64_t amount;
     uint64_t block_height;
@@ -407,7 +407,7 @@ namespace pre_hf4_api
   {
     struct request
     {
-      std::vector<std::string> payment_ids;
+      std::vector<std::string> payment_ids; // hex-encoded
       uint64_t min_block_height;
       bool allow_locked_transactions;
 

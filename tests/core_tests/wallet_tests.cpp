@@ -53,8 +53,9 @@ bool determine_tx_real_inputs(currency::core& c, const currency::transaction& tx
       , m_found(false)
     {}
 
-    bool handle_output(const transaction& source_tx, const transaction& validated_tx, const tx_out_v& out_v, uint64_t source_tx_output_index)
+    bool handle_output(std::shared_ptr<const transaction_chain_entry> source_tx_ptr, const transaction& validated_tx, const tx_out_v& out_v, uint64_t source_tx_output_index)
     {
+      const transaction& source_tx = source_tx_ptr->tx;
       CHECK_AND_ASSERT_MES(!m_found, false, "Internal error: m_found is true but the visitor is still being applied");
       /*
       auto is_even = [&](const tx_out_v& v) { return boost::get<tx_out_bare>(v) == out; };
@@ -1542,6 +1543,7 @@ bool gen_wallet_decrypted_payload_items::generate(std::vector<test_event_entry>&
   REWIND_BLOCKS_N(events, blk_2r, blk_2, miner_acc, WALLET_DEFAULT_TX_SPENDABLE_AGE);
 
   MAKE_TX_EXTRA_ATTACH_FEE(events, tx_1, alice_acc, miner_acc, MK_TEST_COINS(100), TESTS_DEFAULT_FEE, blk_2r, std::vector<currency::payload_items_v>({ a_tx_comment }), std::vector<currency::payload_items_v>({ a_tx_payer, a_tx_message }));
+  //LOG_PRINT_L0("tx_1: " << get_transaction_hash(tx_1) << ENDL << obj_to_json_str(tx_1) << ENDL);
   MAKE_NEXT_BLOCK(events, blk_3, blk_2r, miner_acc); // don't put tx_1 into this block, the block is only necessary to trigger tx_pool scan on in wallet2::refresh()
 
   // Spend tx was not sent via Alice wallet instance, so wallet can't obtain destination address and pass it to callback (although, it decrypts attachments & extra)
@@ -1620,9 +1622,10 @@ void gen_wallet_decrypted_payload_items::on_transfer2(const tools::wallet_public
     std::string remote_addresses;
     for (auto it : wti.remote_addresses)
       remote_addresses += remote_addresses.empty() ? it : (", " + it);
-    CHECK_AND_ASSERT_THROW_MES(wti.comment == m_comment_to_be_checked &&
-      ((m_address_to_be_checked.empty() && wti.remote_addresses.empty()) || std::count(wti.remote_addresses.begin(), wti.remote_addresses.end(), m_address_to_be_checked) == 1),
-      "Wrongs wti received: comment: " << wti.comment << " remote addr: " << remote_addresses << std::endl << "  EXPECTED: comment: " << m_comment_to_be_checked << " remote addr: " << m_address_to_be_checked);
+
+    CHECK_AND_ASSERT_THROW_MES(wti.comment == m_comment_to_be_checked, "Wrong wti comment for tx " << wti.tx_hash << ", got: '" << wti.comment << "', expected: '" << m_comment_to_be_checked << "'");
+    bool condition = ((m_address_to_be_checked.empty() && wti.remote_addresses.empty()) || std::count(wti.remote_addresses.begin(), wti.remote_addresses.end(), m_address_to_be_checked) == 1);
+    CHECK_AND_ASSERT_THROW_MES(condition, "Wrongs wti remote address for tx " << wti.tx_hash << ", remote addrs got: " << remote_addresses << std::endl << "  remote addr expected: " << m_address_to_be_checked);
   //}
   //catch (...) { LOG_ERROR("!!!!!!!\n!!!!!!!\n!!!!!!!!\n!!!!!!\n!!!!!!!!\n!!!!!!!\n"); }
 }
@@ -1658,7 +1661,7 @@ bool gen_wallet_alias_and_unconfirmed_txs::generate(std::vector<test_event_entry
   bool r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc, null_account, get_alias_coast_from_fee(ai.m_alias, ALIAS_VERY_INITAL_COAST), TESTS_DEFAULT_FEE, 0, sources, destinations);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
   for(auto& d : destinations)
-    if (d.addr.back() == null_pub_addr)
+    if (boost::get<currency::account_public_address>(d.addr.back()) == null_pub_addr)
       d.flags |= tx_destination_entry_flags::tdef_explicit_native_asset_id | tx_destination_entry_flags::tdef_zero_amount_blinding_mask;
   transaction tx_alice_alias{};
   crypto::secret_key sk{};
@@ -3537,15 +3540,15 @@ bool wallet_sending_to_integrated_address::c1(currency::core& c, size_t ev_index
   miner_wlt->refresh();
 
   std::string payment_id = "super-payment-id-1948503537205028248";
-  std::string alice_integrated_address = get_account_address_and_payment_id_as_str(m_accounts[ALICE_ACC_IDX].get_public_address(), payment_id);
+  std::string alice_integrated_address = get_account_address_as_str(m_accounts[ALICE_ACC_IDX].get_public_address(), payment_id);
 
   bool callback_succeded = false;
   std::shared_ptr<wlt_lambda_on_transfer2_wrapper> l(new wlt_lambda_on_transfer2_wrapper(
     [&](const tools::wallet_public::wallet_transfer_info& wti, const std::list<tools::wallet_public::asset_balance_entry>& balances, uint64_t total_mined) -> bool {
-    LOG_PRINT_YELLOW("on_transfer: " << print_money_brief(wti.get_native_amount()) << " pid len: " << wti.payment_id.size() << " remote addr: " << (wti.remote_addresses.size() > 0 ? wti.remote_addresses[0] : ""), LOG_LEVEL_0);
-    if (wti.payment_id.empty())
+    LOG_PRINT_YELLOW("on_transfer: " << print_money_brief(wti.get_native_amount()) << " pid len: " << wti.tx_wide_payment_id.size() << " remote addr: " << (wti.remote_addresses.size() > 0 ? wti.remote_addresses[0] : ""), LOG_LEVEL_0);
+    if (wti.tx_wide_payment_id.empty())
       return true; // skip another outputs
-    CHECK_AND_ASSERT_MES(wti.payment_id == payment_id, false, "incorrect payment id");
+    CHECK_AND_ASSERT_MES(wti.tx_wide_payment_id == payment_id, false, "incorrect payment id");
     // below: tx_payer and tx_receiver are temporary disabled, @#@#TODO -- sowle
     //CHECK_AND_ASSERT_MES(wti.remote_addresses.size() == 1, false, "remote_addressed.size() = " << wti.remote_addresses.size());
     //CHECK_AND_ASSERT_MES(wti.remote_addresses[0] == alice_integrated_address, false, "incorrect remote address");
@@ -3810,7 +3813,7 @@ bool wallet_and_sweep_below::c1(currency::core& c, size_t ev_index, const std::v
   size_t outs_swept = 0;
   size_t amount_swept = 0;
   transaction tx{};
-  miner_wlt->sweep_below(native_coin_asset_id, 10 /* <- decoys */, m_accounts[ALICE_ACC_IDX].get_public_address(), COIN + 1, payment_id_t(), TESTS_DEFAULT_FEE, outs_total, amount_total, outs_swept, amount_swept, &tx);
+  miner_wlt->sweep_below(native_coin_asset_id, 10 /* <- decoys */, m_accounts[ALICE_ACC_IDX].get_public_address(), COIN + 1, payment_id_t(), TESTS_DEFAULT_FEE, 0, 0, outs_total, amount_total, outs_swept, amount_swept, &tx);
 
   CHECK_AND_ASSERT_MES(amount_swept == amount_total, false, "amount_swept != amount_total");
   CHECK_AND_ASSERT_MES(amount_swept == COIN * (2 * CURRENCY_MINED_MONEY_UNLOCK_WINDOW), false, "amount_swept = " << amount_swept);

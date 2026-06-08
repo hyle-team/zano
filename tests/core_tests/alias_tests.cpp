@@ -971,7 +971,7 @@ bool gen_alias_too_much_reward::generate(std::vector<test_event_entry>& events) 
   r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc, reward_acc, premine, TESTS_DEFAULT_FEE, 0, sources, destinations);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
   for(auto& d : destinations)
-    if (d.addr.back() == null_pub_addr)
+    if (boost::get<currency::account_public_address>(d.addr.back()) == null_pub_addr)
       d.flags |= tx_destination_entry_flags::tdef_explicit_native_asset_id | tx_destination_entry_flags::tdef_zero_amount_blinding_mask;
   transaction tx_0{};
   crypto::secret_key sk{};

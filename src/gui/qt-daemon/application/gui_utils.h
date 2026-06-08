@@ -7,8 +7,11 @@
 
 #pragma once
 
+#include <string>
+
 namespace gui_tools
 {
   bool GetStartOnSystemStartup();
   bool SetStartOnSystemStartup(bool fAutoStart);
+  bool calculate_html_folder_hash(const std::string& html_path, std::string& result_hash);
 }

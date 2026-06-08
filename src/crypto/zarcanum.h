@@ -281,6 +281,71 @@ namespace crypto
     }
   }
 
+  // multi-base Schnorr-like proof of knowledge a0, a1, b such that A = a0 * gen0 + a1 * gen1; B = b * gen2
+  // (three generators, three secrets, one Fiat-Shamir challenge)
+  //
+  // don't use yet, work in progress -- sowle
+  struct generic_linear_composition_and_schnorr_sig
+  {
+    scalar_t  c;
+    scalar_t  y0;
+    scalar_t  y1;
+    scalar_t  y2;
+  };
+
+  template<generator_tag gen0, generator_tag gen1, generator_tag gen_2>
+  inline bool generate_linear_composition_and_schnorr_sig(const hash& m, const point_t& A, const scalar_t& secret_a0, const scalar_t& secret_a1,
+    const point_t& B, const scalar_t& secret_b, generic_linear_composition_and_schnorr_sig& result);
+
+  template<>
+  inline bool generate_linear_composition_and_schnorr_sig<gt_G, gt_X, gt_G>(const hash& m, const point_t& A, const scalar_t& secret_a0, const scalar_t& secret_a1,
+    const point_t& B, const scalar_t& secret_b, generic_linear_composition_and_schnorr_sig& result)
+  {
+#ifndef NDEBUG
+    if (A != secret_a0 * c_point_G + secret_a1 * c_point_X || B != secret_b * c_point_G)
+      return false;
+#endif
+    scalar_t r0 = scalar_t::random();
+    scalar_t r1 = scalar_t::random();
+    scalar_t r2 = scalar_t::random();
+    point_t R0 = r0 * c_point_G + r1 * c_point_X; // = (y0 + c * a0) * G + (y1 + c * a1) * X = y0 * G + y1 * X + c * A
+    point_t R2 = r2 * c_point_G;
+    hash_helper_t::hs_t hsc(5);
+    hsc.add_hash(m);
+    hsc.add_point(A);
+    hsc.add_point(B);
+    hsc.add_point(R0);
+    hsc.add_point(R2);
+    result.c = hsc.calc_hash();
+    result.y0.assign_mulsub(result.c, secret_a0, r0); // y0 = r0 - c * secret_a0
+    result.y1.assign_mulsub(result.c, secret_a1, r1); // y1 = r1 - c * secret_a1
+    result.y2.assign_mulsub(result.c, secret_b,  r2); // y2 = r2 - c * secret_b
+    return true;
+  }
+
+  template<generator_tag gen0, generator_tag gen1, generator_tag gen_2>
+  inline bool verify_linear_composition_and_schnorr_sig(const hash& m, const point_t& A, const public_key& B, const generic_linear_composition_and_schnorr_sig& sig) noexcept;
+
+  template<>
+  inline bool verify_linear_composition_and_schnorr_sig<gt_G, gt_X, gt_G>(const hash& m, const point_t& A, const public_key& B, const generic_linear_composition_and_schnorr_sig& sig) noexcept
+  {
+    try
+    {
+      if (!sig.c.is_reduced() || !sig.y0.is_reduced() || !sig.y1.is_reduced() || !sig.y2.is_reduced())
+        return false;
+      hash_helper_t::hs_t hsc(5);
+      hsc.add_hash(m);
+      hsc.add_point(A);
+      hsc.add_pub_key(B);
+      hsc.add_point(A.mul_plus_G(sig.c, sig.y0) + sig.y1 * c_point_X);  // sig.y0 * G + sig.y1 * X + sig.c * A
+      hsc.add_point(sig.y2 * c_point_G + sig.c * point_t(B));           // sig.y2 * X + sig.c * B
+      return sig.c == hsc.calc_hash();
+    }
+    catch(...)
+    {
+      return false;
+    }
+  }
 
   // TODO: improve this proof using random weightning factor
   struct vector_UG_aggregation_proof

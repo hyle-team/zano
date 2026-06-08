@@ -99,6 +99,11 @@ namespace currency
     return get_tx_version(m_blockchain_storage.get_current_blockchain_size(), m_blockchain_storage.get_core_runtime_config().hard_forks);
   }
   //-----------------------------------------------------------------------------------------------
+  size_t core::get_current_hardfork_id() const
+  {
+    return m_blockchain_storage.get_current_hardfork_id();
+  }
+  //-----------------------------------------------------------------------------------------------
   uint64_t core::get_top_block_height() const
   {
     return m_blockchain_storage.get_top_block_height();
@@ -263,7 +268,7 @@ namespace currency
     TIME_MEASURE_FINISH_MS(parse_tx_time);
     
     TIME_MEASURE_START_MS(check_tx_semantic_time);
-    if(!validate_tx_semantic(tx, tx_blob.size()))
+    if(!validate_tx_semantic(tx, tx_blob.size(), tx_hash))
     {
       LOG_PRINT_L0("WRONG TRANSACTION SEMANTICS, Failed to check tx " << tx_hash << " semantic, rejected");
       tvc.m_verification_failed = true;

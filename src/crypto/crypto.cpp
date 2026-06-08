@@ -257,7 +257,7 @@ namespace crypto {
     ge_p3 tmp3;
     ec_scalar c;
     s_comm buf;
-    crypto_assert(check_key(pub));
+    // crypto_assert(check_key(pub)); <-- unnecessary here as it simply calls ge_frombytes_vartime(..., &pub) -- sowle
     buf.h = prefix_hash;
     buf.key = pub;
     if (ge_frombytes_vartime(&tmp3, &pub) != 0) {

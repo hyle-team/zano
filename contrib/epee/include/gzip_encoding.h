@@ -83,7 +83,7 @@ namespace net_utils
     *
     */
     inline 
-    virtual bool update_in( std::string& piece_of_transfer)
+    virtual bool update_in( std::string& piece_of_transfer) override
     {  
 
       bool is_first_time_here = m_is_first_update_in;
@@ -244,7 +244,7 @@ namespace net_utils
   {
     std::shared_ptr<abstract_callback_base> m_pcb;
 
-    virtual bool handle_target_data(std::string& piece_of_transfer)
+    virtual bool handle_target_data(std::string& piece_of_transfer) override
     {
       bool r = m_pcb->do_call(piece_of_transfer);
       piece_of_transfer.clear();

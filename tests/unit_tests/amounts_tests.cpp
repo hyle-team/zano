@@ -448,3 +448,128 @@ TEST(print_money_brief, 1)
   ASSERT_EQ(print_money_brief(18446744073709551614ull, 21),  "0.018446744073709551614");
   ASSERT_EQ(print_money_brief(18446744073709551615ull, 21),  "0.018446744073709551615");
 }
+
+TEST(print_fixed_decimal_point, 1)
+{
+  // decimal point 0
+  ASSERT_EQ(print_fixed_decimal_point(                   0ull,  0),                     "0");
+  ASSERT_EQ(print_fixed_decimal_point(                   1ull,  0),                     "1");
+  ASSERT_EQ(print_fixed_decimal_point(       1000000000000ull,  0),         "1000000000000");
+  ASSERT_EQ(print_fixed_decimal_point(       1900000000000ull,  0),         "1900000000000");
+  ASSERT_EQ(print_fixed_decimal_point(       1000000100000ull,  0),         "1000000100000");
+  ASSERT_EQ(print_fixed_decimal_point(       1000000000001ull,  0),         "1000000000001");
+  ASSERT_EQ(print_fixed_decimal_point(       9999999999999ull,  0),         "9999999999999");
+  ASSERT_EQ(print_fixed_decimal_point(      90009990009900ull,  0),        "90009990009900");
+  ASSERT_EQ(print_fixed_decimal_point(10109010000000000000ull,  0),  "10109010000000000000");
+  ASSERT_EQ(print_fixed_decimal_point(10109010010000000000ull,  0),  "10109010010000000000");
+  ASSERT_EQ(print_fixed_decimal_point(18446744073709551610ull,  0),  "18446744073709551610");
+  ASSERT_EQ(print_fixed_decimal_point(18446744073709551614ull,  0),  "18446744073709551614");
+  ASSERT_EQ(print_fixed_decimal_point(18446744073709551615ull,  0),  "18446744073709551615");
+
+  // decimal point 1
+  ASSERT_EQ(print_fixed_decimal_point(                   0ull,  1),                    "0.0");
+  ASSERT_EQ(print_fixed_decimal_point(                   1ull,  1),                    "0.1");
+  ASSERT_EQ(print_fixed_decimal_point(       1000000000000ull,  1),         "100000000000.0");
+  ASSERT_EQ(print_fixed_decimal_point(       1900000000000ull,  1),         "190000000000.0");
+  ASSERT_EQ(print_fixed_decimal_point(       1000000100000ull,  1),         "100000010000.0");
+  ASSERT_EQ(print_fixed_decimal_point(       1000000000001ull,  1),         "100000000000.1");
+  ASSERT_EQ(print_fixed_decimal_point(       9999999999999ull,  1),         "999999999999.9");
+  ASSERT_EQ(print_fixed_decimal_point(      90009990009900ull,  1),        "9000999000990.0");
+  ASSERT_EQ(print_fixed_decimal_point(10109010000000000000ull,  1),  "1010901000000000000.0");
+  ASSERT_EQ(print_fixed_decimal_point(10109010010000000000ull,  1),  "1010901001000000000.0");
+  ASSERT_EQ(print_fixed_decimal_point(18446744073709551610ull,  1),  "1844674407370955161.0");
+  ASSERT_EQ(print_fixed_decimal_point(18446744073709551614ull,  1),  "1844674407370955161.4");
+  ASSERT_EQ(print_fixed_decimal_point(18446744073709551615ull,  1),  "1844674407370955161.5");
+
+  // decimal point 2
+  ASSERT_EQ(print_fixed_decimal_point(                   0ull,  2),                   "0.00");
+  ASSERT_EQ(print_fixed_decimal_point(                   1ull,  2),                   "0.01");
+  ASSERT_EQ(print_fixed_decimal_point(       1000000000000ull,  2),         "10000000000.00");
+  ASSERT_EQ(print_fixed_decimal_point(       1900000000000ull,  2),         "19000000000.00");
+  ASSERT_EQ(print_fixed_decimal_point(       1000000100000ull,  2),         "10000001000.00");
+  ASSERT_EQ(print_fixed_decimal_point(       1000000000001ull,  2),         "10000000000.01");
+  ASSERT_EQ(print_fixed_decimal_point(       9999999999999ull,  2),         "99999999999.99");
+  ASSERT_EQ(print_fixed_decimal_point(      90009990009900ull,  2),        "900099900099.00");
+  ASSERT_EQ(print_fixed_decimal_point(10109010000000000000ull,  2),  "101090100000000000.00");
+  ASSERT_EQ(print_fixed_decimal_point(10109010010000000000ull,  2),  "101090100100000000.00");
+  ASSERT_EQ(print_fixed_decimal_point(18446744073709551610ull,  2),  "184467440737095516.10");
+  ASSERT_EQ(print_fixed_decimal_point(18446744073709551614ull,  2),  "184467440737095516.14");
+  ASSERT_EQ(print_fixed_decimal_point(18446744073709551615ull,  2),  "184467440737095516.15");
+
+  // decimal point 3
+  ASSERT_EQ(print_fixed_decimal_point(                   0ull,  3),                  "0.000");
+  ASSERT_EQ(print_fixed_decimal_point(                   1ull,  3),                  "0.001");
+  ASSERT_EQ(print_fixed_decimal_point(       1000000000000ull,  3),         "1000000000.000");
+  ASSERT_EQ(print_fixed_decimal_point(       1900000000000ull,  3),         "1900000000.000");
+  ASSERT_EQ(print_fixed_decimal_point(       1000000100000ull,  3),         "1000000100.000");
+  ASSERT_EQ(print_fixed_decimal_point(       1000000000001ull,  3),         "1000000000.001");
+  ASSERT_EQ(print_fixed_decimal_point(       9999999999999ull,  3),         "9999999999.999");
+  ASSERT_EQ(print_fixed_decimal_point(      90009990009900ull,  3),        "90009990009.900");
+  ASSERT_EQ(print_fixed_decimal_point(10109010000000000000ull,  3),  "10109010000000000.000");
+  ASSERT_EQ(print_fixed_decimal_point(10109010010000000000ull,  3),  "10109010010000000.000");
+  ASSERT_EQ(print_fixed_decimal_point(18446744073709551610ull,  3),  "18446744073709551.610");
+  ASSERT_EQ(print_fixed_decimal_point(18446744073709551614ull,  3),  "18446744073709551.614");
+  ASSERT_EQ(print_fixed_decimal_point(18446744073709551615ull,  3),  "18446744073709551.615");
+
+  // decimal point 18
+  ASSERT_EQ(print_fixed_decimal_point(                   0ull, 18),   "0.000000000000000000");
+  ASSERT_EQ(print_fixed_decimal_point(                   1ull, 18),   "0.000000000000000001");
+  ASSERT_EQ(print_fixed_decimal_point(       1000000000000ull, 18),   "0.000001000000000000");
+  ASSERT_EQ(print_fixed_decimal_point(       1900000000000ull, 18),   "0.000001900000000000");
+  ASSERT_EQ(print_fixed_decimal_point(       1000000100000ull, 18),   "0.000001000000100000");
+  ASSERT_EQ(print_fixed_decimal_point(       1000000000001ull, 18),   "0.000001000000000001");
+  ASSERT_EQ(print_fixed_decimal_point(       9999999999999ull, 18),   "0.000009999999999999");
+  ASSERT_EQ(print_fixed_decimal_point(      90009990009900ull, 18),   "0.000090009990009900");
+  ASSERT_EQ(print_fixed_decimal_point(10109010000000000000ull, 18),  "10.109010000000000000");
+  ASSERT_EQ(print_fixed_decimal_point(10109010010000000000ull, 18),  "10.109010010000000000");
+  ASSERT_EQ(print_fixed_decimal_point(18446744073709551610ull, 18),  "18.446744073709551610");
+  ASSERT_EQ(print_fixed_decimal_point(18446744073709551614ull, 18),  "18.446744073709551614");
+  ASSERT_EQ(print_fixed_decimal_point(18446744073709551615ull, 18),  "18.446744073709551615");
+
+  // decimal point 19
+  ASSERT_EQ(print_fixed_decimal_point(                   0ull, 19),  "0.0000000000000000000");
+  ASSERT_EQ(print_fixed_decimal_point(                   1ull, 19),  "0.0000000000000000001");
+  ASSERT_EQ(print_fixed_decimal_point(       1000000000000ull, 19),  "0.0000001000000000000");
+  ASSERT_EQ(print_fixed_decimal_point(       1900000000000ull, 19),  "0.0000001900000000000");
+  ASSERT_EQ(print_fixed_decimal_point(       1000000100000ull, 19),  "0.0000001000000100000");
+  ASSERT_EQ(print_fixed_decimal_point(       1000000000001ull, 19),  "0.0000001000000000001");
+  ASSERT_EQ(print_fixed_decimal_point(       9999999999999ull, 19),  "0.0000009999999999999");
+  ASSERT_EQ(print_fixed_decimal_point(      90009990009900ull, 19),  "0.0000090009990009900");
+  ASSERT_EQ(print_fixed_decimal_point(10109010000000000000ull, 19),  "1.0109010000000000000");
+  ASSERT_EQ(print_fixed_decimal_point(10109010010000000000ull, 19),  "1.0109010010000000000");
+  ASSERT_EQ(print_fixed_decimal_point(18446744073709551610ull, 19),  "1.8446744073709551610");
+  ASSERT_EQ(print_fixed_decimal_point(18446744073709551614ull, 19),  "1.8446744073709551614");
+  ASSERT_EQ(print_fixed_decimal_point(18446744073709551615ull, 19),  "1.8446744073709551615");
+
+  // TODO: remove it after setting reasonable limit of 18
+  // decimal point 20
+  ASSERT_EQ(print_fixed_decimal_point(                   0ull, 20),  "0.00000000000000000000");
+  ASSERT_EQ(print_fixed_decimal_point(                   1ull, 20),  "0.00000000000000000001");
+  ASSERT_EQ(print_fixed_decimal_point(       1000000000000ull, 20),  "0.00000001000000000000");
+  ASSERT_EQ(print_fixed_decimal_point(       1900000000000ull, 20),  "0.00000001900000000000");
+  ASSERT_EQ(print_fixed_decimal_point(       1000000100000ull, 20),  "0.00000001000000100000");
+  ASSERT_EQ(print_fixed_decimal_point(       1000000000001ull, 20),  "0.00000001000000000001");
+  ASSERT_EQ(print_fixed_decimal_point(       9999999999999ull, 20),  "0.00000009999999999999");
+  ASSERT_EQ(print_fixed_decimal_point(      90009990009900ull, 20),  "0.00000090009990009900");
+  ASSERT_EQ(print_fixed_decimal_point(10109010000000000000ull, 20),  "0.10109010000000000000");
+  ASSERT_EQ(print_fixed_decimal_point(10109010010000000000ull, 20),  "0.10109010010000000000");
+  ASSERT_EQ(print_fixed_decimal_point(18446744073709551610ull, 20),  "0.18446744073709551610");
+  ASSERT_EQ(print_fixed_decimal_point(18446744073709551614ull, 20),  "0.18446744073709551614");
+  ASSERT_EQ(print_fixed_decimal_point(18446744073709551615ull, 20),  "0.18446744073709551615");
+
+  // TODO: remove it after setting reasonable limit of 18
+  // decimal point 21
+  ASSERT_EQ(print_fixed_decimal_point(                   0ull, 21),  "0.000000000000000000000");
+  ASSERT_EQ(print_fixed_decimal_point(                   1ull, 21),  "0.000000000000000000001");
+  ASSERT_EQ(print_fixed_decimal_point(       1000000000000ull, 21),  "0.000000001000000000000");
+  ASSERT_EQ(print_fixed_decimal_point(       1900000000000ull, 21),  "0.000000001900000000000");
+  ASSERT_EQ(print_fixed_decimal_point(       1000000100000ull, 21),  "0.000000001000000100000");
+  ASSERT_EQ(print_fixed_decimal_point(       1000000000001ull, 21),  "0.000000001000000000001");
+  ASSERT_EQ(print_fixed_decimal_point(       9999999999999ull, 21),  "0.000000009999999999999");
+  ASSERT_EQ(print_fixed_decimal_point(      90009990009900ull, 21),  "0.000000090009990009900");
+  ASSERT_EQ(print_fixed_decimal_point(10109010000000000000ull, 21),  "0.010109010000000000000");
+  ASSERT_EQ(print_fixed_decimal_point(10109010010000000000ull, 21),  "0.010109010010000000000");
+  ASSERT_EQ(print_fixed_decimal_point(18446744073709551610ull, 21),  "0.018446744073709551610");
+  ASSERT_EQ(print_fixed_decimal_point(18446744073709551614ull, 21),  "0.018446744073709551614");
+  ASSERT_EQ(print_fixed_decimal_point(18446744073709551615ull, 21),  "0.018446744073709551615");
+}

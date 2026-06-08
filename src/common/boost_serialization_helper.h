@@ -32,7 +32,7 @@ namespace tools
     a << obj;
 
     return !data_file.fail();
-    CATCH_ENTRY_L0("serialize_obj_to_file: could not serialize into " << file_path, false);
+    CATCH_ENTRY_L0("serialize_obj_to_file: could not serialize into " << file_path <<, false);
   }
 
 
@@ -74,7 +74,7 @@ namespace tools
 
     a >> obj;
     return !data_file.fail();
-    CATCH_ENTRY_L0("unserialize_obj_from_file: could not load " << file_path, false);
+    CATCH_ENTRY_L0("unserialize_obj_from_file: could not load " << file_path <<, false);
   }
 
   template<class t_object>

@@ -8,7 +8,7 @@
 #pragma once
 #include "include_base_utils.h"
 #include "net/http_client.h"
-#include "core_rpc_proxy.h"
+#include "i_core_rpc_proxy.h"
 #include "storages/http_abstract_invoke.h"
 
 #ifdef NDEBUG
@@ -25,11 +25,9 @@
 
 namespace tools
 {
-
   class default_http_core_proxy final : public i_core_proxy
   {
   public:
-
 
     bool set_connection_addr(const std::string& url) override;
     void set_connectivity(unsigned int connection_timeout, size_t repeats_count) override;
@@ -42,6 +40,7 @@ namespace tools
     bool call_COMMAND_RPC_GET_ALIASES_BY_ADDRESS(const currency::COMMAND_RPC_GET_ALIASES_BY_ADDRESS::request& rqt, currency::COMMAND_RPC_GET_ALIASES_BY_ADDRESS::response& rsp) override;
     bool call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS(const currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::request& rqt, currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::response& rsp) override;
     bool call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3(const currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::request& rqt, currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::response& rsp) override;
+    bool call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4(const currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request& rqt, currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::response& rsp) override;
     bool call_COMMAND_RPC_SEND_RAW_TX(const currency::COMMAND_RPC_SEND_RAW_TX::request& rqt, currency::COMMAND_RPC_SEND_RAW_TX::response& rsp) override;
     bool call_COMMAND_RPC_FORCE_RELAY_RAW_TXS(const currency::COMMAND_RPC_FORCE_RELAY_RAW_TXS::request& rqt, currency::COMMAND_RPC_FORCE_RELAY_RAW_TXS::response& rsp) override;
     bool call_COMMAND_RPC_GET_ALL_ALIASES(currency::COMMAND_RPC_GET_ALL_ALIASES::response& rsp) override;
@@ -61,7 +60,8 @@ namespace tools
     bool call_COMMAND_RPC_INVOKE(const std::string& uri, const std::string& body, int& response_code, std::string& response_body) override;
 
     bool check_connection() override;
-    bool get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id) override;
+//    bool get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id) override;
+///    bool get_transfer_address(const std::string& adr_str, address_v& addr, std::string& payment_id) override;
 
     uint64_t get_download_speed() override;
     void set_plast_daemon_is_disconnected(std::atomic<bool> *plast_daemon_is_disconnected);   
@@ -143,7 +143,6 @@ namespace tools
 
     unsigned int m_connection_timeout;
     size_t m_attempts_count;
-
   };
 }
 

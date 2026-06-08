@@ -37,6 +37,7 @@ namespace tools
     virtual bool call_COMMAND_RPC_GET_ALIASES_BY_ADDRESS(const currency::COMMAND_RPC_GET_ALIASES_BY_ADDRESS::request& rqt, currency::COMMAND_RPC_GET_ALIASES_BY_ADDRESS::response& rsp){ return false; }
     virtual bool call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS(const currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::request& rqt, currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::response& rsp){ return false; }
     virtual bool call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3(const currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::request& rqt, currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::response& rsp) { return false; }
+    virtual bool call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4(const currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request& rqt, currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::response& rsp) { return false; }
     virtual bool call_COMMAND_RPC_SEND_RAW_TX(const currency::COMMAND_RPC_SEND_RAW_TX::request& rqt, currency::COMMAND_RPC_SEND_RAW_TX::response& rsp){ return false; }
     virtual bool call_COMMAND_RPC_FORCE_RELAY_RAW_TXS(const currency::COMMAND_RPC_FORCE_RELAY_RAW_TXS::request& rqt, currency::COMMAND_RPC_FORCE_RELAY_RAW_TXS::response& rsp){ return false; }
     virtual bool call_COMMAND_RPC_GET_ALL_ALIASES(currency::COMMAND_RPC_GET_ALL_ALIASES::response& rsp){ return false; }
@@ -67,7 +68,8 @@ namespace tools
     virtual uint64_t get_download_speed() { return 0; }
     std::shared_ptr<const proxy_diagnostic_info> get_proxy_diagnostic_info() const { return m_pdiganostic_info; }
     std::shared_ptr<proxy_diagnostic_info> get_editable_proxy_diagnostic_info() { return m_pdiganostic_info; }
-    virtual bool get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id){ return false; }
+    virtual bool get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id);
+    virtual bool get_transfer_address(const std::string& adr_str, currency::address_v& addr, std::string& payment_id);
     virtual void set_connectivity(unsigned int connection_timeout, size_t repeats_count) {}
     // This method determines if the daemons share the same address space as the caller (which may help decide if some RPC calls can be skipped).
     virtual bool is_daemon_inbox() { return false; }

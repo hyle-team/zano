@@ -105,3 +105,10 @@ struct offer_cancellation_with_zero_fee : public wallet_test
   bool generate(std::vector<test_event_entry>& events) const;
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };
+
+struct offers_decompression_test : public test_chain_unit_base
+{
+  offers_decompression_test();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool check_offers(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};
