@@ -65,6 +65,7 @@ namespace currency
 
 
     uint64_t get_createtime_precise() const { return m_creation_timestamp; }
+    uint64_t get_createtime_rounded() const;
     void set_createtime(uint64_t val) { m_creation_timestamp = val; }
 
     bool load(const std::string& file_path);
