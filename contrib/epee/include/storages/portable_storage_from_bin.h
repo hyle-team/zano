@@ -198,7 +198,7 @@ namespace epee
       case SERIALIZE_TYPE_OBJECT: return read_ae<section>();
       case SERIALIZE_TYPE_ARRAY:  return read_ae<array_entry>();
       default: 
-        CHECK_AND_ASSERT_THROW_MES(false, "unknown entry_type code = " << type);
+        CHECK_AND_ASSERT_THROW_MES(false, "unknown entry_type code = " << (int)type);
       }
     }
 
@@ -216,7 +216,7 @@ namespace epee
       case PORTABLE_RAW_SIZE_MARK_DWORD: v = read<uint32_t>();break;
       case PORTABLE_RAW_SIZE_MARK_INT64: v = read<uint64_t>();break;
       default:
-        CHECK_AND_ASSERT_THROW_MES(false, "unknown varint size_mask = " << size_mask);
+        CHECK_AND_ASSERT_THROW_MES(false, "unknown varint size_mask = " << (int)size_mask);
       }
       v >>= 2;
       return v;
@@ -285,7 +285,7 @@ namespace epee
       case SERIALIZE_TYPE_OBJECT: return read_se<section>();
       case SERIALIZE_TYPE_ARRAY:  return read_se<array_entry>();
       default: 
-        CHECK_AND_ASSERT_THROW_MES(false, "unknown entry_type code = " << ent_type);
+        CHECK_AND_ASSERT_THROW_MES(false, "unknown entry_type code = " << (int)ent_type);
       }
     }
     inline 
