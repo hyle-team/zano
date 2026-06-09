@@ -3244,10 +3244,13 @@ void wallet2::assign_account(const currency::account_base& acc)
     m_watch_only = true;
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::generate(const std::wstring& path, const std::string& pass, bool auditable_wallet)
+void wallet2::generate(const std::wstring& path, const std::string& pass, bool auditable_wallet, bool allow_weak_password /* = false */)
 {
-  WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(validate_password(pass), "new wallet generation failed: password contains forbidden characters")
-    clear();
+  if (!allow_weak_password)
+  {
+    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(validate_password(pass, WALLET_PASSWORD_MIN_LENGTH, WALLET_PASSWORD_MAX_LENGTH), "new wallet generation failed: password does not meet the password policy (allowed characters only, length must be 8..256)")
+  }
+  clear();
   prepare_file_names(path);
 
   m_password = pass;
