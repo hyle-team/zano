@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2026 Zano Project
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -12,6 +12,7 @@
 #include "include_base_utils.h"
 #include "crypto/chacha.h"
 #include "crypto/chacha8_stream.h"
+#include "crypto/crypto.h"
 
 
 namespace tools
@@ -56,8 +57,8 @@ namespace tools
 
     ~encrypt_chacha8_processer_base()
     {
-      m_ctx = ECRYPT_ctx{};
-      m_key = crypto::chacha_key{};
+      crypto::wipe(m_ctx);
+      // m_key wipes itself
     }
 
     template<typename cb_handler>
@@ -112,8 +113,8 @@ namespace tools
 
 
   /************************************************************************/
-/*  ChaCha20 processor base with domain separator support               */
-/************************************************************************/
+  /*  ChaCha20 processor base with domain separator support               */
+  /************************************************************************/
 
   class encrypt_chacha20_processer_base
   {
@@ -130,8 +131,8 @@ namespace tools
 
     ~encrypt_chacha20_processer_base()
     {
-      m_key = crypto::chacha_key{};
-      memset(&m_base_iv, 0, sizeof(m_base_iv));
+      crypto::wipe(m_base_iv);
+      // m_key wipes itself
     }
 
     template<typename cb_handler>
@@ -199,8 +200,8 @@ namespace tools
   };
 
   /************************************************************************/
-/*  ChaCha20 processor base with domain separator support               */
-/************************************************************************/
+  /*  ChaCha20 processor base with domain separator support               */
+  /************************************************************************/
 
   class encrypt_chacha20_v2_processer_base
   {
@@ -217,8 +218,8 @@ namespace tools
 
     ~encrypt_chacha20_v2_processer_base()
     {
-      m_key = crypto::chacha_key{};
-      memset(&m_base_iv, 0, sizeof(m_base_iv));
+      crypto::wipe(m_base_iv);
+      // m_key wipes itself
     }
 
     template<typename cb_handler>
@@ -490,4 +491,4 @@ namespace tools
   typedef encrypt_chacha_out_filter_t<encrypt_chacha20_processer_base> encrypt_chacha20_out_filter;
   typedef encrypt_chacha_out_filter_t<encrypt_chacha20_v2_processer_base> encrypt_chacha20_v2_out_filter;
 
-}
+} // namespace tools

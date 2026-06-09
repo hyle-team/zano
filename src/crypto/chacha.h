@@ -23,6 +23,7 @@ namespace crypto
 }
 #include "hash.h"
 #include "string_tools.h"
+#include "crypto.h"
 
 namespace crypto
 {
@@ -41,7 +42,7 @@ namespace crypto
 
     ~chacha_key()
     {
-      memset(data, 0, sizeof(data));
+      crypto::wipe(data);
     }
   };
 
