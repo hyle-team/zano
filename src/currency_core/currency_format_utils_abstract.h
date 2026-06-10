@@ -9,6 +9,7 @@
 #include <unordered_map>
 #include <list>
 #include <memory>
+#include <type_traits>
 
 
 #include "include_base_utils.h"
@@ -465,6 +466,17 @@ namespace currency
     return ss.str();
   }
   //---------------------------------------------------------------
+
+  template<typename T>
+  bool assign_add_with_overflow_check(const T& value, T& result)
+  {
+    static_assert(std::is_integral<T>::value && std::is_unsigned<T>::value, "only unsigned integrals, please");
+    if (result + value < result)
+      return false;
+
+    result += value;
+    return true;
+  }
 
   //---------------------------------------------------------------
   size_t get_object_blobsize(const transaction& t);
