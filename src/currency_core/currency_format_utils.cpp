@@ -3583,7 +3583,9 @@ namespace currency
       }
       else if (in.type() == typeid(txin_gateway))
       {
-        //TODO: @Val do we need to check anything here?
+        CHECKED_GET_SPECIFIC_VARIANT(in, const txin_gateway, gw_in, false);
+        if (gw_in.asset_id == currency::native_coin_asset_id_1div8)
+          this_amount = gw_in.amount;
       }
       else
       {
@@ -3602,14 +3604,18 @@ namespace currency
     uint64_t money = 0;
     for(const auto& o : tx.vout)
     {
+      uint64_t this_amount = 0;
       VARIANT_SWITCH_BEGIN(o);
       VARIANT_CASE_CONST(tx_out_bare, o)
-        if (money > o.amount + money)
-          return false;
-        money += o.amount;
-      // VARIANT_CASE_CONST(tx_out_zarcanum, o)
-        // ignore inputs with hidden amounts
+        this_amount = o.amount;
+      VARIANT_CASE_CONST(tx_out_gateway, out_gw)
+        if (out_gw.asset_id == native_coin_asset_id_1div8)
+          this_amount = out_gw.amount;
       VARIANT_SWITCH_END();
+      
+      if (money > this_amount + money)
+          return false;
+      money += this_amount;
     }
     return true;
   }
