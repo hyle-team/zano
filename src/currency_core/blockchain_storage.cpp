@@ -9410,16 +9410,26 @@ bool blockchain_storage::collect_all_outs_in_block(uint64_t input_amount, uint64
     {
       uint64_t amount = 0;
 
+      bool out_is_decoy_eligible = false;
       VARIANT_SWITCH_BEGIN(tx.vout[i]);
       VARIANT_CASE_CONST(tx_out_bare, o)
       {
-        amount = o.amount;
+        if (o.target.type() == typeid(txout_to_key))
+        {
+          amount = o.amount;
+          out_is_decoy_eligible = true;
+        }
       }
       VARIANT_CASE_CONST(tx_out_zarcanum, dummy_zc)
       {
         amount = 0;
+        out_is_decoy_eligible = true;
       }
       VARIANT_SWITCH_END();
+
+      // skip for multisig gateway and other, cuz they have no out in m_global_output_indexes
+      if (!out_is_decoy_eligible)
+        continue;
 
       COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry oen{};
       if (this->build_random_out_entry(amount, gidx[i], mix_count, /*use_only_forced_to_mix=*/false, /*height_upper_limit=*/0, oen) &&
