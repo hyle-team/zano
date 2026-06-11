@@ -1205,6 +1205,7 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY(mix_attr_tests);
     GENERATE_AND_PLAY(mix_in_spent_outs);
     GENERATE_AND_PLAY(random_outs_and_burnt_coins);
+    GENERATE_AND_PLAY(decoy_set_oob_on_multisig_out);
 
     // Block verification tests
     GENERATE_AND_PLAY_HF(gen_block_big_major_version, "0,3");

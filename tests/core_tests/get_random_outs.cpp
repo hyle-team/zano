@@ -187,3 +187,115 @@ bool random_outs_and_burnt_coins::c1(currency::core& c, size_t ev_index, const s
 
   return true;
 }
+
+decoy_set_oob_on_multisig_out::decoy_set_oob_on_multisig_out()
+{
+  REGISTER_CALLBACK_METHOD(decoy_set_oob_on_multisig_out, c1);
+}
+
+bool decoy_set_oob_on_multisig_out::generate(std::vector<test_event_entry>& events) const
+{
+  account_base genesis_acc;
+  genesis_acc.generate();
+  m_mining_accunt.generate();
+  m_accunt_a.generate();
+  m_accunt_b.generate();
+
+  block blk_0 = AUTO_VAL_INIT(blk_0);
+  generator.construct_genesis_block(blk_0, genesis_acc, test_core_time::get_time());
+  events.push_back(blk_0);
+
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, m_mining_accunt, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  DO_CALLBACK(events, "c1");
+  return true;
+}
+
+bool decoy_set_oob_on_multisig_out::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  // Test case: a block contains a multisig output with a non-decomposable amount and thus a stub global index 0. 
+  // when the decoy collector iterates every output of a sampled block without skipping them, it throws an out-of-range exception 
+  // upon trying to access the empty m_db_outputs bucket
+  std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, m_mining_accunt);
+  size_t blocks_fetched = 0;
+  bool received_money = false;
+  std::atomic<bool> atomic_false = ATOMIC_VAR_INIT(false);
+  miner_wlt->refresh(blocks_fetched, received_money, atomic_false);
+
+  std::vector<currency::extra_v> extra;
+  std::vector<currency::attachment_v> attachments;
+  std::vector<tx_destination_entry> dst(1);
+  dst.back().addr.push_back(m_accunt_a.get_public_address());
+  dst.back().addr.push_back(m_accunt_b.get_public_address());
+  dst.back().amount = ms_amount;
+  dst.back().minimum_sigs = dst.back().addr.size();
+
+  transaction ms_tx = AUTO_VAL_INIT(ms_tx);
+  miner_wlt->transfer(dst, 0, 0, TESTS_DEFAULT_FEE, extra, attachments, tools::detail::ssi_digit, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), ms_tx);
+
+  const uint64_t ms_tx_height = c.get_current_blockchain_size();
+
+  bool r = mine_next_pow_blocks_in_playtime(m_mining_accunt.get_public_address(), c, 3 * CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
+
+  // check locate the multisig output and confirm the stub-gindex situation
+  size_t ms_vout_idx = SIZE_MAX;
+  uint64_t ms_vout_amount = 0;
+  for (size_t i = 0; i < ms_tx.vout.size(); ++i)
+  {
+    if (ms_tx.vout[i].type() == typeid(tx_out_bare) && boost::get<tx_out_bare>(ms_tx.vout[i]).target.type() == typeid(txout_multisig))
+    {
+      ms_vout_idx = i;
+      ms_vout_amount = boost::get<tx_out_bare>(ms_tx.vout[i]).amount;
+      break;
+    }
+  }
+  CHECK_AND_ASSERT_MES(ms_vout_idx != SIZE_MAX, false, "multisig output not found in ms_tx");
+  CHECK_AND_ASSERT_MES(ms_vout_amount != 0, false, "multisig output has zero (hidden) amount, can't reproduce");
+
+  const crypto::hash ms_txid = get_transaction_hash(ms_tx);
+  std::vector<uint64_t> gindexes;
+  r = c.get_blockchain_storage().get_tx_outputs_gindexs(ms_txid, gindexes);
+  CHECK_AND_ASSERT_MES(r, false, "get_tx_outputs_gindexs failed for multisig tx (tx must be on the main chain)");
+  CHECK_AND_ASSERT_MES(gindexes.size() == ms_tx.vout.size(), false, "gindexes size mismatch");
+  // the multisig output carries a STUB global index 0 and is absent from m_db_outputs
+  CHECK_AND_ASSERT_MES(gindexes[ms_vout_idx] == 0, false, "expected stub global index 0 for the multisig output");
+
+  bool oob_direct = false;
+  try
+  {
+    std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry> outs;
+    c.get_blockchain_storage().collect_all_outs_in_block(ms_vout_amount, ms_tx_height, outs);
+  }
+  catch (const std::out_of_range& e)
+  {
+    oob_direct = true;
+    LOG_PRINT_RED("collect_all_outs_in_block: " << e.what(), LOG_LEVEL_0);
+  }
+
+  bool oob_rpc = false;
+  try
+  {
+    COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request req = AUTO_VAL_INIT(req);
+    req.look_up_strategy = LOOK_UP_STRATEGY_REGULAR_TX;
+    req.height_upper_limit = 0;
+    COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request_batch batch = AUTO_VAL_INIT(batch);
+    batch.input_amount = ms_vout_amount;
+    batch.heights.push_back(ms_tx_height);
+    req.batches.push_back(batch);
+    COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::response resp = AUTO_VAL_INIT(resp);
+    c.get_blockchain_storage().get_random_outs_for_amounts4(req, resp);
+  }
+  catch (const std::out_of_range& e)
+  {
+    oob_rpc = true;
+    LOG_PRINT_RED("get_random_outs_for_amounts4: " << e.what(), LOG_LEVEL_0);
+  }
+
+  CHECK_AND_ASSERT_MES(!oob_direct, false, "collect_all_outs_in_block() threw out_of_range on a block with a multisig output (amount=" 
+    << ms_vout_amount << ", height=" << ms_tx_height << ")");
+  CHECK_AND_ASSERT_MES(!oob_rpc, false, "get_random_outs_for_amounts4() threw out_of_range on a block with a multisig output (height=" 
+    << ms_tx_height << ")");
+
+  return true;
+}
