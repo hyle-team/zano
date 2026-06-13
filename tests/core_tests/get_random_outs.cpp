@@ -294,9 +294,9 @@ bool decoy_set_oob_on_multisig_out::c1(currency::core& c, size_t ev_index, const
     LOG_PRINT_RED("get_random_outs_for_amounts4: " << e.what(), LOG_LEVEL_0);
   }
 
-  CHECK_AND_ASSERT_MES(!oob_direct, false, "collect_all_outs_in_block() threw out_of_range on a block with a multisig output (amount="
+  CHECK_AND_ASSERT_MES(!oob_direct, false, "collect_all_outs_in_block() threw out_of_range on a block with a multisig output (amount=" 
     << ms_vout_amount << ", height=" << ms_tx_height << ")");
-  CHECK_AND_ASSERT_MES(!oob_rpc, false, "get_random_outs_for_amounts4() threw out_of_range on a block with a multisig output (height="
+  CHECK_AND_ASSERT_MES(!oob_rpc, false, "get_random_outs_for_amounts4() threw out_of_range on a block with a multisig output (height=" 
     << ms_tx_height << ")");
 
   return true;
