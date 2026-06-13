@@ -222,6 +222,8 @@ bool decoy_set_oob_on_multisig_out::c1(currency::core& c, size_t ev_index, const
   std::atomic<bool> atomic_false = ATOMIC_VAR_INIT(false);
   miner_wlt->refresh(blocks_fetched, received_money, atomic_false);
 
+  const uint64_t ms_amount = TESTS_DEFAULT_FEE * 13;
+
   std::vector<currency::extra_v> extra;
   std::vector<currency::attachment_v> attachments;
   std::vector<tx_destination_entry> dst(1);
@@ -292,10 +294,76 @@ bool decoy_set_oob_on_multisig_out::c1(currency::core& c, size_t ev_index, const
     LOG_PRINT_RED("get_random_outs_for_amounts4: " << e.what(), LOG_LEVEL_0);
   }
 
-  CHECK_AND_ASSERT_MES(!oob_direct, false, "collect_all_outs_in_block() threw out_of_range on a block with a multisig output (amount=" 
+  CHECK_AND_ASSERT_MES(!oob_direct, false, "collect_all_outs_in_block() threw out_of_range on a block with a multisig output (amount="
     << ms_vout_amount << ", height=" << ms_tx_height << ")");
-  CHECK_AND_ASSERT_MES(!oob_rpc, false, "get_random_outs_for_amounts4() threw out_of_range on a block with a multisig output (height=" 
+  CHECK_AND_ASSERT_MES(!oob_rpc, false, "get_random_outs_for_amounts4() threw out_of_range on a block with a multisig output (height="
     << ms_tx_height << ")");
+
+  return true;
+}
+
+//------------------------------------------------------------------------------
+
+decoy_set_on_zero_output_tx::decoy_set_on_zero_output_tx()
+{
+  REGISTER_CALLBACK_METHOD(decoy_set_on_zero_output_tx, check_decoys);
+}
+
+bool decoy_set_on_zero_output_tx::generate(std::vector<test_event_entry>& events) const
+{
+
+// Test case: a block contains a transaction with ZERO outputs
+
+  GENERATE_ACCOUNT(miner_account);
+  GENERATE_ACCOUNT(alice_account);
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_account, test_core_time::get_time());
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_account, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  MAKE_TX(events, fund_tx, miner_account, alice_account, TESTS_DEFAULT_FEE, blk_0r);
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_1, blk_0r, miner_account, std::list<transaction>({ fund_tx }));
+  REWIND_BLOCKS_N(events, blk_1r, blk_1, miner_account, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  std::vector<tx_source_entry> sources;
+  std::vector<tx_destination_entry> destinations;
+  bool r = fill_tx_sources(sources, events, blk_1r, alice_account.get_keys(), TESTS_DEFAULT_FEE, 0);
+  CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources failed");
+
+  transaction zero_out_tx = AUTO_VAL_INIT(zero_out_tx);
+  r = construct_tx(alice_account.get_keys(), sources, destinations, events, this, zero_out_tx);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx (zero-output) failed");
+  CHECK_AND_ASSERT_MES(zero_out_tx.vout.empty(), false, "internal test error: constructed tx has " << zero_out_tx.vout.size() << " output(s), expected 0");
+
+  events.push_back(zero_out_tx);
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_2, blk_1r, miner_account, std::list<transaction>({ zero_out_tx }));
+
+  m_zero_out_txid = get_transaction_hash(zero_out_tx);
+  m_zero_out_tx_height = get_block_height(blk_2);
+
+  DO_CALLBACK(events, "check_decoys");
+  return true;
+}
+
+bool decoy_set_on_zero_output_tx::check_decoys(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  std::vector<uint64_t> gindexes;
+  bool g = c.get_blockchain_storage().get_tx_outputs_gindexs(m_zero_out_txid, gindexes);
+  CHECK_AND_ASSERT_MES(!g, false, "get_tx_outputs_gindexs() unexpectedly succeeded (gindexes=" << gindexes.size() << ") for the zero-output tx " << m_zero_out_txid);
+
+
+  std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry> outs;
+  bool collected = c.get_blockchain_storage().collect_all_outs_in_block(0, m_zero_out_tx_height, outs);
+  CHECK_AND_ASSERT_MES(collected, false, "collect_all_outs_in_block() aborted on a block containing a zero-output tx at height " << m_zero_out_tx_height);
+
+  COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request req = AUTO_VAL_INIT(req);
+  req.look_up_strategy = LOOK_UP_STRATEGY_REGULAR_TX;
+  req.height_upper_limit = 0;
+  COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request_batch batch = AUTO_VAL_INIT(batch);
+  batch.input_amount = 0;
+  batch.heights.push_back(m_zero_out_tx_height);
+  req.batches.push_back(batch);
+  COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::response resp = AUTO_VAL_INIT(resp);
+  bool ok = c.get_blockchain_storage().get_random_outs_for_amounts4(req, resp);
+  CHECK_AND_ASSERT_MES(ok, false, "get_random_outs_for_amounts4() failed on a block with a zero-output tx at height " << m_zero_out_tx_height);
 
   return true;
 }

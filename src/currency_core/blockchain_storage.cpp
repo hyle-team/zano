@@ -9402,8 +9402,20 @@ bool blockchain_storage::collect_all_outs_in_block(uint64_t input_amount, uint64
 
   auto process_tx = [&](const crypto::hash& txid, const transaction& tx) -> bool
   {
+
+    if (tx.vout.empty())
+    {
+      LOG_PRINT_L2("collect_all_outs_in_block: skipping tx " << txid << " height " << height << " - it has no outputs (alias-like tx), nothing to collect for decoys");
+      return true;
+    }
+
     std::vector<uint64_t> gidx;
-    CHECK_AND_ASSERT_MES(this->get_tx_outputs_gindexs(txid, gidx), false, "failed to get_tx_outputs_gindexs() for tx_id " << txid);
+    if (!this->get_tx_outputs_gindexs(txid, gidx))
+    {
+      LOG_PRINT_L2("collect_all_outs_in_block: skipping tx " << txid << " height " << height << " - empty global output index, nothing to collect for decoys");
+      return true;
+    }
+
     CHECK_AND_ASSERT_MES(gidx.size() == tx.vout.size(), false, "gidx size (" << gidx.size() << ") != tx vout size (" << tx.vout.size() << ") for tx_id " << txid);
 
     for (size_t i = 0; i < tx.vout.size(); ++i)
