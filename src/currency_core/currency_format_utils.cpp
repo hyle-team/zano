@@ -4064,7 +4064,7 @@ namespace currency
 
     for (const auto ch : al)
     {
-      CHECK_AND_ASSERT_MES(alphabet[static_cast<unsigned char>(ch)], false, "Wrong character in alias: '" << ch << "'");
+      CHECK_AND_ASSERT_MES(alphabet[static_cast<unsigned char>(ch)], false, "Wrong character in alias: 0x" << std::hex << (int)static_cast<unsigned char>(ch));
     }
     return true;
   }

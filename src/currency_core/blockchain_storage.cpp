@@ -8289,7 +8289,7 @@ bool blockchain_storage::prevalidate_block(const block& bl)
   if (bl.minor_version > CURRENT_BLOCK_MINOR_VERSION)
   {
     //this means that binary block is compatible, but semantics got changed due to hardfork, daemon should be updated
-    LOG_PRINT_MAGENTA("Block's MINOR_VERSION is: " << bl.minor_version 
+    LOG_PRINT_MAGENTA("Block's MINOR_VERSION is: " << (int)bl.minor_version 
       << ", while current build supports not bigger then " <<  CURRENT_BLOCK_MINOR_VERSION 
       << ", please make sure you using latest version.", LOG_LEVEL_0
     );

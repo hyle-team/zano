@@ -25,6 +25,7 @@
 // 
 #pragma once 
 #include <algorithm>
+#include <ios>
 
 namespace epee 
 {
@@ -190,7 +191,7 @@ namespace misc_utils
               break;
             default:
               val.push_back(*it);
-              LOG_PRINT_L0("JSON unknown escape sequence :\"\\" << *it << "\"");
+              LOG_PRINT_L0("JSON unknown escape sequence :0x" << std::hex << (int)(uint8_t)*it);
             }
             escape_mode = false;
           }else if(*it == '"')
