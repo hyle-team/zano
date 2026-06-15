@@ -2950,7 +2950,7 @@ void wallet2::detach_blockchain(uint64_t including_height)
 
       if (!m_unconfirmed_txs.insert(std::make_pair(it->tx_hash, *it)).second)
       {
-        WLT_LOG_ERROR("can't move wti from transfer history to unronfirmed txs because such it is already here, tx hash: " << it->tx_hash);
+        WLT_LOG_L0("WARNING: can't move wti from transfer history to unconfirmed txs because such id is already here, tx hash: " << it->tx_hash);
       }
     }
     m_transfer_history.erase(it_from, m_transfer_history.end());
