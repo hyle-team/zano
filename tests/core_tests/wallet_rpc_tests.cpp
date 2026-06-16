@@ -24,7 +24,7 @@ using namespace currency;
 
 namespace
 {
-  bool gateway_rpc_proxy_decrypt_history(currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY2::response& resp, const std::string& gw_address, const crypto::secret_key& view_secret_key)
+  bool gateway_rpc_proxy_decrypt_history(currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY::response& resp, const std::string& gw_address, const crypto::secret_key& view_secret_key)
   {
     currency::address_v v_addr = {};
     currency::payment_id_t dummy_pid = {};
@@ -2155,17 +2155,17 @@ bool wallet_rpc_gateway_address::c1(currency::core& c, size_t ev_index, const st
 
   CHECK_AND_ASSERT_EQ(get_history_resp.transactions.back().comment, tr_to_gw_req2.comment);
 
-  // v2 keyless + client-side decryption (exactly what the gateway_rpc_proxy does) must yield the SAME decrypted result as the v1 server-side path above
+  // keyless + client-side decryption - exactly what the gateway_rpc_proxy does - must yield the SAME decrypted result as the server-side path above
   {
-    currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY2::request h2_req = {};
-    currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY2::response h2_resp = {};
-    h2_req.gateway_address = gw_reg_resp.address;
-    h2_req.count = 10;
-    r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_get_address_history2", h2_req, h2_resp);
-    CHECK_AND_ASSERT_MES(r, false, "gateway_get_address_history2 failed");
-    CHECK_AND_ASSERT_MES(gateway_rpc_proxy_decrypt_history(h2_resp, gw_reg_resp.address, gw_addr_secret_key), false, "v2 client-side decryption failed");
-    CHECK_AND_ASSERT_EQ(h2_resp.transactions.size(), get_history_resp.transactions.size());
-    CHECK_AND_ASSERT_EQ(h2_resp.transactions.back().subtransfers_by_pid.size(), get_history_resp.transactions.back().subtransfers_by_pid.size());
+    currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY::request hk_req = {};
+    currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY::response hk_resp = {};
+    hk_req.gateway_address = gw_reg_resp.address;   // gateway_view_secret_key left unset -> daemon returns raw_txs
+    hk_req.count = 10;
+    r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_get_address_history", hk_req, hk_resp);
+    CHECK_AND_ASSERT_MES(r, false, "keyless gateway_get_address_history failed");
+    CHECK_AND_ASSERT_MES(gateway_rpc_proxy_decrypt_history(hk_resp, gw_reg_resp.address, gw_addr_secret_key), false, "client-side decryption failed");
+    CHECK_AND_ASSERT_EQ(hk_resp.transactions.size(), get_history_resp.transactions.size());
+    CHECK_AND_ASSERT_EQ(hk_resp.transactions.back().subtransfers_by_pid.size(), get_history_resp.transactions.back().subtransfers_by_pid.size());
   }
 
   return true;

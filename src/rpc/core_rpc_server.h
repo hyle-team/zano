@@ -112,7 +112,6 @@ namespace currency
     bool on_gateway_create_owner_change(const COMMAND_RPC_GATEWAY_CREATE_OWNER_CHANGE::request& req, COMMAND_RPC_GATEWAY_CREATE_OWNER_CHANGE::response& res, connection_context& cntx);
     bool on_gateway_submit_owner_change(const COMMAND_RPC_GATEWAY_SUBMIT_OWNER_CHANGE::request& req, COMMAND_RPC_GATEWAY_SUBMIT_OWNER_CHANGE::response& res, connection_context& cntx);
     bool on_gateway_get_address_history(const COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY::request& req, COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY::response& res, connection_context& cntx);
-    bool on_gateway_get_address_history2(const COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY2::request& req, COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY2::response& res, connection_context& cntx);
 
 
     CHAIN_HTTP_TO_MAP2(connection_context); //forward http requests to uri map
@@ -202,7 +201,6 @@ namespace currency
         MAP_JON_RPC_CONDITIONAL("gateway_create_owner_change", on_gateway_create_owner_change, COMMAND_RPC_GATEWAY_CREATE_OWNER_CHANGE, m_enabled_admin_api)
         MAP_JON_RPC_CONDITIONAL("gateway_submit_owner_change", on_gateway_submit_owner_change, COMMAND_RPC_GATEWAY_SUBMIT_OWNER_CHANGE, m_enabled_admin_api)
         MAP_JON_RPC("gateway_get_address_history", on_gateway_get_address_history, COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY)
-        MAP_JON_RPC("gateway_get_address_history2", on_gateway_get_address_history2, COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY2)
 
         CHAIN_TO_PHANDLER(m_prpc_chain_handler)
       END_JSON_RPC_MAP()

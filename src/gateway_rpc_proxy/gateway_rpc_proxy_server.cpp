@@ -276,31 +276,32 @@ namespace gateway_rpc_proxy
   }
 
   //------------------------------------------------------------------------------------------------------------------------------
-  bool gateway_rpc_proxy_server::forward_keyless_history(const currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY2::request& req, currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY2::response& res)
+  bool gateway_rpc_proxy_server::forward_keyless_history(const currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY::request& req, currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY::response& res)
   {
     CRITICAL_REGION_LOCAL(m_daemon_lock);
 
-    currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY2::request d_req = AUTO_VAL_INIT(d_req);
+    currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY::request d_req = AUTO_VAL_INIT(d_req);
     d_req.gateway_address = req.gateway_address;
     d_req.offset          = req.offset;
     d_req.count           = req.count;
+    d_req.gateway_view_secret_key.reset();
 
     bool ok = false;
     for (size_t i = m_daemon_attempts; i && !ok; --i)
     {
       if (!ensure_daemon_connection())
         continue;
-      ok = epee::net_utils::invoke_http_json_rpc("/json_rpc", "gateway_get_address_history2", d_req, res, m_daemon_client, m_daemon_timeout);
+      ok = epee::net_utils::invoke_http_json_rpc("/json_rpc", "gateway_get_address_history", d_req, res, m_daemon_client, m_daemon_timeout);
       if (!ok)
         m_daemon_client.disconnect();
     }
     if (!ok)
-      LOG_ERROR("gateway_rpc_proxy: gateway_get_address_history2 forward failed after " << m_daemon_attempts << " attempt(s) to " << m_daemon_address);
+      LOG_ERROR("gateway_rpc_proxy: gateway_get_address_history forward failed after " << m_daemon_attempts << " attempt(s) to " << m_daemon_address);
     return ok;
   }
 
   //------------------------------------------------------------------------------------------------------------------------------
-  bool gateway_rpc_proxy_server::on_gateway_get_address_history2(const currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY2::request& req, currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY2::response& res, connection_context& cntx)
+  bool gateway_rpc_proxy_server::on_gateway_get_address_history(const currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY::request& req, currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY::response& res, connection_context& cntx)
   {
     currency::gateway_address_id_type addr_id = {};
     currency::address_v v_addr = {};
@@ -319,7 +320,7 @@ namespace gateway_rpc_proxy
 
     if (!forward_keyless_history(req, res))
     {
-      res = currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY2::response();
+      res = currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY::response();
       res.status = API_RETURN_CODE_INTERNAL_ERROR;
       res.status_error = "gateway_rpc_proxy: failed to query upstream daemon";
       return true;
@@ -333,7 +334,7 @@ namespace gateway_rpc_proxy
     if (res.transactions.size() != res.raw_txs.size())
     {
       LOG_ERROR("gateway_rpc_proxy: daemon returned " << res.transactions.size() << " transactions but " << res.raw_txs.size()
-        << " raw_txs; cannot decrypt (is the daemon up to date with gateway_get_address_history2?)");
+        << " raw_txs; cannot decrypt (is the daemon up to date - does it return raw_txs for a keyless gateway_get_address_history?)");
       res.transactions.clear();
       res.raw_txs.clear();
       res.status = API_RETURN_CODE_INTERNAL_ERROR;

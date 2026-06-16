@@ -43,11 +43,11 @@ namespace gateway_rpc_proxy
     virtual bool handle_http_request(const epee::net_utils::http::http_request_info& query_info, epee::net_utils::http::http_response_info& response_info, epee::net_utils::connection_context_base& conn_context,
       bool& call_found, documentation& docs = epee::net_utils::http::i_chain_handler::m_empty_documentation) override;
 
-    bool on_gateway_get_address_history2(const currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY2::request& req, currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY2::response& res, connection_context& cntx);
+    bool on_gateway_get_address_history(const currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY::request& req, currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY::response& res, connection_context& cntx);
 
     BEGIN_URI_MAP2_VIRTUAL()
       BEGIN_JSON_RPC_MAP("/json_rpc")
-        MAP_JON_RPC("gateway_get_address_history2", on_gateway_get_address_history2, currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY2)
+        MAP_JON_RPC("gateway_get_address_history", on_gateway_get_address_history, currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY)
       END_JSON_RPC_MAP()
     END_URI_MAP2()
 
@@ -55,7 +55,7 @@ namespace gateway_rpc_proxy
     bool handle_command_line(const boost::program_options::variables_map& vm);
     bool load_view_secret_key(const boost::program_options::variables_map& vm);
     bool ensure_daemon_connection();
-    bool forward_keyless_history(const currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY2::request& req, currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY2::response& res);
+    bool forward_keyless_history(const currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY::request& req, currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY::response& res);
     bool auth_http_request(const epee::net_utils::http::http_request_info& query_info,  epee::net_utils::http::http_response_info& response, connection_context& conn_context);
 
     std::string m_bind_ip;

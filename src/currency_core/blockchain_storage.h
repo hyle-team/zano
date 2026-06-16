@@ -511,7 +511,6 @@ namespace currency
 
     bool get_pos_votes(uint64_t start_h, uint64_t end_h, vote_results& r);
     bool gateway_get_address_history(const currency::gateway_address_id_type& addr_id, const COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY::request& req, COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY::response& res);
-    bool gateway_get_address_history2(const currency::gateway_address_id_type& addr_id, const COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY2::request& req, COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY2::response& res);
 
     //debug functions
     bool validate_blockchain_prev_links(size_t last_n_blocks_to_check = 10) const;
