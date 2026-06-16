@@ -87,7 +87,7 @@ bool hard_fork_2_tx_payer_in_wallet::c1(currency::core& c, size_t ev_index, cons
 
   // Before HF2: Miner -> Alice (normal address) with payer info
   tools::wallet_public::COMMAND_RPC_TRANSFER::request req_a = AUTO_VAL_INIT(req_a);
-  req_a.destinations.push_back(tools::wallet_public::transfer_destination{ MK_TEST_COINS(1), m_accounts[ALICE_ACC_IDX].get_public_address_str() });
+  req_a.destinations.push_back(currency::transfer_destination{ MK_TEST_COINS(1), m_accounts[ALICE_ACC_IDX].get_public_address_str() });
   req_a.fee = TESTS_DEFAULT_FEE;
   req_a.push_payer = true;
 
@@ -111,7 +111,7 @@ bool hard_fork_2_tx_payer_in_wallet::c1(currency::core& c, size_t ev_index, cons
 
   // Before HF2: Miner -> Bob (auditable address) with payer info
   tools::wallet_public::COMMAND_RPC_TRANSFER::request req_b = AUTO_VAL_INIT(req_b);
-  req_b.destinations.push_back(tools::wallet_public::transfer_destination{ MK_TEST_COINS(1), m_accounts[BOB_ACC_IDX].get_public_address_str() });
+  req_b.destinations.push_back(currency::transfer_destination{ MK_TEST_COINS(1), m_accounts[BOB_ACC_IDX].get_public_address_str() });
   req_b.fee = TESTS_DEFAULT_FEE;
   req_b.push_payer = true;
 
@@ -163,7 +163,7 @@ bool hard_fork_2_tx_payer_in_wallet::c1(currency::core& c, size_t ev_index, cons
   // Before HF2: Bob (auditable address) -> Alice with payer info requested (should NOT put tx_payer or tx_payer_old)
   tools::wallet_rpc_server bob_wlt_rpc(bob_wlt);
   tools::wallet_public::COMMAND_RPC_TRANSFER::request req_c = AUTO_VAL_INIT(req_c);
-  req_c.destinations.push_back(tools::wallet_public::transfer_destination{ MK_TEST_COINS(1), m_accounts[ALICE_ACC_IDX].get_public_address_str() });
+  req_c.destinations.push_back(currency::transfer_destination{ MK_TEST_COINS(1), m_accounts[ALICE_ACC_IDX].get_public_address_str() });
   req_c.fee = TESTS_DEFAULT_FEE;
   req_c.push_payer = true;
   res = AUTO_VAL_INIT(res);
@@ -255,7 +255,7 @@ bool hard_fork_2_tx_payer_in_wallet::c1(currency::core& c, size_t ev_index, cons
 
   // After HF2: Bob (auditable address) -> Alice with payer info requested (should put tx_payer)
   req_c = AUTO_VAL_INIT(req_c);
-  req_c.destinations.push_back(tools::wallet_public::transfer_destination{ MK_TEST_COINS(1), m_accounts[ALICE_ACC_IDX].get_public_address_str() });
+  req_c.destinations.push_back(currency::transfer_destination{ MK_TEST_COINS(1), m_accounts[ALICE_ACC_IDX].get_public_address_str() });
   req_c.fee = TESTS_DEFAULT_FEE;
   req_c.push_payer = true;
   res = AUTO_VAL_INIT(res);
@@ -333,8 +333,8 @@ bool hard_fork_2_tx_receiver_in_wallet::c1(currency::core& c, size_t ev_index, c
   tools::wallet_rpc_server::connection_context ctx;
 
   tools::wallet_public::COMMAND_RPC_TRANSFER::request req = AUTO_VAL_INIT(req);
-  req.destinations.push_back(tools::wallet_public::transfer_destination { MK_TEST_COINS(1), m_accounts[MINER_ACC_IDX].get_public_address_str() }); 
-  req.destinations.push_back(tools::wallet_public::transfer_destination { MK_TEST_COINS(1), m_accounts[BOB_ACC_IDX].get_public_address_str() });  // auditable address
+  req.destinations.push_back(currency::transfer_destination { MK_TEST_COINS(1), m_accounts[MINER_ACC_IDX].get_public_address_str() }); 
+  req.destinations.push_back(currency::transfer_destination { MK_TEST_COINS(1), m_accounts[BOB_ACC_IDX].get_public_address_str() });  // auditable address
   req.fee = TESTS_DEFAULT_FEE;
   req.hide_receiver = false; // just to emphasize, this is false by default
 

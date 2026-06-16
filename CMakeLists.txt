@@ -44,7 +44,6 @@ if(CMAKE_SYSTEM_NAME STREQUAL "iOS" OR CMAKE_SYSTEM_NAME STREQUAL "Android")
 endif()
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
-
 # build types
 if (UNIX AND NOT APPLE)
   # single configurations, defaults to Release
@@ -74,7 +73,6 @@ if(APPLE AND NOT DEFINED CMAKE_OSX_DEPLOYMENT_TARGET)
 endif()
 
 set(USE_PCH FALSE CACHE BOOL "Use shared precompiled headers")
-set(DISABLE_TOR FALSE CACHE BOOL "Disable TOR library(and related tor-connect submodule)")
 set(TESTNET FALSE CACHE BOOL "Compile for testnet")
 set(BUILD_GUI FALSE CACHE BOOL "Build qt-daemon")
 set(USE_BITCOIN_SECP256K1_FOR_ECDSA FALSE CACHE BOOL "Use bitcoin-secp256k1 library for validating ECDSA(instead of OpenSSL)")
@@ -123,9 +121,14 @@ add_definitions("/DBOOST_NO_CXX98_FUNCTION_BASE")
 
 
 if(MSVC)
-  add_definitions("/D_CRT_SECURE_NO_WARNINGS /D_WIN32_WINNT=0x0600 /DWIN32_LEAN_AND_MEAN /DGTEST_HAS_TR1_TUPLE=0")
+  add_definitions(
+    /D_CRT_SECURE_NO_WARNINGS
+    /D_WIN32_WINNT=0x0600
+    /DWIN32_LEAN_AND_MEAN
+    /DGTEST_HAS_TR1_TUPLE=0
+  ) 
   add_compile_options(/EHa /bigobj /Zm1000 /Z7 /MP2 /W3 /GS- /wd4996 /wd4503 /wd4345 /wd4091 /FIinline_c.h)
-  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /STACK:10485760 /DEBUG dbghelp.lib crypt32.lib")
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /STACK:10485760 /DEBUG dbghelp.lib crypt32.lib Bcrypt.lib")
   if(STATIC)
     foreach(VAR CMAKE_C_FLAGS_DEBUG CMAKE_CXX_FLAGS_DEBUG CMAKE_C_FLAGS_RELEASE CMAKE_CXX_FLAGS_RELEASE)
       string(REPLACE "/MD" "/MT" ${VAR} "${${VAR}}")
@@ -198,7 +201,7 @@ else()
   set(RELEASE_FLAGS "-Ofast -DNDEBUG -Wno-unused-variable")
 
   if(NOT APPLE AND NOT (CMAKE_SYSTEM_NAME STREQUAL "Android"))
-    set(RELEASE_FLAGS "${RELEASE_FLAGS} -flto -g3")
+    set(RELEASE_FLAGS "${RELEASE_FLAGS} -flto=auto -g3")
   endif()
   #if(CMAKE_C_COMPILER_ID STREQUAL "GNU" AND NOT MINGW)
   #  set(RELEASE_FLAGS "${RELEASE_FLAGS} -fno-fat-lto-objects")
@@ -316,7 +319,7 @@ else()
   find_package(Git QUIET)
   if(Git_FOUND OR GIT_FOUND)
     message(STATUS "Found Git: ${GIT_EXECUTABLE}")
-    add_custom_target(version ALL "${CMAKE_COMMAND}" "-D" "VERSION=${VERSION}" "-D" "GIT=${GIT_EXECUTABLE}" "-D" "TO=${CMAKE_BINARY_DIR}/version/version.h" "-P" "src/version.cmake" WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
+    add_custom_target(version ALL "${CMAKE_COMMAND}" "-D" "VERSION=${VERSION}" "-D" "TESTNET=${TESTNET}"  "-D" "GIT=${GIT_EXECUTABLE}" "-D" "TO=${CMAKE_BINARY_DIR}/version/version.h" "-P" "src/version.cmake" WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
   else()
     message(STATUS "WARNING: Git was not found!")
     set(VERSION "${VERSION}-unknown")
@@ -325,10 +328,26 @@ else()
   endif()
 endif()
 
+if(BUILD_GUI)
+  set(HTML_CONTENT_HASH_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/gui/qt-daemon/layout/html")
+  file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/version")
+  add_custom_target(html_content_hash ALL
+    "${CMAKE_COMMAND}"
+    "-D" "HTML_DIR=${HTML_CONTENT_HASH_DIR}"
+    "-D" "TO=${CMAKE_BINARY_DIR}/version/html_content_hash.h"
+    "-P" "src/gui/qt-daemon/html_content_hash.cmake"
+    WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+  )
+endif()
+
 set(BUILD_TESTS FALSE CACHE BOOL "Build Zano tests")
 set(DISABLE_MDBX FALSE CACHE BOOL "Exclude mdbx from build(need for a first time)") 
 if(NOT DISABLE_MDBX)
    add_definitions(-DENABLED_ENGINE_MDBX)
+endif()
+
+if (BUILD_TESTS)
+  add_definitions(-DBUILD_TESTS)
 endif()
 
   

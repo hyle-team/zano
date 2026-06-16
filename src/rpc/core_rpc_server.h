@@ -11,6 +11,7 @@
 
 #include "net/http_server_impl_base.h"
 #include "core_rpc_server_commands_defs.h"
+#include "core_rpc_server_commands_defs_wallet_ext.h"
 #include "currency_core/currency_core.h"
 #include "p2p/net_node.h"
 #include "currency_protocol/currency_protocol_handler.h"
@@ -40,6 +41,7 @@ namespace currency
     void set_rpc_chain_handler(epee::net_utils::http::i_chain_handler* prpc_chain_handler) { m_prpc_chain_handler = prpc_chain_handler; }
     bool on_get_blocks_direct(const COMMAND_RPC_GET_BLOCKS_DIRECT::request& req, COMMAND_RPC_GET_BLOCKS_DIRECT::response& res, connection_context& cntx);
     void set_ignore_connectivity_status(bool ignore) { m_ignore_offline_status = ignore;}
+    void set_enabled_admin_api(bool enabled) { m_enabled_admin_api = enabled; }
 
     bool on_get_height(const COMMAND_RPC_GET_HEIGHT::request& req, COMMAND_RPC_GET_HEIGHT::response& res, connection_context& cntx);
     bool on_get_blocks(const COMMAND_RPC_GET_BLOCKS_FAST::request& req, COMMAND_RPC_GET_BLOCKS_FAST::response& res, connection_context& cntx);
@@ -53,6 +55,7 @@ namespace currency
     bool on_get_random_outs(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS_LEGACY::request& req, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS_LEGACY::response& res, connection_context& cntx);
     bool on_get_random_outs1(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::request& req, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::response& res, connection_context& cntx);
     bool on_get_random_outs3(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::request& req, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::response& res, connection_context& cntx);
+    bool on_get_random_outs4(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request& req, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::response& res, connection_context& cntx);
     bool on_get_info(const COMMAND_RPC_GET_INFO::request& req, COMMAND_RPC_GET_INFO::response& res, connection_context& cntx);
     bool on_set_maintainers_info(const COMMAND_RPC_SET_MAINTAINERS_INFO::request& req, COMMAND_RPC_SET_MAINTAINERS_INFO::response& res, connection_context& cntx);
     bool on_get_tx_pool(const COMMAND_RPC_GET_TX_POOL::request& req, COMMAND_RPC_GET_TX_POOL::response& res, connection_context& cntx);
@@ -93,6 +96,7 @@ namespace currency
     bool on_get_asset_info(const COMMAND_RPC_GET_ASSET_INFO::request& req, COMMAND_RPC_GET_ASSET_INFO::response& res, connection_context& cntx);
     bool on_get_assets_list(const COMMAND_RPC_GET_ASSETS_LIST::request& req, COMMAND_RPC_GET_ASSETS_LIST::response& res, connection_context& cntx);
     bool on_decrypt_tx_details(const COMMAND_RPC_DECRYPT_TX_DETAILS::request& req, COMMAND_RPC_DECRYPT_TX_DETAILS::response& res, epee::json_rpc::error& error_resp, connection_context& cntx);
+    bool on_decrypt_tx_outs_and_update_op(const COMMAND_RPC_DECRYPT_TX_OUTS_AND_UPDATE_OP::request& req, COMMAND_RPC_DECRYPT_TX_OUTS_AND_UPDATE_OP::response& res, epee::json_rpc::error& error_resp, connection_context& cntx);
 
     bool on_get_main_block_details(const COMMAND_RPC_GET_BLOCK_DETAILS::request& req, COMMAND_RPC_GET_BLOCK_DETAILS::response& res, epee::json_rpc::error& error_resp, connection_context& cntx);
     bool on_get_alt_block_details(const COMMAND_RPC_GET_BLOCK_DETAILS::request& req, COMMAND_RPC_GET_BLOCK_DETAILS::response& res, epee::json_rpc::error& error_resp, connection_context& cntx);
@@ -101,9 +105,15 @@ namespace currency
     bool on_find_outs_in_recent_blocks(const COMMAND_RPC_FIND_OUTS_IN_RECENT_BLOCKS::request& req, COMMAND_RPC_FIND_OUTS_IN_RECENT_BLOCKS::response& res, epee::json_rpc::error& error_resp, connection_context& cntx);
     bool on_get_integrated_address(const COMMAND_RPC_GET_INTEGRATED_ADDRESS::request& req, COMMAND_RPC_GET_INTEGRATED_ADDRESS::response& res, epee::json_rpc::error& error_resp, connection_context& cntx);    
     bool on_validate_signature(const COMMAND_VALIDATE_SIGNATURE::request& req, COMMAND_VALIDATE_SIGNATURE::response& res, epee::json_rpc::error& er, connection_context& cntx);
-    
-    
-    
+
+    bool on_gateway_get_address_info(const COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO::request& req, COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO::response& res, connection_context& cntx);
+    bool on_gateway_create_transfer(const COMMAND_RPC_GATEWAY_CREATE_TRANSFER::request& req, COMMAND_RPC_GATEWAY_CREATE_TRANSFER::response& res, connection_context& cntx);
+    bool on_gateway_sign_transfer(const COMMAND_RPC_GATEWAY_SIGN_TRANSFER::request& req, COMMAND_RPC_GATEWAY_SIGN_TRANSFER::response& res, connection_context& cntx);
+    bool on_gateway_create_owner_change(const COMMAND_RPC_GATEWAY_CREATE_OWNER_CHANGE::request& req, COMMAND_RPC_GATEWAY_CREATE_OWNER_CHANGE::response& res, connection_context& cntx);
+    bool on_gateway_submit_owner_change(const COMMAND_RPC_GATEWAY_SUBMIT_OWNER_CHANGE::request& req, COMMAND_RPC_GATEWAY_SUBMIT_OWNER_CHANGE::response& res, connection_context& cntx);
+    bool on_gateway_get_address_history(const COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY::request& req, COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY::response& res, connection_context& cntx);
+
+
     CHAIN_HTTP_TO_MAP2(connection_context); //forward http requests to uri map
 
     BEGIN_URI_MAP2()
@@ -111,7 +121,7 @@ namespace currency
       MAP_URI_AUTO_JON2("/getheight",                 on_get_height,                  COMMAND_RPC_GET_HEIGHT)
       MAP_URI_AUTO_JON2("/gettransactions",           on_get_transactions,            COMMAND_RPC_GET_TRANSACTIONS)
       MAP_URI_AUTO_JON2("/sendrawtransaction",        on_send_raw_tx,                 COMMAND_RPC_SEND_RAW_TX)
-      MAP_URI_AUTO_JON2("/force_relay",               on_force_relaey_raw_txs,        COMMAND_RPC_FORCE_RELAY_RAW_TXS)
+      MAP_URI_AUTO_JON2_CONDITIONAL("/force_relay",   on_force_relaey_raw_txs,        COMMAND_RPC_FORCE_RELAY_RAW_TXS, m_enabled_admin_api)
 #ifdef CPU_MINING_ENABLED
       MAP_URI_AUTO_JON2("/start_mining",              on_start_mining,                COMMAND_RPC_START_MINING)
       MAP_URI_AUTO_JON2("/stop_mining",               on_stop_mining,                 COMMAND_RPC_STOP_MINING)
@@ -123,6 +133,7 @@ namespace currency
       MAP_URI_AUTO_BIN2("/getrandom_outs.bin",        on_get_random_outs,             COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS_LEGACY)
       MAP_URI_AUTO_BIN2("/getrandom_outs1.bin",       on_get_random_outs1,            COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS)
       MAP_URI_AUTO_BIN2("/getrandom_outs3.bin",       on_get_random_outs3,            COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3)
+      MAP_URI_AUTO_BIN2("/getrandom_outs4.bin",       on_get_random_outs4,            COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4)
       MAP_URI_AUTO_BIN2("/set_maintainers_info.bin",  on_set_maintainers_info,        COMMAND_RPC_SET_MAINTAINERS_INFO)
       MAP_URI_AUTO_BIN2("/get_tx_pool.bin",           on_get_tx_pool,                 COMMAND_RPC_GET_TX_POOL)
       MAP_URI_AUTO_BIN2("/check_keyimages.bin",       on_check_keyimages,             COMMAND_RPC_CHECK_KEYIMAGES) 
@@ -162,12 +173,14 @@ namespace currency
         MAP_JON_RPC   ("getrandom_outs",              on_get_random_outs,             COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS_LEGACY)
         MAP_JON_RPC   ("getrandom_outs1",             on_get_random_outs1,            COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS)
         MAP_JON_RPC   ("getrandom_outs3",             on_get_random_outs3,            COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3)
+        MAP_JON_RPC   ("getrandom_outs4",             on_get_random_outs4,            COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4)
         MAP_JON_RPC   ("get_votes",                   on_get_votes,                   COMMAND_RPC_GET_VOTES)
         
         //assets api
         MAP_JON_RPC   ("get_asset_info",              on_get_asset_info,             COMMAND_RPC_GET_ASSET_INFO)
         MAP_JON_RPC   ("get_assets_list",             on_get_assets_list,            COMMAND_RPC_GET_ASSETS_LIST)
         MAP_JON_RPC_WE("decrypt_tx_details",          on_decrypt_tx_details,         COMMAND_RPC_DECRYPT_TX_DETAILS)
+        MAP_JON_RPC_WE("decrypt_tx_outs_and_update_op", on_decrypt_tx_outs_and_update_op, COMMAND_RPC_DECRYPT_TX_OUTS_AND_UPDATE_OP)
 
         MAP_JON_RPC_WE("get_main_block_details",      on_get_main_block_details,      COMMAND_RPC_GET_BLOCK_DETAILS)
         MAP_JON_RPC_WE("get_alt_block_details",       on_get_alt_block_details,       COMMAND_RPC_GET_BLOCK_DETAILS)
@@ -180,6 +193,15 @@ namespace currency
         //
         MAP_JON_RPC_WE("marketplace_global_get_offers_ex", on_get_offers_ex,          COMMAND_RPC_GET_OFFERS_EX)        
         MAP_JON_RPC_WE("validate_signature",          on_validate_signature,          COMMAND_VALIDATE_SIGNATURE)
+        
+        //gateway addresses api
+        MAP_JON_RPC("gateway_get_address_info",    on_gateway_get_address_info,    COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO)
+        MAP_JON_RPC_CONDITIONAL("gateway_create_transfer",     on_gateway_create_transfer,     COMMAND_RPC_GATEWAY_CREATE_TRANSFER, m_enabled_admin_api)
+        MAP_JON_RPC_CONDITIONAL("gateway_sign_transfer",       on_gateway_sign_transfer,       COMMAND_RPC_GATEWAY_SIGN_TRANSFER, m_enabled_admin_api)
+        MAP_JON_RPC_CONDITIONAL("gateway_create_owner_change", on_gateway_create_owner_change, COMMAND_RPC_GATEWAY_CREATE_OWNER_CHANGE, m_enabled_admin_api)
+        MAP_JON_RPC_CONDITIONAL("gateway_submit_owner_change", on_gateway_submit_owner_change, COMMAND_RPC_GATEWAY_SUBMIT_OWNER_CHANGE, m_enabled_admin_api)
+        MAP_JON_RPC("gateway_get_address_history", on_gateway_get_address_history, COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY)
+
         CHAIN_TO_PHANDLER(m_prpc_chain_handler)
       END_JSON_RPC_MAP()
       CHAIN_TO_PHANDLER(m_prpc_chain_handler)
@@ -196,14 +218,16 @@ namespace currency
     bool fill_block_header_response(const block& blk, bool orphan_status, block_header_response& response);
     void set_session_blob(const std::string& session_id, const currency::block& blob);
     bool get_session_blob(const std::string& session_id, currency::block& blob);
+    void do_explicit_block_simulations();
     
     core& m_core;
     nodetool::node_server<currency::t_currency_protocol_handler<currency::core> >& m_p2p;
     bc_services::bc_offers_service& m_of;
     std::string m_port;
     std::string m_bind_ip;
-    bool m_ignore_offline_status;
+    bool m_ignore_offline_status = false;
     bool m_enabled_admin_api = false;
+    bool m_allow_legacy_payment_id_size = false;
     epee::net_utils::http::i_chain_handler* m_prpc_chain_handler = nullptr;
   };
 }

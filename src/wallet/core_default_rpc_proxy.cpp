@@ -107,6 +107,11 @@ namespace tools
     return invoke_http_bin_remote_command2_update_is_disconnect("/getrandom_outs3.bin", req, res);
   }
   //------------------------------------------------------------------------------------------------------------------------------
+  bool default_http_core_proxy::call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4(const currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request& req, currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::response& res)
+  {
+    return invoke_http_bin_remote_command2_update_is_disconnect("/getrandom_outs4.bin", req, res);
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
   bool default_http_core_proxy::call_COMMAND_RPC_SEND_RAW_TX(const currency::COMMAND_RPC_SEND_RAW_TX::request& req, currency::COMMAND_RPC_SEND_RAW_TX::response& res)
   {
     return invoke_http_json_remote_command2_update_is_disconnect("/sendrawtransaction", req, res);
@@ -217,10 +222,15 @@ namespace tools
     return invoke_http_json_rpc_update_is_disconnect("get_asset_info", req, res);
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  bool default_http_core_proxy::get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id)
-  {
-    return tools::get_transfer_address(adr_str, addr, payment_id, this);
-  }
+//   bool default_http_core_proxy::get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id)
+//   {
+//     return tools::get_transfer_address(adr_str, addr, payment_id, this);
+//   }
+//   //------------------------------------------------------------------------------------------------------------------------------
+//   bool default_http_core_proxy::get_transfer_address(const std::string& adr_str, address_v& addr, std::string& payment_id)
+//   {
+//     return tools::get_transfer_address(adr_str, addr, payment_id, this);
+//   }
   //------------------------------------------------------------------------------------------------------------------------------
 //   void default_http_core_proxy::set_plast_daemon_is_disconnected(std::atomic<bool> *plast_daemon_is_disconnected)
 //   {

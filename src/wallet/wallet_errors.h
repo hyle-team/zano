@@ -635,6 +635,20 @@ namespace tools
       std::string m_message;
     };
     //----------------------------------------------------------------------------------------------------
+    struct tx_has_too_many_inputs : public transfer_error
+    {
+      explicit tx_has_too_many_inputs(std::string&& loc, const std::string& message)
+        : transfer_error(std::move(loc), API_RETURN_CODE_TX_HAS_TOO_MANY_INPUTS)
+        , m_message(message)
+      {
+      }
+ 
+      const std::string get_message() const { return m_message; }
+ 
+    private:
+      std::string m_message;
+    };
+    //----------------------------------------------------------------------------------------------------
     struct zero_destination : public transfer_error
     {
       explicit zero_destination(std::string&& loc)
@@ -681,6 +695,14 @@ namespace tools
       }
     };
     //----------------------------------------------------------------------------------------------------
+    struct tx_freeze_period : public wallet_rpc_error
+    {
+      explicit tx_freeze_period(std::string&& loc, const std::string& request)
+        : wallet_rpc_error(std::move(loc), "sending transactions is temporarily not allowed because a hardfork activation is coming", request)
+      {
+      }
+    };
+    //----------------------------------------------------------------------------------------------------
     struct no_connection_to_daemon : public wallet_rpc_error
     {
       explicit no_connection_to_daemon(std::string&& loc, const std::string& request)
@@ -718,14 +740,14 @@ namespace tools
         return ss.str();
       }
 
-      wallet_error_with_rpc_code(std::string&& loc, int64_t rpc_error_code, const std::string& rpc_error_message)
+      wallet_error_with_rpc_code(std::string&& loc, const std::string& rpc_error_message, int64_t rpc_error_code)
         : wallet_logic_error(std::move(loc), rpc_error_message)
         , m_rpc_error_code(rpc_error_code)
         , m_rpc_error_message(rpc_error_message)
       {
       }
 
-      wallet_error_with_rpc_code(std::string&& loc, int64_t rpc_error_code, const std::string& rpc_error_message, const std::string& message)
+      wallet_error_with_rpc_code(std::string&& loc, const std::string& message, const std::string& rpc_error_message, int64_t rpc_error_code)
         : wallet_logic_error(std::move(loc), message)
         , m_rpc_error_code(rpc_error_code)
         , m_rpc_error_message(rpc_error_message)

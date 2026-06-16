@@ -39,7 +39,7 @@
 #define UNUSED_ATTRIBUTE __attribute__((unused))
 #endif 
 
-#define LOCATION_SS "[" << LOCAL_FUNCTION_DEF__ << ("] @ " __FILE__ ":" STR(__LINE__))
+#define LOCATION_SS "[" << LOCAL_FUNCTION_DEF__ << "] @ " __FILE__ ":" STR(__LINE__)
 #define LOCATION_STR (std::string("[") + LOCAL_FUNCTION_DEF__ + "] @ " __FILE__ ":" STR(__LINE__))
 
 
@@ -50,29 +50,33 @@
 #define TRY_ENTRY()             try {
 #define CATCH_ALL_DO_NOTHING()  }catch(...) {}
 
-#define CATCH_ENTRY_CUSTOM(location, custom_code, return_val) } \
+#define CATCH_ENTRY_CUSTOM_LOG_OP(log_op, location, custom_code, return_val) } \
   catch(const std::exception& ex) \
 { \
   (void)(ex); \
   custom_code; \
-  LOG_ERROR("Exception at [" << location << "], what=" << ex.what()); \
+  log_op("Exception at [" location "], what=" << ex.what()); \
   return return_val; \
 } \
   catch(...) \
 { \
   custom_code; \
-  LOG_ERROR("Exception at [" << location << "], generic exception \"...\""); \
+  log_op("Exception at [" location "], generic exception \"...\""); \
   return return_val; \
 }
+
+#define CATCH_ENTRY_CUSTOM(location, custom_code, return_val) CATCH_ENTRY_CUSTOM_LOG_OP(LOG_ERROR, location, custom_code, return_val)
 #define CATCH_ENTRY(location, return_val) CATCH_ENTRY_CUSTOM(location, (void)0, return_val)
 #define CATCH_ENTRY2(return_val) CATCH_ENTRY_CUSTOM(LOCATION_SS, (void)0, return_val)
 #define CATCH_ENTRY_CUSTOM2(custom_code, return_val) CATCH_ENTRY_CUSTOM(LOCATION_SS, custom_code, return_val)
 
-#define CATCH_ENTRY_L0(location, return_val) CATCH_ENTRY(location, return_val)
-#define CATCH_ENTRY_L1(location, return_val) CATCH_ENTRY(location, return_val)
-#define CATCH_ENTRY_L2(location, return_val) CATCH_ENTRY(location, return_val)
-#define CATCH_ENTRY_L3(location, return_val) CATCH_ENTRY(location, return_val)
-#define CATCH_ENTRY_L4(location, return_val) CATCH_ENTRY(location, return_val)
+#define CATCH_ENTRY_L0(location, return_val) CATCH_ENTRY_CUSTOM_LOG_OP(LOG_PRINT_L0, location, (void)0, return_val)
+#define CATCH_ENTRY_L0_RED(location, return_val) CATCH_ENTRY_CUSTOM_LOG_OP(LOG_PRINT_RED_L0, location, (void)0, return_val)
+#define CATCH_ENTRY_L1(location, return_val) CATCH_ENTRY_CUSTOM_LOG_OP(LOG_PRINT_L1, location, (void)0, return_val)
+#define CATCH_ENTRY_L2(location, return_val) CATCH_ENTRY_CUSTOM_LOG_OP(LOG_PRINT_L2, location, (void)0, return_val)
+#define CATCH_ENTRY_L3(location, return_val) CATCH_ENTRY_CUSTOM_LOG_OP(LOG_PRINT_L3, location, (void)0, return_val)
+#define CATCH_ENTRY_L4(location, return_val) CATCH_ENTRY_CUSTOM_LOG_OP(LOG_PRINT_L4, location, (void)0, return_val)
+#define CATCH_ENTRY_LOG_ERROR(location, return_val) CATCH_ENTRY_CUSTOM_LOG_OP(LOG_ERROR, location, (void)0, return_val)
 
 /// @brief Catches TRY_ENTRY without returning
 /// @details Useful within a dtor - but only if nested within another try block

@@ -1298,6 +1298,31 @@ namespace crypto
       std::vector<item_t> m_elements;
     };
 
+    //
+    // h - hash to crypto::hash [0..2^256-1], no reduce
+    //
+
+    static hash h(const char(&str32)[32], const crypto::hash& h)
+    {
+      hs_t hs_calculator(2);
+      hs_calculator.add_32_chars(str32);
+      hs_calculator.add_hash(h);
+      return hs_calculator.calc_hash_no_reduce();
+    }
+
+    static hash h(const char(&str32)[32], const crypto::hash& h, const uint64_t i)
+    {
+      hs_t hs_calculator(3);
+      hs_calculator.add_32_chars(str32);
+      hs_calculator.add_hash(h);
+      hs_calculator.add_scalar(scalar_t(i));
+      return hs_calculator.calc_hash_no_reduce();
+    }
+
+    //
+    // hs - hash to scalar [0..l-1]
+    //
+    
     static scalar_t hs(const scalar_t& s, const std::vector<point_t>& ps0, const std::vector<point_t>& ps1)
     {
       hs_t hs_calculator(3);
@@ -1392,6 +1417,10 @@ namespace crypto
       return hs_calculator.calc_hash();
     }
 
+    //
+    // hp - hash to point (group element)
+    //
+
     static point_t hp(const point_t& p)
     {
       point_t result;
@@ -1437,6 +1466,16 @@ namespace crypto
   {
     // hs won't touch memory if size is 0, so it's safe
     return hash_helper_t::hs(data(), sizeof(scalar_t) * size());
-  } 
+  }
+
+  inline bool pub_key_mul8(const public_key& pk_1div8, public_key& result)
+  {
+    point_t p{};
+    if (!p.from_public_key(pk_1div8))
+      return false;
+    p.modify_mul8();
+    result = p.to_public_key();
+    return true;
+  }
 
 } // namespace crypto

@@ -176,6 +176,7 @@ bool wallet_test_core_proxy::call_COMMAND_RPC_GET_CURRENT_CORE_TX_EXPIRATION_MED
   return true;
 }
 
+/*
 bool wallet_test_core_proxy::get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id)
 {
   return tools::get_transfer_address_cb(adr_str, addr, payment_id, [](currency::COMMAND_RPC_GET_ALIAS_DETAILS::request&, currency::COMMAND_RPC_GET_ALIAS_DETAILS::response){
@@ -184,3 +185,4 @@ bool wallet_test_core_proxy::get_transfer_address(const std::string& adr_str, cu
   });
 
 }
+*/

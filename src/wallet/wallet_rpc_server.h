@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2026 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -24,6 +24,7 @@ namespace tools
 //#ifndef MOBILE_WALLET_BUILD
     virtual std::shared_ptr<wallet2> get_wallet() = 0;
 //#endif
+    virtual ~i_wallet_provider() = default;
   };
 
   struct wallet_rpc_locker
@@ -85,6 +86,9 @@ namespace tools
     const static command_line::arg_descriptor<std::string> arg_miner_text_info;
     const static command_line::arg_descriptor<bool>        arg_deaf_mode;
     const static command_line::arg_descriptor<std::string> arg_jwt_secret;
+    const static command_line::arg_descriptor<bool>        arg_unsecure_no_auth;
+    const static command_line::arg_descriptor<bool>        arg_allow_legacy_decrypt;
+
 
 
     static void init_options(boost::program_options::options_description& desc);
@@ -92,7 +96,7 @@ namespace tools
     bool run(bool do_mint, bool offline_mode, const currency::account_public_address& miner_address);
 
     virtual bool handle_http_request(const epee::net_utils::http::http_request_info& query_info, epee::net_utils::http::http_response_info& response_info,
-      connection_context& conn_context)
+      connection_context& conn_context) override
     {
       bool  call_found = false;
       return this->handle_http_request(query_info, response_info, conn_context, call_found, epee::net_utils::http::i_chain_handler::m_empty_documentation);
@@ -110,9 +114,9 @@ namespace tools
         MAP_JON_RPC_WE("getbalance",                on_getbalance,                wallet_public::COMMAND_RPC_GET_BALANCE)
         MAP_JON_RPC_WE("getaddress",                on_getaddress,                wallet_public::COMMAND_RPC_GET_ADDRESS)
         MAP_JON_RPC_WE("get_wallet_info",           on_getwallet_info,            wallet_public::COMMAND_RPC_GET_WALLET_INFO)
-        MAP_JON_RPC_WE("get_recent_txs_and_info",   on_get_recent_txs_and_info,   wallet_public::COMMAND_RPC_GET_RECENT_TXS_AND_INFO) //LEGACY
-        MAP_JON_RPC_WE("get_recent_txs_and_info2",  on_get_recent_txs_and_info2,  wallet_public::COMMAND_RPC_GET_RECENT_TXS_AND_INFO2)
-
+        MAP_JON_RPC_WE("get_recent_txs_and_info",   on_get_recent_txs_and_info,   wallet_public::COMMAND_RPC_GET_RECENT_TXS_AND_INFO)  // very LEGACY
+        MAP_JON_RPC_WE("get_recent_txs_and_info2",  on_get_recent_txs_and_info2,  wallet_public::COMMAND_RPC_GET_RECENT_TXS_AND_INFO2) // will fail on post-HF6 txs with intrinsic pid
+        MAP_JON_RPC_WE("get_recent_txs_and_info3",  on_get_recent_txs_and_info3,  wallet_public::COMMAND_RPC_GET_RECENT_TXS_AND_INFO3)
         MAP_JON_RPC_WE("get_outputs",               on_get_outputs,               wallet_public::COMMAND_RPC_GET_OUTPUTS)
         MAP_JON_RPC_WE("get_utxo_stats",            on_get_utxo_stats,            wallet_public::COMMAND_RPC_GET_UTXO_STATS)
 
@@ -167,6 +171,9 @@ namespace tools
         MAP_JON_RPC_WE("attach_asset_descriptor",             on_attach_asset_descriptor,       wallet_public::COMMAND_ATTACH_ASSET_DESCRIPTOR)
         MAP_JON_RPC_WE("transfer_asset_ownership",            on_transfer_asset_ownership,      wallet_public::COMMAND_TRANSFER_ASSET_OWNERSHIP)
 
+        //Gateway API
+        MAP_JON_RPC_WE("register_gateway_address",            on_register_gateway_address,      wallet_public::COMMAND_GATEWAY_REGISTER_ADDRESS)
+
         //MULTIWALLET APIs
         MAP_JON_RPC_WE("mw_get_wallets",                      on_mw_get_wallets,                wallet_public::COMMAND_MW_GET_WALLETS)
         MAP_JON_RPC_WE("mw_select_wallet",                    on_mw_select_wallet,              wallet_public::COMMAND_MW_SELECT_WALLET)
@@ -175,6 +182,7 @@ namespace tools
         MAP_JON_RPC_WE("sign_message",                        on_sign_message,                  wallet_public::COMMAND_SIGN_MESSAGE)
         MAP_JON_RPC_WE("encrypt_data",                        on_encrypt_data,                  wallet_public::COMMAND_ENCRYPT_DATA)
         MAP_JON_RPC_WE("decrypt_data",                        on_decrypt_data,                  wallet_public::COMMAND_DECRYPT_DATA)
+        MAP_JON_RPC_WE("decrypt_data_legacy",                 on_decrypt_data_legacy,           wallet_public::COMMAND_DECRYPT_DATA_LEGACY)
 
         //utility call
         MAP_JON_RPC_WE("proxy_to_daemon",                     on_proxy_to_daemon,               wallet_public::COMMAND_PROXY_TO_DAEMON)
@@ -191,8 +199,10 @@ namespace tools
     bool on_get_seed_phrase_info(const wallet_public::COMMAND_RPC_GET_SEED_PHRASE_INFO::request& req, wallet_public::COMMAND_RPC_GET_SEED_PHRASE_INFO::response& res, epee::json_rpc::error& er, connection_context& cntx);
     bool on_get_recent_txs_and_info(const wallet_public::COMMAND_RPC_GET_RECENT_TXS_AND_INFO::request& req, wallet_public::COMMAND_RPC_GET_RECENT_TXS_AND_INFO::response& res, epee::json_rpc::error& er, connection_context& cntx);
     bool on_get_recent_txs_and_info2(const wallet_public::COMMAND_RPC_GET_RECENT_TXS_AND_INFO2::request& req, wallet_public::COMMAND_RPC_GET_RECENT_TXS_AND_INFO2::response& res, epee::json_rpc::error& er, connection_context& cntx);
+    bool on_get_recent_txs_and_info3(const wallet_public::COMMAND_RPC_GET_RECENT_TXS_AND_INFO3::request& req, wallet_public::COMMAND_RPC_GET_RECENT_TXS_AND_INFO3::response& res, epee::json_rpc::error& er, connection_context& cntx);
     bool on_get_outputs(const wallet_public::COMMAND_RPC_GET_OUTPUTS::request& req, wallet_public::COMMAND_RPC_GET_OUTPUTS::response& res, epee::json_rpc::error& er, connection_context& cntx);
     bool on_get_utxo_stats(const wallet_public::COMMAND_RPC_GET_UTXO_STATS::request& req, wallet_public::COMMAND_RPC_GET_UTXO_STATS::response& res, epee::json_rpc::error& er, connection_context& cntx);
+
     bool on_transfer(const wallet_public::COMMAND_RPC_TRANSFER::request& req, wallet_public::COMMAND_RPC_TRANSFER::response& res, epee::json_rpc::error& er, connection_context& cntx);
     bool on_store(const wallet_public::COMMAND_RPC_STORE::request& req, wallet_public::COMMAND_RPC_STORE::response& res, epee::json_rpc::error& er, connection_context& cntx);
     bool force_rescan_tx_pool(const wallet_public::COMMAND_RPC_FORCE_RESCAN_TX_POOL::request& req, wallet_public::COMMAND_RPC_FORCE_RESCAN_TX_POOL::response& res, epee::json_rpc::error& er, connection_context& cntx);
@@ -239,7 +249,9 @@ namespace tools
     bool on_asset_send_ext_signed_tx(const wallet_public::COMMAND_ASSET_SEND_EXT_SIGNED_TX::request& req, wallet_public::COMMAND_ASSET_SEND_EXT_SIGNED_TX::response& res, epee::json_rpc::error& er, connection_context& cntx);
     bool on_attach_asset_descriptor(const wallet_public::COMMAND_ATTACH_ASSET_DESCRIPTOR::request& req, wallet_public::COMMAND_ATTACH_ASSET_DESCRIPTOR::response& res, epee::json_rpc::error& er, connection_context& cntx);
     bool on_transfer_asset_ownership(const wallet_public::COMMAND_TRANSFER_ASSET_OWNERSHIP::request& req, wallet_public::COMMAND_TRANSFER_ASSET_OWNERSHIP::response& res, epee::json_rpc::error& er, connection_context& cntx);
-    
+
+    bool on_register_gateway_address(const wallet_public::COMMAND_GATEWAY_REGISTER_ADDRESS::request& req, wallet_public::COMMAND_GATEWAY_REGISTER_ADDRESS::response& res, epee::json_rpc::error& er, connection_context& cntx);
+
 
     bool on_mw_get_wallets(const wallet_public::COMMAND_MW_GET_WALLETS::request& req, wallet_public::COMMAND_MW_GET_WALLETS::response& res, epee::json_rpc::error& er, connection_context& cntx);
     bool on_mw_select_wallet(const wallet_public::COMMAND_MW_SELECT_WALLET::request& req, wallet_public::COMMAND_MW_SELECT_WALLET::response& res, epee::json_rpc::error& er, connection_context& cntx);
@@ -247,6 +259,7 @@ namespace tools
     bool on_sign_message(const wallet_public::COMMAND_SIGN_MESSAGE::request& req, wallet_public::COMMAND_SIGN_MESSAGE::response& res, epee::json_rpc::error& er, connection_context& cntx);
     bool on_encrypt_data(const wallet_public::COMMAND_ENCRYPT_DATA::request& req, wallet_public::COMMAND_ENCRYPT_DATA::response& res, epee::json_rpc::error& er, connection_context& cntx);
     bool on_decrypt_data(const wallet_public::COMMAND_DECRYPT_DATA::request& req, wallet_public::COMMAND_DECRYPT_DATA::response& res, epee::json_rpc::error& er, connection_context& cntx);
+    bool on_decrypt_data_legacy(const wallet_public::COMMAND_DECRYPT_DATA_LEGACY::request& req, wallet_public::COMMAND_DECRYPT_DATA_LEGACY::response& res, epee::json_rpc::error& er, connection_context& cntx);
 
     bool on_proxy_to_daemon(const wallet_public::COMMAND_PROXY_TO_DAEMON::request& req, wallet_public::COMMAND_PROXY_TO_DAEMON::response& res, epee::json_rpc::error& er, connection_context& cntx);
     bool on_clear_utxo_cold_sig_reservation(const wallet_public::COMMAND_CLEAR_UTXO_COLD_SIG_RESERVATION::request& req, wallet_public::COMMAND_CLEAR_UTXO_COLD_SIG_RESERVATION::response& res, epee::json_rpc::error& er, connection_context& cntx);
@@ -257,8 +270,9 @@ namespace tools
     //bool reset_active_wallet(std::shared_ptr<wallet2> w);
 
     bool handle_command_line(const boost::program_options::variables_map& vm);
-    void rpc_destinations_to_currency_destinations(const std::list<wallet_public::transfer_destination>& rpc_destinations, bool nullify_asset_id, bool try_to_split, std::vector<currency::tx_destination_entry>& currency_destinations);
+    void rpc_destinations_to_currency_destinations(const std::list<currency::transfer_destination>& rpc_destinations, bool nullify_asset_id, bool try_to_split, std::vector<currency::tx_destination_entry>& currency_destinations);
 
+    void set_flag_allow_legacy_payment_id_size(bool value) { m_allow_legacy_payment_id_size = value; }
 
   private:
     std::shared_ptr<i_wallet_provider> m_pwallet_provider_sh_ptr;
@@ -267,6 +281,8 @@ namespace tools
     std::string m_bind_ip;
     bool m_do_mint;
     bool m_deaf;
+    bool m_allow_legacy_payment_id_size;
+    bool m_allow_legacy_decrypt;
     uint64_t m_last_wallet_store_height;
     std::string m_jwt_secret;
     epee::misc_utils::expirating_set<std::string, uint64_t> m_jwt_used_salts;

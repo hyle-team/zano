@@ -110,6 +110,8 @@ public:
   QString get_version(const QString& param);
   QString get_os_version(const QString& param);
   QString get_network_type(const QString& param);
+  QString is_html_verified(const QString& param);
+  QString get_html_content_hash(const QString& param);
   QString transfer(const QString& param);
   QString have_secure_app_data(const QString& param);
   QString drop_secure_app_data();
@@ -319,7 +321,7 @@ private:
 
     localization_id_couter // keep it at the end of list
   };
-
+  std::string m_html_path;
   std::string m_normal_icon_path;
   std::string m_blocked_icon_path;
 

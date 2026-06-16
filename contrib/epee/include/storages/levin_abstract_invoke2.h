@@ -61,7 +61,11 @@ namespace epee
         LOG_ERROR("Failed to load_from_binary on command " << command);
         return false;
       }
-      result_struct.load(stg_ret);
+      if(!result_struct.load(stg_ret))
+      {
+        LOG_ERROR("Failed to result_struct.load(stg_ret) on command " << command);
+        return false;
+      }
       return true;
     }
 
@@ -110,7 +114,11 @@ namespace epee
         LOG_ERROR("Failed to load_from_binary on command " << command);
         return false;
       }
-      result_struct.load(stg_ret);
+      if(!result_struct.load(stg_ret))
+      {
+        LOG_ERROR("Failed to result_struct.load(stg_ret) on command " << command);
+        return false;
+      }
 
       return true;
     }
@@ -143,7 +151,11 @@ namespace epee
           CATCH_ENTRY2(true);
           return false;
         }
-        result_struct.load(stg_ret);
+        if(!result_struct.load(stg_ret))
+        {
+          LOG_ERROR("Failed to result_struct.load(stg_ret) on command " << command);
+          return false;
+        }
         TRY_ENTRY()
         cb(code, result_struct, context);
         CATCH_ENTRY2(true)
@@ -213,7 +225,11 @@ namespace epee
       boost::value_initialized<t_in_type> in_struct;
       boost::value_initialized<t_out_type> out_struct;
 
-      static_cast<t_in_type&>(in_struct).load(strg);
+      if(!static_cast<t_in_type&>(in_struct).load(strg))
+      {
+        LOG_ERROR("Failed to (in_struct).load(strg) in command " << command);
+        return LEVIN_ERROR_FORMAT;
+      }
       int res = LEVIN_ERROR_UNKNOWN_ERROR;
       TRY_ENTRY()
       res = cb(command, static_cast<t_in_type&>(in_struct), static_cast<t_out_type&>(out_struct), context);
@@ -250,7 +266,12 @@ namespace epee
         return LEVIN_ERROR_FORMAT;
       }
       boost::value_initialized<t_in_type> in_struct;
-      static_cast<t_in_type&>(in_struct).load(strg);
+      if(!static_cast<t_in_type&>(in_struct).load(strg))
+      {
+        LOG_ERROR("Failed to (in_struct).load(strg) in command" << command);
+        return LEVIN_ERROR_INTERNAL;
+      }
+
       int res = LEVIN_ERROR_UNKNOWN_ERROR;
       TRY_ENTRY()
       res = cb(command, in_struct, context);

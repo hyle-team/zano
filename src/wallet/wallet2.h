@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2023 Zano Project
+// Copyright (c) 2014-2026 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -14,7 +14,7 @@
 #include <boost/serialization/shared_ptr.hpp>
 #include <boost/serialization/optional.hpp>
 #include <atomic>
-
+#include <type_traits>
 
 #include "include_base_utils.h"
 #include "profile_tools.h"
@@ -31,9 +31,9 @@
 #include "common/unordered_containers_boost_serialization.h"
 #include "common/atomics_boost_serialization.h"
 #include "storages/portable_storage_template_helper.h"
-#include "crypto/chacha8.h"
+#include "crypto/chacha.h"
 #include "crypto/hash.h"
-#include "core_rpc_proxy.h"
+#include "i_core_rpc_proxy.h"
 #include "core_default_rpc_proxy.h"
 #include "wallet_errors.h"
 #include "eos/portable_archive.hpp"
@@ -42,11 +42,11 @@
 #include "currency_core/bc_escrow_service.h"
 #include "common/pod_array_file_container.h"
 #include "currency_core/block_chain_shortener.h"
-#include "tor-connect/torlib/tor_lib_iface.h"
 #include "currency_core/pos_mining.h"
 #include "view_iface.h"
 #include "wallet2_base.h"
 #include "decoy_selection.h"
+#include "net/socks5_proxy_transport.h"
 
 #define WALLET_DEFAULT_TX_SPENDABLE_AGE                               CURRENCY_HF4_MANDATORY_MIN_COINAGE
 #define WALLET_POS_MINT_CHECK_HEIGHT_INTERVAL                         1
@@ -143,6 +143,7 @@ namespace tools
     std::unordered_map<crypto::public_key, currency::asset_descriptor_base> m_custom_assets; //assets that manually added by user
     mutable std::unordered_map<crypto::public_key, currency::asset_descriptor_base> m_whitelisted_assets; //assets that whitelisted
     escrow_contracts_container m_contracts;
+    // 3 lines below -- HTLCTODO: wallet serialization -- sowle
     std::multimap<uint64_t, htlc_expiration_trigger> m_htlcs; //map [expired_if_more_then] -> height of expiration
     amount_gindex_to_transfer_id_container m_active_htlcs; // map [amount; gindex] -> transfer index
     std::unordered_map<crypto::hash, uint64_t> m_active_htlcs_txid; // map [txid] -> transfer index, limitation: 1 transactiom -> 1 htlc
@@ -151,7 +152,6 @@ namespace tools
     uint64_t m_last_pow_block_h = 0;
     std::list<std::pair<uint64_t, wallet_event_t>> m_rollback_events;
     std::list<std::pair<uint64_t, uint64_t> > m_last_zc_global_indexs; // <height, last_zc_global_indexs>, biggest height comes in front
-   
 
     //variables that not being serialized
     std::atomic<uint64_t> m_last_bc_timestamp = 0;
@@ -171,7 +171,6 @@ namespace tools
       {
         LOG_PRINT_MAGENTA("Serializing file with ver: " << ver, LOG_LEVEL_0);
       }
-
 
       // do not load wallet if data version is greather than the code version 
       if (ver > WALLET_FILE_SERIALIZATION_VERSION)
@@ -200,21 +199,12 @@ namespace tools
           return;
         }
       }
+
       //convert from old version
       a & m_chain;
       a & m_minimum_height;
       a & m_amount_gindex_to_transfer_id;
-      if (ver <= 167)
-      {
-        std::deque<transfer_details> transfer_container_old;
-        a& transfer_container_old;
-        for (size_t i = 0; i != transfer_container_old.size(); i++){m_transfers[i] = transfer_container_old[i];}
-      }
-      else
-      {
-        a& m_transfers;
-      }
-      
+      a & m_transfers;      
       a & m_multisig_transfers;
       a & m_key_images;
       a & m_unconfirmed_txs;
@@ -235,29 +225,12 @@ namespace tools
       a & m_rollback_events;
       a & m_whitelisted_assets;
       a & m_use_assets_whitelisting;
-      if (ver <= 165)
-      {
-        uint64_t last_zc_global_index = 0;
-        a& last_zc_global_index;
-        m_last_zc_global_indexs.push_back(std::make_pair(uint64_t(0), last_zc_global_index));
-        return;
-      }
-      a& m_last_zc_global_indexs;
-      if (ver == 166 && m_last_zc_global_indexs.size())
-      {
-        //workaround for m_last_zc_global_indexs holding invalid index for last item
-        m_last_zc_global_indexs.pop_front();
-      } 
-      if (ver <= 167)
-      {
-        return;
-      }
-      
+      a & m_last_zc_global_indexs;      
     }
   };
   
 
-  class wallet2: public tools::tor::t_transport_state_notifier, public boost::static_visitor<void>, public wallet2_base_state
+  class wallet2: public boost::static_visitor<void>, public wallet2_base_state
   {
     wallet2(const wallet2&) = delete;
   public:
@@ -305,7 +278,7 @@ namespace tools
 
     struct keys_file_data_old
     {
-      crypto::chacha8_iv iv;
+      crypto::chacha_iv iv;
       std::string account_data;
 
       BEGIN_SERIALIZE_OBJECT()
@@ -317,8 +290,13 @@ namespace tools
     struct keys_file_data
     {
       uint8_t             version;
-      crypto::chacha8_iv  iv;
+      crypto::chacha_iv   iv;
       std::string         account_data;
+
+      uint8_t             kdf_algo{0};
+      uint8_t             kdf_N_log2{0};
+      std::string         kdf_salt;
+      uint8_t             kdf_phase2_log2_reduction{0};
 
       static keys_file_data from_old(const keys_file_data_old& v)
       {
@@ -328,11 +306,18 @@ namespace tools
         return result;
       }
 
-      DEFINE_SERIALIZATION_VERSION(1)
+      DEFINE_SERIALIZATION_VERSION(4)
       BEGIN_SERIALIZE_OBJECT()
         VERSION_ENTRY(version)
         FIELD(iv)
         FIELD(account_data)
+        if (version >= 3)
+        {
+          FIELD(kdf_algo)
+          FIELD(kdf_N_log2)
+          FIELD(kdf_salt)
+          FIELD(kdf_phase2_log2_reduction)
+        }
       END_SERIALIZE()
     };
 
@@ -343,6 +328,7 @@ namespace tools
       process_transaction_context(const currency::transaction& t) : tx(t) {}
       const currency::transaction& tx;
       bool spent_own_native_inputs = false; 
+      bool spent_own_outs_in_inputs = false;
       // check all outputs for spending (compare key images)
       wallet_public::employed_tx_entries employed_entries;
       bool is_pos_coinbase = false;
@@ -350,16 +336,20 @@ namespace tools
       //PoW block don't have change, so all outs supposed to be marked as "mined"
       bool is_derived_from_coinbase = false;
       size_t i = 0;
-      size_t sub_i = 0;
       uint64_t height = 0;
       uint64_t timestamp = 0;
       std::unordered_map<crypto::public_key, boost::multiprecision::int128_t> total_balance_change;
+      std::unordered_map<uint64_t, std::unordered_map<crypto::public_key, boost::multiprecision::int128_t>> total_balance_change_per_payment_id; // { intrinsic_payment_id -> { asset_id -> balance_change } }
       std::vector<std::string> recipients;
       std::vector<std::string> remote_aliases;
       multisig_entries_map* pmultisig_entries = nullptr;
       crypto::public_key tx_pub_key = currency::null_pkey;
       uint64_t tx_expiration_ts_median = 0;
       uint64_t max_out_unlock_time = 0;
+      //currency::payment_id_t tx_wide_payment_id;
+
+      void handle_incoming_tx_input(size_t transfer_index, const transfer_details& td, size_t input_index);
+      void handle_incoming_tx_output(const currency::wallet_out_info& woi, size_t transfer_index = SIZE_MAX);
 
       const crypto::hash& tx_hash() const
       {
@@ -381,7 +371,20 @@ namespace tools
       uint64_t additional_tid_amount = 0;
     };
 
+    private:
+      struct mix_input_plan
+      {
+        size_t            selection_pos;               // position in the input list of selected_indices
+        uint64_t          transfer_index;              // key in m_transfers
+        const transfer_details* td;
+        size_t            target_decoy_count;          // how many decoys we want
+        bool              needs_decoys;                // (!auditable && target_decoy_count > 0)
+        bool              is_real_output_post_hf4;     // zone HF real output
+        uint64_t          batch_key;                   // 0 for ZC, otherwise td.amount()
+        size_t            batch_idx;                   // batch index in req4/resp4 (SIZE_MAX if not needed)
+      };
 
+    public:
 
     void assign_account(const currency::account_base& acc);
     void generate(const std::wstring& path, const std::string& password, bool auditable_wallet);
@@ -392,7 +395,7 @@ namespace tools
     void store(const std::wstring& path);
     void store(const std::wstring& path, const std::string& password);
     void store_watch_only(const std::wstring& path, const std::string& password) const;
-    bool store_keys(std::string& buff, const std::string& password, wallet2::keys_file_data& keys_file_data, bool store_as_watch_only = false);
+    bool store_keys(std::string& buff, const std::string& password, wallet2::keys_file_data& keys_file_data, bool store_as_watch_only = false, std::string* out_body_password = nullptr);
     std::wstring get_wallet_path()const { return m_wallet_file; }
     std::string get_wallet_password()const { return m_password; }
     currency::account_base& get_account() { return m_account; }
@@ -452,6 +455,8 @@ namespace tools
     void update_asset(const crypto::public_key& asset_id, const currency::asset_descriptor_base& new_descriptor, currency::finalized_tx& ft);
     void burn_asset(const crypto::public_key& asset_id, uint64_t amount_to_burn, currency::finalized_tx& ft, const std::vector<currency::tx_service_attachment>& service_entries = std::vector<currency::tx_service_attachment>(), const std::string& address_to_point = std::string(), uint64_t native_amount_to_point = 0);
     void transfer_asset_ownership(const crypto::public_key& asset_id, const currency::asset_owner_pub_key_v& new_owner_v, currency::finalized_tx& ft);
+    
+    void register_gateway_address(const wallet_public::COMMAND_GATEWAY_REGISTER_ADDRESS::request& req, wallet_public::COMMAND_GATEWAY_REGISTER_ADDRESS::response& res, currency::finalized_tx& ft);
 
     bool daemon_get_asset_info(const crypto::public_key& asset_id, currency::asset_descriptor_base& adb) const;
     bool set_core_proxy(const std::shared_ptr<i_core_proxy>& proxy);
@@ -597,6 +602,12 @@ namespace tools
       add_transfers_to_transfers_cache(tids);
     }
 
+    // SOCKS5 relay API (runtime)
+    void configure_socks_relay(const socks5::socks5_proxy_settings& cfg);
+    bool configure_socks_relay(const std::string& addr_port); // "ip:port"
+    void disable_socks_relay();
+    const socks5::socks5_proxy_settings& get_socks5_relay_config() const;
+
     // PoS mining
     void do_pos_mining_prepare_entry(mining_context& cxt, const transfer_details& td);
     bool do_pos_mining_iteration(mining_context& cxt, uint64_t ts);
@@ -642,9 +653,10 @@ namespace tools
     void clear_utxo_cold_sig_reservation(std::vector<uint64_t>& affected_transfer_ids);
 
     void sweep_below(const crypto::public_key& asset_id, size_t fake_outs_count, const currency::account_public_address& destination_addr, uint64_t threshold_amount, const currency::payment_id_t& payment_id,
-      uint64_t fee, size_t& outs_total, uint64_t& amount_total, size_t& outs_swept, uint64_t& amount_swept, currency::transaction* p_result_tx = nullptr, std::string* p_filename_or_unsigned_tx_blob_str = nullptr);
+      uint64_t fee, uint64_t inputs_max, uint64_t outputs_min, size_t& outs_total, uint64_t& amount_total, size_t& outs_swept, uint64_t& amount_swept, currency::transaction* p_result_tx = nullptr, std::string* p_filename_or_unsigned_tx_blob_str = nullptr);
 
     bool get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id);
+    bool get_transfer_address(const std::string& adr_str, currency::address_v& addr, std::string& payment_id);
     inline uint64_t get_blockchain_current_size() const {
       return m_chain.get_blockchain_current_size();
     }
@@ -674,12 +686,16 @@ namespace tools
     //TODO: Need refactoring - remove it back to private zone 
     void set_genesis(const crypto::hash& genesis_hash);
     bool prepare_and_sign_pos_block(const mining_context& cxt, uint64_t full_block_reward, const currency::pos_entry& pe, currency::tx_generation_context& miner_tx_tgc, currency::block& b) const;
+    bool prepare_pos_zc_input_and_ring(const transfer_details& td, const currency::tx_out_zarcanum& stake_out, currency::txin_zc_input& stake_input,
+      std::vector<currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry>& decoy_storage, std::vector<crypto::CLSAG_GGXXG_input_ref_t>& ring, uint64_t& secret_index) const;
+    void distribute_decoys_and_build_sources(const currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::response& resp4, const std::vector<mix_input_plan>& plans,
+      bool use_all_decoys_if_found_less_than_required, std::vector<currency::tx_source_entry>& sources) const;
+    void plan_decoy_batches_for_sources( size_t fake_outputs_count_, const std::vector<uint64_t>& selected_indices, uint64_t hf4_height,
+      currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request& req4, std::vector<mix_input_plan>& plans) const;
     void process_new_blockchain_entry(const currency::block& b, 
       const currency::block_direct_data_entry& bche, 
       const crypto::hash& bl_id,
       uint64_t height);
-    void process_htlc_triggers_on_block_added(uint64_t height);
-    void unprocess_htlc_triggers_on_block_removed(uint64_t height);
     
     bool get_pos_entries(std::vector<currency::pos_entry>& entries); // TODO: make it const
     size_t get_pos_entries_count();
@@ -744,6 +760,8 @@ namespace tools
     void set_disable_tor_relay(bool disable);
     uint64_t get_default_fee() {return TX_DEFAULT_FEE;}
     uint64_t get_current_minimum_network_fee() { return TX_DEFAULT_FEE; }
+    detail::split_strategy_id_t get_current_split_strategy();
+
     void export_transaction_history(std::ostream& ss, const std::string& format, bool include_pos_transactions = true);
 
     bool add_custom_asset_id(const crypto::public_key& asset_id, currency::asset_descriptor_base& asset_descriptor);
@@ -776,9 +794,10 @@ namespace tools
 
     // Signing and auth
     bool sign_buffer(const std::string& buff, crypto::signature& sig);
-    bool validate_sign(const std::string& buff, const crypto::signature& sig, const crypto::public_key& pkey);
+    //bool validate_sign(const std::string& buff, const crypto::signature& sig, const crypto::public_key& pkey);
     bool encrypt_buffer(const std::string& buff, std::string& res_buff);
     bool decrypt_buffer(const std::string& buff, std::string& res_buff);
+    bool decrypt_buffer_legacy(const std::string& buff, std::string& res_buff); // don't use it, deprecated -- sowle
     bool is_in_hardfork_zone(uint64_t hardfork_index) const;
     //performance inefficient call, suitable only for rare ocasions or super lazy developers
     bool proxy_to_daemon(const std::string& uri, const std::string& body, int& response_code, std::string& response_body);
@@ -789,6 +808,7 @@ namespace tools
     bool find_unconfirmed_tx(const crypto::hash& tx_id, wallet_public::wallet_transfer_info& res) const;
 
     construct_tx_param get_default_construct_tx_param();
+    uint64_t get_current_pos_attempts() const { return m_pos_attempts_count; }
 
     //---------- m_rollback_events visitor ------------------------------------------------
     void operator()(const asset_register_event& e);
@@ -808,7 +828,7 @@ private:
     // ------------------------------------------------------------------------------------
     void add_transfers_to_expiration_list(const std::vector<uint64_t>& selected_transfers, const std::vector<payment_details_subtransfer>& received, uint64_t expiration, const crypto::hash& related_tx_id);
     void remove_transfer_from_expiration_list(uint64_t transfer_index);
-    void load_keys(const std::string& keys_file_name, const std::string& password, uint64_t file_signature, keys_file_data& kf_data);
+    void load_keys(const std::string& keys_file_name, const std::string& password, uint64_t file_signature, keys_file_data& kf_data, std::string* out_body_password = nullptr);
     void process_ado_in_new_transaction(const currency::asset_descriptor_operation& ado, process_transaction_context& ptc);
     void process_new_transaction(const currency::transaction& tx, uint64_t height, const currency::block& b, const std::vector<uint64_t>* pglobal_indexes);
     void fetch_tx_global_indixes(const currency::transaction& tx, std::vector<uint64_t>& goutputs_indexes);
@@ -833,13 +853,12 @@ private:
                                  const std::vector<uint64_t>& selected_indicies, 
                                  const std::vector<currency::tx_destination_entry>& splitted_dsts);
 
-    void update_current_tx_limit();
     void prepare_wti(wallet_public::wallet_transfer_info& wti, const process_transaction_context& tx_process_context);
     void prepare_wti_decrypted_attachments(wallet_public::wallet_transfer_info& wti, const std::vector<currency::payload_items_v>& decrypted_att);    
     void handle_money(const currency::block& b, const process_transaction_context& tx_process_context);
     void load_wti_from_process_transaction_context(wallet_public::wallet_transfer_info& wti, const process_transaction_context& tx_process_context);
-    bool process_payment_id_for_wti(wallet_public::wallet_transfer_info& wti, const process_transaction_context& tx_process_context);
-    void add_to_last_zc_global_indexs(uint64_t h, uint64_t last_zc_output_index);
+    bool process_payment_id_for_wti_and_populate_subtransfers(wallet_public::wallet_transfer_info& wti, const process_transaction_context& tx_process_context, const std::vector<currency::payload_items_v>& decrypted_items);
+    //void add_to_last_zc_global_indexs(uint64_t h, uint64_t last_zc_output_index);
     uint64_t get_actual_zc_global_index();
     void handle_pulled_blocks(size_t& blocks_added, std::atomic<bool>& stop,
       currency::COMMAND_RPC_GET_BLOCKS_DIRECT::response& blocks, bool& full_reset_needed);
@@ -856,13 +875,13 @@ private:
     bool prepare_tx_sources(size_t fake_outputs_count, std::vector<currency::tx_source_entry>& sources, const std::vector<uint64_t>& selected_indicies);
     bool prepare_tx_sources(size_t fake_outputs_count, bool use_all_decoys_if_found_less_than_required, std::vector<currency::tx_source_entry>& sources, const std::vector<uint64_t>& selected_indicies);
     bool prepare_tx_sources(crypto::hash multisig_id, std::vector<currency::tx_source_entry>& sources, uint64_t& found_money);
-    bool prepare_tx_sources_htlc(crypto::hash htlc_tx_id, const std::string& origin, std::vector<currency::tx_source_entry>& sources, uint64_t& found_money);
     bool prepare_tx_sources_for_defragmentation_tx(std::vector<currency::tx_source_entry>& sources, std::vector<uint64_t>& selected_indicies, uint64_t& found_money);
     void prefetch_global_indicies_if_needed(const std::vector<uint64_t>& selected_indicies);
     assets_selection_context get_needed_money(uint64_t fee, const std::vector<currency::tx_destination_entry>& dsts);
     void prepare_tx_destinations(const assets_selection_context& needed_money_map,
       detail::split_strategy_id_t destination_split_strategy_id,
       const tx_dust_policy& dust_policy,
+      size_t outs_number_min,
       const std::vector<currency::tx_destination_entry>& dsts,
       uint8_t tx_flags,
       std::vector<currency::tx_destination_entry>& final_destinations);
@@ -941,13 +960,14 @@ private:
     uint64_t get_directly_spent_transfer_index_by_input_in_tracking_wallet(const currency::txin_to_key& intk);
     uint64_t get_directly_spent_transfer_index_by_input_in_tracking_wallet(const currency::txin_zc_input& inzc);
     uint8_t out_get_mixin_attr(const currency::tx_out_v& out_t);
-    const crypto::public_key& out_get_pub_key(const currency::tx_out_v& out_t, std::list<currency::htlc_info>& htlc_info_list);
+    const crypto::public_key& out_get_pub_key(const currency::tx_out_v& out_t);
     bool expand_selection_with_zc_input(assets_selection_context& needed_money_map, uint64_t fake_outputs_count, std::vector<uint64_t>& selected_indexes);
 
     void push_alias_info_to_extra_according_to_hf_status(const currency::extra_alias_entry& ai, std::vector<currency::extra_v>& extra);
     void remove_transfer_from_amount_gindex_map(uint64_t tid);
     uint64_t get_alias_cost(const std::string& alias);
-    detail::split_strategy_id_t get_current_split_strategy();
+    void append_heights_with_distribution(std::vector<uint64_t>& heights, size_t oversample, uint64_t max_height, decoy_selection_generator::dist_kind kind) const;
+    void build_distribution_for_input(std::vector<uint64_t>& height_distrib, uint64_t own_height, decoy_selection_generator::dist_kind kind) const;
     void build_distribution_for_input(std::vector<uint64_t>& offsets, uint64_t own_index);
     void select_decoys(currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount & amount_entry, uint64_t own_g_index);
 
@@ -956,14 +976,14 @@ private:
     void wti_to_csv_entry(std::ostream& ss, const wallet_public::wallet_transfer_info& wti, size_t index) const;
     void wti_to_txt_line(std::ostream& ss, const wallet_public::wallet_transfer_info& wti, size_t index) const;
     void wti_to_json_line(std::ostream& ss, const wallet_public::wallet_transfer_info& wti, size_t index) const;
-
-
+    
+    bool send_block_via_socks5(const currency::block& bl);
 
     /*     
      
      !!!!! IMPORTAN !!!!! 
 
-     All variables that supposed to hold wallet state of synchronization(i.e. transfers, assets, htlc, swaps, contracts) - should 
+     All variables that supposed to hold wallet state of synchronization(i.e. transfers, assets, swaps, contracts) - should 
      be placed in wallet2_base_state base class to avoid typical bugs when it's forgotten to be included in reset/resync/serialize functions     
      
      */
@@ -989,7 +1009,6 @@ private:
     
     size_t m_required_decoys_count;
     pending_ki_file_container_t m_pending_key_images_file_container;
-    uint64_t m_upper_transaction_size_limit; //TODO: auto-calc this value or request from daemon, now use some fixed value
 
     std::atomic<bool> m_stop;
     std::shared_ptr<i_core_proxy> m_core_proxy;
@@ -1003,8 +1022,9 @@ private:
     std::string m_miner_text_info;
 
     bool m_use_deffered_global_outputs;
-    bool m_disable_tor_relay;
     mutable current_operation_context m_current_context;
+
+    socks5::socks5_proxy_settings m_socks5_relay_cfg{};
 
     std::string m_votes_config_path;
     tools::wallet_public::wallet_vote_config m_votes_config;
@@ -1013,6 +1033,7 @@ private:
     uint64_t m_last_known_daemon_height = 0;
     uint64_t m_wallet_concise_mode_max_reorg_blocks = WALLET_CONCISE_MODE_MAX_REORG_BLOCKS;
     uint64_t m_full_resync_requested_at_h = 0;
+    uint64_t m_pos_attempts_count = 0;
     uint64_t m_truncate_history_max_entries 
 #ifdef MOBILE_WALLET_BUILD
       = WALLET_CONCISE_MODE_MOBILE_MAX_HISTORY_SIZE;
@@ -1026,8 +1047,6 @@ private:
 } // namespace tools
 
 BOOST_CLASS_VERSION(tools::wallet2, WALLET_FILE_SERIALIZATION_VERSION)
-
-BOOST_CLASS_VERSION(tools::wallet_public::wallet_transfer_info, 12)
 
 namespace boost
 {
@@ -1133,22 +1152,23 @@ namespace tools
       auto it_tr = m_transfers.find(tr_index);
       if (it_tr == m_transfers.end())
       {
+        WLT_LOG_L0("process_input_t: transfer with index " << tr_index << " could not be found when handling input in tx " << get_transaction_hash(tx) << ", triggering resync...");
         throw tools::error::wallet_error_resync_needed();
       }
       transfer_details& td = it_tr->second;
             
-      ptc.total_balance_change[td.get_asset_id()] -= td.amount();
-      if (td.is_native_coin())
-      {
-        ptc.spent_own_native_inputs = true;
-      }
+      //ptc.total_balance_change[td.get_asset_id()] -= td.amount();
+      //if (td.is_native_coin())
+      //{
+      //  ptc.spent_own_native_inputs = true;
+      //}
       uint32_t flags_before = td.m_flags;
       td.m_flags |= WALLET_TRANSFER_DETAIL_FLAG_SPENT;
       td.m_spent_height = ptc.height;
-      if (ptc.coin_base_tx && td.m_flags&WALLET_TRANSFER_DETAIL_FLAG_MINED_TRANSFER)
-        ptc.is_derived_from_coinbase = true;
-      else
-        ptc.is_derived_from_coinbase = false;
+      //if (ptc.coin_base_tx && td.m_flags&WALLET_TRANSFER_DETAIL_FLAG_MINED_TRANSFER)
+      //  ptc.is_derived_from_coinbase = true;
+      //else
+      //  ptc.is_derived_from_coinbase = false;
 
       if (td.is_native_coin())
       {
@@ -1161,7 +1181,8 @@ namespace tools
           << ", with tx: " << get_transaction_hash(tx) << ", at height " << ptc.height << "; flags: " << flags_before << " -> " << td.m_flags);
       }
       
-      ptc.employed_entries.spent.push_back(wallet_public::employed_tx_entry{ ptc.i, td.amount(), td.get_asset_id()});
+      //ptc.employed_entries.spent.push_back(wallet_public::employed_tx_entry{ ptc.i, td.amount(), td.get_asset_id()});
+      ptc.handle_incoming_tx_input(tr_index, td, ptc.i);
       remove_transfer_from_expiration_list(tr_index);
     }
     return true;
@@ -1301,6 +1322,7 @@ namespace tools
 
 
 } // namespace tools
+
 
 #if !defined(KEEP_WALLET_LOG_MACROS)
 #undef WLT_LOG

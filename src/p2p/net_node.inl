@@ -114,21 +114,34 @@ namespace nodetool
 
     if (is_incoming)
     {
-      size_t conn_count = get_incoming_connections_count();
 
-      if (m_p2p_manual_config.incoming_connections_limit)
+      // total limit and per-IP limit
+      size_t per_ip_count = 0;
+      size_t inbound_count = 0;
+      m_net_server.get_config_object().foreach_connection([&](const p2p_connection_context& cntxt)
+        {
+          if (cntxt.m_is_income && cntxt.m_remote_ip == addr)
+            ++per_ip_count;
+          if (cntxt.m_is_income)
+            ++inbound_count;
+          return true;
+        });
+
+      if (per_ip_count >= P2P_DEFAULT_MAX_CONNECTIONS_PER_IP)
+        return false;
+
+      if (m_p2p_manual_config.incoming_connections_limit) 
       {
-        if (conn_count >= *m_p2p_manual_config.incoming_connections_limit)
-          return false;
+        if (inbound_count >= *m_p2p_manual_config.incoming_connections_limit) return false;
       }
-      else
+      else 
       {
-        if (conn_count >= m_config.m_net_config.default_max_inc_count)
-          return false;        
+        if (inbound_count >= m_config.m_net_config.default_max_inc_count) return false;
       }
 
       if (m_use_only_priority_peers)
         return false;
+
     }
 
     bool ignore_auto_blocked_list = !m_ip_auto_blocking_enabled;
@@ -505,15 +518,13 @@ namespace nodetool
   template<class t_payload_net_handler>
   bool node_server<t_payload_net_handler>::run(bool sync_call)
   {
-    //here you can set worker threads count
-    int thrds_count = 10;
 
     m_net_server.add_idle_handler(boost::bind(&node_server<t_payload_net_handler>::idle_worker, this), 1000);
     m_net_server.add_idle_handler(boost::bind(&t_payload_net_handler::on_idle, &m_payload_handler), 1000);
 
     //go to loop
-    LOG_PRINT("Run net_service loop( " << thrds_count << " threads)...", LOG_LEVEL_0);
-    if(!m_net_server.run_server(thrds_count, sync_call))
+    LOG_PRINT("Run net_service loop( " << m_threads_count << " threads)...", LOG_LEVEL_0);
+    if(!m_net_server.run_server(m_threads_count, sync_call))
     {
       LOG_ERROR("Failed to run net tcp server!");
     }
@@ -891,6 +902,12 @@ namespace nodetool
   void node_server<t_payload_net_handler>::cache_connect_fail_info(const net_address& addr)
   {
     CRITICAL_REGION_LOCAL(m_conn_fails_cache_lock);
+    if (m_conn_fails_cache.size() >= P2P_FAILED_ADDR_CACHE_MAX_SIZE && m_conn_fails_cache.find(addr) == m_conn_fails_cache.end())
+    {
+      auto oldest = std::min_element(m_conn_fails_cache.begin(), m_conn_fails_cache.end(),
+        [](const std::pair<const net_address, time_t>& a, const std::pair<const net_address, time_t>& b) { return a.second < b.second; });
+      m_conn_fails_cache.erase(oldest);
+    }
     m_conn_fails_cache[addr] = time(NULL);
   }
   //-----------------------------------------------------------------------------------
@@ -1198,7 +1215,7 @@ namespace nodetool
   }
   //-----------------------------------------------------------------------------------
   template<class t_payload_net_handler>
-  bool node_server<t_payload_net_handler>::fix_time_delta(std::list<peerlist_entry>& local_peerlist, time_t local_time, int64_t& delta)
+  bool node_server<t_payload_net_handler>::fix_time_delta(std::vector<peerlist_entry>& local_peerlist, time_t local_time, int64_t& delta)
   {
     //fix time delta
     time_t now = 0;
@@ -1218,10 +1235,17 @@ namespace nodetool
   }
   //-----------------------------------------------------------------------------------
   template<class t_payload_net_handler>
-  bool node_server<t_payload_net_handler>::handle_remote_peerlist(const std::list<peerlist_entry>& peerlist, time_t local_time, const net_utils::connection_context_base& context)
+  bool node_server<t_payload_net_handler>::handle_remote_peerlist(const std::vector<peerlist_entry>& peerlist, time_t local_time, const net_utils::connection_context_base& context)
   {
+    const size_t max_allowed_peerlist_size = m_payload_handler.is_hardfork_active(ZANO_HARDFORK_06) ? P2P_DEFAULT_PEERS_IN_HANDSHAKE : P2P_DEFAULT_PEERS_IN_HANDSHAKE + 2;
+    if (peerlist.size() > max_allowed_peerlist_size)
+    {
+      LOG_PRINT_L0("Too many peers in peerlist received from remote node " << string_tools::get_ip_string_from_int32(context.m_remote_ip) << ":" << context.m_remote_port << ", peerlist size: " << peerlist.size() << ", dropping connection");
+      return false;
+    }
+
     int64_t delta = 0;
-    std::list<peerlist_entry> peerlist_ = peerlist;
+    std::vector<peerlist_entry> peerlist_ = peerlist;
     if(!fix_time_delta(peerlist_, local_time, delta))
       return false;
     LOG_PRINT_L2("REMOTE PEERLIST: TIME_DELTA: " << delta << ", remote peerlist size=" << peerlist_.size());
@@ -1334,12 +1358,6 @@ namespace nodetool
   template<class t_payload_net_handler>
   int node_server<t_payload_net_handler>::handle_request_anonymized_peers(int command, COMMAND_REQUEST_ANONYMIZED_PEERS::request& req, COMMAND_REQUEST_ANONYMIZED_PEERS::response& rsp, p2p_connection_context& context)
   {
-    if (!check_trust(req.tr))
-    {
-      drop_connection(context);
-      return 1;
-    }
-
     m_net_server.get_config_object().foreach_connection([&](const p2p_connection_context& cn_context)
       {
         auto& el = rsp.peers.emplace_back();
@@ -1495,7 +1513,7 @@ namespace nodetool
 
     //fill response
     rsp.local_time = time(NULL);
-    m_peerlist.get_peerlist_head(rsp.local_peerlist);
+    m_peerlist.get_peerlist_head(rsp.local_peerlist, true);
     m_payload_handler.get_payload_sync_data(rsp.payload_data);
     fill_maintainers_entry(rsp.maintrs_entry);
     LOG_PRINT_L3("COMMAND_TIMED_SYNC");
@@ -1579,7 +1597,7 @@ namespace nodetool
     }
 
     //fill response
-    m_peerlist.get_peerlist_head(rsp.local_peerlist);
+    m_peerlist.get_peerlist_head(rsp.local_peerlist, true);
     get_local_node_data(rsp.node_data);
     m_payload_handler.get_payload_sync_data(rsp.payload_data);
     fill_maintainers_entry(rsp.maintrs_entry);
@@ -1599,8 +1617,8 @@ namespace nodetool
   template<class t_payload_net_handler>
   bool node_server<t_payload_net_handler>::log_peerlist()
   {
-    std::list<peerlist_entry> pl_wite;
-    std::list<peerlist_entry> pl_gray;
+    std::vector<peerlist_entry> pl_wite;
+    std::vector<peerlist_entry> pl_gray;
     m_peerlist.get_peerlist_full(pl_gray, pl_wite);
     LOG_PRINT_L0(ENDL << "Peerlist white:" << ENDL << print_peerlist_to_string(pl_wite) << ENDL << "Peerlist gray:" << ENDL << print_peerlist_to_string(pl_gray) );
     return true;

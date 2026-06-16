@@ -290,6 +290,13 @@ namespace currency
       return 1;
     }
 
+    if (b.tx_hashes.size() > TX_HASHES_IN_BLOCK_MAX_COUNT)
+    {
+      LOG_PRINT_RED("Block has many tx_hashes (" << b.tx_hashes.size() << "), dropping connection", LOG_LEVEL_0);
+      m_p2p->drop_connection(context);
+      return 1;
+    }
+
     crypto::hash block_id = get_block_hash(b);
     LOG_PRINT_GREEN("[HANDLE]NOTIFY_NEW_BLOCK " << block_id << " HEIGHT " << get_block_height(b), LOG_LEVEL_2);
 
@@ -729,12 +736,21 @@ namespace currency
     if (m_debug_ip_address != 0 && context.m_remote_ip == m_debug_ip_address)
       return 1;
 
+    if (arg.block_ids.size() > CURRENCY_NOTIFY_REQUEST_CHAIN_MAX_BLOCKS_COUNT)
+    {
+      m_p2p->drop_connection(context);
+      m_p2p->add_ip_fail(context.m_remote_ip);
+      return 1;
+    }
+
     LOG_PRINT_L2("[HANDLE]NOTIFY_REQUEST_CHAIN: block_ids.size()=" << arg.block_ids.size());
     LOG_PRINT_L3("[HANDLE]NOTIFY_REQUEST_CHAIN: " << print_kv_structure(arg));
     NOTIFY_RESPONSE_CHAIN_ENTRY::request r;
     if(!m_core.find_blockchain_supplement(arg.block_ids, r))
     {
       LOG_PRINT_CC_RED(m_connection_context, "[HANDLE]NOTIFY_REQUEST_CHAIN: failed (find_blockchain_supplement failed, arg.block_ids.size()=" << arg.block_ids.size() << ").", LOG_LEVEL_1);
+      m_p2p->drop_connection(context);
+      m_p2p->add_ip_fail(context.m_remote_ip);
       return 1;
     }
     LOG_PRINT_L2("[NOTIFY]NOTIFY_RESPONSE_CHAIN_ENTRY: m_start_height=" << r.start_height << ", m_total_height=" << r.total_height << ", m_block_ids.size()=" << r.m_block_ids.size());
@@ -870,18 +886,28 @@ namespace currency
       NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::request req = AUTO_VAL_INIT(req);
       for (auto& qe : que)
       {
-        //exclude relaying to original sender
-        if (qe.second.m_connection_id == cc.m_connection_id)
-          continue;
-        req.txs.insert(req.txs.begin(), qe.first.txs.begin(), qe.first.txs.end());
+        if (qe.second.m_connection_id == cc.m_connection_id) continue;
+        for (auto& tx : qe.first.txs) 
+        {
+          if (req.txs.size() >= CURRENCY_RELAY_TXS_MAX_COUNT) 
+          {
+            post_notify<NOTIFY_OR_INVOKE_NEW_TRANSACTIONS>(req, cc);
+            if (debug_ss.tellp())
+              debug_ss << ", ";
+            debug_ss << cc << ": " << req.txs.size();
+
+            req = AUTO_VAL_INIT(req);   // start a new batch
+          }
+          req.txs.push_back(tx);        // one-by-one, not range insert
+        }
       }
       if (req.txs.size())
       {
         post_notify<NOTIFY_OR_INVOKE_NEW_TRANSACTIONS>(req, cc);
-
         if (debug_ss.tellp())
           debug_ss << ", ";
         debug_ss << cc << ": " << req.txs.size();
+
       }
     }
     TIME_MEASURE_FINISH_MS(ms);
@@ -1119,6 +1145,12 @@ namespace currency
       return false;
 
     return is_remote_client_version_allowed(build_number);
+  }
+  //------------------------------------------------------------------------------------------------------------------------
+  template<class t_core>
+  bool t_currency_protocol_handler<t_core>::is_hardfork_active(size_t hardfork_id) const
+  {
+    return m_core.get_blockchain_storage().is_hardfork_active(hardfork_id);
   }
   //------------------------------------------------------------------------------------------------------------------------
   template<class t_core>

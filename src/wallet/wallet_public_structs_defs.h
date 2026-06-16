@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2026 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -21,30 +21,37 @@ const uint64_t WALLET_GLOBAL_OUTPUT_INDEX_UNDEFINED = std::numeric_limits<uint64
 
 const boost::uuids::uuid RPC_INTERNAL_UI_CONTEXT = {0, 1, 1, 0, 1, 1, 1, 0, 1, 0, 0, 1, 2, 1, 0, 0}; //Bender's nightmare 
 
-namespace tools
+namespace tools::legacy
 {
-namespace wallet_public
+  struct wallet_transfer_info_hf5;
+}
+  
+namespace tools::wallet_public
 {
 #define WALLET_RPC_STATUS_OK      "OK"
 #define WALLET_RPC_STATUS_BUSY    "BUSY"
 
 
-  struct employed_tx_entry {
-    uint64_t index = 0;
+  struct employed_tx_entry
+  {
+    uint64_t index = 0;   // tx's input index or output index
     uint64_t amount = 0;
     crypto::public_key asset_id = currency::native_coin_asset_id;
+    uint64_t payment_id = 0;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(index)
       KV_SERIALIZE(amount)
       KV_SERIALIZE_POD_AS_HEX_STRING(asset_id)
+      KV_SERIALIZE(payment_id)
     END_KV_SERIALIZE_MAP()
 
     BEGIN_BOOST_SERIALIZATION()
       BOOST_SERIALIZE(index)
       BOOST_SERIALIZE(amount)
       BOOST_SERIALIZE(asset_id)
-    END_BOOST_SERIALIZATION()
+      BOOST_SERIALIZE(payment_id)
+    END_BOOST_SERIALIZATION_TOTAL_FIELDS(4)
 
   };
 
@@ -61,7 +68,7 @@ namespace wallet_public
     BEGIN_BOOST_SERIALIZATION()
       BOOST_SERIALIZE(receive)
       BOOST_SERIALIZE(spent)
-    END_BOOST_SERIALIZATION()
+    END_BOOST_SERIALIZATION_TOTAL_FIELDS(2)
   };
 
   struct escrow_contract_details_basic
@@ -114,7 +121,6 @@ namespace wallet_public
   };
 
 
-#define WALLET_TRANSFER_INFO_FLAGS_HTLC_DEPOSIT   static_cast<uint16_t>(1 << 0)
 
 
   struct wallet_sub_transfer_info
@@ -133,8 +139,23 @@ namespace wallet_public
       BOOST_SERIALIZE(amount) 
       BOOST_SERIALIZE(is_income)
       BOOST_SERIALIZE(asset_id)
-    END_BOOST_SERIALIZATION()
+    END_BOOST_SERIALIZATION_TOTAL_FIELDS(3)
+  };
 
+  struct wallet_sub_transfers_by_pid_info
+  {
+    currency::payment_id_t payment_id;
+    std::vector<wallet_sub_transfer_info> subtransfers;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE_BLOB_AS_HEX_STRING(payment_id) DOC_DSCR("HEX-encoded payment id, or empty string if not present")  DOC_EXMP("a1a2a3a4a5a6a7a8")   DOC_END
+      KV_SERIALIZE(subtransfers)                  DOC_DSCR("Amounts that been transfered in this transaction with corresponding payment ID grouped by asset ID")  DOC_EXMP_AUTO(1)   DOC_END
+    END_KV_SERIALIZE_MAP()
+
+    BEGIN_BOOST_SERIALIZATION()
+      BOOST_SERIALIZE(payment_id)
+      BOOST_SERIALIZE(subtransfers)
+    END_BOOST_SERIALIZATION()
   };
 
   struct wallet_transfer_info
@@ -144,20 +165,19 @@ namespace wallet_public
     uint64_t      height = 0;          //if height == 0 then tx is unconfirmed
     uint64_t      unlock_time = 0;
     uint32_t      tx_blob_size = 0;
-    std::string   payment_id;
     std::string   comment;
     bool          is_service = false;
     bool          is_mixing = false;
     bool          is_mining = false;
     uint64_t      tx_type = 0;
+    uint64_t      fee = 0;
     employed_tx_entries employed_entries;
     std::vector<currency::tx_service_attachment> service_entries;
     std::vector<std::string> remote_addresses;  //optional
     std::vector<std::string> remote_aliases; //optional, describe only if there only one remote address
-    std::vector<wallet_sub_transfer_info> subtransfers;
+    std::vector<wallet_sub_transfers_by_pid_info> subtransfers_by_pid;
 
     //not included in streaming serialization
-    uint64_t      fee = 0;
     bool          show_sender = false;
     std::vector<escrow_contract_details> contract;
     uint16_t      extra_flags = 0;
@@ -167,6 +187,7 @@ namespace wallet_public
     currency::transaction tx;
     std::vector<uint64_t> selected_indicies;
     std::list<bc_services::offers_attachment_t> marketplace_entries;
+    std::string   tx_wide_payment_id; // if not empty -- all subtransfers_by_pid elements are supposed to have the same pid, if empty -- intrinsic pid MAY be present in subtransfers_by_pid
 
 
 
@@ -175,7 +196,6 @@ namespace wallet_public
       KV_SERIALIZE(height)                        DOC_DSCR("Height of the block that included transaction(0 i  transaction is unconfirmed)")  DOC_EXMP(0)   DOC_END
       KV_SERIALIZE(unlock_time)                   DOC_DSCR("Unlock time of this transfer (if present)")  DOC_EXMP(0)   DOC_END
       KV_SERIALIZE(tx_blob_size)                  DOC_DSCR("Size of transaction in bytes")  DOC_EXMP(0)   DOC_END
-      KV_SERIALIZE_BLOB_AS_HEX_STRING(payment_id) DOC_DSCR("HEX-encoded payment id blob, if it was present")  DOC_EXMP("00000000ff00ff00")   DOC_END
       KV_SERIALIZE(comment)                       DOC_DSCR("Some human-readable comment")  DOC_EXMP("Comment here")   DOC_END
       KV_SERIALIZE(timestamp)                     DOC_DSCR("Timestamp of the block that included transaction in blockchain, 0 for unconfirmed")  DOC_EXMP(1712590951)   DOC_END
       KV_SERIALIZE(employed_entries)              DOC_DSCR("Mark entries from transaction that was connected to this wallet")  DOC_END
@@ -183,26 +203,29 @@ namespace wallet_public
       KV_SERIALIZE(is_service)                    DOC_DSCR("Tells if this transaction is used as utility by one of Zano services(contracts, ionic swaps, etc)")  DOC_EXMP(false)   DOC_END
       KV_SERIALIZE(is_mixing)                     DOC_DSCR("Tells if this transaction using mixins or not(auditble wallets normally don't use mixins)")  DOC_EXMP(false)   DOC_END
       KV_SERIALIZE(is_mining)                     DOC_DSCR("Tells if this transaction is coinbase transaction(ie generated by PoW mining or by PoS staking)")  DOC_EXMP(false)   DOC_END
-      KV_SERIALIZE(tx_type)                       DOC_DSCR("Could be one of this:  GUI_TX_TYPE_NORMAL=0, GUI_TX_TYPE_PUSH_OFFER=1, GUI_TX_TYPE_UPDATE_OFFER=2, GUI_TX_TYPE_CANCEL_OFFER=3, GUI_TX_TYPE_NEW_ALIAS=4,GUI_TX_TYPE_UPDATE_ALIAS=5,GUI_TX_TYPE_COIN_BASE=6,GUI_TX_TYPE_ESCROW_PROPOSAL=7,GUI_TX_TYPE_ESCROW_TRANSFER=8,GUI_TX_TYPE_ESCROW_RELEASE_NORMAL=9,GUI_TX_TYPE_ESCROW_RELEASE_BURN=10,GUI_TX_TYPE_ESCROW_CANCEL_PROPOSAL=11,GUI_TX_TYPE_ESCROW_RELEASE_CANCEL=12,GUI_TX_TYPE_HTLC_DEPOSIT=13,GUI_TX_TYPE_HTLC_REDEEM=14")  DOC_EXMP(0)   DOC_END
+      KV_SERIALIZE(tx_type)                       DOC_DSCR("Could be one of this:  GUI_TX_TYPE_NORMAL=0, GUI_TX_TYPE_PUSH_OFFER=1, GUI_TX_TYPE_UPDATE_OFFER=2, GUI_TX_TYPE_CANCEL_OFFER=3, GUI_TX_TYPE_NEW_ALIAS=4,GUI_TX_TYPE_UPDATE_ALIAS=5,GUI_TX_TYPE_COIN_BASE=6,GUI_TX_TYPE_ESCROW_PROPOSAL=7,GUI_TX_TYPE_ESCROW_TRANSFER=8,GUI_TX_TYPE_ESCROW_RELEASE_NORMAL=9,GUI_TX_TYPE_ESCROW_RELEASE_BURN=10,GUI_TX_TYPE_ESCROW_CANCEL_PROPOSAL=11,GUI_TX_TYPE_ESCROW_RELEASE_CANCEL=12")  DOC_EXMP(0)   DOC_END
       KV_SERIALIZE(show_sender)                   DOC_DSCR("If sender is included in tx")  DOC_EXMP(false)   DOC_END
       KV_SERIALIZE(contract)                      DOC_DSCR("Escrow contract if it's part of transaction")  DOC_EXMP_AUTO(1)   DOC_END
       KV_SERIALIZE(service_entries)               DOC_DSCR("Additional entries that might be stored in transaction but not part of it's consensus")  DOC_EXMP_AUTO(1)   DOC_END
       KV_SERIALIZE(transfer_internal_index)       DOC_DSCR("Index of this entry in the wallet's array of transaction's history")  DOC_EXMP(12)   DOC_END
       KV_SERIALIZE(remote_addresses)              DOC_DSCR("Remote addresses of this transfer(destination if it's outgoing transfer or sender if it's incoming transaction)")  DOC_EXMP_AUTO(1, "ZxBvJDuQjMG9R2j4WnYUhBYNrwZPwuyXrC7FHdVmWqaESgowDvgfWtiXeNGu8Px9B24pkmjsA39fzSSiEQG1ekB225ZnrMTBp")   DOC_END
       KV_SERIALIZE(remote_aliases)                DOC_DSCR("Aliases for remot addresses, of discovered")  DOC_EXMP_AUTO(1, "roger")    DOC_END
-      KV_SERIALIZE(subtransfers)                  DOC_DSCR("Essential part of transfer entry: amounts that been transfered in this transaction grouped by asset id")  DOC_EXMP_AUTO(1)   DOC_END
+      KV_SERIALIZE(subtransfers_by_pid)           DOC_DSCR("Essential part of transfer entry: amounts that been transfered in this transaction grouped by payment ID and then by asset ID")  DOC_EXMP_AUTO(1)   DOC_END
       
       KV_SERIALIZE_EPHEMERAL_N(currency::asset_descriptor_operation, wallet_transfer_info_get_ado, "ado")   DOC_DSCR("\"Asset Descriptor Operation\" if it was present in transaction")   DOC_END
     END_KV_SERIALIZE_MAP()
 
+    BOOST_SERIALIZATION_CURRENT_ARCHIVE_VER(14)
     BEGIN_BOOST_SERIALIZATION()
+      BOOST_CHAIN_TRANSITION_VER(12, tools::legacy::wallet_transfer_info_hf5)
       BOOST_SERIALIZE(timestamp)
       BOOST_SERIALIZE(tx_hash)
       BOOST_SERIALIZE(height)
       BOOST_SERIALIZE(tx_blob_size)
-      BOOST_SERIALIZE(payment_id)
+      BOOST_SERIALIZE(tx_wide_payment_id)
       BOOST_SERIALIZE(remote_addresses)
       BOOST_SERIALIZE(employed_entries)
+      BOOST_SERIALIZE(fee)
       BOOST_SERIALIZE(tx)
       BOOST_SERIALIZE(remote_aliases)
       BOOST_SERIALIZE(comment)
@@ -211,76 +234,101 @@ namespace wallet_public
       BOOST_SERIALIZE(marketplace_entries)
       BOOST_SERIALIZE(unlock_time)
       BOOST_SERIALIZE(service_entries)
-      BOOST_SERIALIZE(subtransfers)
-      BOOST_SERIALIZATION_DO_ON_LOADING(restore_fee_from_tx()) // TODO: remove this after HF6 migration -- sowle
-    END_BOOST_SERIALIZATION()
+      BOOST_SERIALIZE(subtransfers_by_pid)
+    END_BOOST_SERIALIZATION_TOTAL_FIELDS(24)
 
-    void restore_fee_from_tx();
+    wallet_sub_transfers_by_pid_info& get_or_add_subtransfers_by_pid(const currency::payment_id_t& pid)
+    {
+      for (auto& st : subtransfers_by_pid)
+      {
+        if (st.payment_id == pid)
+          return st;
+      }
+      wallet_sub_transfers_by_pid_info result{};
+      result.payment_id = pid;
+      return subtransfers_by_pid.emplace_back(result);
+    }
+
+    std::vector<wallet_sub_transfer_info>& access_subtransfers_default_pid()
+    {
+      return get_or_add_subtransfers_by_pid("").subtransfers;
+    }
 
     bool is_income_mode_encryption() const 
     {
-      for (const auto& st : subtransfers)
-      {
-        if (st.asset_id == currency::native_coin_asset_id)
-          return st.is_income;
-      }
+      for (const auto& stbp : subtransfers_by_pid)
+        for (const auto& st : stbp.subtransfers)
+          if (st.asset_id == currency::native_coin_asset_id)
+            return st.is_income;
       return true;
     }
     bool has_outgoing_entries() const
     {
-      for (const auto& st : subtransfers)
-      {
-        if (!st.is_income)
-          return true;
-      }
+      for (const auto& stbp : subtransfers_by_pid)
+        for (const auto& st : stbp.subtransfers)
+          if (!st.is_income)
+            return true;
       return false;
     }
     uint64_t get_native_income_amount() const
     {
-      for (const auto& st : subtransfers)
-      {
-        if (st.asset_id == currency::native_coin_asset_id && st.is_income)
-          return st.amount;
-      }
-      return 0;
+      uint64_t result = 0;
+      for (const auto& stbp : subtransfers_by_pid)
+        for (const auto& st : stbp.subtransfers)
+          if (st.asset_id == currency::native_coin_asset_id && st.is_income)
+            result += st.amount;
+      return result;
     }
     uint64_t get_native_amount() const
     {
-      for (const auto& st : subtransfers)
-      {
-        if (st.asset_id == currency::native_coin_asset_id )
-          return st.amount;
-      }
-      return 0;
+      bool income = get_native_is_income();
+      uint64_t result = 0;
+      for (const auto& stbp : subtransfers_by_pid)
+        for (const auto& st : stbp.subtransfers)
+          if (st.asset_id == currency::native_coin_asset_id && st.is_income == income)
+            result += st.amount;
+      return result;
     }
     bool get_native_is_income() const
     {
-      for (const auto& st : subtransfers)
-      {
-        if (st.asset_id == currency::native_coin_asset_id)
-          return st.is_income;
-      }
+      for (const auto& stbp : subtransfers_by_pid)
+        for (const auto& st : stbp.subtransfers)
+          if (st.asset_id == currency::native_coin_asset_id)
+            return st.is_income;
+      return false;
+    }
+    bool has_intrinsic_payment_id() const
+    {
+      if (!tx_wide_payment_id.empty()) // if tx_wide_payment_id is non-empty, then no intrinsic PID in the structure; s.a. wallet2::process_payment_id_for_wti()
+        return false;
+      for (const auto& stbp : subtransfers_by_pid)
+        if (!stbp.payment_id.empty())
+          return true;
       return false;
     }
     uint64_t& get_native_income_amount()
     {
-      for (auto& st : subtransfers)
+      // TODO: reconsider this function -- sowle
+      for (auto& stbp : subtransfers_by_pid)
       {
-        if (st.asset_id == currency::native_coin_asset_id)
+        for (auto& st : stbp.subtransfers)
         {
-          if (st.is_income)
+          if (st.asset_id == currency::native_coin_asset_id)
           {
-            return st.amount;
-          }
-          else
-          {
-            throw std::runtime_error("Unexpected wallet_transfer_info: native is not income type");
+            if (st.is_income)
+            {
+              return st.amount;
+            }
+            else
+            {
+              throw std::runtime_error("Unexpected wallet_transfer_info: native is not income type");
+            }
           }
         }
       }
-      subtransfers.push_back(wallet_sub_transfer_info());
-      subtransfers.back().is_income = true;
-      return subtransfers.back().amount;
+      wallet_sub_transfer_info& wsti = get_or_add_subtransfers_by_pid("").subtransfers.emplace_back();
+      wsti.is_income = true;
+      return wsti.amount;
     }
     static inline bool wallet_transfer_info_get_ado(const wallet_transfer_info& tdb, currency::asset_descriptor_operation& val)
     {
@@ -293,13 +341,10 @@ namespace wallet_public
 
   struct wallet_transfer_info_old : public wallet_transfer_info
   {
-    //uint64_t amount = 0;
-    //bool is_income = false;
-
     BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE_EPHEMERAL_N(uint64_t, wallet_transfer_info_to_amount, "amount")   DOC_DSCR("Native coins amount")                           DOC_EXMP(1000000000000)   DOC_END
-      KV_SERIALIZE_EPHEMERAL_N(bool, wallet_transfer_info_to_is_income, "is_income") DOC_DSCR("If trnasfer entrie is income (taken from native subtransfer)") DOC_EXMP(false)           DOC_END
-      //KV_SERIALIZE(amount)
+      KV_SERIALIZE_EPHEMERAL_N(uint64_t, wallet_transfer_info_to_amount,  "amount")     DOC_DSCR("Native coins amount")                           DOC_EXMP(1000000000000)   DOC_END
+      KV_SERIALIZE_EPHEMERAL_N(bool, wallet_transfer_info_to_is_income,   "is_income")  DOC_DSCR("If trnasfer entrie is income (taken from native subtransfer)") DOC_EXMP(false)           DOC_END
+      KV_SERIALIZE_EPHEMERAL_N(std::string, wallet_transfer_info_to_pid,  "payment_id") DOC_DSCR("HEX-encoded payment id blob, if it was present")  DOC_EXMP("00000000ff00ff00")   DOC_END
       KV_CHAIN_BASE(wallet_transfer_info)
     END_KV_SERIALIZE_MAP()
 
@@ -315,7 +360,54 @@ namespace wallet_public
       return true;
     }
 
+    static bool wallet_transfer_info_to_pid(const wallet_transfer_info_old& wtio, std::string& val)
+    {
+      if (!wtio.has_intrinsic_payment_id())
+      {
+        val = epee::string_tools::buff_to_hex_nodelimer(wtio.tx_wide_payment_id);
+        return true;
+      }
+
+      if (wtio.subtransfers_by_pid.size() == 1 && wtio.tx_wide_payment_id.empty())
+      {
+        // single subtransfer by pid -- get this pid as tx wide pid
+        val = epee::string_tools::buff_to_hex_nodelimer(wtio.subtransfers_by_pid.front().payment_id);
+        return true;
+      }
+
+      // otherwise -- legacy API cannot determine which pid to return, so we can return error in this case
+      LOG_ERROR("corresponding tx uses intrinsic payment id(s), and its data cannot be retreived using legacy API");
+      return false;
+    }
   };
+
+  // only for txs with legacy tx-wide payment id, should not be used for new transactions if intrinsic payment id is present
+  struct wallet_transfer_info_v2 : public wallet_transfer_info
+  {
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE_EPHEMERAL_N(std::string, wti2_to_payment_id, "payment_id") DOC_DSCR("HEX-encoded payment id blob, if it was present")  DOC_EXMP("00000000ff00ff00")   DOC_END
+      KV_SERIALIZE_EPHEMERAL_N(std::vector<wallet_sub_transfer_info>, wti2_to_subtransfers, "subtransfers") DOC_DSCR("Essential part of transfer entry: amounts that been transfered in this transaction grouped by asset id")  DOC_EXMP_AUTO(1)   DOC_END
+      KV_CHAIN_BASE(wallet_transfer_info)
+    END_KV_SERIALIZE_MAP()
+
+    static bool wti2_to_payment_id(const wallet_transfer_info_v2& wti2, std::string &val)
+    {
+      val = wti2.tx_wide_payment_id;
+      return true;
+    }
+    static bool wti2_to_subtransfers(const wallet_transfer_info_v2& wti2, std::vector<wallet_sub_transfer_info> &val)
+    {
+      // assuming legacy tx-wide payment id and no intrinsic payment ids
+      CHECK_AND_ASSERT_MES(wti2.subtransfers_by_pid.size() <= 1, false, "subtransfers_by_pid is " << wti2.subtransfers_by_pid.size());
+      if (wti2.subtransfers_by_pid.empty())
+        return true;
+      val = wti2.subtransfers_by_pid.back().subtransfers;
+      return true;
+    }
+  };
+
+  static_assert(std::is_move_constructible<wallet_transfer_info_v2>::value, "wallet_transfer_info_v2 is not move-constructible");
+  static_assert(std::is_move_assignable<wallet_transfer_info_v2>::value, "wallet_transfer_info_v2 is not move-assignable");
 
 
 
@@ -569,7 +661,7 @@ namespace wallet_public
 
   struct COMMAND_RPC_GET_RECENT_TXS_AND_INFO2
   {
-    DOC_COMMAND("Returns wallet history of transactions V2(post-zarcanum version)");
+    DOC_COMMAND("(deprecated) Returns wallet history of transactions V2 (post-Zarcanum version)");
 
     struct request
     {
@@ -605,7 +697,7 @@ namespace wallet_public
     struct response
     {
       wallet_provision_info pi;
-      std::vector<wallet_transfer_info> transfers;
+      std::vector<wallet_transfer_info_v2> transfers;
       uint64_t total_transfers;
       uint64_t last_item_index;
 
@@ -618,10 +710,9 @@ namespace wallet_public
     };
   };
 
-
   struct COMMAND_RPC_GET_RECENT_TXS_AND_INFO
   {
-    DOC_COMMAND("Returns wallet history of transactions");
+    DOC_COMMAND("(deprecated) Returns wallet history of transactions");
 
     typedef COMMAND_RPC_GET_RECENT_TXS_AND_INFO2::request request;
 
@@ -637,6 +728,29 @@ namespace wallet_public
         KV_SERIALIZE(transfers)       DOC_DSCR("Transfers history array")                                           DOC_EXMP_AUTO(1)  DOC_END
         KV_SERIALIZE(total_transfers) DOC_DSCR("Total number of transfers in the tx history")                       DOC_EXMP(1)       DOC_END
         KV_SERIALIZE(last_item_index) DOC_DSCR("Index of last returned item(might be needed if filters are used)")  DOC_EXMP(1)       DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
+
+  struct COMMAND_RPC_GET_RECENT_TXS_AND_INFO3
+  {
+    DOC_COMMAND("Returns wallet history of transactions V3 (HF6-ready version with intrinsic payment IDs support)");
+
+    using request = COMMAND_RPC_GET_RECENT_TXS_AND_INFO2::request;
+
+    struct response
+    {
+      wallet_provision_info pi;
+      std::vector<wallet_transfer_info> transfers;
+      uint64_t total_transfers;
+      uint64_t last_item_index;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(pi)               DOC_DSCR("Details on wallet balance etc") DOC_END
+        KV_SERIALIZE(transfers)        DOC_DSCR("Transfers")                     DOC_EXMP_AUTO(1) DOC_END
+        KV_SERIALIZE(total_transfers)  DOC_DSCR("Total transfers")               DOC_EXMP(1) DOC_END
+        KV_SERIALIZE(last_item_index)  DOC_DSCR("Last item index")               DOC_EXMP(1) DOC_END
       END_KV_SERIALIZE_MAP()
     };
   };
@@ -792,17 +906,8 @@ namespace wallet_public
   };
 
   
-  struct transfer_destination
-  {
-    uint64_t amount = 0;
-    std::string address;
-    crypto::public_key asset_id = currency::native_coin_asset_id;
-    BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(amount)                      DOC_DSCR("Amount to transfer to destination") DOC_EXMP(10000000000000)     DOC_END
-      KV_SERIALIZE(address)                     DOC_DSCR("Destination address") DOC_EXMP("ZxBvJDuQjMG9R2j4WnYUhBYNrwZPwuyXrC7FHdVmWqaESgowDvgfWtiXeNGu8Px9B24pkmjsA39fzSSiEQG1ekB225ZnrMTBp")     DOC_END
-      KV_SERIALIZE_POD_AS_HEX_STRING(asset_id)  DOC_DSCR("Asset id to transfer") DOC_EXMP("cc608f59f8080e2fbfe3c8c80eb6e6a953d47cf2d6aebd345bada3a1cab99852")     DOC_END
-    END_KV_SERIALIZE_MAP()
-  };
+  //typedef currency::transfer_destination transfer_destination; // probably better to rename it later to currency::transfer_destination everywhere instead of typedef
+
 
   struct COMMAND_RPC_TRANSFER
   {
@@ -810,27 +915,28 @@ namespace wallet_public
 
     struct request
     {
-      std::list<transfer_destination> destinations;
+      std::list<currency::transfer_destination> destinations;
       uint64_t fee;
       uint64_t mixin;
-      //uint64_t unlock_time;
       std::string payment_id; // hex-encoded
       std::string comment; 
       bool push_payer;
       bool hide_receiver;
-      std::vector<currency::tx_service_attachment> service_entries;
       bool service_entries_permanent;
+      std::vector<currency::tx_service_attachment> service_entries;
+      std::vector<uint64_t> out_ids_to_spend;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(destinations)     DOC_DSCR("List of destinations") DOC_EXMP_AUTO(1)     DOC_END
         KV_SERIALIZE(fee)              DOC_DSCR("Fee to be paid on behalf of sender's wallet(paid in native coins)") DOC_EXMP_AUTO(10000000000)     DOC_END
-        KV_SERIALIZE(mixin)            DOC_DSCR("Specifies number of mixins(decoys) that would be used to create input, actual for pre-zarcanum outputs, for post-zarcanum outputs instead of this option, number that is defined by network hard rules(15+)") DOC_EXMP(15)     DOC_END
-        KV_SERIALIZE(payment_id)       DOC_DSCR("Hex-encoded payment_id, that normally used for user database by exchanges") DOC_EXMP_AUTO("")     DOC_END
+        KV_SERIALIZE(mixin)            DOC_DSCR("Specifies number of mixins (decoys) that would be used to create input, actual for pre-Zarcanum outputs, for post-Zarcanum outputs instead of this option, number that is defined by network hard rules (15+)") DOC_EXMP(15)     DOC_END
+        KV_SERIALIZE(payment_id)       DOC_DSCR("[deprecated] Legacy tx-wide hex-encoded payment_id, that normally used for user database by exchanges") DOC_EXMP_AUTO("")     DOC_END
         KV_SERIALIZE(comment)          DOC_DSCR("Text comment that is displayed in UI") DOC_EXMP_AUTO("Thanks for the coffe")     DOC_END
-        KV_SERIALIZE(push_payer)       DOC_DSCR("Reveal information about sender of this transaction, basically add sender address to transaction in encrypted way, so only receiver can see who sent transaction") DOC_EXMP(false)     DOC_END
-        KV_SERIALIZE(hide_receiver)    DOC_DSCR("This add to transaction information about remote address(destination), might be needed when the wallet restored from seed phrase and fully resynched, if this option were true, then sender won't be able to see remote address for sent transactions anymore.") DOC_EXMP(true)     DOC_END
+        KV_SERIALIZE(push_payer)       DOC_DSCR("[deprecated] Reveal information about sender of this transaction, basically add sender address to transaction in encrypted way, so only receiver can see who sent transaction") DOC_EXMP(false)     DOC_END
+        KV_SERIALIZE(hide_receiver)    DOC_DSCR("[deprecated] This add to transaction information about remote address(destination), might be needed when the wallet restored from seed phrase and fully resynched, if this option were true, then sender won't be able to see remote address for sent transactions anymore.") DOC_EXMP(true)     DOC_END
         KV_SERIALIZE(service_entries)  DOC_DSCR("Service entries that might be used by different apps that works on top of Zano network, not part of consensus") DOC_EXMP_AUTO(1)     DOC_END
         KV_SERIALIZE(service_entries_permanent) DOC_DSCR("Point to wallet that service_entries should be placed to 'extra' section of transaction(which won't be pruned after checkpoints)") DOC_EXMP_AUTO(1)     DOC_END
+        KV_SERIALIZE(out_ids_to_spend) DOC_DSCR("[optional] List of output IDs that should only be used for this transfer. If empty or not present -- no restriction (default).") DOC_EXMP_AGGR({10, 15, 305}) DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
@@ -840,12 +946,14 @@ namespace wallet_public
       std::string tx_unsigned_hex; // for cold-signing process
       uint64_t tx_size;
       std::optional<wallet_transfer_info> tx_details;
+      std::vector<uint64_t> used_out_ids;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(tx_hash)           DOC_DSCR("Has of the generated transaction(if succeded)") DOC_EXMP("01220e8304d46b940a86e383d55ca5887b34f158a7365bbcdd17c5a305814a93")     DOC_END
         KV_SERIALIZE(tx_unsigned_hex)   DOC_DSCR("Has unsigned tx blob in hex encoding") DOC_EXMP("e383d55ca5887b34f158a7365bbcd01220e8304d46b940a86e383d55ca5887b34f158a7365bbcdd17c5a305814a9301220e8304d46b940a86e383d55ca5887b34f158a7365bbcdd17c5a305814a9301220e8304d46b940a86e383d55ca5887b34f158a7365bbcdd17c5a305814a93")     DOC_END
         KV_SERIALIZE(tx_size)           DOC_DSCR("Transaction size in bytes") DOC_EXMP(1234)     DOC_END
         KV_SERIALIZE(tx_details)        DOC_DSCR("Tx details[optional]")      DOC_EXMP_AGGR()    DOC_END
+        KV_SERIALIZE(used_out_ids)      DOC_DSCR("Output IDs that were actually spent.") DOC_EXMP_AGGR({10, 15, 305})    DOC_END
       END_KV_SERIALIZE_MAP()
     };
   };
@@ -1015,6 +1123,8 @@ namespace wallet_public
       uint64_t    amount;
       std::string payment_id_hex;
       uint64_t    fee;
+      uint64_t    max_inputs;
+      uint64_t    min_outputs;
       crypto::public_key asset_id = currency::native_coin_asset_id;
 
       BEGIN_KV_SERIALIZE_MAP()
@@ -1023,6 +1133,8 @@ namespace wallet_public
         KV_SERIALIZE(amount)             DOC_DSCR("Threshold amount of native coins to sweep.") DOC_EXMP(1000000000000) DOC_END
         KV_SERIALIZE(payment_id_hex)     DOC_DSCR("[deprecated] Legacy tx-wide hex-encoded payment_id, that normally used for user database by exchanges") DOC_EXMP_AUTO("")     DOC_END
         KV_SERIALIZE(fee)                DOC_DSCR("Transaction fee required for processing the transaction.") DOC_EXMP(10000000000) DOC_END
+        KV_SERIALIZE(max_inputs)         DOC_DSCR("[optional] Maximum number of inputs in sweeping transaction. Default is the maximum possible.") DOC_EXMP(5) DOC_END
+        KV_SERIALIZE(min_outputs)        DOC_DSCR("[optional] Minimum number of outputs in sweeping transaction. Default is the minimum possible.") DOC_EXMP(3) DOC_END
         KV_SERIALIZE_POD_AS_HEX_STRING(asset_id) DOC_DSCR("[optional] Asset ID to filter outputs. Native coin if not specified.") DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
       END_KV_SERIALIZE_MAP()
     };
@@ -1451,127 +1563,6 @@ namespace wallet_public
   };
 
 
-  struct htlc_entry_info
-  {
-    currency::account_public_address counterparty_address;
-    crypto::hash sha256_hash;
-    crypto::hash tx_id;
-    uint64_t amount;
-    bool is_redeem;
-
-    BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(amount)
-      KV_SERIALIZE_ADDRESS_AS_TEXT(counterparty_address)
-      KV_SERIALIZE_POD_AS_HEX_STRING(sha256_hash)
-      KV_SERIALIZE_POD_AS_HEX_STRING(tx_id)
-      KV_SERIALIZE(is_redeem)
-    END_KV_SERIALIZE_MAP()
-  };
-
-
-  struct COMMAND_CREATE_HTLC_PROPOSAL
-  {
-
-
-    struct request
-    {
-      uint64_t amount;
-      currency::account_public_address counterparty_address;
-      uint64_t lock_blocks_count;
-      crypto::hash htlc_hash;
-
-      BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(amount)
-        KV_SERIALIZE_ADDRESS_AS_TEXT(counterparty_address)
-        KV_SERIALIZE(lock_blocks_count)
-        KV_SERIALIZE_POD_AS_HEX_STRING(htlc_hash)
-      END_KV_SERIALIZE_MAP()
-    };
-
-    struct response
-    {
-      std::string result_tx_blob;
-      crypto::hash result_tx_id;
-      std::string derived_origin_secret; // this field derived in a deterministic way if no htlc_hash was provided
-
-      BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE_BLOB_AS_HEX_STRING(result_tx_blob)
-        KV_SERIALIZE_POD_AS_HEX_STRING(result_tx_id)
-        KV_SERIALIZE_BLOB_AS_HEX_STRING_N(derived_origin_secret, "derived_origin_secret_as_hex")
-      END_KV_SERIALIZE_MAP()
-    };
-  };
-
-  struct COMMAND_GET_LIST_OF_ACTIVE_HTLC
-  {
-    struct request
-    {
-      bool income_redeem_only;
-
-      BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(income_redeem_only)
-      END_KV_SERIALIZE_MAP()
-    };
-
-    struct response
-    {
-      std::list<wallet_public::htlc_entry_info> htlcs;
-
-      BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(htlcs)
-      END_KV_SERIALIZE_MAP()
-    };
-  };
-
-  struct COMMAND_REDEEM_HTLC
-  {
-    struct request
-    {
-      crypto::hash tx_id;
-      std::string origin_secret;
-
-      BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE_POD_AS_HEX_STRING(tx_id)
-        KV_SERIALIZE_BLOB_AS_HEX_STRING_N(origin_secret, "origin_secret_as_hex")
-      END_KV_SERIALIZE_MAP()
-    };
-
-    struct response
-    {
-      std::string result_tx_blob;
-      crypto::hash result_tx_id;
-
-      BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE_BLOB_AS_HEX_STRING(result_tx_blob)
-        KV_SERIALIZE_POD_AS_HEX_STRING(result_tx_id)
-      END_KV_SERIALIZE_MAP()
-    };
-  };
-
-  struct COMMAND_CHECK_HTLC_REDEEMED
-  {
-    struct request
-    {
-      crypto::hash htlc_tx_id;
-      BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE_POD_AS_HEX_STRING(htlc_tx_id)
-      END_KV_SERIALIZE_MAP()
-    };
-
-
-    struct response
-    {
-      std::string origin_secrete;
-      crypto::hash redeem_tx_id;
-
-      BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE_BLOB_AS_HEX_STRING_N(origin_secrete, "origin_secrete_as_hex")
-        KV_SERIALIZE_POD_AS_HEX_STRING(redeem_tx_id)
-      END_KV_SERIALIZE_MAP()
-    };
-  };
-
-
   struct wallet_vote_config_entry
   {
     std::string proposal_id;
@@ -1750,6 +1741,8 @@ namespace wallet_public
     bool is_auditable;
     bool is_watch_only;
     bool has_bare_unspent_outputs;
+    uint64_t current_pos_attempts;              //every attempt happens every 2 seconds
+    uint64_t est_iterations_per_pos_block;      //estimated iterations for PoS block, valid only if balances valid, 
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(balances)                    DOC_DSCR("Balances hold by this wallet") DOC_EXMP_AUTO(1) DOC_END
@@ -1760,6 +1753,8 @@ namespace wallet_public
       KV_SERIALIZE(is_auditable)                DOC_DSCR("Flag indicating whether the wallet is auditable")             DOC_EXMP(false) DOC_END
       KV_SERIALIZE(is_watch_only)               DOC_DSCR("Flag indicating whether the wallet is watch-only")            DOC_EXMP(false) DOC_END
       KV_SERIALIZE(has_bare_unspent_outputs)    DOC_DSCR("Flag indicating whether the wallet has bare unspent outputs(pre-zarcanum outputs)") DOC_EXMP(false) DOC_END
+      KV_SERIALIZE(current_pos_attempts)        DOC_DSCR("Current POS iterations that reset after PoS block found, used to calculate estimation of the next PoS block time(attempt is happening every 2 seconds)") DOC_EXMP(12344) DOC_END
+      KV_SERIALIZE(est_iterations_per_pos_block)DOC_DSCR("Estimated iterations needed to find PoS block with given balance, valid only if balances valid") DOC_EXMP(464400000) DOC_END
     END_KV_SERIALIZE_MAP()
   };
 
@@ -1838,14 +1833,14 @@ namespace wallet_public
 
   struct COMMAND_SIGN_MESSAGE
   {
-    DOC_COMMAND("Trivially sign base64 encoded data message using wallet spend key")
+    DOC_COMMAND("Sign a base64-encoded message using the wallet's spend key.")
 
     struct request
     {
       std::string buff; //base64 encoded data
       
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(buff)        DOC_DSCR("base64 encoded data message to be signed")    DOC_EXMP("ZGNjc2Ztc2xrZm12O2xrZm12OydlbGtmdm0nbGtmbXY=")  DOC_END
+        KV_SERIALIZE_BLOB_AS_BASE64_STRING(buff)        DOC_DSCR("Base64-encoded message to be signed.")    DOC_EXMP("ZGNjc2Ztc2xrZm12O2xrZm12OydlbGtmdm0nbGtmbXY=")  DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
@@ -1861,17 +1856,17 @@ namespace wallet_public
       END_KV_SERIALIZE_MAP()
     };
   };
-   
+
   struct COMMAND_ENCRYPT_DATA
   {
-    DOC_COMMAND("Trivially encrypt base64 encoded data message with chacha using wallet spend key")
+    DOC_COMMAND("Encrypt arbitrary data with chacha using wallet view secret key")
 
     struct request
     {
       std::string buff; //base64 encoded data
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(buff) DOC_DSCR("base64 encoded data message to be encrypted")    DOC_EXMP("ZGNjc2Ztc2xrZm12O2xrZm12OydlbGtmdm0nbGtmbXY=")  DOC_END
+        KV_SERIALIZE_BLOB_AS_BASE64_STRING(buff) DOC_DSCR("base64-encoded data message to be encrypted")    DOC_EXMP("ZGNjc2Ztc2xrZm12O2xrZm12OydlbGtmdm0nbGtmbXY=")  DOC_END
       END_KV_SERIALIZE_MAP()
     };     
 
@@ -1879,14 +1874,36 @@ namespace wallet_public
     { 
       std::string res_buff; //base64 encoded encrypted data
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(res_buff) DOC_DSCR("base64 encoded resulted data message")    DOC_EXMP("ZGNjc2Ztc2xrZm12O2xrZm12OydlbGtmdm0nbGtmbXY=")  DOC_END
+        KV_SERIALIZE_BLOB_AS_BASE64_STRING(res_buff) DOC_DSCR("base64-encoded ciphertext")    DOC_EXMP("ZGNjc2Ztc2xrZm12O2xrZm12OydlbGtmdm0nbGtmbXY=")  DOC_END
       END_KV_SERIALIZE_MAP()
     };
   }; 
   
   struct COMMAND_DECRYPT_DATA
   {
-    DOC_COMMAND("Trivially decrypt base64 encoded data message with chacha using wallet spend key")
+    DOC_COMMAND("Decrypt base64 encoded data message with chacha using wallet view secret key")
+    struct request
+    {
+      std::string buff; //base64 encoded encrypted data
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_BLOB_AS_BASE64_STRING(buff) DOC_DSCR("base64-encoded ciphertext")    DOC_EXMP("ZGNjc2Ztc2xrZm12O2xrZm12OydlbGtmdm0nbGtmbXY=")  DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      std::string res_buff; //base64 encoded data
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_BLOB_AS_BASE64_STRING(res_buff) DOC_DSCR("base64-encoded decrypted result")    DOC_EXMP("ZGNjc2Ztc2xrZm12O2xrZm12OydlbGtmdm0nbGtmbXY=")  DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
+  struct COMMAND_DECRYPT_DATA_LEGACY
+  {
+    DOC_COMMAND("(deprecated) Trivially decrypt base64 encoded data message with chacha using wallet view secret key")
     struct request
     {
       std::string buff; //base64 encoded encrypted data
@@ -2060,7 +2077,7 @@ namespace wallet_public
 
     struct request
     {
-      std::list<transfer_destination> destinations;
+      std::list<currency::transfer_destination> destinations;
       currency::asset_descriptor_base asset_descriptor;
       bool do_not_split_destinations = false;
 
@@ -2107,7 +2124,7 @@ namespace wallet_public
     struct request
     {
       crypto::public_key asset_id;
-      std::list<transfer_destination> destinations;
+      std::list<currency::transfer_destination> destinations;
       bool do_not_split_destinations = false;
 
       BEGIN_KV_SERIALIZE_MAP()
@@ -2310,5 +2327,42 @@ namespace wallet_public
     };
   };
 
-} // namespace wallet_rpc
-} // namespace tools
+
+  struct COMMAND_GATEWAY_REGISTER_ADDRESS
+  {
+    DOC_COMMAND("Register gateway address to be used in further transfers.")
+    struct request
+    {
+      crypto::public_key                      view_pub_key = {};     //Zano specific generic Schnorr signature public key
+
+      currency::gateway_descriptor_api_info   descriptor_info = {};     
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_POD_AS_HEX_STRING(view_pub_key)               DOC_DSCR("View address to register")                     DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
+        KV_SERIALIZE(descriptor_info)                              DOC_DSCR("Descriptor information for the gateway")       DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      std::string status;
+      currency::gateway_address_id_type address_id = {};
+      std::string address;
+      //currency::gateway_address_descriptor_base descriptor = {};
+      crypto::hash tx_id = currency::null_hash;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(status) DOC_DSCR("Result (OK if success)") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(address_id) DOC_DSCR("Registered gateway address id") DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
+        //KV_SERIALIZE(descriptor) DOC_DSCR("Registered gateway address descriptor")         DOC_EXMP_AGGR() DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(tx_id) DOC_DSCR("Transaction id")                     DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
+        KV_SERIALIZE(address)                 DOC_DSCR("Addres starting from gwZ or gwiZ")   DOC_EXMP("") DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
+} // namespace tools::wallet_public
+
+LOOP_BACK_BOOST_SERIALIZATION_VERSION(tools::wallet_public::wallet_transfer_info);
+
+#include "wallet_public_structs_backward_comp.h"

@@ -323,7 +323,7 @@ namespace epee {
 
 #define BEGIN_URI_MAP2_VIRTUAL()   virtual bool handle_http_request_map(const epee::net_utils::http::http_request_info& query_info, \
   epee::net_utils::http::http_response_info& response_info, \
-  epee::net_utils::connection_context_base& m_conn_context, bool& call_found, documentation& docs = epee::net_utils::http::i_chain_handler::m_empty_documentation) { \
+  epee::net_utils::connection_context_base& m_conn_context, bool& call_found, documentation& docs = epee::net_utils::http::i_chain_handler::m_empty_documentation) override { \
   call_found = false; \
   if(false) return true; //just a stub to have "else if"
 
@@ -351,6 +351,27 @@ namespace epee {
       response_info.m_header_info.m_content_type = " application/json"; \
       LOG_PRINT("[HTTP/JSON][" << epee::string_tools::get_ip_string_from_int32(m_conn_context.m_remote_ip ) << "][" << query_info.m_URI << "] processed with " << ticks1-ticks << "/"<< ticks2-ticks1 << "/" << ticks3-ticks2 << "ms", LOG_LEVEL_2); \
     }
+
+#define MAP_URI_AUTO_JON2_CONDITIONAL(s_pattern, callback_f, command_type, predicate) \
+    else if(auto_doc<command_type, false>(s_pattern, "", true, docs) && query_info.m_URI == s_pattern && predicate) \
+    { \
+      call_found = true; \
+      uint64_t ticks = misc_utils::get_tick_count(); \
+      boost::value_initialized<command_type::request> req; \
+      bool res = epee::serialization::load_t_from_json(static_cast<command_type::request&>(req), query_info.m_body); \
+      CHECK_AND_ASSERT_MES(res, false, "Failed to parse json: \r\n" << query_info.m_body); \
+      uint64_t ticks1 = epee::misc_utils::get_tick_count(); \
+      boost::value_initialized<command_type::response> resp;\
+      res = callback_f(static_cast<command_type::request&>(req), static_cast<command_type::response&>(resp), m_conn_context); \
+      CHECK_AND_ASSERT_MES(res, false, "Failed to call " << #callback_f << "() while handling " << s_pattern); \
+      uint64_t ticks2 = epee::misc_utils::get_tick_count(); \
+      epee::serialization::store_t_to_json(static_cast<command_type::response&>(resp), response_info.m_body); \
+      uint64_t ticks3 = epee::misc_utils::get_tick_count(); \
+      response_info.m_mime_tipe = "application/json"; \
+      response_info.m_header_info.m_content_type = " application/json"; \
+      LOG_PRINT("[HTTP/JSON][" << epee::string_tools::get_ip_string_from_int32(m_conn_context.m_remote_ip ) << "][" << query_info.m_URI << "] processed with " << ticks1-ticks << "/"<< ticks2-ticks1 << "/" << ticks3-ticks2 << "ms", LOG_LEVEL_2); \
+    }
+
 
 #define MAP_URI_AUTO_BIN2(s_pattern, callback_f, command_type) \
     else if(auto_doc<command_type, false>(s_pattern, "", false, docs) && query_info.m_URI == s_pattern) \
@@ -508,7 +529,7 @@ namespace epee {
 }
 
 #define MAP_JON_RPC_CONDITIONAL(method_name, callback_f, command_type, predicate) \
-    else if(predicate && auto_doc<command_type, true>(current_zone_json_uri, method_name, true, docs) && callback_name == method_name) \
+    else if(auto_doc<command_type, true>(current_zone_json_uri, method_name, true, docs) && callback_name == method_name && predicate) \
 { \
   call_found = true; \
   PREPARE_OBJECTS_FROM_JSON(command_type) \

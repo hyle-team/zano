@@ -50,10 +50,23 @@ template<size_t A, size_t B> struct TAssertEquality {
   fields to the structure but forgets to update the serialization map, the compilation will fail. Any update to "num_fields" must
   be accompanied by a thorough review of the serialization map to ensure no fields are omitted.
 **********************************************************************************************************************************/
+
+template <std::size_t Expected, std::size_t Actual>
+struct if_you_see_this_check_END_BOOST_SERIALIZATION_TOTAL_FIELDS_macro;
+
+template <class T, std::size_t Expected>
+using validate_fields_t = std::conditional_t<(boost::pfr::tuple_size_v<T> == Expected), int, if_you_see_this_check_END_BOOST_SERIALIZATION_TOTAL_FIELDS_macro<Expected, boost::pfr::tuple_size_v<T>>>;
+
+template<std::size_t expected, std::size_t actual>
+constexpr bool static_check_num_eq() { static_assert(expected == actual, "numbers mismatched -- see static_check_num_eq<expected, actual> in the instantiation below"); return expected == actual; }
+
+
 #ifndef DISABLE_PFR_SERIALIZATION_SELFCHECK
-  #define END_BOOST_SERIALIZATION_TOTAL_FIELDS(num_fields)  static_assert(num_fields == boost::pfr::tuple_size<std::remove_reference<decltype(*this)>::type>::value, "Unexpected number of fields!"); }
+  #define END_BOOST_SERIALIZATION_TOTAL_FIELDS(num_fields) { using _check = validate_fields_t<std::remove_reference<decltype(*this)>::type, num_fields>; static_assert(sizeof(_check) != 999, "Dummy Assert"); } }
+  #define STATIC_CHECK_TYPE_TOTAL_FIELDS(T, num_fields, msg) static_assert(static_check_num_eq<boost::pfr::tuple_size_v<T>, (num_fields)>(), "====> ERROR: number of fields for type " #T " has changed; " msg)
 #else
   #define END_BOOST_SERIALIZATION_TOTAL_FIELDS(num_fields) END_BOOST_SERIALIZATION()
+  #define STATIC_CHECK_TYPE_TOTAL_FIELDS(T, num_fields, msg)
 #endif
 
 #define BOOST_SERIALIZATION_CURRENT_ARCHIVE_VER(current_version) static const unsigned int current_boost_version_serialization_version = current_version;
@@ -69,11 +82,12 @@ template<typename destination_t>
 struct boost_transition_t<true, destination_t>
 {
   template <typename archive, typename origin_type>
-  static void chain_serialize(archive& ar, const origin_type& origin_tx)
+  static void chain_serialize(archive& ar, const origin_type& origin_tx, const unsigned int ver)
   {
-    destination_t dst_tx = AUTO_VAL_INIT(dst_tx);
-    transition_convert(origin_tx, dst_tx);
-    ar & dst_tx;
+    destination_t dst_tx{};
+    transition_convert(origin_tx, dst_tx); // <- dependent name, use ADL wisely and put your transition_convert implementation into proper namespace -- sowle
+    //ar & dst_tx;
+    boost::serialization::serialize(ar, dst_tx, ver);
   }
 };
 
@@ -81,19 +95,18 @@ template<typename destination_t>
 struct boost_transition_t<false, destination_t>
 {
   template <typename archive, typename origin_type>
-  static void chain_serialize(archive& ar, origin_type& origin_tx)
+  static void chain_serialize(archive& ar, origin_type& origin_tx, const unsigned int ver)
   {
-    // TODO: consider using move semantic for temporary 'dst_tx'
-    destination_t dst_tx = AUTO_VAL_INIT(dst_tx);
-    ar & dst_tx;    
-    transition_convert(dst_tx, origin_tx);
+    destination_t dst_tx{};
+    boost::serialization::serialize(ar, dst_tx, ver);
+    transition_convert(std::move(dst_tx), origin_tx); // <- dependent name, use ADL wisely and put your transition_convert implementation into proper namespace -- sowle
   }
 };
 
 
-#define BOOST_CHAIN_TRANSITION_VER(obj_version, old_type)   if (obj_version == ver)  {boost_transition_t<t_archive::is_saving::value, old_type>::chain_serialize(_arch, *this);return;}
+#define BOOST_CHAIN_TRANSITION_VER(obj_version, old_type)   if (obj_version == ver)  {boost_transition_t<t_archive::is_saving::value, old_type>::chain_serialize(_arch, *this, ver);return;}
 
-#define BOOST_CHAIN_TRANSITION_IF_COND_TRUE(condition, old_type)   if (condition)  {boost_transition_t<t_archive::is_saving::value, old_type>::chain_serialize(_arch, *this);return;}
+#define BOOST_CHAIN_TRANSITION_IF_COND_TRUE(condition, old_type)   if (condition)  {boost_transition_t<t_archive::is_saving::value, old_type>::chain_serialize(_arch, *this, ver);return;}
 
 /*
   example of use: 
@@ -112,6 +125,6 @@ struct boost_transition_t<false, destination_t>
       BOOST_SERIALIZE(m_user_data_blob)
       BOOST_SERIALIZE(m_attachment_info)
       BOOST_SERIALIZATION_DO_ON_LOADING(fee = currency::is_coinbase(tx) ? 0 : currency::get_tx_fee(tx))
-    END_BOOST_SERIALIZATION()
+    END_BOOST_SERIALIZATION_TOTAL_FIELDS(0)
   };
 */

@@ -60,6 +60,7 @@ namespace
   const command_line::arg_descriptor<bool>        arg_get_anonymized_peers( "get-anonymized-peers", "Retrieves anonymized peers connected to the specified peer.");
   const command_line::arg_descriptor<bool>        arg_do_consloe_log     ( "do-console-log", "Tool generates debug console output(debug purposes)");
   const command_line::arg_descriptor<std::string> arg_generate_integrated_address  ( "generate-integrated-address", "Tool create integrated address from simple address and payment_id");
+  const command_line::arg_descriptor<bool>        arg_allow_legacy_payment_id_size ( "allow-legacy-payment-id-size", "Temporary (till HF6) removes requirement for payment id to be 8 bytes long");
   const command_line::arg_descriptor<std::string> arg_pack_file           ("pack-file", "perform gzip-packing and calculate hash for a given file");
   const command_line::arg_descriptor<std::string> arg_unpack_file         ("unpack-file", "Perform gzip-unpacking and calculate hash for a given file");
   const command_line::arg_descriptor<std::string> arg_target_file         ("target-file", "Specify target file for pack-file and unpack-file commands");
@@ -351,8 +352,10 @@ bool generate_genesis(const std::string& path_config, uint64_t premine_split_amo
   for (auto& p: gcp.payments)
   {
 
-    bool r = get_account_address_from_str(de.addr.back(), p.address_this);
+    account_public_address addr{};
+    bool r = get_account_address_from_str(addr, p.address_this);
     CHECK_AND_ASSERT_MES(r, false, "wrong address string: " << p.address_this);
+    de.addr.push_back(addr);
 
     de.amount = p.amount_this_coin_int; //std::cout << de.amount << ENDL;
     summary_premine_coins += de.amount;
@@ -924,20 +927,18 @@ bool invoke_debug_command(po::variables_map& vm, const crypto::secret_key& sk, n
 //---------------------------------------------------------------------------------------------------------------
 bool handle_get_anonymized_peers(po::variables_map& vm)
 {
-  crypto::secret_key sk{};
-  if (!get_private_key(sk, vm))
-  {
-    std::cout << "ERROR: secret key error" << ENDL;
-    return false;
-  }
-
   net_utils::levin_client2 transport;
   peerid_type peer_id = 0;
 
+  if (!transport.connect(command_line::get_arg(vm, arg_ip), static_cast<int>(command_line::get_arg(vm, arg_port)), static_cast<int>(command_line::get_arg(vm, arg_timeout))))
+  {
+    std::cout << "{" << ENDL << "  \"status\": \"ERROR: " << "Failed to connect to " << command_line::get_arg(vm, arg_ip) << ":" << command_line::get_arg(vm, arg_port) << "\"" << ENDL << "}" << ENDL;
+    return false;
+  }
+
   COMMAND_REQUEST_ANONYMIZED_PEERS::request req{};
-  
   COMMAND_REQUEST_ANONYMIZED_PEERS::response rsp{};
-  if (!invoke_debug_command<COMMAND_REQUEST_ANONYMIZED_PEERS>(vm, sk, transport, peer_id, req, rsp))
+  if (!net_utils::invoke_remote_command2(COMMAND_REQUEST_ANONYMIZED_PEERS::ID, req, rsp, transport))
   {
     std::cout << "ERROR: invoking COMMAND_REQUEST_ANONYMIZED_PEERS failed" << ENDL;
     return false;
@@ -969,6 +970,12 @@ bool handle_generate_integrated_address(po::variables_map& vm)
     payment_id_bin = payment_id;
   }
 
+  if (payment_id_bin.size() != CURRENCY_HF6_INTRINSIC_PAYMENT_ID_SIZE && !command_line::has_arg(vm, arg_allow_legacy_payment_id_size))
+  {
+    std::cout << "ERROR: invalid payment id size: " << payment_id_bin.size() << " bytes. Expected: " << CURRENCY_HF6_INTRINSIC_PAYMENT_ID_SIZE << " bytes." << ENDL;
+    return false;
+  }
+
   if (address.empty() || payment_id_bin.empty())
   {
     std::cout << "ERROR: wrong syntax, address or paymentd_id not set" << ENDL;
@@ -983,7 +990,7 @@ bool handle_generate_integrated_address(po::variables_map& vm)
     return false;
   }
 
-  std::string integrated_addr = currency::get_account_address_and_payment_id_as_str(acc_addr, payment_id_bin);
+  std::string integrated_addr = currency::get_account_address_as_str(acc_addr, payment_id_bin);
 
 
   std::cout << "Integrated address: " << integrated_addr << ENDL;
@@ -1208,6 +1215,7 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_params, arg_get_anonymized_peers);
   command_line::add_arg(desc_params, arg_do_consloe_log);
   command_line::add_arg(desc_params, arg_generate_integrated_address);
+  command_line::add_arg(desc_params, arg_allow_legacy_payment_id_size);
   command_line::add_arg(desc_params, arg_pack_file);
   command_line::add_arg(desc_params, arg_unpack_file);
   command_line::add_arg(desc_params, arg_target_file);
@@ -1299,7 +1307,7 @@ int main(int argc, char* argv[])
     std::cerr << desc_all << ENDL;
   }
 
-      CATCH_ENTRY_L0(__func__, EXIT_FAILURE);
+      CATCH_ENTRY_L0(LOCATION_SS, EXIT_FAILURE);
     }
   catch (...)
     {

@@ -11,16 +11,20 @@ using namespace epee;
 #include "common/command_line.h"
 #include "currency_core/currency_format_utils.h"
 #include "currency_core/account.h"
+#include "currency_core/crypto_config.h"
 
 #include "misc_language.h"
 #include "crypto/hash.h"
 #include "core_rpc_server_error_codes.h"
+#include "wallet/core_fast_rpc_proxy.h"
+#include "wallet/fill_destination_helper.h"
 
 #define CHECK_RPC_LIMITS(var, limit)    if(var > limit)  {res.status = API_RETURN_CODE_ARG_OUT_OF_LIMITS; return true;}
 
 
 #define RPC_LIMIT_COMMAND_RPC_GET_BLOCKS_DIRECT_BLOCK_IDS                                       4000
-#define RPC_LIMIT_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS                                    500
+#define RPC_LIMIT_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS                                    CURRENCY_TX_MAX_ALLOWED_INPUTS * (CURRENCY_HF4_MANDATORY_DECOY_SET_SIZE + 1) * 2 // 2 - over
+#define RPC_LIMIT_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3                                   300
 #define RPC_LIMIT_COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES_TXIDS                               100
 #define RPC_LIMIT_COMMAND_RPC_CHECK_KEYIMAGES_IMAGES                                            1000
 #define RPC_LIMIT_COMMAND_RPC_GET_TRANSACTIONS_TXS_HASHES                                       5000
@@ -32,6 +36,7 @@ using namespace epee;
 #define RPC_LIMIT_COMMAND_RPC_GET_ALT_BLOCKS_DETAILS_COUNT                                      100
 #define RPC_LIMIT_COMMAND_RPC_FORCE_RELAY_RAW_TXS                                               100
 #define RPC_LIMIT_COMMAND_RPC_GET_ALIASES_COUNT                                                 200
+#define RPC_LIMIT_COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY                                       200
 
 
 
@@ -51,7 +56,7 @@ namespace currency
     command_line::add_arg(desc, arg_rpc_bind_port);
     command_line::add_arg(desc, arg_rpc_ignore_offline_status);
     command_line::add_arg(desc, arg_rpc_enable_admin_api);
-    
+    command_line::add_arg(desc, command_line::arg_allow_legacy_payment_id_size);
   }
   //------------------------------------------------------------------------------------------------------------------------------
   core_rpc_server::core_rpc_server(core& cr, nodetool::node_server<currency::t_currency_protocol_handler<currency::core> >& p2p,
@@ -59,7 +64,6 @@ namespace currency
     : m_core(cr)
     , m_p2p(p2p)
     , m_of(of)
-    , m_ignore_offline_status(false)
   {}
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::handle_command_line(const boost::program_options::variables_map& vm)
@@ -81,7 +85,8 @@ namespace currency
     {
       m_enabled_admin_api = command_line::get_arg(vm, arg_rpc_enable_admin_api);
     }
-    
+    m_allow_legacy_payment_id_size = command_line::has_arg(vm, command_line::arg_allow_legacy_payment_id_size);
+
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
@@ -90,7 +95,16 @@ namespace currency
     m_net_server.set_threads_prefix("RPC");
     bool r = handle_command_line(vm);
     CHECK_AND_ASSERT_MES(r, false, "Failed to process command line in core_rpc_server");
-    return epee::http_server_impl_base<core_rpc_server, connection_context>::init(m_port, m_bind_ip);
+
+    bool do_server_init = true;
+    int port_num = 0;
+    if (epee::string_tools::string_to_num_fast(m_port, port_num) && port_num == 0)
+      do_server_init = false;
+
+    if (do_server_init)
+      r = epee::http_server_impl_base<core_rpc_server, connection_context>::init(m_port, m_bind_ip);
+
+    return r;
   }
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::check_core_ready_(const std::string& calling_method)
@@ -120,7 +134,9 @@ namespace currency
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_get_info(const COMMAND_RPC_GET_INFO::request& req, COMMAND_RPC_GET_INFO::response& res, connection_context& cntx)
   {
-    //unconditional values 
+    //
+    // unconditional values 
+    //
     res.height = m_core.get_current_blockchain_size();
     res.tx_count = m_core.get_blockchain_storage().get_total_transactions() - res.height; //without coinbase
     res.tx_pool_size = m_core.get_pool_transactions_count();
@@ -147,8 +163,9 @@ namespace currency
       else
         res.daemon_network_state = COMMAND_RPC_GET_INFO::daemon_network_state_synchronizing;
     }
-    res.synchronization_start_height = m_p2p.get_payload_object().get_core_inital_height();
-    res.max_net_seen_height = m_p2p.get_payload_object().get_max_seen_height();
+    res.max_net_seen_height = std::max(m_p2p.get_payload_object().get_max_seen_height(), res.height);
+    res.synchronization_start_height = std::min(m_p2p.get_payload_object().get_core_inital_height(), res.max_net_seen_height);
+
     m_p2p.get_maintainers_info(res.mi);
     res.pos_allowed = m_core.get_blockchain_storage().is_pos_allowed();
     wide_difficulty_type pos_diff = m_core.get_blockchain_storage().get_cached_next_difficulty(true);
@@ -163,7 +180,11 @@ namespace currency
       res.is_hardfok_active.push_back(m_core.get_blockchain_storage().is_hardfork_active(i));
     }
 
-    //conditional values 
+    res.pre_hf_tx_freeze_period_active = m_core.get_blockchain_storage().is_pre_hardfork_tx_freeze_period_active();
+
+    //
+    // conditional values 
+    //
     if (req.flags&COMMAND_RPC_GET_INFO_FLAG_NET_TIME_DELTA_MEDIAN)
     {
       int64_t last_median2local_time_diff, last_ntp2local_time_diff;
@@ -487,6 +508,24 @@ namespace currency
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
+  bool core_rpc_server::on_get_random_outs4(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request& req, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::response& res, connection_context& cntx)
+  {
+    CHECK_CORE_READY();
+    size_t total_heights = 0;
+    for(size_t i = 0; i < req.batches.size(); ++i)
+    {
+      total_heights += req.batches[i].heights.size();
+      CHECK_RPC_LIMITS(total_heights, RPC_LIMIT_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS);
+    }
+    res.status = API_RETURN_CODE_FAIL;
+    if (!m_core.get_blockchain_storage().get_random_outs_for_amounts4(req, res))
+    {
+      return true;
+    }
+    res.status = API_RETURN_CODE_OK;
+    return true;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_get_indexes(const COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES::request& req, COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES::response& res, connection_context& cntx)
   {
     CHECK_CORE_READY();
@@ -607,12 +646,8 @@ namespace currency
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_validate_signature(const COMMAND_VALIDATE_SIGNATURE::request& req, COMMAND_VALIDATE_SIGNATURE::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
-    if (!m_p2p.get_connections_count())
-    {
-      res.status = API_RETURN_CODE_DISCONNECTED;
-      return true;
-    }
-    std::string buff = epee::string_encoding::base64_decode(req.buff);    
+    CHECK_CORE_READY();
+
     crypto::public_key pkey = req.pkey;
 
     if(pkey == currency::null_pkey)
@@ -627,9 +662,615 @@ namespace currency
       pkey = eaeb.m_address.spend_public_key;
     }
 
-    crypto::hash h = crypto::cn_fast_hash(buff.data(), buff.size());
+    crypto::hash data_hash = crypto::cn_fast_hash(req.buff.data(), req.buff.size());
+    crypto::hash h = crypto::hash_helper_t::h(CRYPTO_HDS_WALLET_GENERIC_SIGN_WITH_SPK, data_hash);
+
+    res.sig_format = "v2";
     bool sig_check_res = crypto::check_signature(h, pkey, req.sig);
     if (!sig_check_res)
+    {
+      // fallback to old-style validation without HDS
+      res.sig_format = "legacy";
+      sig_check_res = crypto::check_signature(data_hash, pkey, req.sig);
+      if (!sig_check_res)
+      {
+        res.sig_format = "";
+        res.status = API_RETURN_CODE_FAIL;
+        return true;
+      }
+    }
+    res.status = API_RETURN_CODE_OK;
+    return true;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool gateway_descriptor_api_info::from_gateway_address_descriptor_base(const gateway_address_descriptor_base& gadb)
+  {
+    meta_info = gadb.meta_info;
+    VARIANT_SWITCH_BEGIN(gadb.owner_key);
+      VARIANT_CASE_CONST(crypto::public_key, owner_key)
+        opt_owner_custom_schnorr_pub_key = owner_key;
+      VARIANT_CASE_CONST(crypto::eth_public_key, owner_key)
+        opt_owner_ecdsa_pub_key = owner_key;
+      VARIANT_CASE_CONST(crypto::eddsa_public_key, owner_key)
+        opt_owner_eddsa_pub_key = owner_key;
+      VARIANT_CASE_OTHER();
+        return false;
+    VARIANT_SWITCH_END();
+    return true;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool core_rpc_server::on_gateway_get_address_info(const COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO::request& req, COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO::response& res, connection_context& cntx)
+  {
+    currency::gateway_address_id_type addr_id = {};
+    address_v v_addr = {};
+
+    bool r = currency::get_account_address_and_payment_id_from_str(v_addr, res.payment_id, req.gateway_address);
+    if(!r)
+    {
+      res.status = API_RETURN_CODE_BAD_ARG_INVALID_ADDRESS;
+      return true;
+    }
+    if (v_addr.type() == typeid(currency::gateway_address_id_type))
+    {
+      addr_id = boost::get<currency::gateway_address_id_type>(v_addr);
+    }
+    else
+    {
+      res.status = API_RETURN_CODE_BAD_ARG_INVALID_ADDRESS_TYPE;
+      return true;
+    }
+
+    auto addr_data_ptr = m_core.get_blockchain_storage().get_gateway_address_info(addr_id);
+
+    if (!addr_data_ptr) 
+    {
+      res.status = API_RETURN_CODE_NOT_FOUND;
+      return true;
+    }
+
+    res.gateway_view_pub_key = addr_id;
+    if (!addr_data_ptr->info_history.size())
+    {
+      res.status = API_RETURN_CODE_INTERNAL_ERROR;
+      return true;
+    }
+
+    const auto& last_info = addr_data_ptr->info_history.back();
+    if (!res.descriptor_info.from_gateway_address_descriptor_base(last_info))
+    {
+      res.status = API_RETURN_CODE_INTERNAL_ERROR;
+      return true;
+    }
+
+    for (const auto& [asset_id, balance_entry] : addr_data_ptr->balances)
+    {
+      gateway_balance_entry be = {};
+      be.asset_id = asset_id;
+      be.amount = balance_entry.amount;
+      res.balances.push_back(be);
+    }
+    
+    res.status = API_RETURN_CODE_OK;
+    return true;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool core_rpc_server::on_gateway_create_transfer(const COMMAND_RPC_GATEWAY_CREATE_TRANSFER::request& req, COMMAND_RPC_GATEWAY_CREATE_TRANSFER::response& res, connection_context& cntx)
+  {
+    //TODO: Some of the code presented here might need to be moved to separate library/module as it touch privacy-sensitive operations
+
+    if (req.gateway_view_secret_key == currency::null_skey)
+    {
+      res.status = API_RETURN_CODE_BAD_ARG;
+      res.status_error = "gateway_view_secret_key is required, must be a non-null secret";
+      return true;
+    }
+
+    // gw has no real spend_secret_key; we put view_secret_key into the spend slot
+    // so encrypt_payload_items produces a tx_crypto_checksum the scanner can actually undo
+    currency::account_keys gw_sender_keys = {};
+    gw_sender_keys.spend_secret_key = req.gateway_view_secret_key;
+    currency::finalize_tx_param ftp = {};
+    currency::finalized_tx ftx = {};
+
+    if (m_core.get_blockchain_storage().is_pre_hardfork_tx_freeze_period_active())
+    {
+      res.status = API_RETURN_CODE_TX_FREEZE_PERIOD;
+      res.status_error = "Pre hardfork freeze period is in effect, sending transactions is not allowed till the next hardfork. Please, try again after the hardfork activation.";
+      LOG_PRINT_L0("[on_gateway_create_transfer]: pre hardfork freeze period is in effect.");
+      return true;
+    }
+
+
+
+    std::unordered_map<crypto::public_key, uint64_t> total_coins_needed; //asset_id -> amount
+    for(const auto& dest : req.destinations)
+    {
+      total_coins_needed[dest.asset_id] += dest.amount;
+    }
+
+    total_coins_needed[currency::native_coin_asset_id] += req.fee;
+
+
+    for (const auto& [asset_id, amount] : total_coins_needed)
+    {
+      tx_source_entry source = {};
+      source.asset_id = asset_id;
+      source.amount = amount;
+      source.gateway_origin = req.origin_gateway_id;
+      ftp.sources.push_back(source);
+    }
+
+    //check the balance
+    auto addr_data_ptr = m_core.get_blockchain_storage().get_gateway_address_info(req.origin_gateway_id);
+
+    if (!addr_data_ptr)
+    {
+      res.status = API_RETURN_CODE_NOT_FOUND;
+      res.status_error = std::string("Gateway address ") + epee::string_tools::pod_to_hex(req.origin_gateway_id) + " not found";
+      return true;
+    }
+    for ( const auto& [asset_id, amount] : total_coins_needed)
+    {
+      auto it = addr_data_ptr->balances.find(asset_id);
+      if (it == addr_data_ptr->balances.end() || it->second.amount < amount)
+      {
+        res.status = API_RETURN_CODE_NOT_ENOUGH_MONEY;
+        res.status_error = std::string("Insufficient funds for asset_id ") + epee::string_tools::pod_to_hex(asset_id);
+        return true;
+      }
+    }
+
+    //fill destinations
+    std::string legacy_tx_wide_payment_id;
+    epee::json_rpc::error er_local{};
+    bool r = rpc_fill_destinations_helper(req.destinations, ftp.prepared_destinations, ftp.extra, true, er_local, legacy_tx_wide_payment_id, false, req.origin_gateway_id, [&](const std::string& address, currency::address_v& addr_v, std::string& embedded_payment_id) {
+      tools::core_fast_rpc_proxy tmp_proxy(*this);
+      if (!tmp_proxy.get_transfer_address(address, addr_v, embedded_payment_id))
+      {
+        er_local.code = WALLET_RPC_ERROR_CODE_WRONG_ADDRESS;
+        er_local.message = std::string("WALLET_RPC_ERROR_CODE_WRONG_ADDRESS: ") + address;
+        return false;
+      }
+      return true;
+    });
+    if (!r)
+    {
+      res.status = API_RETURN_CODE_BAD_ARG;
+      res.status_error = er_local.message;
+      return true;
+    }
+
+    if(!ftp.prepared_destinations.size() || ftp.prepared_destinations.begin()->addr.size() != 1)
+    {
+      res.status = API_RETURN_CODE_BAD_ARG;
+      res.status_error = "No valid destinations were found after processing";
+      return true;
+    }
+    
+    if (ftp.prepared_destinations.size() < CURRENCY_TX_MIN_ALLOWED_OUTS)
+    {
+      tx_destination_entry de = ftp.prepared_destinations.back();
+      ftp.prepared_destinations.pop_back();
+      size_t items_to_be_added = CURRENCY_TX_MIN_ALLOWED_OUTS - ftp.prepared_destinations.size();
+      currency::decompose_amount_randomly(de.amount, [&](uint64_t amount)
+      {
+        de.amount = amount;
+        ftp.prepared_destinations.push_back(de);
+      }, items_to_be_added);
+      CHECK_AND_ASSERT_MES(ftp.prepared_destinations.size() >= CURRENCY_TX_MIN_ALLOWED_OUTS, false,
+        "decompose_amount_randomly failed to produce enough outputs: " << ftp.prepared_destinations.size());
+    }
+
+    const address_v& addr = ftp.prepared_destinations.begin()->addr.back();
+    VARIANT_SWITCH_BEGIN(addr);
+    VARIANT_CASE_CONST(account_public_address, a_pub_addr)
+    {
+      ftp.crypt_address = a_pub_addr;
+    }
+    VARIANT_CASE_CONST(gateway_address_id_type, a_gw_address)
+    {
+      ftp.crypt_address.view_public_key = a_gw_address;
+      ftp.crypt_address.spend_public_key = a_gw_address;
+    }
+    VARIANT_CASE_THROW_ON_OTHER();
+    VARIANT_SWITCH_END();
+
+    ftp.tx_outs_attr  = CURRENCY_TO_KEY_OUT_RELAXED;
+    ftp.tx_version    = m_core.get_current_tx_version();
+    ftp.spend_pub_key = req.origin_gateway_id;
+    ftp.tx_hardfork_id = m_core.get_current_hardfork_id();
+
+    if (req.service_entries_permanent)
+      ftp.extra.insert(ftp.extra.end(), req.service_entries.begin(), req.service_entries.end());
+    else
+      ftp.attachments.insert(ftp.attachments.end(), req.service_entries.begin(), req.service_entries.end());
+
+    if (!req.comment.empty())
+    {
+      currency::tx_comment tc{};
+      tc.comment = req.comment;
+      ftp.extra.push_back(tc);
+    }
+
+    r = currency::construct_tx(gw_sender_keys, ftp, ftx);
+    if(!r)
+    {
+      res.status = API_RETURN_CODE_FAIL;
+      res.status_error = "Failed to construct transaction";
+      return true;
+    }
+
+    res.tx_blob = t_serializable_object_to_blob(ftx.tx);
+    res.tx_id = get_transaction_hash(ftx.tx);
+
+    crypto::hash tx_hash_for_input_sig = currency::prepare_prefix_hash_for_sign(ftx.tx, 0, res.tx_id);
+    if (tx_hash_for_input_sig == currency::null_hash)
+    {
+      res.status = API_RETURN_CODE_FAIL;
+      res.status_error = "prepare prefix hash for sign failed";
+      return true;
+    }
+    res.tx_hash_to_sign = crypto::hash_helper_t::h(CRYPTO_HDS_GW_INPUT_SIGNATURE, tx_hash_for_input_sig);
+
+    res.status = API_RETURN_CODE_OK;
+    return true;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool core_rpc_server::on_gateway_sign_transfer(const COMMAND_RPC_GATEWAY_SIGN_TRANSFER::request& req, COMMAND_RPC_GATEWAY_SIGN_TRANSFER::response& res, connection_context& cntx)
+  {
+    transaction tx = {};
+
+    bool r = t_unserializable_object_from_blob(tx, req.tx_blob);
+    if (!r)
+    {
+      res.status = API_RETURN_CODE_BAD_ARG;
+      res.status_error = "Failed to deserialize transaction blob";
+      return true;
+    }
+
+    crypto::hash tx_id = get_transaction_hash(tx);
+    if(tx_id != req.tx_id)
+    {
+      LOG_ERROR("Transaction hash mismatch in on_gateway_sign_transfer: " << tx_id << " != " << req.tx_id);
+      res.status = API_RETURN_CODE_BAD_ARG;
+      res.status_error = "Transaction hash mismatch";
+      return true;
+    }
+
+    size_t gw_sig_count = 0;
+    gateway_signature_v gw_sig;
+    if(req.opt_ecdsa_signature)
+    {
+      gw_sig = req.opt_ecdsa_signature.value();
+      gw_sig_count++;
+    }
+    if(req.opt_custom_schnorr_signature)
+    {
+      gw_sig = req.opt_custom_schnorr_signature.value();
+      gw_sig_count++;
+    }
+    if(req.opt_eddsa_signature)
+    {
+      gw_sig = req.opt_eddsa_signature.value();
+      gw_sig_count++;
+    }
+
+    if(gw_sig_count != 1)
+    {
+      LOG_ERROR("Expected exactly one gateway signature in on_gateway_sign_transfer, got: " << gw_sig_count);
+      res.status = API_RETURN_CODE_BAD_ARG;
+      res.status_error = "Expected exactly one signature";
+      return true;
+    }
+
+    for(auto& sig : tx.signatures)
+    {
+      if (sig.type() == typeid(gateway_sig))
+      {
+        gateway_sig& gw_sig_in_tx = boost::get<gateway_sig>(sig);
+        gw_sig_in_tx.s = gw_sig;
+      }
+      else
+      {
+        // Right now we assume that gateway-originated tx might have only gateway_inputs in it
+        LOG_ERROR("Unexpected signature type in on_gateway_sign_transfer");
+        res.status = API_RETURN_CODE_BAD_ARG;
+        res.status_error = "Unexpected signature type in transaction";
+        return true;
+      }
+    }
+
+    res.signed_tx_blob = t_serializable_object_to_blob(tx);
+    res.status = API_RETURN_CODE_OK;
+    return true;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool core_rpc_server::on_gateway_create_owner_change(const COMMAND_RPC_GATEWAY_CREATE_OWNER_CHANGE::request& req, COMMAND_RPC_GATEWAY_CREATE_OWNER_CHANGE::response& res, connection_context& cntx)
+  {
+    if (m_core.get_blockchain_storage().is_pre_hardfork_tx_freeze_period_active())
+    {
+      LOG_PRINT_L0("[on_gateway_create_owner_change]: pre hardfork freeze period is in effect.");
+      res.status = API_RETURN_CODE_TX_FREEZE_PERIOD;
+      res.status_error = "Pre hardfork freeze period is in effect, sending transactions is not allowed till the next hardfork.";
+      return true;
+    }
+
+    size_t count_keys = 0;
+    if (req.new_descriptor_info.opt_owner_custom_schnorr_pub_key)
+      count_keys++;
+    if (req.new_descriptor_info.opt_owner_eddsa_pub_key)
+      count_keys++;
+    if (req.new_descriptor_info.opt_owner_ecdsa_pub_key)
+      count_keys++;
+
+    if (count_keys != 1)
+    {
+      res.status = API_RETURN_CODE_BAD_ARG;
+      res.status_error = "Expected exactly one owner key (ecdsa, eddsa, or custom schnorr)";
+      return true;
+    }
+
+    auto addr_data_ptr = m_core.get_blockchain_storage().get_gateway_address_info(req.address_id);
+    if (!addr_data_ptr)
+    {
+      res.status = API_RETURN_CODE_NOT_FOUND;
+      res.status_error = std::string("Gateway address ") + epee::string_tools::pod_to_hex(req.address_id) + " not found";
+      return true;
+    }
+
+    uint64_t fee = req.fee ? req.fee : TX_DEFAULT_FEE;
+
+    auto it = addr_data_ptr->balances.find(currency::native_coin_asset_id);
+    if (it == addr_data_ptr->balances.end() || it->second.amount < fee)
+    {
+      res.status = API_RETURN_CODE_NOT_ENOUGH_MONEY;
+      res.status_error = "Insufficient native coin balance for fee";
+      return true;
+    }
+
+    gateway_address_descriptor_operation_update gao_upd{};
+    gao_upd.address_id = req.address_id;
+    gao_upd.descriptor.meta_info = req.new_descriptor_info.meta_info;
+
+    if (req.new_descriptor_info.opt_owner_custom_schnorr_pub_key)
+      gao_upd.descriptor.owner_key = req.new_descriptor_info.opt_owner_custom_schnorr_pub_key.value();
+    else if (req.new_descriptor_info.opt_owner_eddsa_pub_key)
+      gao_upd.descriptor.owner_key = req.new_descriptor_info.opt_owner_eddsa_pub_key.value();
+    else if (req.new_descriptor_info.opt_owner_ecdsa_pub_key)
+      gao_upd.descriptor.owner_key = req.new_descriptor_info.opt_owner_ecdsa_pub_key.value();
+
+    gateway_address_descriptor_operation gwdo{};
+    gwdo.operation = gao_upd;
+
+    currency::account_keys dummy_keys = {};
+    currency::finalize_tx_param ftp = {};
+    currency::finalized_tx ftx = {};
+
+    tx_source_entry source = {};
+    source.asset_id = currency::native_coin_asset_id;
+    source.amount = fee;
+    source.gateway_origin = req.address_id;
+    ftp.sources.push_back(source);
+
+    ftp.crypt_address.view_public_key = req.address_id;
+    ftp.crypt_address.spend_public_key = req.address_id;
+
+    ftp.tx_outs_attr = CURRENCY_TO_KEY_OUT_RELAXED;
+    ftp.tx_version = m_core.get_current_tx_version();
+    ftp.spend_pub_key = req.address_id;
+    ftp.tx_hardfork_id = m_core.get_current_hardfork_id();
+    ftp.extra.push_back(gwdo);
+
+    bool r = currency::construct_tx(dummy_keys, ftp, ftx);
+    if (!r)
+    {
+      res.status = API_RETURN_CODE_FAIL;
+      res.status_error = "Failed to construct transaction";
+      return true;
+    }
+
+    res.tx_blob = t_serializable_object_to_blob(ftx.tx);
+    res.tx_id = get_transaction_hash(ftx.tx);
+    res.tx_secret_key = ftx.one_time_key;
+
+    crypto::hash tx_hash_for_input_sig = currency::prepare_prefix_hash_for_sign(ftx.tx, 0, res.tx_id);
+    if (tx_hash_for_input_sig == currency::null_hash)
+    {
+      res.status = API_RETURN_CODE_FAIL;
+      res.status_error = "prepare_prefix_hash_for_sign failed";
+      return true;
+    }
+    res.hash_to_sign_transfer  = crypto::hash_helper_t::h(CRYPTO_HDS_GW_INPUT_SIGNATURE, tx_hash_for_input_sig);
+    res.hash_to_sign_ownership = crypto::hash_helper_t::h(CRYPTO_HDS_GW_CHANGE_OWNER_SIGNATURE, res.tx_id);
+
+    res.status = API_RETURN_CODE_OK;
+    return true;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool core_rpc_server::on_gateway_submit_owner_change(const COMMAND_RPC_GATEWAY_SUBMIT_OWNER_CHANGE::request& req, COMMAND_RPC_GATEWAY_SUBMIT_OWNER_CHANGE::response& res, connection_context& cntx)
+  {
+    transaction tx = {};
+
+    bool r = t_unserializable_object_from_blob(tx, req.tx_blob);
+    if (!r)
+    {
+      res.status = API_RETURN_CODE_BAD_ARG;
+      res.status_error = "Failed to deserialize transaction blob";
+      return true;
+    }
+
+    crypto::hash tx_id = get_transaction_hash(tx);
+    if (tx_id != req.tx_id)
+    {
+      LOG_ERROR("Transaction hash mismatch in on_gateway_submit_owner_change: " << tx_id << " != " << req.tx_id);
+      res.status = API_RETURN_CODE_BAD_ARG;
+      res.status_error = "Transaction hash mismatch";
+      return true;
+    }
+
+    size_t sig_count = 0;
+    gateway_signature_v gw_sig;
+    gateway_owner_signature_v ownership_sig;
+    if (req.opt_transfer_ecdsa_signature)
+    {
+      if (!req.opt_ownership_ecdsa_signature)
+      {
+        LOG_ERROR("on_gateway_submit_owner_change: transfer is ecdsa, ownership must be ecdsa too");
+        res.status = API_RETURN_CODE_BAD_ARG;
+        res.status_error = "Ownership signature type does not match transfer signature type (expected ecdsa)";
+        return true;
+      }
+      gw_sig = req.opt_transfer_ecdsa_signature.value();
+      ownership_sig = req.opt_ownership_ecdsa_signature.value();
+      sig_count++;
+    }
+    if (req.opt_transfer_custom_schnorr_signature)
+    {
+      if (!req.opt_ownership_custom_schnorr_signature)
+      {
+        LOG_ERROR("on_gateway_submit_owner_change: transfer is custom schnorr, ownership must be custom schnorr too");
+        res.status = API_RETURN_CODE_BAD_ARG;
+        res.status_error = "Ownership signature type does not match transfer signature type (expected custom schnorr)";
+        return true;
+      }
+      gw_sig = req.opt_transfer_custom_schnorr_signature.value();
+      ownership_sig = req.opt_ownership_custom_schnorr_signature.value();
+      sig_count++;
+    }
+    if (req.opt_transfer_eddsa_signature)
+    {
+      if (!req.opt_ownership_eddsa_signature)
+      {
+        LOG_ERROR("on_gateway_submit_owner_change: transfer is eddsa, ownership must be eddsa too");
+        res.status = API_RETURN_CODE_BAD_ARG;
+        res.status_error = "Ownership signature type does not match transfer signature type (expected eddsa)";
+        return true;
+      }
+      gw_sig = req.opt_transfer_eddsa_signature.value();
+      ownership_sig = req.opt_ownership_eddsa_signature.value();
+      sig_count++;
+    }
+
+    if (sig_count != 1)
+    {
+      LOG_ERROR("Expected exactly one transfer signature in on_gateway_submit_owner_change, got: " << sig_count);
+      res.status = API_RETURN_CODE_BAD_ARG;
+      res.status_error = "Expected exactly one transfer signature";
+      return true;
+    }
+
+    // apply gateway input signatures (for fee)
+    for (auto& sig : tx.signatures)
+    {
+      if (sig.type() == typeid(gateway_sig))
+      {
+        gateway_sig& gw_sig_in_tx = boost::get<gateway_sig>(sig);
+        gw_sig_in_tx.s = gw_sig;
+      }
+      else
+      {
+        LOG_ERROR("Unexpected signature type in on_gateway_submit_owner_change");
+        res.status = API_RETURN_CODE_BAD_ARG;
+        res.status_error = "Unexpected signature type in transaction";
+        return true;
+      }
+    }
+
+    // add ownership proof to tx.proofs
+    gateway_address_ownership_proof gaoop{};
+    gaoop.sign = ownership_sig;
+    tx.proofs.push_back(gaoop);
+
+    blobdata signed_tx_blob = t_serializable_object_to_blob(tx);
+
+    // broadcast tx
+    tx_verification_context tvc = AUTO_VAL_INIT(tvc);
+    if (!m_core.handle_incoming_tx(signed_tx_blob, tvc, false))
+    {
+      LOG_ERROR("[on_gateway_submit_owner_change]: Failed to process signed tx");
+      res.status = API_RETURN_CODE_FAIL;
+      res.status_error = "Failed to process signed transaction";
+      return true;
+    }
+    if (tvc.m_verification_failed)
+    {
+      LOG_ERROR("[on_gateway_submit_owner_change]: signed tx verification failed");
+      res.status = API_RETURN_CODE_FAIL;
+      res.status_error = "Signed transaction verification failed";
+      return true;
+    }
+    
+    /*
+    * We don't want to return "already exists" error, some exchanges/custody might specifically want to relay tx again.
+    if (!tvc.m_should_be_relayed && !tvc.m_already_existed)
+    {
+      res.status = API_RETURN_CODE_ALREADY_EXISTS;
+      return true;
+    }
+    */
+
+    NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::request ntx_req;
+    ntx_req.txs.push_back(signed_tx_blob);
+
+    currency_connection_context fake_context = AUTO_VAL_INIT(fake_context);
+    m_core.get_protocol()->relay_transactions(ntx_req, fake_context);
+
+    res.signed_tx_blob = signed_tx_blob;
+    res.status = API_RETURN_CODE_OK;
+    return true;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool core_rpc_server::on_gateway_get_address_history(const COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY::request& req, COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY::response& res, connection_context& cntx)
+  {
+    CHECK_RPC_LIMITS(req.count, RPC_LIMIT_COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY);
+
+    if (req.gateway_view_secret_key == currency::null_skey)
+    {
+      res.status = API_RETURN_CODE_BAD_ARG;
+      res.status_error = "gateway_view_secret_key is required, must be a non-null secret";
+      return true;
+    }
+
+    currency::gateway_address_id_type addr_id = {};
+    address_v v_addr = {};
+    payment_id_t dummy_payment_id = {};
+
+    bool r = currency::get_account_address_and_payment_id_from_str(v_addr, dummy_payment_id, req.gateway_address);
+    if (!r)
+    {
+      res.status = API_RETURN_CODE_BAD_ARG_INVALID_ADDRESS;
+      return true;
+    }
+    if (v_addr.type() == typeid(currency::gateway_address_id_type))
+    {
+      addr_id = boost::get<currency::gateway_address_id_type>(v_addr);
+    }
+    else
+    {
+      res.status = API_RETURN_CODE_BAD_ARG_INVALID_ADDRESS_TYPE;
+      return true;
+    }
+
+    //read balances
+    auto addr_data_ptr = m_core.get_blockchain_storage().get_gateway_address_info(addr_id);
+
+    if (!addr_data_ptr)
+    {
+      res.status = API_RETURN_CODE_NOT_FOUND;
+      return true;
+    }
+
+    for (const auto& [asset_id, balance_entry] : addr_data_ptr->balances)
+    {
+      gateway_balance_entry be = {};
+      be.asset_id = asset_id;
+      be.amount = balance_entry.amount;
+      res.balances.push_back(be);
+    }
+
+    //read history
+    r = m_core.get_blockchain_storage().gateway_get_address_history(addr_id, req, res);
+    if(!r)
     {
       res.status = API_RETURN_CODE_FAIL;
       return true;
@@ -832,7 +1473,8 @@ namespace currency
 
     LOCAL_CHECK(req.tx_id.empty() != req.tx_blob.empty(), "One of either tx_id or tx_blob must be specified.");
 
-    transaction tx{};
+    res.tx = transaction{};
+    transaction& tx = res.tx;
     if (!req.tx_id.empty())
     {
       CHECK_CORE_READY_WE();
@@ -856,38 +1498,158 @@ namespace currency
     crypto::public_key tx_pub_key = get_tx_pub_key_from_extra(tx);
     crypto::point_t R{};
     LOCAL_CHECK(tx_pub_key != null_pkey && R.from_public_key(tx_pub_key) && R.is_in_main_subgroup(), "unsigned_tx: tx public key is missing or invalid");
-
     LOCAL_CHECK(tx_pub_key == (crypto::scalar_t(req.tx_secret_key) * crypto::c_point_G).to_public_key(), "tx_secret_key doesn't match the transaction public key");
 
-    LOCAL_CHECK(req.outputs_addresses.size() == tx.vout.size(), "outputs_addresses count (" + epee::string_tools::num_to_string_fast(req.outputs_addresses.size()) + " doesn't match tx.vout size (" + epee::string_tools::num_to_string_fast(tx.vout.size()) + ")");
+    auto decode_output = [&req, &res](const address_v& addr_v, const tx_out_v& out_v, size_t addr_idx, size_t out_idx, const crypto::key_derivation& derivation, bool& unknown_output_type) -> bool {
+      VARIANT_SWITCH_BEGIN(out_v)
+        VARIANT_CASE_CONST(tx_out_zarcanum, zo)
+          if (addr_v.type() != typeid(account_public_address))
+            return false;
+          auto& decoded_out = res.decoded_outputs.emplace_back();
+          decoded_out.out_index = out_idx;
+          decoded_out.address = req.outputs_addresses[addr_idx];
+          crypto::scalar_t amount_blinding_mask{}, asset_id_blinding_mask{};
+          return currency::decode_output_data(zo, derivation, out_idx, decoded_out.amount, decoded_out.asset_id, amount_blinding_mask, asset_id_blinding_mask, decoded_out.payment_id);
+        VARIANT_CASE_CONST(tx_out_gateway, gwo)
+          if (addr_v.type() != typeid(gateway_address_id_type))
+            return false;
+          auto& decoded_out = res.decoded_outputs.emplace_back();
+          decoded_out.out_index = out_idx;
+          decoded_out.address = req.outputs_addresses[addr_idx];
+          return currency::decode_output_data(gwo, derivation, out_idx, decoded_out.payment_id);
+        VARIANT_CASE_OTHER()
+          unknown_output_type = true;
+          return false;
+      VARIANT_SWITCH_END()
+    };
 
-    for(size_t i = 0; i < req.outputs_addresses.size(); ++i)
+    if (req.strict_output_addresses_match)
     {
-      if (req.outputs_addresses[i].empty())
-        continue; // skip this output if the given address is empty string
+      LOCAL_CHECK(req.outputs_addresses.size() == tx.vout.size(), "outputs_addresses count (" + epee::string_tools::num_to_string_fast(req.outputs_addresses.size()) + " doesn't match tx.vout size (" + epee::string_tools::num_to_string_fast(tx.vout.size()) + ")");
 
-      account_public_address addr{};
-      payment_id_t payment_id{};
-      LOCAL_CHECK(currency::get_account_address_and_payment_id_from_str(addr, payment_id, req.outputs_addresses[i]) && payment_id.empty(), "output address #" + epee::string_tools::num_to_string_fast(i) + " couldn't be parsed or it is an integrated address (which is not supported)");
+      for(size_t i = 0; i < req.outputs_addresses.size(); ++i)
+      {
+        if (req.outputs_addresses[i].empty())
+          continue; // skip this output if the given address is empty string
 
-      tx_out_v& out_v = tx.vout[i];
-      LOCAL_CHECK(out_v.type() == typeid(tx_out_zarcanum), "tx output #" + epee::string_tools::num_to_string_fast(i) + " has wrong type");
-      const tx_out_zarcanum& zo = boost::get<tx_out_zarcanum>(out_v);
+        address_v addr_v{};
+        payment_id_t payment_id{};
+        LOCAL_CHECK(currency::get_account_address_and_payment_id_from_str(addr_v, payment_id, req.outputs_addresses[i]) && payment_id.empty(), "output address #" + epee::string_tools::num_to_string_fast(i) + " couldn't be parsed or it is an integrated address (which is not supported)");
 
-      crypto::key_derivation derivation{};
-      LOCAL_CHECK_INT_ERR(crypto::generate_key_derivation(addr.view_public_key, req.tx_secret_key, derivation), "output #" + epee::string_tools::num_to_string_fast(i) + ": generate_key_derivation failed");
-      
-      auto& decoded_out = res.decoded_outputs.emplace_back();
-      decoded_out.out_index = i;
-      decoded_out.address = req.outputs_addresses[i];
-      crypto::scalar_t amount_blinding_mask{}, asset_id_blinding_mask{};
-      LOCAL_CHECK(currency::decode_output_amount_and_asset_id(zo, derivation, i, decoded_out.amount, decoded_out.asset_id, amount_blinding_mask, asset_id_blinding_mask), "output #" + epee::string_tools::num_to_string_fast(i) + ": cannot be decoded");
+        crypto::key_derivation derivation{};
+        LOCAL_CHECK_INT_ERR(generate_key_derivation(addr_v, req.tx_secret_key, derivation), "output #" + epee::string_tools::num_to_string_fast(i) + ": generate_key_derivation failed");
+
+        const tx_out_v& out_v = tx.vout[i];
+        bool unknown_output_type = false;
+        bool r = decode_output(addr_v, out_v, i, i, derivation, unknown_output_type);
+        LOCAL_CHECK_INT_ERR(!unknown_output_type, (std::string("unknown output type: ") + out_v.type().name()));
+        LOCAL_CHECK(r, "output #" + epee::string_tools::num_to_string_fast(i) + ": cannot be decoded");
+      }
+    }
+    else
+    {
+      // req.strict_output_addresses_match == false
+      // try to decode each output with each given address, and if it is decoded successfully - add to the result.
+      // outputs_addresses count can be less than vout size, and order doesn't matter
+
+      std::unordered_set<std::string> seen_addresses;
+      for(const auto& addr : req.outputs_addresses)
+      {
+        LOCAL_CHECK(seen_addresses.insert(addr).second, "duplicate address in outputs_addresses: " + addr);
+      }
+
+      res.decoded_outputs.reserve(tx.vout.size());
+
+      for(size_t i = 0; i < req.outputs_addresses.size(); ++i)
+      {
+        address_v addr_v{};
+        payment_id_t payment_id{};
+        LOCAL_CHECK(currency::get_account_address_and_payment_id_from_str(addr_v, payment_id, req.outputs_addresses[i]) && payment_id.empty(), "output address #" + epee::string_tools::num_to_string_fast(i) + " couldn't be parsed or it is an integrated address (which is not supported)");
+
+        crypto::key_derivation derivation{};
+        LOCAL_CHECK_INT_ERR(generate_key_derivation(addr_v, req.tx_secret_key, derivation), "output #" + epee::string_tools::num_to_string_fast(i) + ": generate_key_derivation failed");
+
+        bool decoded = false;
+        for(size_t out_idx = 0; out_idx < tx.vout.size(); ++out_idx)
+        {
+          const tx_out_v& out_v = tx.vout[out_idx];
+          bool unknown_output_type = false;
+          bool decoded_using_this_out = decode_output(addr_v, out_v, i, out_idx, derivation, unknown_output_type);
+          LOCAL_CHECK_INT_ERR(!unknown_output_type, (std::string("unknown output type: ") + out_v.type().name()));
+          if (!decoded_using_this_out)
+          {
+            res.decoded_outputs.pop_back();
+            continue; // this output is not decoded with the given address, try next one
+          }
+          decoded = true;
+        }
+        LOCAL_CHECK(decoded, "output_address #" + epee::string_tools::num_to_string_fast(i) + " doesn't match any output in the transaction");
+      }
     }
 
     res.tx_in_json = currency::obj_to_json_str(tx);
     res.verified_tx_id = get_transaction_hash(tx);
 
     res.status = API_RETURN_CODE_OK;
+    return true;
+#undef LOCAL_CHECK
+#undef LOCAL_CHECK_INT_ERR
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool core_rpc_server::on_decrypt_tx_outs_and_update_op(const COMMAND_RPC_DECRYPT_TX_OUTS_AND_UPDATE_OP::request& req, COMMAND_RPC_DECRYPT_TX_OUTS_AND_UPDATE_OP::response& res, epee::json_rpc::error& error_resp, connection_context& cntx)
+  {
+#define LOCAL_CHECK(cond, msg)         if (!(cond)) { error_resp.code = CORE_RPC_ERROR_CODE_WRONG_PARAM;    error_resp.message = msg; LOG_PRINT_L1("on_decrypt_tx_outs_and_ownership_change: " << error_resp.message); return false; }
+#define LOCAL_CHECK_INT_ERR(cond, msg) if (!(cond)) { error_resp.code = CORE_RPC_ERROR_CODE_INTERNAL_ERROR; error_resp.message = msg; LOG_PRINT_L1("on_decrypt_tx_outs_and_ownership_change: " << error_resp.message); return false; }
+
+    COMMAND_RPC_DECRYPT_TX_DETAILS::response dtd_res{};
+    if (!on_decrypt_tx_details(req, dtd_res, error_resp, cntx))
+    {
+      res.status = dtd_res.status;
+      return false;
+    }
+
+    res.tx_in_json        = std::move(dtd_res.tx_in_json);
+    res.verified_tx_id    = std::move(dtd_res.verified_tx_id);
+
+    size_t sensitive_operations = 0;
+    // find out whether it normal transfer or ownership change
+    gateway_address_descriptor_operation gado{};
+    if (get_type_in_variant_container<gateway_address_descriptor_operation>(dtd_res.tx.extra, gado))
+    {
+      ++sensitive_operations;
+      if (gado.operation.type() == typeid(gateway_address_descriptor_operation_update))
+      {
+        // found gateway operation update
+        gateway_address_descriptor_operation_update& gadou = boost::get<gateway_address_descriptor_operation_update>(gado.operation);
+        res.gw_update.emplace();
+        res.gw_update->decoded_outputs = std::move(dtd_res.decoded_outputs);
+        res.gw_update->gw_updated_descriptor.emplace();
+        res.gw_update->gw_updated_descriptor->from_gateway_address_descriptor_base(gadou.descriptor);
+        res.gw_update->gw_updated_descriptor->opt_gateway_address.emplace(get_account_address_as_str(gadou.address_id));
+      }
+    }
+
+    asset_descriptor_operation ado{};
+    if (get_type_in_variant_container<asset_descriptor_operation>(dtd_res.tx.extra, ado))
+    {
+      ++sensitive_operations;
+      if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_UPDATE)
+      {
+        res.asset_update.emplace();
+        res.asset_update->decoded_outputs = std::move(dtd_res.decoded_outputs);
+        res.asset_update->asset_updated_descriptor.emplace(ado);
+      }
+    }
+
+    LOCAL_CHECK(sensitive_operations <= 1, "more the one sensitive operation (gw update, asset update) found in this transaction");
+
+    if (sensitive_operations == 0)
+    {
+      // consider as normal tx
+      res.normal_transfer.emplace();
+      res.normal_transfer->decoded_outputs = std::move(dtd_res.decoded_outputs);
+    }
+
     return true;
 #undef LOCAL_CHECK
 #undef LOCAL_CHECK_INT_ERR
@@ -961,7 +1723,7 @@ namespace currency
     if (m_p2p.get_payload_object().get_core().get_blockchain_storage().is_pre_hardfork_tx_freeze_period_active())
     {
       LOG_PRINT_L0("[on_send_raw_tx]: pre hardfork freeze period is in effect, sending transactions is not allowed till the next hardfork. Please, try again after the hardfork activation.");
-      res.status = API_RETURN_CODE_BUSY;
+      res.status = API_RETURN_CODE_TX_FREEZE_PERIOD;
       return true;
     }
 
@@ -970,14 +1732,20 @@ namespace currency
     if(!m_core.handle_incoming_tx(tx_blob, tvc, false))
     {
       LOG_PRINT_L0("[on_send_raw_tx]: Failed to process tx");
-      res.status = "Failed";
+      if (tvc.m_error_code.size())
+        res.status = tvc.m_error_code;
+      else
+        res.status = "Failed";
       return true;
     }
 
     if(tvc.m_verification_failed)
     {
       LOG_PRINT_L0("[on_send_raw_tx]: tx verification failed");
-      res.status = "Failed";
+      if (tvc.m_error_code.size())
+        res.status = tvc.m_error_code;
+      else
+        res.status = "Failed";
       return true;
     }
 
@@ -1010,7 +1778,7 @@ namespace currency
 			std::string tx_blob;
 			if (!string_tools::parse_hexstr_to_binbuff(t, tx_blob))
 			{
-				LOG_PRINT_L0("[on_send_raw_tx]: Failed to parse tx from hexbuff: " << t);
+				LOG_PRINT_L0("[on_force_relaey_raw_txs]: Failed to parse tx from hexbuff: " << t);
 				res.status = "Failed";
 				return true;
 			}
@@ -1170,6 +1938,34 @@ namespace currency
     TIME_MEASURE_FINISH(t);
     LOG_PRINT_L1("COMMAND_RPC_GETBLOCKTEMPLATE -- OK  (took " << std::setprecision(2) << t / 1000.0 << " ms)");
     LOG_PRINT_L2("response block: " << ENDL << currency::obj_to_json_str(resp.b));
+
+    if (req.do_explicit_simulation)
+    {
+      if (!resp.b.tx_hashes.size())
+      {
+        //if there are no transactions in the block, then we can end simulation here, as point of simulation is to blacklist failing transactions
+        return true;
+      }
+
+      currency::block_verification_context bvc = AUTO_VAL_INIT(bvc);
+      bvc.do_just_simulation = true;
+      bool r = m_core.get_blockchain_storage().add_new_block(resp.b, bvc);
+      if (!r)
+      {
+        if (bvc.m_major_db_failure)
+        {
+          res.status = API_RETURN_CODE_INTERNAL_ERROR;
+        }
+        else
+        {
+          res.status = API_RETURN_CODE_SIMULATION_FAILED;
+        }
+        LOG_ERROR("Explicit simulation of block template failed, block was rejected by the core");
+        return false;
+      }
+    }
+      
+
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
@@ -1209,6 +2005,8 @@ namespace currency
       }
       error_resp.code = CORE_RPC_ERROR_CODE_BLOCK_NOT_ACCEPTED;
       error_resp.message = "Block not accepted";
+
+      do_explicit_block_simulations();
       return false;
     }
 
@@ -1254,11 +2052,40 @@ namespace currency
       }
       error_resp.code = CORE_RPC_ERROR_CODE_BLOCK_NOT_ACCEPTED;
       error_resp.message = "Block not accepted";
+
+      do_explicit_block_simulations();
       return false;
     }
 
     res.status = "OK";
     return true;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  void core_rpc_server::do_explicit_block_simulations()
+  {
+    //do perform explicit simulation to blacklist failing pool transactions, if any
+    LOG_PRINT_MAGENTA("Performing explicit simulation to blacklist failing pool transactions", LOG_LEVEL_0);
+    std::string simulation_result_str = API_RETURN_CODE_SIMULATION_FAILED;
+    size_t sim_count = 0;
+    account_base acc;
+    acc.generate();
+    while (simulation_result_str == API_RETURN_CODE_SIMULATION_FAILED)
+    {
+      //calling getblocktemplate in simulation mode
+      currency::COMMAND_RPC_GETBLOCKTEMPLATE::request tmpl_req_sim = AUTO_VAL_INIT(tmpl_req_sim);
+      currency::COMMAND_RPC_GETBLOCKTEMPLATE::response tmpl_rsp_sim = AUTO_VAL_INIT(tmpl_rsp_sim);
+      tmpl_req_sim.wallet_address = get_account_address_as_str(acc.get_public_address());
+      tmpl_req_sim.stakeholder_address = get_account_address_as_str(acc.get_public_address());
+      tmpl_req_sim.pos_block = false;
+      tmpl_req_sim.do_explicit_simulation = true;
+      epee::json_rpc::error error_resp = AUTO_VAL_INIT(error_resp);
+      connection_context cntx = AUTO_VAL_INIT(cntx);
+      this->on_getblocktemplate(tmpl_req_sim, tmpl_rsp_sim, error_resp, cntx);
+      simulation_result_str = tmpl_rsp_sim.status;
+      sim_count++;
+    }
+
+    LOG_PRINT_MAGENTA("Explicit simulation done, iterations: " << sim_count, LOG_LEVEL_0);
   }
   //------------------------------------------------------------------------------------------------------------------------------
   uint64_t core_rpc_server::get_block_reward(const block& blk, const crypto::hash& h)
@@ -1578,10 +2405,10 @@ namespace currency
         if (outv.type() != typeid(tx_out_zarcanum))
           continue;
 
-        uint64_t decoded_amount = 0;
+        uint64_t decoded_amount = 0, decoded_payment_id = 0;
         crypto::public_key decoded_asset_id{};
         crypto::scalar_t amount_blinding_mask{}, asset_id_blinding_mask{};
-        if (!is_out_to_acc(req.address, boost::get<tx_out_zarcanum>(outv), derivation, i, decoded_amount, decoded_asset_id, amount_blinding_mask, asset_id_blinding_mask))
+        if (!is_out_to_acc(req.address, boost::get<tx_out_zarcanum>(outv), derivation, i, decoded_amount, decoded_asset_id, amount_blinding_mask, asset_id_blinding_mask, decoded_payment_id))
           continue;
 
         auto& el = resp.outputs.emplace_back();
@@ -1590,6 +2417,7 @@ namespace currency
         el.tx_id            = tx_id;
         el.tx_block_height  = height;
         el.output_tx_index  = i;
+        el.payment_id       = decoded_payment_id;
       }
       return true;
     };
@@ -1625,13 +2453,15 @@ namespace currency
     std::string payment_id;
     if (!epee::string_tools::parse_hexstr_to_binbuff(req.payment_id, payment_id))
     {
+      res.status = API_RETURN_CODE_BAD_ARG;
       error_resp.code = WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID;
       error_resp.message = std::string("invalid payment id given: \'") + req.payment_id + "\', hex-encoded string was expected";
       return false;
     }
 
-    if (!currency::is_payment_id_size_ok(payment_id))
+    if (!currency::is_payment_id_size_ok(payment_id, m_allow_legacy_payment_id_size))
     {
+      res.status = API_RETURN_CODE_BAD_ARG;
       error_resp.code = WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID;
       error_resp.message = std::string("given payment id is too long: \'") + req.payment_id + "\'";
       return false;
@@ -1645,33 +2475,44 @@ namespace currency
 
 
     std::string payment_id_from_provided_addr; // won't be used
-    account_public_address addr = AUTO_VAL_INIT(addr);
-    if (!get_account_address_and_payment_id_from_str(addr, payment_id_from_provided_addr, req.regular_address))
+    address_v v_adddr = {};
+    if (!get_account_address_and_payment_id_from_str(v_adddr, payment_id_from_provided_addr, req.regular_address))
     {
+      res.status = API_RETURN_CODE_BAD_ARG;
       error_resp.code = WALLET_RPC_ERROR_CODE_WRONG_ADDRESS;
       error_resp.message = std::string("invalid address provided: \'") + req.regular_address + "\', Zano address expected";
       return false;
     }
     if (payment_id_from_provided_addr.size())
     {
+      res.status = API_RETURN_CODE_BAD_ARG;
       error_resp.code = WALLET_RPC_ERROR_CODE_WRONG_ADDRESS;
       error_resp.message = std::string("invalid address provided: \'") + req.regular_address + "\', Zano address expected be regular and NOT integrated address";
       return false;
     }
 
-    res.integrated_address = currency::get_account_address_and_payment_id_as_str(addr, payment_id);
+    res.integrated_address = currency::get_account_address_as_str(v_adddr, payment_id);
     res.payment_id = epee::string_tools::buff_to_hex_nodelimer(payment_id);
+    res.status = API_RETURN_CODE_OK;
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_aliases_by_address(const COMMAND_RPC_GET_ALIASES_BY_ADDRESS::request& req, COMMAND_RPC_GET_ALIASES_BY_ADDRESS::response& res, epee::json_rpc::error& error_resp, connection_context& cntx)
   {
-    account_public_address addr = AUTO_VAL_INIT(addr);
-    if (!get_account_address_from_str(addr, req))
+    address_v addr_v = {};
+    if (!get_account_address_from_str(addr_v, req))
     {
       res.status = API_RETURN_CODE_FAIL;
       return true;
     }
+
+    if (addr_v.type() == typeid(gateway_address_id_type))
+    {
+      res.status = API_RETURN_CODE_NOT_FOUND;
+      return true;
+    }
+    
+    const account_public_address& addr = boost::get<account_public_address>(addr_v);
     //res.alias = m_core.get_blockchain_storage().get_alias_by_address(addr);
     COMMAND_RPC_GET_ALIAS_DETAILS::request req2 = AUTO_VAL_INIT(req2);
     COMMAND_RPC_GET_ALIAS_DETAILS::response res2 = AUTO_VAL_INIT(res2);

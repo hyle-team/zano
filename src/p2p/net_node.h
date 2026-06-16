@@ -193,12 +193,12 @@ namespace nodetool
     bool parse_peerlist(const std::vector<std::string>& perrs_str, std::list<nodetool::net_address>& peers);
     bool handle_command_line(const boost::program_options::variables_map& vm);
     bool idle_worker();
-    bool handle_remote_peerlist(const std::list<peerlist_entry>& peerlist, time_t local_time, const net_utils::connection_context_base& context);
+    bool handle_remote_peerlist(const std::vector<peerlist_entry>& peerlist, time_t local_time, const net_utils::connection_context_base& context);
     bool get_local_node_data(basic_node_data& node_data);
     //bool get_local_handshake_data(handshake_data& hshd);
 
-    bool merge_peerlist_with_local(const std::list<peerlist_entry>& bs);
-    bool fix_time_delta(std::list<peerlist_entry>& local_peerlist, time_t local_time, int64_t& delta);
+    bool merge_peerlist_with_local(const std::vector<peerlist_entry>& bs);
+    bool fix_time_delta(std::vector<peerlist_entry>& local_peerlist, time_t local_time, int64_t& delta);
 
     bool connections_maker();
     bool peer_sync_idle_maker();
@@ -285,7 +285,7 @@ namespace nodetool
     std::list<net_address>   m_priority_peers;
     bool m_use_only_priority_peers;
     std::vector<net_address> m_seed_nodes;
-    std::list<nodetool::peerlist_entry> m_command_line_peers;
+    std::vector<nodetool::peerlist_entry> m_command_line_peers;
     int64_t m_peer_livetime;
     //keep connections to initiate some interactions
     net_server m_net_server;
