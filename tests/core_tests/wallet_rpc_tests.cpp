@@ -22,6 +22,33 @@
 
 using namespace currency;
 
+namespace
+{
+  bool gateway_rpc_proxy_decrypt_history(currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY2::response& resp, const std::string& gw_address, const crypto::secret_key& view_secret_key)
+  {
+    currency::address_v v_addr = {};
+    currency::payment_id_t dummy_pid = {};
+    CHECK_AND_ASSERT_MES(currency::get_account_address_and_payment_id_from_str(v_addr, dummy_pid, gw_address), false, "gateway_rpc_proxy_decrypt_history: bad gw address");
+    CHECK_AND_ASSERT_MES(v_addr.type() == typeid(currency::gateway_address_id_type), false, "gateway_rpc_proxy_decrypt_history: not a gw address");
+    currency::gateway_address_id_type addr_id = boost::get<currency::gateway_address_id_type>(v_addr);
+
+    CHECK_AND_ASSERT_MES(resp.transactions.size() == resp.raw_txs.size(), false, "gateway_rpc_proxy_decrypt_history: transactions/raw_txs size mismatch");
+    auto raw_it = resp.raw_txs.begin();
+    for (auto& wti : resp.transactions)
+    {
+      std::string blob;
+      CHECK_AND_ASSERT_MES(epee::string_tools::parse_hexstr_to_binbuff(*raw_it, blob), false, "gateway_rpc_proxy_decrypt_history: bad raw tx hex");
+      ++raw_it;
+      currency::transaction tx = AUTO_VAL_INIT(tx);
+      CHECK_AND_ASSERT_MES(currency::parse_and_validate_tx_from_blob(blob, tx), false, "gateway_rpc_proxy_decrypt_history: parse tx failed");
+      wti.tx = tx;
+      CHECK_AND_ASSERT_MES(currency::gateway_decrypt_wti(view_secret_key, addr_id, wti), false, "gateway_rpc_proxy_decrypt_history: decrypt failed");
+    }
+    resp.raw_txs.clear();
+    return true;
+  }
+}
+
 
 wallet_rpc_integrated_address::wallet_rpc_integrated_address()
 {
@@ -2127,6 +2154,19 @@ bool wallet_rpc_gateway_address::c1(currency::core& c, size_t ev_index, const st
   CHECK_AND_ASSERT_EQ(payment_id_to_asset_id_to_amout[payment_id_b][deployed_asset_id], 2);
 
   CHECK_AND_ASSERT_EQ(get_history_resp.transactions.back().comment, tr_to_gw_req2.comment);
+
+  // v2 keyless + client-side decryption (exactly what the gateway_rpc_proxy does) must yield the SAME decrypted result as the v1 server-side path above
+  {
+    currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY2::request h2_req = {};
+    currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY2::response h2_resp = {};
+    h2_req.gateway_address = gw_reg_resp.address;
+    h2_req.count = 10;
+    r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_get_address_history2", h2_req, h2_resp);
+    CHECK_AND_ASSERT_MES(r, false, "gateway_get_address_history2 failed");
+    CHECK_AND_ASSERT_MES(gateway_rpc_proxy_decrypt_history(h2_resp, gw_reg_resp.address, gw_addr_secret_key), false, "v2 client-side decryption failed");
+    CHECK_AND_ASSERT_EQ(h2_resp.transactions.size(), get_history_resp.transactions.size());
+    CHECK_AND_ASSERT_EQ(h2_resp.transactions.back().subtransfers_by_pid.size(), get_history_resp.transactions.back().subtransfers_by_pid.size());
+  }
 
   return true;
 }

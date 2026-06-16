@@ -1279,6 +1279,55 @@ namespace currency
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
+  bool core_rpc_server::on_gateway_get_address_history2(const COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY2::request& req, COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY2::response& res, connection_context& cntx)
+  {
+    CHECK_RPC_LIMITS(req.count, RPC_LIMIT_COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY);
+
+    // keyless variant the daemon does NOT receive the view secret key and does NOT decrypt anything
+    currency::gateway_address_id_type addr_id = {};
+    address_v v_addr = {};
+    payment_id_t dummy_payment_id = {};
+
+    bool r = currency::get_account_address_and_payment_id_from_str(v_addr, dummy_payment_id, req.gateway_address);
+    if (!r)
+    {
+      res.status = API_RETURN_CODE_BAD_ARG_INVALID_ADDRESS;
+      return true;
+    }
+    if (v_addr.type() == typeid(currency::gateway_address_id_type))
+    {
+      addr_id = boost::get<currency::gateway_address_id_type>(v_addr);
+    }
+    else
+    {
+      res.status = API_RETURN_CODE_BAD_ARG_INVALID_ADDRESS_TYPE;
+      return true;
+    }
+
+    auto addr_data_ptr = m_core.get_blockchain_storage().get_gateway_address_info(addr_id);
+    if (!addr_data_ptr)
+    {
+      res.status = API_RETURN_CODE_NOT_FOUND;
+      return true;
+    }
+    for (const auto& [asset_id, balance_entry] : addr_data_ptr->balances)
+    {
+      gateway_balance_entry be = {};
+      be.asset_id = asset_id;
+      be.amount = balance_entry.amount;
+      res.balances.push_back(be);
+    }
+
+    r = m_core.get_blockchain_storage().gateway_get_address_history2(addr_id, req, res);
+    if (!r)
+    {
+      res.status = API_RETURN_CODE_FAIL;
+      return true;
+    }
+    res.status = API_RETURN_CODE_OK;
+    return true;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_get_pos_mining_details(const COMMAND_RPC_GET_POS_MINING_DETAILS::request& req, COMMAND_RPC_GET_POS_MINING_DETAILS::response& res, connection_context& cntx)
   {
     if (!m_ignore_offline_status && !m_p2p.get_connections_count())

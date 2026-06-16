@@ -5307,9 +5307,9 @@ namespace currency
     }
   }
   //-----------------------------------------------------------------------------------------------------
-  bool gateway_prepare_wti(const currency::gateway_address_id_type& gw_id, const crypto::hash& tx_id, const crypto::secret_key& decrypt_key, tools::wallet_public::wallet_transfer_info& wti, const transaction_chain_entry& tx_chain_entry)
+  bool gateway_prepare_wti_public(const currency::gateway_address_id_type& gw_id, const crypto::hash& tx_id, tools::wallet_public::wallet_transfer_info& wti, const transaction_chain_entry& tx_chain_entry, bool& out_decrypt_as_income, bool& out_found)
   {
-    PROFILE_FUNC("wallet2::prepare_wti");
+    PROFILE_FUNC("currency::gateway_prepare_wti_public");
     wti.tx = tx_chain_entry.tx;
 
     wti.height = tx_chain_entry.m_keeper_block_height;
@@ -5319,22 +5319,16 @@ namespace currency
     wti.tx_hash = tx_id;
     load_wallet_transfer_info_flags(wti);
 
-    // escrow transactions, which are built with TX_FLAG_SIGNATURE_MODE_SEPARATE flag actually encrypt attachments 
-    // with buyer as a sender, and seller as receiver, despite the fact that for both sides transaction seen as outgoing.
-    // so here to decrypt tx properly we need to figure out, if this transaction is actually escrow acceptance. 
-    //we check if spent_indices have zero then input do not belong to this account, which means that we are seller for this 
-    //escrow, and decryption should be processed as income flag
-
-    //bool is_income = false;
-    //bool is_outcome = false;
+    // this is the public keyless half of gateway_prepare_wti, it only reads public gateway
+    // inputs/outputs and preserves the raw tx (wti.tx) so that gateway_decrypt_wti() can later recover
+    // the encrypted payment_id / attachments using the gateway view secret key
     bool is_outcome_native_coins = false;
-    bool found = false;
+    out_found = false;
     for (const auto& in : wti.tx.vin)
     {
       if(in.type() == typeid(txin_gateway) && boost::get<txin_gateway>(in).gateway_addr == gw_id)
       {
-        //is_outcome = true;
-        found = true;
+        out_found = true;
         if (boost::get<txin_gateway>(in).asset_id == currency::native_coin_asset_id_1div8)
         {
           is_outcome_native_coins = true;
@@ -5346,23 +5340,45 @@ namespace currency
     {
       if (out.type() == typeid(tx_out_gateway) && boost::get<tx_out_gateway>(out).gateway_addr == gw_id)
       {
-        //is_income = true;
-        found = true;
+        out_found = true;
       }
     }
 
-    if (!found)
+    if (!out_found)
     {
       LOG_ERROR("Detected transaction that don't have expected gatewate inputs/outputs, tx_id: " << tx_id << ", gw_id: " << gw_id);
+      out_decrypt_as_income = false;
       return true;
     }
 
     //let's assume that the one who pays for tx fee is sender of tx
+    out_decrypt_as_income = !(is_outcome_native_coins);
+    return true;
+  }
+  //-----------------------------------------------------------------------------------------------------
+  bool gateway_decrypt_wti(const crypto::secret_key& view_secret_key, const currency::gateway_address_id_type& gw_id, tools::wallet_public::wallet_transfer_info& wti)
+  {
+    PROFILE_FUNC("currency::gateway_decrypt_wti");
+    const crypto::hash& tx_id = wti.tx_hash;
+
+    wti.subtransfers_by_pid.clear();
+    wti.service_entries.clear();
+    wti.remote_addresses.clear();
+
+    bool is_outcome_native_coins = false;
+    for (const auto& in : wti.tx.vin)
+    {
+      if (in.type() == typeid(txin_gateway) && boost::get<txin_gateway>(in).gateway_addr == gw_id
+          && boost::get<txin_gateway>(in).asset_id == currency::native_coin_asset_id_1div8)
+      {
+        is_outcome_native_coins = true;
+      }
+    }
     bool decrypt_attachment_as_income = !(is_outcome_native_coins);
 
     currency::account_keys keys = {};
-    keys.spend_secret_key = decrypt_key;
-    keys.view_secret_key = decrypt_key; // for gateway transactions we use the same key for view and spend, so it doesn't matter which one we use for decryption
+    keys.spend_secret_key = view_secret_key;
+    keys.view_secret_key = view_secret_key; // for gateway transactions we use the same key for view and spend, so it doesn't matter which one we use for decryption
 
     std::vector<currency::payload_items_v> decrypted_att;
     crypto::key_derivation derivation = {};
@@ -5383,7 +5399,7 @@ namespace currency
     }
 
     out_index = 0;
-    std::map<uint64_t, std::unordered_map<crypto::public_key, boost::multiprecision::int128_t>> total_balance_change_per_payment_id; // { intrinsic_payment_id -> { asset_id -> balance_change } }    
+    std::map<uint64_t, std::unordered_map<crypto::public_key, boost::multiprecision::int128_t>> total_balance_change_per_payment_id; // { intrinsic_payment_id -> { asset_id -> balance_change } }
     std::unordered_map<crypto::public_key, std::map<uint64_t, boost::multiprecision::int128_t>> total_balance_change_per_asset_id; // { asset_id -> { intrinsic_payment_id -> balance_change } }
 
     for (const auto& out : wti.tx.vout)
@@ -5426,6 +5442,18 @@ namespace currency
     prepare_wti_decrypted_attachments(wti, decrypted_att); // should be called after wti subtransfer are populated
 
     return true;
+  }
+  //-----------------------------------------------------------------------------------------------------
+  bool gateway_prepare_wti(const currency::gateway_address_id_type& gw_id, const crypto::hash& tx_id, const crypto::secret_key& decrypt_key, tools::wallet_public::wallet_transfer_info& wti, const transaction_chain_entry& tx_chain_entry)
+  {
+    PROFILE_FUNC("wallet2::prepare_wti");
+    bool decrypt_as_income = false;
+    bool found = false;
+    if (!gateway_prepare_wti_public(gw_id, tx_id, wti, tx_chain_entry, decrypt_as_income, found))
+      return false;
+    if (!found)
+      return true; // nothing to decrypt; preserves legacy behavior
+    return gateway_decrypt_wti(decrypt_key, gw_id, wti);
   }
 
 
