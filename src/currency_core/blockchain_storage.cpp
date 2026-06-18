@@ -6556,15 +6556,15 @@ std::vector<uint64_t> blockchain_storage::get_last_n_blocks_timestamps(size_t n)
 uint64_t blockchain_storage::get_last_n_blocks_timestamps_median(size_t n) const
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
-  CRITICAL_REGION_LOCAL1(m_timestamps_median_cache_lock);
-  auto it = m_timestamps_median_cache.find(n);
-  if (it != m_timestamps_median_cache.end())
-    return it->second;
+
+  uint64_t cached_median = 0;
+  if (m_timestamps_median_cache.visit(n, [&cached_median](const auto& kv){ cached_median = kv.second; }))
+    return cached_median;
 
   std::vector<uint64_t> timestamps = get_last_n_blocks_timestamps(n);
   uint64_t median_res = epee::misc_utils::median(timestamps);
   if (timestamps.size() == n)
-    m_timestamps_median_cache[n] = median_res;
+    m_timestamps_median_cache.emplace(n, median_res);
   return median_res;
 }
 //------------------------------------------------------------------
@@ -8155,10 +8155,7 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
 void blockchain_storage::on_block_added(const block_extended_info& bei, const crypto::hash& id, const std::list<crypto::key_image>& bsk)
 {
   update_next_comulative_size_limit();
-  {
-    CRITICAL_REGION_LOCAL(m_timestamps_median_cache_lock);
-    m_timestamps_median_cache.clear();
-  }
+  m_timestamps_median_cache.clear();
   m_tx_pool.on_blockchain_inc(bei.height, id, bsk);
 
   update_targetdata_cache_on_block_added(bei);
@@ -8172,10 +8169,7 @@ void blockchain_storage::on_block_added(const block_extended_info& bei, const cr
 void blockchain_storage::on_block_removed(const block_extended_info& bei)
 {
   m_tx_pool.on_blockchain_dec(m_db_blocks.size() - 1, get_top_block_id());
-  {
-    CRITICAL_REGION_LOCAL(m_timestamps_median_cache_lock);
-    m_timestamps_median_cache.clear();
-  }
+  m_timestamps_median_cache.clear();
   update_targetdata_cache_on_block_removed(bei);
   LOG_PRINT_L2("block at height " << bei.height << " was removed from the blockchain");
 }
@@ -8225,10 +8219,7 @@ void blockchain_storage::on_abort_transaction()
 {
   if (m_event_handler) m_event_handler->on_clear_events();
   CHECK_AND_ASSERT_MES_NO_RET(validate_blockchain_prev_links(), "EPIC FAIL! 4");
-  {
-    CRITICAL_REGION_LOCAL(m_timestamps_median_cache_lock);
-    m_timestamps_median_cache.clear();
-  }
+  m_timestamps_median_cache.clear();
 }
 //------------------------------------------------------------------
 bool blockchain_storage::update_next_comulative_size_limit()
