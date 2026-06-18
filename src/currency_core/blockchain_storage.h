@@ -630,6 +630,7 @@ namespace currency
     mutable i_core_event_handler m_event_handler_stub;
 
     //tools::median_db_cache<uint64_t, uint64_t> m_tx_fee_median;
+    mutable epee::critical_section m_timestamps_median_cache_lock;
     mutable std::unordered_map<size_t, uint64_t> m_timestamps_median_cache;
     mutable performnce_data m_performance_data;
     std::list<core_event> m_core_events_pack;
