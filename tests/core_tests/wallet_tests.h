@@ -28,6 +28,17 @@ struct gen_wallet_unconfirmed_tx_from_tx_pool : public wallet_test
   bool generate(std::vector<test_event_entry>& events) const;
 };
 
+struct gen_wallet_unconfirmed_dup_on_pool_reorg : public wallet_test
+{
+  gen_wallet_unconfirmed_dup_on_pool_reorg();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool confirm_deposit_on_chain_a(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+  bool repro_duplicate_after_reorg(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+
+protected:
+  mutable std::shared_ptr<tools::wallet2> m_alice_wlt;
+};
+
 struct gen_wallet_save_load_and_balance : public wallet_test
 {
   gen_wallet_save_load_and_balance();
