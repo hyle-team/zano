@@ -600,15 +600,6 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
 //     }
 //   }
 
-  //skip non-coinbase txs that carry any unlock_time
-  if (!ptc.coin_base_tx && 
-    (currency::have_type_in_variant_container<currency::etc_tx_details_unlock_time>(tx.extra) ||
-    currency::have_type_in_variant_container<currency::etc_tx_details_unlock_time2>(tx.extra)))
-  {
-    WLT_LOG_L1("Ignoring non-coinbase tx with unlock_time at height " << height << ", tx: " << ptc.tx_hash());
-    return;
-  }
-
   for (auto& in : tx.vin)
   {
     VARIANT_SWITCH_BEGIN(in);
@@ -634,6 +625,15 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
     }
     VARIANT_SWITCH_END();
     ptc.i++;
+  }
+
+  //skip non-coinbase txs that carry any unlock_time
+  if (!ptc.coin_base_tx &&
+    (currency::have_type_in_variant_container<currency::etc_tx_details_unlock_time>(tx.extra) ||
+    currency::have_type_in_variant_container<currency::etc_tx_details_unlock_time2>(tx.extra)))
+  {
+    WLT_LOG_L1("Ignoring outputs of non-coinbase tx with unlock_time at height " << height << ", tx: " << ptc.tx_hash());
+    return;
   }
 
   /*
