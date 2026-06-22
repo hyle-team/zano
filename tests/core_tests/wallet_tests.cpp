@@ -1020,6 +1020,80 @@ bool gen_wallet_unlock_by_block_and_by_time::c4(currency::core& c, size_t ev_ind
 
 //------------------------------------------------------------------------------
 
+wallet_unlock_time_tx_spend_detection::wallet_unlock_time_tx_spend_detection()
+{
+  REGISTER_CALLBACK_METHOD(wallet_unlock_time_tx_spend_detection, c1);
+}
+
+bool wallet_unlock_time_tx_spend_detection::generate(std::vector<test_event_entry>& events) const
+{
+  // a wallet own output was spent by a (legacy) non-coinbase tx carrying unlock_time such txs are ignored 
+  // on sync output wise, but their inputs must still be processed - otherwise the wallet keeps the already spent output as "unspent"
+
+  GENERATE_ACCOUNT(preminer_acc);
+  GENERATE_ACCOUNT(miner_acc);
+  m_accounts.push_back(miner_acc);
+  GENERATE_ACCOUNT(alice_acc);
+  m_accounts.push_back(alice_acc);
+
+  currency::block blk_0 = AUTO_VAL_INIT(blk_0);
+  generator.construct_genesis_block(blk_0, preminer_acc, test_core_time::get_time());
+  events.push_back(blk_0);
+
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+
+  CREATE_TEST_WALLET(miner_wlt, miner_acc, blk_0);
+  CREATE_TEST_WALLET(alice_wlt, alice_acc, blk_0);
+
+  REFRESH_TEST_WALLET_AT_GEN_TIME(events, miner_wlt, blk_0r, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+
+  transaction tx_fund = AUTO_VAL_INIT(tx_fund);
+  miner_wlt->transfer(std::vector<tx_destination_entry>({ { MK_TEST_COINS(90), alice_acc.get_public_address() } }), 0, 0, TESTS_DEFAULT_FEE, std::vector<extra_v>(), std::vector<attachment_v>(), tx_fund);
+  events.push_back(tx_fund);
+  MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_fund);
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_1r, blk_1, miner_acc, WALLET_DEFAULT_TX_SPENDABLE_AGE);
+
+  REFRESH_TEST_WALLET_AT_GEN_TIME(events, alice_wlt, blk_1r, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 2 + WALLET_DEFAULT_TX_SPENDABLE_AGE);
+  CHECK_TEST_WALLET_BALANCE_AT_GEN_TIME(alice_wlt, MK_TEST_COINS(90));
+
+  uint64_t unlock_block_num = 10000;
+  transaction tx_locked = AUTO_VAL_INIT(tx_locked);
+  alice_wlt->transfer(std::vector<tx_destination_entry>({ { MK_TEST_COINS(30), miner_acc.get_public_address() } }), 0, unlock_block_num, TESTS_DEFAULT_FEE, std::vector<extra_v>(), std::vector<attachment_v>(), tx_locked);
+  CHECK_AND_ASSERT_MES(!is_coinbase(tx_locked) && get_tx_max_unlock_time(tx_locked) != 0, false, "tx_locked is expected to be non-coinbase with non-zero unlock_time");
+  events.push_back(tx_locked);
+  MAKE_NEXT_BLOCK_TX1(events, blk_2, blk_1r, miner_acc, tx_locked);
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_2r, blk_2, miner_acc, WALLET_DEFAULT_TX_SPENDABLE_AGE);
+
+  DO_CALLBACK(events, "c1");
+
+  return true;
+}
+
+bool wallet_unlock_time_tx_spend_detection::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
+  alice_wlt->refresh();
+
+  if (!check_balance_via_wallet(*alice_wlt.get(), "alice_wlt", 0, 0, 0, 0, 0))
+    return false;
+
+  // no phantom unspent outputs, theres nothing to spend
+  bool r = false;
+  try
+  {
+    alice_wlt->transfer(std::vector<tx_destination_entry>({ { MK_TEST_COINS(1), m_accounts[MINER_ACC_IDX].get_public_address() } }), 0, 0, TESTS_DEFAULT_FEE, std::vector<extra_v>(), std::vector<attachment_v>());
+  }
+  catch (const tools::error::not_enough_money&)
+  {
+    r = true;
+  }
+  CHECK_AND_ASSERT_MES(r, false, "Expected 'not_enough_money' wasn't thrown - the wallet seems to have phantom unspent outputs");
+
+  return true;
+}
+
+//------------------------------------------------------------------------------
+
 gen_wallet_payment_id::gen_wallet_payment_id()
 {
   REGISTER_CALLBACK_METHOD(gen_wallet_payment_id, c1);

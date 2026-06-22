@@ -74,6 +74,14 @@ struct gen_wallet_unlock_by_block_and_by_time : public wallet_test
   bool c4(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };
 
+struct wallet_unlock_time_tx_spend_detection : public wallet_test
+{
+  wallet_unlock_time_tx_spend_detection();
+
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};
+
 struct gen_wallet_payment_id : public wallet_test
 {
   gen_wallet_payment_id();
