@@ -392,7 +392,7 @@ namespace tools::wallet_public
 
     static bool wti2_to_payment_id(const wallet_transfer_info_v2& wti2, std::string &val)
     {
-      val = wti2.tx_wide_payment_id;
+      val = epee::string_tools::buff_to_hex_nodelimer(wti2.tx_wide_payment_id);
       return true;
     }
     static bool wti2_to_subtransfers(const wallet_transfer_info_v2& wti2, std::vector<wallet_sub_transfer_info> &val)

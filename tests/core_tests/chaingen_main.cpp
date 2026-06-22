@@ -1143,6 +1143,7 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY_HF(gbt_pool_invalid_txs_asset_overemit, "4-*");
     GENERATE_AND_PLAY(gen_wallet_unconfirmed_outdated_tx);
     GENERATE_AND_PLAY(gen_wallet_unlock_by_block_and_by_time);
+    GENERATE_AND_PLAY(wallet_unlock_time_tx_spend_detection);
     GENERATE_AND_PLAY(gen_wallet_payment_id);
     GENERATE_AND_PLAY(gen_wallet_oversized_payment_id);
     GENERATE_AND_PLAY(gen_wallet_transfers_and_outdated_unconfirmed_txs);
@@ -1252,6 +1253,8 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY(mix_attr_tests);
     GENERATE_AND_PLAY(mix_in_spent_outs);
     GENERATE_AND_PLAY(random_outs_and_burnt_coins);
+    GENERATE_AND_PLAY(decoy_set_oob_on_multisig_out);
+    GENERATE_AND_PLAY(decoy_set_on_zero_output_tx);
 
     // Block verification tests
     GENERATE_AND_PLAY_HF(gen_block_big_major_version, "0,3");

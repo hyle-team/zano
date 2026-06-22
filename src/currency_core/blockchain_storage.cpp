@@ -9402,24 +9402,46 @@ bool blockchain_storage::collect_all_outs_in_block(uint64_t input_amount, uint64
 
   auto process_tx = [&](const crypto::hash& txid, const transaction& tx) -> bool
   {
+
+    if (tx.vout.empty())
+    {
+      LOG_PRINT_L2("collect_all_outs_in_block: skipping tx " << txid << " height " << height << " - it has no outputs (alias-like tx), nothing to collect for decoys");
+      return true;
+    }
+
     std::vector<uint64_t> gidx;
-    CHECK_AND_ASSERT_MES(this->get_tx_outputs_gindexs(txid, gidx), false, "failed to get_tx_outputs_gindexs() for tx_id " << txid);
+    if (!this->get_tx_outputs_gindexs(txid, gidx))
+    {
+      LOG_PRINT_L2("collect_all_outs_in_block: skipping tx " << txid << " height " << height << " - empty global output index, nothing to collect for decoys");
+      return true;
+    }
+
     CHECK_AND_ASSERT_MES(gidx.size() == tx.vout.size(), false, "gidx size (" << gidx.size() << ") != tx vout size (" << tx.vout.size() << ") for tx_id " << txid);
 
     for (size_t i = 0; i < tx.vout.size(); ++i)
     {
       uint64_t amount = 0;
 
+      bool out_is_decoy_eligible = false;
       VARIANT_SWITCH_BEGIN(tx.vout[i]);
       VARIANT_CASE_CONST(tx_out_bare, o)
       {
-        amount = o.amount;
+        if (o.target.type() == typeid(txout_to_key))
+        {
+          amount = o.amount;
+          out_is_decoy_eligible = true;
+        }
       }
       VARIANT_CASE_CONST(tx_out_zarcanum, dummy_zc)
       {
         amount = 0;
+        out_is_decoy_eligible = true;
       }
       VARIANT_SWITCH_END();
+
+      // skip for multisig gateway and other, cuz they have no out in m_global_output_indexes
+      if (!out_is_decoy_eligible)
+        continue;
 
       COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry oen{};
       if (this->build_random_out_entry(amount, gidx[i], mix_count, /*use_only_forced_to_mix=*/false, /*height_upper_limit=*/0, oen) &&
