@@ -11,6 +11,7 @@
 #include <boost/program_options.hpp>
 
 #include <boost/interprocess/sync/named_mutex.hpp>
+#include <boost/unordered/concurrent_flat_map.hpp>
 
 #include <boost/serialization/serialization.hpp>
 #include <boost/serialization/version.hpp>
@@ -630,7 +631,7 @@ namespace currency
     mutable i_core_event_handler m_event_handler_stub;
 
     //tools::median_db_cache<uint64_t, uint64_t> m_tx_fee_median;
-    mutable std::unordered_map<size_t, uint64_t> m_timestamps_median_cache;
+    mutable boost::concurrent_flat_map<size_t, uint64_t> m_timestamps_median_cache;
     mutable performnce_data m_performance_data;
     std::list<core_event> m_core_events_pack;
     mutable epee::file_io_utils::native_filesystem_handle m_interprocess_locker_file;

@@ -6556,14 +6556,15 @@ std::vector<uint64_t> blockchain_storage::get_last_n_blocks_timestamps(size_t n)
 uint64_t blockchain_storage::get_last_n_blocks_timestamps_median(size_t n) const
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
-  auto it = m_timestamps_median_cache.find(n);
-  if (it != m_timestamps_median_cache.end())
-    return it->second;
+
+  uint64_t cached_median = 0;
+  if (m_timestamps_median_cache.visit(n, [&cached_median](const auto& kv){ cached_median = kv.second; }))
+    return cached_median;
 
   std::vector<uint64_t> timestamps = get_last_n_blocks_timestamps(n);
   uint64_t median_res = epee::misc_utils::median(timestamps);
   if (timestamps.size() == n)
-    m_timestamps_median_cache[n] = median_res;
+    m_timestamps_median_cache.emplace(n, median_res);
   return median_res;
 }
 //------------------------------------------------------------------
