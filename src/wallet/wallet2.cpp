@@ -2502,9 +2502,14 @@ void wallet2::handle_unconfirmed_tx(process_transaction_context& ptc)
     if (m_unconfirmed_txs.count(ptc.tx_hash()))
       return;
 
-    for (const auto& hist_wti : m_transfer_history)
-      if (hist_wti.tx_hash == ptc.tx_hash())
+    const uint64_t top_height = get_top_block_height();
+    for (auto it = m_transfer_history.rbegin(); it != m_transfer_history.rend(); ++it)
+    {
+      if (it->height + WALLET_UNCONFIRMED_SCAN_DEPTH <= top_height)
+        break;
+      if (it->tx_hash == ptc.tx_hash())
         return;
+    }
 
     //prepare notification about pending transaction
     wallet_public::wallet_transfer_info& unconfirmed_wti = misc_utils::get_or_insert_value_initialized(m_unconfirmed_txs, ptc.tx_hash());
