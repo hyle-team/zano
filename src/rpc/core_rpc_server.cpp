@@ -1224,13 +1224,6 @@ namespace currency
   {
     CHECK_RPC_LIMITS(req.count, RPC_LIMIT_COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY);
 
-    if (req.gateway_view_secret_key == currency::null_skey)
-    {
-      res.status = API_RETURN_CODE_BAD_ARG;
-      res.status_error = "gateway_view_secret_key is required, must be a non-null secret";
-      return true;
-    }
-
     currency::gateway_address_id_type addr_id = {};
     address_v v_addr = {};
     payment_id_t dummy_payment_id = {};
