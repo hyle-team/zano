@@ -388,7 +388,7 @@ namespace tools
     public:
 
     void assign_account(const currency::account_base& acc);
-    void generate(const std::wstring& path, const std::string& password, bool auditable_wallet);
+    void generate(const std::wstring& path, const std::string& password, bool auditable_wallet, bool allow_weak_password = false);
     void restore(const std::wstring& path, const std::string& pass, const std::string& seed_or_tracking_seed, bool tracking_wallet, const std::string& seed_password);
     void restore(const std::wstring& path, const std::string& pass, const std::string& secret_derivation, bool is_auditabe_wallet, uint64_t creation_timestamp);
     void load(const std::wstring& path, const std::string& password, bool skip_pending_ki_load = false);
