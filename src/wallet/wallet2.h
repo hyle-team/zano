@@ -51,7 +51,8 @@
 #define WALLET_DEFAULT_TX_SPENDABLE_AGE                               CURRENCY_HF4_MANDATORY_MIN_COINAGE
 #define WALLET_POS_MINT_CHECK_HEIGHT_INTERVAL                         1
 #define WALLET_CONCISE_MODE_MAX_REORG_BLOCKS                          CURRENCY_BLOCKS_PER_DAY * 7 //week
-#define WALLET_CONCISE_MODE_MOBILE_MAX_HISTORY_SIZE                   500                         
+#define WALLET_CONCISE_MODE_MOBILE_MAX_HISTORY_SIZE                   500
+#define WALLET_UNCONFIRMED_SCAN_DEPTH                                 50
 
 
 const uint64_t WALLET_MINIMUM_HEIGHT_UNSET_CONST = std::numeric_limits<uint64_t>::max();

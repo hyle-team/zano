@@ -600,15 +600,6 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
 //     }
 //   }
 
-  //skip non-coinbase txs that carry any unlock_time
-  if (!ptc.coin_base_tx && 
-    (currency::have_type_in_variant_container<currency::etc_tx_details_unlock_time>(tx.extra) ||
-    currency::have_type_in_variant_container<currency::etc_tx_details_unlock_time2>(tx.extra)))
-  {
-    WLT_LOG_L1("Ignoring non-coinbase tx with unlock_time at height " << height << ", tx: " << ptc.tx_hash());
-    return;
-  }
-
   for (auto& in : tx.vin)
   {
     VARIANT_SWITCH_BEGIN(in);
@@ -634,6 +625,15 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
     }
     VARIANT_SWITCH_END();
     ptc.i++;
+  }
+
+  //skip non-coinbase txs that carry any unlock_time
+  if (!ptc.coin_base_tx &&
+    (currency::have_type_in_variant_container<currency::etc_tx_details_unlock_time>(tx.extra) ||
+    currency::have_type_in_variant_container<currency::etc_tx_details_unlock_time2>(tx.extra)))
+  {
+    WLT_LOG_L1("Ignoring outputs of non-coinbase tx with unlock_time at height " << height << ", tx: " << ptc.tx_hash());
+    return;
   }
 
   /*
@@ -2501,6 +2501,15 @@ void wallet2::handle_unconfirmed_tx(process_transaction_context& ptc)
     m_unconfirmed_in_transfers[ptc.tx_hash()] = tx;
     if (m_unconfirmed_txs.count(ptc.tx_hash()))
       return;
+
+    const uint64_t top_height = get_top_block_height();
+    for (auto it = m_transfer_history.rbegin(); it != m_transfer_history.rend(); ++it)
+    {
+      if (it->height + WALLET_UNCONFIRMED_SCAN_DEPTH <= top_height)
+        break;
+      if (it->tx_hash == ptc.tx_hash())
+        return;
+    }
 
     //prepare notification about pending transaction
     wallet_public::wallet_transfer_info& unconfirmed_wti = misc_utils::get_or_insert_value_initialized(m_unconfirmed_txs, ptc.tx_hash());
