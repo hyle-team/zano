@@ -5346,13 +5346,13 @@ bool blockchain_storage::change_gateway_balance(const crypto::hash& tx_id, const
 
   if (increase)
   {
-    CHECK_AND_ASSERT_MES(balance_entry.amount <= std::numeric_limits<uint64_t>::max() - amount, false, "Uint64 overflow, gateway address " << gw_addr_str << ", tx: " << tx_id << ", asset_id: " << asset_id);
+    CHECK_AND_ASSERT_MES(balance_entry.amount <= std::numeric_limits<uint64_t>::max() - amount, false, "Uint64 overflow, gateway address " << gw_addr_str << ", tx: " << tx_id << ", asset_id: " << asset_id << ", balance: " << balance_entry.amount << ", amount: " << amount);
     balance_entry.amount += amount;
   }
   else
   {
     // decrease
-    CHECK_AND_ASSERT_MES(balance_entry.amount >= amount, false, "Balance underflow, gateway address " << gw_addr_str << ", tx: " << tx_id << ", asset_id: " << asset_id);
+    CHECK_AND_ASSERT_MES(balance_entry.amount >= amount, false, "Balance underflow, gateway address " << gw_addr_str << ", tx: " << tx_id << ", asset_id: " << asset_id << ", balance: " << balance_entry.amount << ", amount: " << amount);
     balance_entry.amount -= amount;
   }
 
