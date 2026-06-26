@@ -51,6 +51,14 @@ namespace epee
         hparent_section->m_descriptions[name] = description;
       }
 
+      void remove_entry_from_doc(hsection hparent_section, const std::string& name)
+      {
+        if (!hparent_section)
+          hparent_section = &m_root;
+        hparent_section->m_entries.erase(name);
+        hparent_section->m_descriptions.erase(name);
+      }
+
       bool dump_as_decriptions(std::string& buff, size_t indent  = 0 , end_of_line_t eol = eol_crlf)
       {
         TRY_ENTRY();

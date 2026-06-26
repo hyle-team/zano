@@ -109,6 +109,14 @@ public: \
 #define DOC_EXMP_AUTO(...)                                       , epee::create_t_object<KV_MAKE_ALIAS_NAME() >(__VA_ARGS__)
 #define DOC_EXMP_AGGR(...)                                       , epee::create_t_object<KV_MAKE_ALIAS_NAME() >(KV_MAKE_ALIAS_NAME(){__VA_ARGS__})
 
+// Hides a field from the auto-generated documentation (example JSON + descriptions)
+// while keeping normal wire serialization intact. Place INSTEAD of DOC_DSCR(...),
+// on the SAME line as the KV_SERIALIZE it applies to. Self-contained: no DOC_END.
+#define DOC_HIDE    if constexpr (t_storage::use_descriptions::value) \
+     { \
+       epee::serialization::selector<is_store>::serialize_and_hide(stg, hparent_section, KV_MAKE_VAR_NAME()); \
+     }
+
 
 // Function template to create an object with forwarded constructor arguments
   template<typename T, typename... Args>
