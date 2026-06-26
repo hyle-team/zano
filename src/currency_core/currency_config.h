@@ -316,7 +316,7 @@ static_assert(CURRENCY_FORMATION_VERSION == 103);
 #define ZANO_HARDFORK_05_MIN_BUILD_VER                  382
 
 #define ZANO_HARDFORK_06_AFTER_HEIGHT                   3833000
-#define ZANO_HARDFORK_06_MIN_BUILD_VER                  382
+#define ZANO_HARDFORK_06_MIN_BUILD_VER                  501
 #else
 // Testnet
 #define ZANO_HARDFORK_01_AFTER_HEIGHT                   0
