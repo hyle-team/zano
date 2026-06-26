@@ -1000,14 +1000,14 @@ namespace tools::wallet_public
 
   struct payment_details
   {
-    std::string payment_id;
+    std::string payment_id;       // hex-encoded
     std::string tx_hash;
     uint64_t amount;
     uint64_t block_height;
     uint64_t unlock_time;
 
     BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(payment_id)     DOC_DSCR("Payment id that related to this payment") DOC_EXMP("1dfe5a88ff9effb3")     DOC_END
+      KV_SERIALIZE(payment_id)     DOC_DSCR("Hex-encoded payment ID that related to this payment") DOC_EXMP("1dfe5a88ff9effb3")     DOC_END
       KV_SERIALIZE(tx_hash)        DOC_DSCR("Transaction ID that is holding this payment") DOC_EXMP("01220e8304d46b940a86e383d55ca5887b34f158a7365bbcdd17c5a305814a93")     DOC_END
       KV_SERIALIZE(amount)         DOC_DSCR("Amount of native coins transfered") DOC_EXMP(100000000000)     DOC_END
       KV_SERIALIZE(block_height)   DOC_DSCR("Block height that holds transaction") DOC_EXMP(12321)     DOC_END
@@ -1026,7 +1026,7 @@ namespace tools::wallet_public
       bool allow_locked_transactions;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(payment_id)                  DOC_DSCR("Payment id that is used to identify transfers") DOC_EXMP("1dfe5a88ff9effb3")     DOC_END
+        KV_SERIALIZE(payment_id)                  DOC_DSCR("Hex-encoded payment ID that is used to identify transfers") DOC_EXMP("1dfe5a88ff9effb3")     DOC_END
         KV_SERIALIZE(allow_locked_transactions)   DOC_DSCR("Says to wallet if locked transfers should be included or not (false is strongly recomennded)") DOC_EXMP(false)     DOC_END
       END_KV_SERIALIZE_MAP()
     };
@@ -1048,12 +1048,12 @@ namespace tools::wallet_public
 
     struct request
     {
-      std::vector<std::string> payment_ids;
+      std::vector<std::string> payment_ids;     // hex-encoded
       uint64_t min_block_height;
       bool allow_locked_transactions;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(payment_ids)                DOC_DSCR("Payment ids that is used to identify transfers")  DOC_EXMP_AUTO(2, "1dfe5a88ff9effb3")     DOC_END
+        KV_SERIALIZE(payment_ids)                DOC_DSCR("Hex-encoded payment IDs that is used to identify transfers")  DOC_EXMP_AUTO(2, "1dfe5a88ff9effb3")     DOC_END
         KV_SERIALIZE(min_block_height)           DOC_DSCR("Minimal block height to consider")  DOC_EXMP(0)     DOC_END
         KV_SERIALIZE(allow_locked_transactions)  DOC_DSCR("Says to wallet if locked transfers should be included or not (false is strongly recomennded)") DOC_EXMP(false)     DOC_END
       END_KV_SERIALIZE_MAP()
