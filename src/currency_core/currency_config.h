@@ -251,7 +251,6 @@ static_assert(CURRENCY_FORMATION_VERSION == 103);
 #define ALIAS_MINIMUM_PUBLIC_SHORT_NAME_ALLOWED         6
 #define ALIAS_SHORT_NAMES_VALIDATION_PUB_KEY            "37947f7b6a5268c5d0a48bde73d7a426f0b5f24648f74024279540207dc70031" 
 
-
 #define ALIAS_NAME_MAX_LEN                              255
 #define ALIAS_VALID_CHARS                               "0123456789abcdefghijklmnopqrstuvwxyz-."
 #define ALIAS_COMMENT_MAX_SIZE_BYTES                    400
@@ -316,8 +315,8 @@ static_assert(CURRENCY_FORMATION_VERSION == 103);
 #define ZANO_HARDFORK_05_AFTER_HEIGHT                   3076400   // 2025-03-18 15:13:39
 #define ZANO_HARDFORK_05_MIN_BUILD_VER                  382
 
-#define ZANO_HARDFORK_06_AFTER_HEIGHT                   999999999999999999
-#define ZANO_HARDFORK_06_MIN_BUILD_VER                  382
+#define ZANO_HARDFORK_06_AFTER_HEIGHT                   3833000
+#define ZANO_HARDFORK_06_MIN_BUILD_VER                  501
 #else
 // Testnet
 #define ZANO_HARDFORK_01_AFTER_HEIGHT                   0

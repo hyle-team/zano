@@ -7145,11 +7145,18 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
     CHECK_AND_ASSERT_MES(tx.vin.size() <= CURRENCY_TX_MAX_ALLOWED_INPUTS, false, "transaction has too many inputs = " << tx.vin.size());
     CHECK_AND_ASSERT_MES(tx.vout.size() <= CURRENCY_TX_MAX_ALLOWED_OUTS,  false, "transaction has too many outputs = " << tx.vout.size());
 
+    bool has_gw_outs = std::any_of(tx.vout.begin(), tx.vout.end(), [](const tx_out_v& o) { return o.type() == typeid(tx_out_gateway); });
+
     if (mode_separate)
     {
       bool has_gw_ins  = std::any_of(tx.vin.begin(),  tx.vin.end(),  [](const txin_v& o)   { return o.type() == typeid(txin_gateway); });
-      bool has_gw_outs = std::any_of(tx.vout.begin(), tx.vout.end(), [](const tx_out_v& o) { return o.type() == typeid(tx_out_gateway); });
       CHECK_AND_ASSERT_MES(!has_gw_ins && !has_gw_outs, false, "TX_FLAG_SIGNATURE_MODE_SEPARATE is incompatible with gw ins/outs");
+    }
+
+    if (has_gw_outs)
+    {
+      bool has_legacy_pid = has_tx_wide_payment_id(tx);
+      CHECK_AND_ASSERT_MES(!has_legacy_pid, false, "legacy tx-wide payment ID is incompatible with gateway outputs");
     }
   }
 
