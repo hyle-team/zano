@@ -5,6 +5,7 @@
 
 
 #include "include_base_utils.h"
+#include "profile_tools.h"
 using namespace epee;
 
 #include "basic_pow_helpers.h"
@@ -102,5 +103,34 @@ namespace currency
     crypto::hash p = null_hash;
     get_block_longhash(b, p);
     return p;
+  }
+  //---------------------------------------------------------------
+  uint64_t measure_longhash_calculation_time_us(const block& b, crypto::hash& pow_result_out, uint64_t* p_context_build_time_ms /* = nullptr */)
+  {
+    init_ethash_log_if_necessary();
+    const uint64_t height = get_block_height(b);
+    const int epoch = ethash_height_to_epoch(height);
+
+    TIME_MEASURE_START_MS(context_build_time_ms);
+    std::shared_ptr<ethash::epoch_context_full> p_context = progpow::get_global_epoch_context_full(epoch);
+    TIME_MEASURE_FINISH_MS(context_build_time_ms);
+    if (p_context_build_time_ms)
+      *p_context_build_time_ms = context_build_time_ms;
+
+    if (!p_context)
+    {
+      LOG_ERROR("fatal error: get_global_epoch_context_full failed, throwing bad_alloc...");
+      throw std::bad_alloc();
+    }
+
+    const crypto::hash block_header_hash = get_block_header_mining_hash(b);
+    TIME_MEASURE_START(longhash_calculation_time);
+    auto res_eth = progpow::hash(*p_context, static_cast<int>(height), *(ethash::hash256*)&block_header_hash, b.nonce);
+    TIME_MEASURE_FINISH(longhash_calculation_time);
+
+    pow_result_out = currency::null_hash;
+    memcpy(&pow_result_out.data, &res_eth.final_hash, sizeof(res_eth.final_hash));
+
+    return longhash_calculation_time;
   }
 }
