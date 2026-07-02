@@ -543,6 +543,7 @@ bool wallet_rpc_exchange_suite::c1(currency::core& c, size_t ev_index, const std
   //r = mine_next_pow_blocks_in_playtime(custody_wlt->get_account().get_public_address(), c, 3);
   r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
+  bool hf4_active = c.get_blockchain_storage().is_hardfork_active(ZANO_HARDFORK_04_ZARCANUM);
   bool hf6_active = c.get_blockchain_storage().is_hardfork_active(ZANO_HARDFORK_06);
 
   // wallet RPC server
@@ -847,6 +848,196 @@ bool wallet_rpc_exchange_suite::c1(currency::core& c, size_t ev_index, const std
     CHECK_AND_ASSERT_EQ(it->amount, 100000000000);
     CHECK_AND_ASSERT_EQ(it->payment_id, bob_payment_id_hex_str);
     CHECK_AND_ASSERT_EQ(it->block_height, 22);
+  }
+
+
+  // since HF4 confidential assets can be received against a payment id. Make sure both get_payments and
+  // get_bulk_payments report the received asset via payment_details::payment_subtransfers.
+  if (hf4_active)
+  {
+    tools::wallet_rpc_server miner_wlt_rpc(miner_wlt);
+    miner_wlt->refresh();
+
+    // miner deploys a new asset (whole supply goes to miner itself by default)
+    const uint64_t asset_supply = 1000;
+    const uint64_t asset_amount = 700; // amount to be sent to custody
+    tools::wallet_public::COMMAND_ASSETS_DEPLOY::request dep_req{};
+    dep_req.asset_descriptor.current_supply   = asset_supply;
+    dep_req.asset_descriptor.total_max_supply = asset_supply;
+    dep_req.asset_descriptor.decimal_point    = 0;
+    dep_req.asset_descriptor.full_name        = "exchange suite asset";
+    dep_req.asset_descriptor.ticker           = "ESA";
+    tools::wallet_public::COMMAND_ASSETS_DEPLOY::response dep_resp{};
+    r = invoke_text_json_for_rpc(miner_wlt_rpc, "deploy_asset", dep_req, dep_resp);
+    CHECK_AND_ASSERT_MES(r, false, "deploy_asset failed");
+    crypto::public_key asset_id = dep_resp.new_asset_id;
+
+    r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+    miner_wlt->refresh();
+
+    // miner sends the asset (no native coins) to custody's integrated address, i.e. against a payment id
+    std::string asset_payment_id_hex_str = gen_payment_id_as_hex_str(custody_wlt_rpc);
+    std::string asset_payment_id;
+    CHECK_AND_ASSERT_TRUE(epee::string_tools::parse_hexstr_to_binbuff(asset_payment_id_hex_str, asset_payment_id));
+
+    tools::wallet_public::COMMAND_RPC_TRANSFER::request tr_req{};
+    tr_req.destinations.emplace_back(currency::transfer_destination{ asset_amount, get_integr_addr(custody_wlt_rpc, asset_payment_id_hex_str), asset_id });
+    tr_req.fee = TESTS_DEFAULT_FEE;
+    tr_req.mixin = 0;
+    tools::wallet_public::COMMAND_RPC_TRANSFER::response tr_resp{};
+    r = invoke_text_json_for_rpc(miner_wlt_rpc, "transfer", tr_req, tr_resp);
+    CHECK_AND_ASSERT_MES(r, false, "asset transfer failed");
+
+    r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+    custody_wlt->refresh();
+
+    // get_payments must report the received asset as a subtransfer (native amount stays 0)
+    {
+      tools::wallet_public::COMMAND_RPC_GET_PAYMENTS::request gp_req{};
+      gp_req.payment_id = asset_payment_id_hex_str;
+      tools::wallet_public::COMMAND_RPC_GET_PAYMENTS::response gp_resp{};
+      r = invoke_text_json_for_rpc(custody_wlt_rpc, "get_payments", gp_req, gp_resp);
+      CHECK_AND_ASSERT_MES(r, false, "get_payments failed");
+
+      CHECK_AND_ASSERT_EQ(gp_resp.payments.size(), 1);
+      const auto& p = gp_resp.payments.front();
+      CHECK_AND_ASSERT_EQ(p.payment_id, asset_payment_id_hex_str);
+      CHECK_AND_ASSERT_EQ(p.amount, 0); // no native coins were sent
+      CHECK_AND_ASSERT_EQ(p.payment_subtransfers.size(), 1);
+      CHECK_AND_ASSERT_EQ(p.payment_subtransfers.front().asset_id, asset_id);
+      CHECK_AND_ASSERT_EQ(p.payment_subtransfers.front().amount, asset_amount);
+    }
+
+    // get_bulk_payments must report the same
+    {
+      tools::wallet_public::COMMAND_RPC_GET_BULK_PAYMENTS::request gbp_req{};
+      gbp_req.payment_ids.push_back(asset_payment_id_hex_str);
+      tools::wallet_public::COMMAND_RPC_GET_BULK_PAYMENTS::response gbp_resp{};
+      r = invoke_text_json_for_rpc(custody_wlt_rpc, "get_bulk_payments", gbp_req, gbp_resp);
+      CHECK_AND_ASSERT_MES(r, false, "get_bulk_payments failed");
+
+      CHECK_AND_ASSERT_EQ(gbp_resp.payments.size(), 1);
+      const auto& p = gbp_resp.payments.front();
+      CHECK_AND_ASSERT_EQ(p.payment_id, asset_payment_id_hex_str);
+      CHECK_AND_ASSERT_EQ(p.amount, 0);
+      CHECK_AND_ASSERT_EQ(p.payment_subtransfers.size(), 1);
+      CHECK_AND_ASSERT_EQ(p.payment_subtransfers.front().asset_id, asset_id);
+      CHECK_AND_ASSERT_EQ(p.payment_subtransfers.front().amount, asset_amount);
+    }
+
+    // native-only payment: payment_subtransfers must stay empty, native amount goes to 'amount'
+    {
+      const uint64_t native_amount = COIN / 5;
+      std::string native_payment_id_hex_str = gen_payment_id_as_hex_str(custody_wlt_rpc);
+
+      tools::wallet_public::COMMAND_RPC_TRANSFER::request ntr_req{};
+      ntr_req.destinations.emplace_back(currency::transfer_destination{ native_amount, get_integr_addr(custody_wlt_rpc, native_payment_id_hex_str) });
+      ntr_req.fee = TESTS_DEFAULT_FEE;
+      ntr_req.mixin = 0;
+      tools::wallet_public::COMMAND_RPC_TRANSFER::response ntr_resp{};
+      r = invoke_text_json_for_rpc(miner_wlt_rpc, "transfer", ntr_req, ntr_resp);
+      CHECK_AND_ASSERT_MES(r, false, "native transfer failed");
+
+      r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+      custody_wlt->refresh();
+
+      tools::wallet_public::COMMAND_RPC_GET_PAYMENTS::request gp_req{};
+      gp_req.payment_id = native_payment_id_hex_str;
+      tools::wallet_public::COMMAND_RPC_GET_PAYMENTS::response gp_resp{};
+      r = invoke_text_json_for_rpc(custody_wlt_rpc, "get_payments", gp_req, gp_resp);
+      CHECK_AND_ASSERT_MES(r, false, "get_payments failed");
+      CHECK_AND_ASSERT_EQ(gp_resp.payments.size(), 1);
+      CHECK_AND_ASSERT_EQ(gp_resp.payments.front().amount, native_amount);
+      CHECK_AND_ASSERT_EQ(gp_resp.payments.front().payment_subtransfers.size(), 0);
+
+      tools::wallet_public::COMMAND_RPC_GET_BULK_PAYMENTS::request gbp_req{};
+      gbp_req.payment_ids.push_back(native_payment_id_hex_str);
+      tools::wallet_public::COMMAND_RPC_GET_BULK_PAYMENTS::response gbp_resp{};
+      r = invoke_text_json_for_rpc(custody_wlt_rpc, "get_bulk_payments", gbp_req, gbp_resp);
+      CHECK_AND_ASSERT_MES(r, false, "get_bulk_payments failed");
+      CHECK_AND_ASSERT_EQ(gbp_resp.payments.size(), 1);
+      CHECK_AND_ASSERT_EQ(gbp_resp.payments.front().amount, native_amount);
+      CHECK_AND_ASSERT_EQ(gbp_resp.payments.front().payment_subtransfers.size(), 0);
+    }
+  }
+
+
+  // native+asset in one tx under one payment id works since HF4; HF6-specific here is the pid mechanism: a short
+  // integrated-address pid is carried per-output as an intrinsic pid (HF6+) instead of a single tx-wide legacy pid.
+  // Check both the native and asset outputs get regrouped under that one pid by get_payments / get_bulk_payments.
+  if (hf6_active)
+  {
+    tools::wallet_rpc_server miner_wlt_rpc(miner_wlt);
+    miner_wlt->refresh();
+
+    const uint64_t asset_supply  = 1000;
+    const uint64_t asset_amount  = 500;
+    const uint64_t native_amount = COIN / 4;
+
+    // miner deploys another asset (whole supply goes to miner itself by default)
+    tools::wallet_public::COMMAND_ASSETS_DEPLOY::request dep_req{};
+    dep_req.asset_descriptor.current_supply   = asset_supply;
+    dep_req.asset_descriptor.total_max_supply = asset_supply;
+    dep_req.asset_descriptor.decimal_point    = 0;
+    dep_req.asset_descriptor.full_name        = "exchange suite asset 2";
+    dep_req.asset_descriptor.ticker           = "ESA2";
+    tools::wallet_public::COMMAND_ASSETS_DEPLOY::response dep_resp{};
+    r = invoke_text_json_for_rpc(miner_wlt_rpc, "deploy_asset", dep_req, dep_resp);
+    CHECK_AND_ASSERT_MES(r, false, "deploy_asset failed");
+    crypto::public_key asset_id = dep_resp.new_asset_id;
+
+    r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+    miner_wlt->refresh();
+
+    // single tx to one integrated address (i.e. one payment id) carrying both native coins and the asset
+    std::string mixed_payment_id_hex_str = gen_payment_id_as_hex_str(custody_wlt_rpc);
+    std::string integr_addr = get_integr_addr(custody_wlt_rpc, mixed_payment_id_hex_str);
+
+    tools::wallet_public::COMMAND_RPC_TRANSFER::request tr_req{};
+    tr_req.destinations.emplace_back(currency::transfer_destination{ native_amount, integr_addr });            // native coins
+    tr_req.destinations.emplace_back(currency::transfer_destination{ asset_amount, integr_addr, asset_id });   // asset
+    tr_req.fee = TESTS_DEFAULT_FEE;
+    tr_req.mixin = 0;
+    tools::wallet_public::COMMAND_RPC_TRANSFER::response tr_resp{};
+    r = invoke_text_json_for_rpc(miner_wlt_rpc, "transfer", tr_req, tr_resp);
+    CHECK_AND_ASSERT_MES(r, false, "mixed native+asset transfer failed");
+
+    r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+    custody_wlt->refresh();
+
+    // get_payments must report native coins in 'amount' and the asset in payment_subtransfers
+    {
+      tools::wallet_public::COMMAND_RPC_GET_PAYMENTS::request gp_req{};
+      gp_req.payment_id = mixed_payment_id_hex_str;
+      tools::wallet_public::COMMAND_RPC_GET_PAYMENTS::response gp_resp{};
+      r = invoke_text_json_for_rpc(custody_wlt_rpc, "get_payments", gp_req, gp_resp);
+      CHECK_AND_ASSERT_MES(r, false, "get_payments failed");
+
+      CHECK_AND_ASSERT_EQ(gp_resp.payments.size(), 1);
+      const auto& p = gp_resp.payments.front();
+      CHECK_AND_ASSERT_EQ(p.payment_id, mixed_payment_id_hex_str);
+      CHECK_AND_ASSERT_EQ(p.amount, native_amount);
+      CHECK_AND_ASSERT_EQ(p.payment_subtransfers.size(), 1);
+      CHECK_AND_ASSERT_EQ(p.payment_subtransfers.front().asset_id, asset_id);
+      CHECK_AND_ASSERT_EQ(p.payment_subtransfers.front().amount, asset_amount);
+    }
+
+    // get_bulk_payments must report the same
+    {
+      tools::wallet_public::COMMAND_RPC_GET_BULK_PAYMENTS::request gbp_req{};
+      gbp_req.payment_ids.push_back(mixed_payment_id_hex_str);
+      tools::wallet_public::COMMAND_RPC_GET_BULK_PAYMENTS::response gbp_resp{};
+      r = invoke_text_json_for_rpc(custody_wlt_rpc, "get_bulk_payments", gbp_req, gbp_resp);
+      CHECK_AND_ASSERT_MES(r, false, "get_bulk_payments failed");
+
+      CHECK_AND_ASSERT_EQ(gbp_resp.payments.size(), 1);
+      const auto& p = gbp_resp.payments.front();
+      CHECK_AND_ASSERT_EQ(p.payment_id, mixed_payment_id_hex_str);
+      CHECK_AND_ASSERT_EQ(p.amount, native_amount);
+      CHECK_AND_ASSERT_EQ(p.payment_subtransfers.size(), 1);
+      CHECK_AND_ASSERT_EQ(p.payment_subtransfers.front().asset_id, asset_id);
+      CHECK_AND_ASSERT_EQ(p.payment_subtransfers.front().amount, asset_amount);
+    }
   }
 
   return true;

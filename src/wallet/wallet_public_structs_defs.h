@@ -998,6 +998,18 @@ namespace tools::wallet_public
     };
   };
 
+  struct payment_subtransfer
+  {
+    crypto::public_key  asset_id = currency::null_pkey;
+    uint64_t            amount   = 0;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE_POD_AS_HEX_STRING(asset_id)  DOC_DSCR("Asset ID of the corresponding subtransfer.") DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
+      KV_SERIALIZE(amount)                      DOC_DSCR("Amount of the asset transferred.") DOC_EXMP(8000) DOC_END
+    END_KV_SERIALIZE_MAP()
+  };
+  
+  
   struct payment_details
   {
     std::string payment_id;       // hex-encoded
@@ -1005,13 +1017,15 @@ namespace tools::wallet_public
     uint64_t amount;
     uint64_t block_height;
     uint64_t unlock_time;
+    std::vector<payment_subtransfer> payment_subtransfers;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(payment_id)     DOC_DSCR("Hex-encoded payment ID that related to this payment") DOC_EXMP("1dfe5a88ff9effb3")     DOC_END
       KV_SERIALIZE(tx_hash)        DOC_DSCR("Transaction ID that is holding this payment") DOC_EXMP("01220e8304d46b940a86e383d55ca5887b34f158a7365bbcdd17c5a305814a93")     DOC_END
-      KV_SERIALIZE(amount)         DOC_DSCR("Amount of native coins transfered") DOC_EXMP(100000000000)     DOC_END
+      KV_SERIALIZE(amount)         DOC_DSCR("Amount of native coins transfered (native coins are always accounted in this field)") DOC_EXMP(100000000000)     DOC_END
       KV_SERIALIZE(block_height)   DOC_DSCR("Block height that holds transaction") DOC_EXMP(12321)     DOC_END
       KV_SERIALIZE(unlock_time)    DOC_DSCR("Timestamp/blocknumber after which this money would become availabe, recommended don't count transfers that has this field not 0") DOC_EXMP(0)     DOC_END
+      KV_SERIALIZE(payment_subtransfers) DOC_DSCR("List of subtransfers that this payment has (only for assets being transferred)") DOC_EXMP_AUTO(1)     DOC_END
     END_KV_SERIALIZE_MAP()
   };
 

@@ -840,6 +840,12 @@ namespace tools
       rpc_payment.amount       = payment.m_amount;
       rpc_payment.block_height = payment.m_block_height;
       rpc_payment.unlock_time  = payment.m_unlock_time;
+      for (auto& st : payment.subtransfers)
+      {
+        auto& pst = rpc_payment.payment_subtransfers.emplace_back();
+        pst.amount = st.amount;
+        pst.asset_id = st.asset_id;
+      }
       res.payments.push_back(rpc_payment);
     }
     WALLET_RPC_CATCH_TRY_ENTRY();
@@ -880,6 +886,12 @@ namespace tools
         rpc_payment.amount        = payment.m_amount;
         rpc_payment.block_height  = payment.m_block_height;
         rpc_payment.unlock_time   = payment.m_unlock_time;
+        for (auto& st : payment.subtransfers)
+        {
+          auto& pst = rpc_payment.payment_subtransfers.emplace_back();
+          pst.amount = st.amount;
+          pst.asset_id = st.asset_id;
+        }
         res.payments.push_back(std::move(rpc_payment));
       }
     }
