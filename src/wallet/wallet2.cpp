@@ -3248,7 +3248,7 @@ void wallet2::generate(const std::wstring& path, const std::string& pass, bool a
 {
   if (!allow_weak_password)
   {
-    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(validate_password(pass, WALLET_PASSWORD_MIN_LENGTH, WALLET_PASSWORD_MAX_LENGTH), "new wallet generation failed: password does not meet the password policy (allowed characters only, length must be 8..256)")
+    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(validate_password(pass, WALLET_PASSWORD_MIN_LENGTH, WALLET_PASSWORD_MAX_LENGTH), "new wallet generation failed: password does not meet the password policy (allowed characters only, length must be " << WALLET_PASSWORD_MIN_LENGTH << ".." << WALLET_PASSWORD_MAX_LENGTH << ")")
   }
   clear();
   prepare_file_names(path);
