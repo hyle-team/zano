@@ -4049,7 +4049,11 @@ int main(int argc, char* argv[])
 
     tools::wallet_rpc_server wrpc(wallet_ptr);
     bool r = wrpc.init(vm);
-    CHECK_AND_ASSERT_MES(r, EXIT_FAILURE, "Failed to initialize wallet rpc server");
+    if (!r)
+    {
+      LOG_PRINT_L0("Wallet RPC server was not started");
+      return EXIT_FAILURE;
+    }
 
     tools::signal_handler::install([&wrpc/*, &wal*/ /* TODO(unassigned): use? */] {
       wrpc.send_stop_signal();

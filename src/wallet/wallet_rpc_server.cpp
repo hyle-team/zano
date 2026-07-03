@@ -243,7 +243,7 @@ namespace tools
 
     if (do_server_init && m_jwt_secret.empty() && !m_deaf && !command_line::has_arg(vm, arg_unsecure_no_auth))
     {
-      LOG_PRINT_RED("Running wallet RPC server without --jwt-secret is INSECURE: every endpoint would be reachable without authentication." << ENDL
+      LOG_PRINT_YELLOW("Running wallet RPC server without --jwt-secret is INSECURE: every endpoint would be reachable without authentication." << ENDL
         << "Use --jwt-secret <secret> to enable JWT auth, --deaf to disable all handlers, or --unsecure-no-auth to acknowledge the risk.", LOG_LEVEL_0);
       return false;
     }
