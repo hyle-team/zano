@@ -2321,8 +2321,15 @@ void wallets_manager::wallet_vs_options::worker_func()
             prepare_wallet_status_info(*this, wsi);
             pview->update_wallet_status(wsi);
           }
-          w->get()->refresh(stop_for_refresh);
+          size_t blocks_fetched = 0;
+          bool received_money = false;
+          w->get()->refresh(blocks_fetched, received_money, stop_for_refresh);
           long_refresh_in_progress = false;
+          if (show_progress && blocks_fetched > 0 && !stop_for_refresh && !major_stop)
+          {
+            LOG_PRINT_L0(get_log_prefix() + "Storing wallet after sync, blocks fetched: " << blocks_fetched);
+            w->get()->store();
+          }
           w->get()->resend_unconfirmed();
           {
             auto w_ptr = *w; // get locked exclusive access to the wallet first (it's more likely that wallet is locked for a long time than 'offers')
