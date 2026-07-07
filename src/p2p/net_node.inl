@@ -253,7 +253,7 @@ namespace nodetool
     m_permanently_blocked_ips.clear();
     m_permanently_blocked_ips = new_block_list;
 
-    LOG_PRINT_L0("P2P network manual config file loaded(some of the p2p cpommand line options might be overridden by '" << P2P_MANUAL_CONFIG_FILENAME << "').");
+    LOG_PRINT_L0("P2P network manual config file loaded (some of the P2P command-line options might be overridden by '" << P2P_MANUAL_CONFIG_FILENAME << "').");
     return true;
   }
   //-----------------------------------------------------------------------------------
