@@ -482,8 +482,8 @@ bool boosted_tcp_server<t_protocol_handler>::init_server(uint32_t port, const st
   acceptor_.set_option(boost::asio::ip::tcp::acceptor::reuse_address(true));
   acceptor_.bind(endpoint);
   acceptor_.listen();
-  boost::asio::ip::tcp::endpoint binded_endpoint = acceptor_.local_endpoint();
-  m_port                                         = binded_endpoint.port();
+  boost::asio::ip::tcp::endpoint bound_endpoint = acceptor_.local_endpoint();
+  m_port                                         = bound_endpoint.port();
   acceptor_.async_accept(new_connection_->socket(),
                          boost::bind(&boosted_tcp_server<t_protocol_handler>::handle_accept, this,
                                      boost::asio::placeholders::error));

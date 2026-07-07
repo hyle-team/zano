@@ -188,9 +188,9 @@ namespace tests
       return true;
     }
 
-    uint32_t get_binded_port()
+    uint32_t get_bound_port()
     {
-      return m_net_server.get_binded_port();
+      return m_net_server.get_bound_port();
     }
   private: 
 
@@ -266,8 +266,8 @@ namespace tests
 
 
     LOG_PRINT_L0("Connecting to each other...");
-    uint32_t port1 = srv1.get_binded_port();
-    uint32_t port2 = srv2.get_binded_port();
+    uint32_t port1 = srv1.get_bound_port();
+    uint32_t port2 = srv2.get_bound_port();
 
     COMMAND_EXAMPLE_1::request arg;
     COMMAND_EXAMPLE_1::request resp;
@@ -372,8 +372,8 @@ namespace tests
 
 
     LOG_PRINT_L0("Connecting to each other...");
-    uint32_t port1 = srv1.get_binded_port();
-    uint32_t port2 = srv2.get_binded_port();
+    uint32_t port1 = srv1.get_bound_port();
+    uint32_t port2 = srv2.get_bound_port();
 
     COMMAND_EXAMPLE_1::request arg;
     COMMAND_EXAMPLE_1::request resp;

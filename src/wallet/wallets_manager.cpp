@@ -630,9 +630,9 @@ bool wallets_manager::init_local_daemon()
   m_pview->update_daemon_status(dsi);
   res = m_rpc_server.init(m_vm);
   CHECK_AND_ASSERT_AND_SET_GUI(res, "Failed to initialize core rpc server.");
-  LOG_PRINT_GREEN("Core rpc server initialized OK on port: " << m_rpc_server.get_binded_port(), LOG_LEVEL_0);
+  LOG_PRINT_GREEN("Core rpc server initialized OK on port: " << m_rpc_server.get_bound_port(), LOG_LEVEL_0);
 
-  m_ui_opt.rpc_port = m_rpc_server.get_binded_port();
+  m_ui_opt.rpc_port = m_rpc_server.get_bound_port();
 
 
   //chain calls to rpc server

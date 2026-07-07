@@ -68,8 +68,8 @@ namespace tools
     class basic_db_accessor
     {
       std::shared_ptr<i_db_backend> m_backend;
-      epee::critical_section m_binded_containers_lock;
-      std::set<i_db_parent_to_container_callabck*> m_binded_containers;
+      epee::critical_section m_bound_containers_lock;
+      std::set<i_db_parent_to_container_callabck*> m_bound_containers;
 
       epee::critical_section m_transactions_stack_lock;
       std::map<std::thread::id, std::vector<bool> > m_transactions_stack;
@@ -108,17 +108,17 @@ namespace tools
 
       bool bind_parent_container(i_db_parent_to_container_callabck* pcontainer)
       {
-        CRITICAL_REGION_LOCAL(m_binded_containers_lock);
-        m_binded_containers.insert(pcontainer);        
+        CRITICAL_REGION_LOCAL(m_bound_containers_lock);
+        m_bound_containers.insert(pcontainer);        
         return true;
       }
 
       bool unbind_parent_container(i_db_parent_to_container_callabck* pcontainer)
       {
-        CRITICAL_REGION_LOCAL(m_binded_containers_lock);
-        auto it = m_binded_containers.find(pcontainer);
-        CHECK_AND_ASSERT_THROW_MES(it != m_binded_containers.end(), "Unable to unbind pointer");
-        m_binded_containers.erase(it);
+        CRITICAL_REGION_LOCAL(m_bound_containers_lock);
+        auto it = m_bound_containers.find(pcontainer);
+        CHECK_AND_ASSERT_THROW_MES(it != m_bound_containers.end(), "Unable to unbind pointer");
+        m_bound_containers.erase(it);
         return true;
       }
       bool has_writer_tx_in_stack(const std::vector<bool>& ve)
@@ -143,7 +143,7 @@ namespace tools
           if (need_to_brodcst_writer_tx && !readonly)
           {
             LOG_PRINT_CYAN("[WRITE_TX_BEGIN]", LOG_LEVEL_2);
-            for (auto cnt_ptr : m_binded_containers)
+            for (auto cnt_ptr : m_bound_containers)
             {
               cnt_ptr->on_write_transaction_begin();
             }
@@ -207,7 +207,7 @@ namespace tools
           if (is_writer_tx && !has_other_writers_on_stack)
           {
             LOG_PRINT_CYAN("[WRITE_TX_COMMIT]", LOG_LEVEL_2);
-            for (auto cnt_ptr : m_binded_containers)
+            for (auto cnt_ptr : m_bound_containers)
             {
               cnt_ptr->on_write_transaction_commit(); // will cause cache isolation to be switched off
             }
@@ -244,7 +244,7 @@ namespace tools
           if (is_writer_tx && !has_other_writers_on_stack)
           {
             LOG_PRINT_CYAN("[WRITE_TX_ABORT]", LOG_LEVEL_2);
-            for (auto cnt_ptr : m_binded_containers)
+            for (auto cnt_ptr : m_bound_containers)
             {
               cnt_ptr->on_write_transaction_abort(); // will cause cache isolation to be switched off
             }
