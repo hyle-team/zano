@@ -920,8 +920,6 @@ namespace tools::wallet_public
       uint64_t mixin;
       std::string payment_id; // hex-encoded
       std::string comment; 
-      bool push_payer;
-      bool hide_receiver;
       bool service_entries_permanent;
       std::vector<currency::tx_service_attachment> service_entries;
       std::vector<uint64_t> out_ids_to_spend;
@@ -932,8 +930,6 @@ namespace tools::wallet_public
         KV_SERIALIZE(mixin)            DOC_DSCR("Specifies number of mixins (decoys) that would be used to create input, actual for pre-Zarcanum outputs, for post-Zarcanum outputs instead of this option, number that is defined by network hard rules (15+)") DOC_EXMP(15)     DOC_END
         KV_SERIALIZE(payment_id)       DOC_HIDE
         KV_SERIALIZE(comment)          DOC_DSCR("Text comment that is displayed in UI") DOC_EXMP_AUTO("Thanks for the coffe")     DOC_END
-        KV_SERIALIZE(push_payer)       DOC_HIDE
-        KV_SERIALIZE(hide_receiver)    DOC_HIDE
         KV_SERIALIZE(service_entries)  DOC_DSCR("Service entries that might be used by different apps that works on top of Zano network, not part of consensus") DOC_EXMP_AUTO(1)     DOC_END
         KV_SERIALIZE(service_entries_permanent) DOC_DSCR("Point to wallet that service_entries should be placed to 'extra' section of transaction(which won't be pruned after checkpoints)") DOC_EXMP_AUTO(1)     DOC_END
         KV_SERIALIZE(out_ids_to_spend) DOC_DSCR("[optional] List of output IDs that should only be used for this transfer. If empty or not present -- no restriction (default).") DOC_EXMP_AGGR({10, 15, 305}) DOC_END

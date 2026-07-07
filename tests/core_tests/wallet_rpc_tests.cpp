@@ -286,17 +286,6 @@ bool wallet_rpc_transfer::c1(currency::core& c, size_t ev_index, const std::vect
   CHECK_AND_ASSERT_MES(currency::count_type_in_variant_container<tx_payer>(pche->tx.extra) == 0, false, "tx_payer: incorrect count of items");
 
 
-  // 2. check tx_receiver and tx_payer non-default
-  req.mixin = 1;
-  req.push_payer = true;
-  tds.amount = MK_TEST_COINS(5);
-  req.destinations.clear();
-  req.destinations.push_back(tds);
-
-  res = AUTO_VAL_INIT(res);
-
-  CHECK_AND_ASSERT_FAILURE(miner_wlt_rpc.on_transfer(req, res, je, ctx));
-
   /*CHECK_AND_ASSERT_MES(r, false, "RPC call failed, code: " << je.code << ", msg: " << je.message);
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "enexpected pool txs count: " << c.get_pool_transactions_count());
@@ -1881,8 +1870,6 @@ bool wallet_rpc_multiple_receivers::c1(currency::core& c, size_t ev_index, const
   tr_req.destinations.emplace_back(currency::transfer_destination{MK_TEST_COINS(90), m_accounts[BOB_ACC_IDX].get_public_address_str()});
   tr_req.fee = TESTS_DEFAULT_FEE;
   tr_req.mixin = 0;
-  tr_req.hide_receiver = false;
-  tr_req.push_payer = true;
   r = invoke_text_json_for_rpc(miner_rpc, "transfer", tr_req, tr_res);
   CHECK_AND_ASSERT_MES(r, false, "RPC failed");
 

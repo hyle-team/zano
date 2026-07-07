@@ -728,20 +728,6 @@ namespace tools
       extra.push_back(comment);
     }
 
-    if (req.push_payer)
-    {
-      er.code = WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT;
-      er.message = "push_payer=true is not supported anymore";
-      return false;
-    }
-
-    /*if (!req.hide_receiver)
-    {
-      er.code = WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT;
-      er.message = "hide_receiver=false is not supported anymore";
-      return false;
-    }*/
-
     currency::finalized_tx result{};
     std::string unsigned_tx_blob_str;
     ctp.fee = req.fee;

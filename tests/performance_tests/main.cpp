@@ -275,7 +275,7 @@ void test_plain_wallet_concurent()
   std::string res3 = plain_wallet::sync_call("invoke", instance_id, invoke_body);
 
 
-  //invoke_body = "{\r\n  \"method\": \"transfer\",\r\n  \"params\": {\r\n    \"destinations\": [\r\n      {\r\n        \"amount\": \"1000000000000\",\r\n        \"address\": \"ZxD9oVwGwW6ULix9Pqttnr7JDpaoLvDVA1KJ9eA9KRxPMRZT5X7WwtU94XH1Z6q6XTMxNbHmbV2xfZ429XxV6fST2DxEg4BQV\",\r\n        \"asset_id\": \"cc4e69455e63f4a581257382191de6856c2156630b3fba0db4bdd73ffcfb36b6\"\r\n      }\r\n    ],\r\n    \"fee\": 10000000000,\r\n    \"mixin\": 10,\r\n    \"payment_id\": \"\",\r\n    \"comment\": \"\",\r\n    \"push_payer\": false,\r\n    \"hide_receiver\": true\r\n  }\r\n}";
+  //invoke_body = "{\r\n  \"method\": \"transfer\",\r\n  \"params\": {\r\n    \"destinations\": [\r\n      {\r\n        \"amount\": \"1000000000000\",\r\n        \"address\": \"ZxD9oVwGwW6ULix9Pqttnr7JDpaoLvDVA1KJ9eA9KRxPMRZT5X7WwtU94XH1Z6q6XTMxNbHmbV2xfZ429XxV6fST2DxEg4BQV\",\r\n        \"asset_id\": \"cc4e69455e63f4a581257382191de6856c2156630b3fba0db4bdd73ffcfb36b6\"\r\n      }\r\n    ],\r\n    \"fee\": 10000000000,\r\n    \"mixin\": 10,\r\n    \"payment_id\": \"\",\r\n    \"comment\": \"\",\r\n    \r\n  }\r\n}";
   //std::string res4 = plain_wallet::sync_call("invoke", instance_id, invoke_body);
 
 
@@ -427,7 +427,7 @@ void test_plain_wallet()
   std::string res3 = plain_wallet::sync_call("invoke", instance_id, invoke_body);
 
 
-  //invoke_body = "{\r\n  \"method\": \"transfer\",\r\n  \"params\": {\r\n    \"destinations\": [\r\n      {\r\n        \"amount\": \"1000000000000\",\r\n        \"address\": \"ZxD9oVwGwW6ULix9Pqttnr7JDpaoLvDVA1KJ9eA9KRxPMRZT5X7WwtU94XH1Z6q6XTMxNbHmbV2xfZ429XxV6fST2DxEg4BQV\",\r\n        \"asset_id\": \"cc4e69455e63f4a581257382191de6856c2156630b3fba0db4bdd73ffcfb36b6\"\r\n      }\r\n    ],\r\n    \"fee\": 10000000000,\r\n    \"mixin\": 10,\r\n    \"payment_id\": \"\",\r\n    \"comment\": \"\",\r\n    \"push_payer\": false,\r\n    \"hide_receiver\": true\r\n  }\r\n}";
+  //invoke_body = "{\r\n  \"method\": \"transfer\",\r\n  \"params\": {\r\n    \"destinations\": [\r\n      {\r\n        \"amount\": \"1000000000000\",\r\n        \"address\": \"ZxD9oVwGwW6ULix9Pqttnr7JDpaoLvDVA1KJ9eA9KRxPMRZT5X7WwtU94XH1Z6q6XTMxNbHmbV2xfZ429XxV6fST2DxEg4BQV\",\r\n        \"asset_id\": \"cc4e69455e63f4a581257382191de6856c2156630b3fba0db4bdd73ffcfb36b6\"\r\n      }\r\n    ],\r\n    \"fee\": 10000000000,\r\n    \"mixin\": 10,\r\n    \"payment_id\": \"\",\r\n    \"comment\": \"\",\r\n    }\r\n}";
   //std::string res4 = plain_wallet::sync_call("invoke", instance_id, invoke_body);
 
   //LOG_PRINT_L0(res);

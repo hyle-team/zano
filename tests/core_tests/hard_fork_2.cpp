@@ -89,7 +89,6 @@ bool hard_fork_2_tx_payer_in_wallet::c1(currency::core& c, size_t ev_index, cons
   tools::wallet_public::COMMAND_RPC_TRANSFER::request req_a = AUTO_VAL_INIT(req_a);
   req_a.destinations.push_back(currency::transfer_destination{ MK_TEST_COINS(1), m_accounts[ALICE_ACC_IDX].get_public_address_str() });
   req_a.fee = TESTS_DEFAULT_FEE;
-  req_a.push_payer = true;
 
   tools::wallet_public::COMMAND_RPC_TRANSFER::response res = AUTO_VAL_INIT(res);
   
@@ -113,7 +112,6 @@ bool hard_fork_2_tx_payer_in_wallet::c1(currency::core& c, size_t ev_index, cons
   tools::wallet_public::COMMAND_RPC_TRANSFER::request req_b = AUTO_VAL_INIT(req_b);
   req_b.destinations.push_back(currency::transfer_destination{ MK_TEST_COINS(1), m_accounts[BOB_ACC_IDX].get_public_address_str() });
   req_b.fee = TESTS_DEFAULT_FEE;
-  req_b.push_payer = true;
 
   res = AUTO_VAL_INIT(res);
   
@@ -165,7 +163,6 @@ bool hard_fork_2_tx_payer_in_wallet::c1(currency::core& c, size_t ev_index, cons
   tools::wallet_public::COMMAND_RPC_TRANSFER::request req_c = AUTO_VAL_INIT(req_c);
   req_c.destinations.push_back(currency::transfer_destination{ MK_TEST_COINS(1), m_accounts[ALICE_ACC_IDX].get_public_address_str() });
   req_c.fee = TESTS_DEFAULT_FEE;
-  req_c.push_payer = true;
   res = AUTO_VAL_INIT(res);
   r = bob_wlt_rpc.on_transfer(req_c, res, je, ctx);
   CHECK_AND_ASSERT_MES(r, false, "on_transfer failed");
@@ -257,7 +254,6 @@ bool hard_fork_2_tx_payer_in_wallet::c1(currency::core& c, size_t ev_index, cons
   req_c = AUTO_VAL_INIT(req_c);
   req_c.destinations.push_back(currency::transfer_destination{ MK_TEST_COINS(1), m_accounts[ALICE_ACC_IDX].get_public_address_str() });
   req_c.fee = TESTS_DEFAULT_FEE;
-  req_c.push_payer = true;
   res = AUTO_VAL_INIT(res);
   r = bob_wlt_rpc.on_transfer(req_c, res, je, ctx);
   CHECK_AND_ASSERT_MES(r, false, "on_transfer failed");
@@ -336,7 +332,6 @@ bool hard_fork_2_tx_receiver_in_wallet::c1(currency::core& c, size_t ev_index, c
   req.destinations.push_back(currency::transfer_destination { MK_TEST_COINS(1), m_accounts[MINER_ACC_IDX].get_public_address_str() }); 
   req.destinations.push_back(currency::transfer_destination { MK_TEST_COINS(1), m_accounts[BOB_ACC_IDX].get_public_address_str() });  // auditable address
   req.fee = TESTS_DEFAULT_FEE;
-  req.hide_receiver = false; // just to emphasize, this is false by default
 
   LOG_PRINT_L0("Miner's address: " << m_accounts[MINER_ACC_IDX].get_public_address_str());
   LOG_PRINT_L0("Alice's address: " << m_accounts[ALICE_ACC_IDX].get_public_address_str());
