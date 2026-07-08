@@ -70,14 +70,51 @@ macro(fetch_version name version_file)
   set(${name}_GIT_REVISION 0)
   set(${name}_GIT_VERSION "")
   if(GIT)
-    execute_process(COMMAND ${GIT} describe --tags --long --dirty=-dirty
-      OUTPUT_VARIABLE ${name}_GIT_DESCRIBE
+
+   # Build a git-describe-like value without requiring tags.
+    # Format: <version>-<revision>-g<short-commit>[-dirty]
+    set(_git_describe_version "0.0.0")
+    if(EXISTS "${version_file}")
+      file(STRINGS "${version_file}" _git_describe_version LIMIT_COUNT 1)
+      string(STRIP "${_git_describe_version}" _git_describe_version)
+      if("${_git_describe_version}" STREQUAL "")
+        set(_git_describe_version "0.0.0")
+      endif()
+    endif()
+
+    execute_process(COMMAND ${GIT} rev-parse --short HEAD
+      OUTPUT_VARIABLE _git_describe_commit
       OUTPUT_STRIP_TRAILING_WHITESPACE
       WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
       RESULT_VARIABLE rc)
-    if(rc OR "${name}_GIT_DESCRIBE" STREQUAL "")
-      message(FATAL_ERROR "Please fetch tags and/or install latest version of git ('describe --tags --long --dirty' failed)")
+    if(rc OR "${_git_describe_commit}" STREQUAL "")
+      message(FATAL_ERROR "Please install latest version of git ('rev-parse --short HEAD' failed)")
     endif()
+
+    execute_process(COMMAND ${GIT} rev-list --count --no-merges HEAD
+      OUTPUT_VARIABLE _git_describe_revision
+      OUTPUT_STRIP_TRAILING_WHITESPACE
+      WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+      RESULT_VARIABLE rc)
+    if(rc OR "${_git_describe_revision}" STREQUAL "")
+      message(FATAL_ERROR "Please install latest version of git ('rev-list --count --no-merges HEAD' failed)")
+    endif()
+
+    execute_process(COMMAND ${GIT} diff --quiet HEAD --
+      WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+      RESULT_VARIABLE _git_describe_dirty)
+    if(_git_describe_dirty EQUAL 0)
+      set(${name}_GIT_DESCRIBE "${_git_describe_version}-${_git_describe_revision}-g${_git_describe_commit}")
+    elseif(_git_describe_dirty EQUAL 1)
+      set(${name}_GIT_DESCRIBE "${_git_describe_version}-${_git_describe_revision}-g${_git_describe_commit}-dirty")
+    else()
+      message(FATAL_ERROR "Please install latest version of git ('diff --quiet HEAD --' failed)")
+    endif()
+
+    unset(_git_describe_version)
+    unset(_git_describe_commit)
+    unset(_git_describe_revision)
+    unset(_git_describe_dirty)
 
     execute_process(COMMAND ${GIT} show --no-patch --format=%cI HEAD
       OUTPUT_VARIABLE ${name}_GIT_TIMESTAMP
