@@ -49,7 +49,7 @@ WORKDIR /root
 
 # Lib Settings
 ARG CMAKE_VERSION_DOT=3.26.3
-ARG CMAKE_HASH=d71eda07d6ecf3964de65a0e36d0b171565e1aced56ba9f53ca3783406b5cacf
+ARG CMAKE_HASH=8ec0ef24375a1d0e78de2f790b4545d0718acc55fd7e2322ecb8e135696c77fe
 
 ARG BOOST_VERSION=1_84_0
 ARG BOOST_VERSION_DOT=1.84.0
@@ -68,8 +68,8 @@ ENV OPENSSL_ROOT_DIR=/root/openssl
 
 # Download CMake
 RUN set -ex \
-    && curl https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION_DOT}/cmake-${CMAKE_VERSION_DOT}-Linux-x86_64.sh -OL\
-    && echo "${CMAKE_HASH}  cmake-${CMAKE_VERSION_DOT}-Linux-x86_64.sh" | sha256sum -c
+    && curl https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION_DOT}/cmake-${CMAKE_VERSION_DOT}-linux-x86_64.sh -OL\
+    && echo "${CMAKE_HASH}  cmake-${CMAKE_VERSION_DOT}-linux-x86_64.sh" | sha256sum -c
 
 # Download Boost
 RUN set -ex \
