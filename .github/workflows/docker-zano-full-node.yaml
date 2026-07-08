@@ -1,4 +1,4 @@
-﻿name: Build & push zano-full-node docker image
+name: Build & push zano-full-node docker image
 
 on:
   workflow_dispatch:
