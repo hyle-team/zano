@@ -18,7 +18,7 @@
 #   docker stop zanod
 #
 # To build with different lib versions, pass through --build-arg's
-#   docker build --build-arg OPENSSL_VERSION_DOT=1.1.1n --build-arg OPENSSL_HASH=40dceb51a4f6a5275bde0e6bf20ef4b91bfc32ed57c0552e2e8e15463372b17a -f utils/docker/Dockerfile .
+#   docker build --build-arg BRANCH=master --build-arg OPENSSL_VERSION_DOT=1.1.1n --build-arg OPENSSL_HASH=40dceb51a4f6a5275bde0e6bf20ef4b91bfc32ed57c0552e2e8e15463372b17a -f utils/docker/Dockerfile .
 #
 # Available Build Args
 #   - CMake Version:    CMAKE_VERSION_DOT, CMAKE_HASH
@@ -115,11 +115,13 @@ FROM build-prep as build
 
 # Zano
 
+ARG BRANCH=master
+
 RUN pwd && mem_avail_gb=$(( $(getconf _AVPHYS_PAGES) * $(getconf PAGE_SIZE) / (1024 * 1024 * 1024) )) &&\
     make_job_slots=$(( $mem_avail_gb < 4 ? 1 : $mem_avail_gb / 4)) &&\
     echo make_job_slots=$make_job_slots &&\
     set -x &&\
-    git clone --single-branch --recursive https://github.com/hyle-team/zano.git &&\
+    git clone --single-branch --branch={BRANCH} --recursive https://github.com/hyle-team/zano.git &&\
     cd zano &&\
     mkdir build && cd build &&\
     cmake -D STATIC=TRUE .. &&\
