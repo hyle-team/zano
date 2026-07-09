@@ -29,21 +29,18 @@
 # Build Zano
 #
 
-FROM ubuntu:18.04 as build-prep
+FROM ubuntu:20.04 AS build-prep
 
-ENV DEBIAN_FRONTEND noninteractive
+ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt update && \
     apt install -y build-essential \
     libicu-dev \
     libz-dev \
     curl \
-    gcc-8 \
-    g++-8 \
+    gcc-9 \
+    g++-9 \
     git
-
-RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 700 --slave /usr/bin/g++ g++ /usr/bin/g++-7 && \
-    update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-8 800 --slave /usr/bin/g++ g++ /usr/bin/g++-8
 
 WORKDIR /root
 
@@ -53,13 +50,13 @@ ARG CMAKE_HASH=8ec0ef24375a1d0e78de2f790b4545d0718acc55fd7e2322ecb8e135696c77fe
 
 ARG BOOST_VERSION=1_84_0
 ARG BOOST_VERSION_DOT=1.84.0
-ARG BOOST_HASH=430ae8354789de4fd19ee52f3b1f739e1fba576f0aded0897c3c2bc00fb38778
+ARG BOOST_HASH=cc4b893acf645c9d4b698e9a0f08ca8846aa5d6c68275c14c3e7949c24109454
 
-ARG OPENSSL_VERSION_DOT=1.1.1w
-ARG OPENSSL_HASH=cf3098950cb4d853ad95c0841f1f9c6d3dc102dccfcacd521d93925208b76ac8
+ARG OPENSSL_VERSION_DOT=3.5.7
+ARG OPENSSL_HASH=a8c0d28a529ca480f9f36cf5792e2cd21984552a3c8e4aa11a24aa31aeac98e8
 
 # Environment Variables
-ENV BOOST_ROOT /root/boost_${BOOST_VERSION}
+ENV BOOST_ROOT=/root/boost_${BOOST_VERSION}
 ENV OPENSSL_ROOT_DIR=/root/openssl
 
 ##########################################################
@@ -80,7 +77,7 @@ RUN set -ex \
 
 
 # Download OpenSSL
-RUN curl https://www.openssl.org/source/openssl-${OPENSSL_VERSION_DOT}.tar.gz -OL \
+RUN curl https://github.com/openssl/openssl/releases/download/openssl-${OPENSSL_VERSION_DOT}/openssl-${OPENSSL_VERSION_DOT}.tar.gz -OL \
     &&  sha256sum openssl-${OPENSSL_VERSION_DOT}.tar.gz \
     && echo "${OPENSSL_HASH} openssl-${OPENSSL_VERSION_DOT}.tar.gz" | sha256sum -c
 
@@ -88,10 +85,10 @@ RUN curl https://www.openssl.org/source/openssl-${OPENSSL_VERSION_DOT}.tar.gz -O
 # Compile CMake
 RUN set -ex \
     && mkdir /opt/cmake \
-    && sh cmake-${CMAKE_VERSION_DOT}-Linux-x86_64.sh --prefix=/opt/cmake --skip-license\
+    && sh cmake-${CMAKE_VERSION_DOT}-linux-x86_64.sh --prefix=/opt/cmake --skip-license\
     && ln -s /opt/cmake/bin/cmake /usr/local/bin/cmake\
     && cmake --version\
-    && rm cmake-${CMAKE_VERSION_DOT}-Linux-x86_64.sh
+    && rm cmake-${CMAKE_VERSION_DOT}-linux-x86_64.sh
 
 # Compile Boost
 RUN set -ex \
@@ -104,14 +101,14 @@ RUN set -ex \
     && tar xaf openssl-${OPENSSL_VERSION_DOT}.tar.gz \
     && rm openssl-${OPENSSL_VERSION_DOT}.tar.gz \
     && cd openssl-${OPENSSL_VERSION_DOT} \
-    && ./config --prefix=/root/openssl --openssldir=/root/openssl shared zlib \
+    && ./config --prefix=/root/openssl --openssldir=/root/openssl --libdir=lib no-comp shared \
     && make \
     && make test \
-    && make install \
+    && make install_sw install_ssldirs \
     && cd .. \
     && rm -rf openssl-${OPENSSL_VERSION_DOT}
 
-FROM build-prep as build
+FROM build-prep AS build
 
 # Zano
 
@@ -132,7 +129,7 @@ RUN pwd && mem_avail_gb=$(( $(getconf _AVPHYS_PAGES) * $(getconf PAGE_SIZE) / (1
 # Run Zano
 #
 
-FROM ubuntu:18.04
+FROM ubuntu:20.04
 
 RUN useradd -ms /bin/bash zano &&\
     mkdir -p /home/zano/.Zano &&\
