@@ -38,3 +38,5 @@ jobs:
           tags: |
             zanoproject/zano-full-node:${{ github.event.inputs.image_tag }}
             zanoproject/zano-full-node:${{ github.event.inputs.branch }}
+          cache-from: type=registry,ref=zanoproject/zano-full-node:buildcache
+          cache-to:   type=registry,ref=zanoproject/zano-full-node:buildcache,mode=max
