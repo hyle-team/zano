@@ -6,7 +6,10 @@
 # Usage:
 # (make sure you have correct permission for /var/data/zano-data prior to run!)
 #
-#   docker run --restart=always -v /var/data/zano-data:/home/zano/.Zano -p 11121:11121 -p 11211:11211 --name=zanod -dit sowle/zano-full-node
+#   docker run --restart=always -v /var/data/zano-data:/home/zano/.Zano -p 0.0.0.0:11121:11121 -p 127.0.0.1:11211:11211 --name=zanod -dit zanoproject/zano-full-node
+#
+# (11121 - is the default P2P port, better to be accessible from outside; 11211 - is the default RPC port, should be protected, thus the binding addresses above)
+#
 #
 # To get into container and interact with the daemon:
 #   docker attach zanod
@@ -18,9 +21,10 @@
 #   docker stop zanod
 #
 # To build with different lib versions, pass through --build-arg's
-#   docker build --build-arg BRANCH=master --build-arg OPENSSL_VERSION_DOT=1.1.1n --build-arg OPENSSL_HASH=40dceb51a4f6a5275bde0e6bf20ef4b91bfc32ed57c0552e2e8e15463372b17a -f utils/docker/Dockerfile .
+#   docker build --build-arg BRANCH=release --build-arg OPENSSL_VERSION_DOT=3.5.7 --build-arg OPENSSL_HASH=a8c0d28a529ca480f9f36cf5792e2cd21984552a3c8e4aa11a24aa31aeac98e8 -f utils/docker/Dockerfile .
 #
 # Available Build Args
+#   - branch to use:    BRANCH
 #   - CMake Version:    CMAKE_VERSION_DOT, CMAKE_HASH
 #   - Boost Version:    BOOST_VERSION, BOOST_VERSION_DOT, BOOST_HASH
 #   - OpenSSL Version:  OPENSSL_VERSION_DOT, OPENSSL_HASH
@@ -103,7 +107,6 @@ RUN set -ex \
     && cd openssl-${OPENSSL_VERSION_DOT} \
     && ./config --prefix=/root/openssl --openssldir=/root/openssl --libdir=lib no-comp shared \
     && make \
-    && make test \
     && make install_sw install_ssldirs \
     && cd .. \
     && rm -rf openssl-${OPENSSL_VERSION_DOT}
@@ -114,7 +117,10 @@ FROM build-prep AS build
 
 ARG BRANCH=master
 
-RUN pwd && mem_avail_gb=$(( $(getconf _AVPHYS_PAGES) * $(getconf PAGE_SIZE) / (1024 * 1024 * 1024) )) &&\
+# CACHEBUST does nothing, just to enforce zano layer to rebuild each time, regardless of the cached settings / other layers
+ARG CACHEBUST=0
+
+RUN echo "cachebust=${CACHEBUST}" && pwd && mem_avail_gb=$(( $(getconf _AVPHYS_PAGES) * $(getconf PAGE_SIZE) / (1024 * 1024 * 1024) )) &&\
     make_job_slots=$(( $mem_avail_gb < 4 ? 1 : $mem_avail_gb / 4)) &&\
     echo make_job_slots=$make_job_slots &&\
     set -x &&\

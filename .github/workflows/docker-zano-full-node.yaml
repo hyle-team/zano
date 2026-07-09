@@ -34,6 +34,7 @@ jobs:
           push: true
           build-args: |
             BRANCH=${{ github.event.inputs.branch }}
+            CACHEBUST=${{ github.run_id }}
           tags: |
             zanoproject/zano-full-node:${{ github.event.inputs.image_tag }}
             zanoproject/zano-full-node:${{ github.event.inputs.branch }}
