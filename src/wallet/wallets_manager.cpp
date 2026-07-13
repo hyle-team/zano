@@ -1706,6 +1706,12 @@ std::string wallets_manager::transfer(uint64_t wallet_id, const view::transfer_p
     api_return_code_result
     );
   
+  if (api_return_code_result == API_RETURN_CODE_OK && !tr_res.tx_details.has_value())
+    return API_RETURN_CODE_INTERNAL_ERROR + std::string(" tx_details is absent, while return code is OK");
+
+  if (tr_res.tx_details.has_value())
+      res_tx = tr_res.tx_details->tx;
+
   return api_return_code_result;
 }
 
