@@ -6483,7 +6483,7 @@ bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, 
 
   CHECK_AND_ASSERT_MES(scan_contex.zc_outs.size() == zc_in.key_offsets.size(), false, "incorrect number of referenced outputs found: " << scan_contex.zc_outs.size() << ", while " << zc_in.key_offsets.size() << " is expected.");
   CHECK_AND_ASSERT_MES(in_index < tx.signatures.size(), false, "tx.signatures.size (" << tx.signatures.size() << ") is less than or equal to in_index (" << in_index << ")");
-  // TODO: consider additional checks here
+  CHECK_AND_ASSERT_MES(tx.signatures[in_index].type() == typeid(ZC_sig), false, "unexpected tx.signatures[" << in_index << "].type() != typeid(ZC_sig): " << tx.signatures[in_index].type().name());
 
   // build a ring of references
   vector<crypto::CLSAG_GGX_input_ref_t> ring;
