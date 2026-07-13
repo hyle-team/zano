@@ -336,6 +336,12 @@ namespace currency
     CHECK_CORE_READY();
     CHECK_RPC_LIMITS(req.block_ids.size(), RPC_LIMIT_COMMAND_RPC_GET_BLOCKS_DIRECT_BLOCK_IDS);
 
+    if (req.block_ids.empty())
+    {
+      res.status = API_RETURN_CODE_GENESIS_MISMATCH;
+      return true;
+    }
+
     if (req.block_ids.back() != m_core.get_blockchain_storage().get_block_id_by_height(0))
     {
       //genesis mismatch, return specific
@@ -375,6 +381,13 @@ namespace currency
     CHECK_CORE_READY();
     CHECK_RPC_LIMITS(req.block_ids.size(), RPC_LIMIT_COMMAND_RPC_GET_BLOCKS_DIRECT_BLOCK_IDS);
     LOG_PRINT_L2("[on_get_blocks]: Prevalidating....");
+
+    if (req.block_ids.empty())
+    {
+      res.status = API_RETURN_CODE_GENESIS_MISMATCH;
+      return true;
+    }
+
     if (req.block_ids.back() != m_core.get_blockchain_storage().get_block_id_by_height(0))
     {
       //genesis mismatch, return specific
@@ -1851,6 +1864,7 @@ namespace currency
     {
       error_resp.code = CORE_RPC_ERROR_CODE_TOO_BIG_HEIGHT;
       error_resp.message = std::string("To big height: ") + std::to_string(h) + ", current blockchain size = " +  std::to_string(m_core.get_current_blockchain_size());
+      return false;
     }
     res = string_tools::pod_to_hex(m_core.get_block_id_by_height(h));
     return true;
