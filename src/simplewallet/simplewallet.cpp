@@ -177,9 +177,8 @@ namespace
   public:
     message_writer(epee::log_space::console_colors color = epee::log_space::console_color_default, bool bright = false,
       std::string&& prefix = std::string(), int log_level = LOG_LEVEL_2)
-      : m_flush(true)
+      : m_bright(bright)
       , m_color(color)
-      , m_bright(bright)
       , m_log_level(log_level)
     {
       m_oss << prefix;
@@ -195,7 +194,6 @@ namespace
 #endif
       , m_color(std::move(rhs.m_color))
       , m_log_level(std::move(rhs.m_log_level))
-      , m_bright(false)
     {
       rhs.m_flush = false;
     }
@@ -221,11 +219,18 @@ namespace
       {
         m_flush = false;
 
-        LOG_PRINT(m_oss.str(), m_log_level)
-        epee::log_space::set_console_color(m_color, m_bright);
-        std::cout << m_oss.str();
-        epee::log_space::reset_console_color();
-        std::cout << std::endl;
+        if (m_print_to_log)
+        {
+          LOG_PRINT(m_oss.str(), m_log_level)
+        }
+
+        if (m_print_to_stdout)
+        {
+          epee::log_space::set_console_color(m_color, m_bright);
+          std::cout << m_oss.str();
+          epee::log_space::reset_console_color();
+          std::cout << std::endl;
+        }
       }
 
       NESTED_CATCH_ENTRY(__func__);
@@ -236,11 +241,13 @@ namespace
     message_writer& operator=(message_writer& rhs);
     message_writer& operator=(message_writer&& rhs);
 
-  private:
-    bool m_flush;
+  protected:
+    bool m_flush = true;
+    bool m_bright = false;
+    bool m_print_to_log = true;
+    bool m_print_to_stdout = true;
     std::stringstream m_oss;
     epee::log_space::console_colors m_color;
-    bool m_bright;
     int m_log_level;
   };
 
@@ -253,7 +260,25 @@ namespace
   {
     return message_writer(epee::log_space::console_color_red, true, "Error: ", LOG_LEVEL_0);
   }
-}
+
+  class message_writer_no_log : public message_writer
+  {
+  public:
+    message_writer_no_log(epee::log_space::console_colors color = epee::log_space::console_color_default, bool bright = false,
+      std::string&& prefix = std::string())
+      : message_writer(color, bright, std::move(prefix), LOG_LEVEL_0)
+    {
+      m_print_to_log = false;
+      m_print_to_stdout = true;
+    }
+  };
+
+  message_writer_no_log success_msg_writer_no_log(bool color = false)
+  {
+    return message_writer_no_log(color ? epee::log_space::console_color_green : epee::log_space::console_color_default, false, std::string());
+  }
+
+} // namespace
 
 void display_vote_info(tools::wallet2& w)
 {
@@ -2359,7 +2384,7 @@ bool simple_wallet::check_all_tx_keys(const std::vector<std::string> &args_)
       crypto::secret_key tx_secret_key{};
       if (m_wallet->get_tx_key(wti.tx_hash, tx_secret_key))
       {
-        message_writer(epee::log_space::console_color_green, true, "", LOG_LEVEL_0) << "tx " << wti.tx_hash << " @ " << wti.height << " : " << tx_secret_key;
+        message_writer_no_log(epee::log_space::console_color_green, true, "") << "tx " << wti.tx_hash << " @ " << wti.height << " : " << tx_secret_key;
         ++txs_with_known_key;
       }
       else
