@@ -9361,7 +9361,8 @@ bool blockchain_storage::validate_alt_block_txs(const block& b, const crypto::ha
     }
     const transaction& tx = it == abei.onboard_transactions.end() ? *tx_ptr : it->second;
 
-    CHECK_AND_ASSERT_MES(tx.signatures.size() == tx.vin.size(), false, "invalid tx: signatures.size() == " <<  tx.signatures.size() << ", tx.vin.size() == " << tx.vin.size());
+    CHECK_AND_ASSERT_MES(tx.signatures.size() == tx.vin.size(), false, "invalid alt block tx " << tx_id << ": signatures.size() == " <<  tx.signatures.size() << ", tx.vin.size() == " << tx.vin.size());
+    CHECK_AND_ASSERT_MES(validate_tx_semantic(tx, get_object_blobsize(tx), tx_id), false, "invalid alt block tx " << tx_id << ": semantic validation failed");
 
     fees.push_back(get_tx_fee(tx));
 
