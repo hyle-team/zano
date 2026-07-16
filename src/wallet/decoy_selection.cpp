@@ -56,28 +56,39 @@ double map_uint_to_double(uint64_t u) {
   return y / TWO64f;
 }
 
+// draws a single scaled height from the CDF
+uint64_t sample_height_from_distribution(const std::map<double, uint64_t>& mapping)
+{
+  uint64_t r = 0;
+  crypto::generate_random_bytes(sizeof(r), &r);
+  double r_ = map_uint_to_double(r);
+  auto it = mapping.upper_bound(r_);
+  if (it == mapping.end())
+  {
+    throw(std::runtime_error(std::string("_r not found in m_distribution_mapping: ") + std::to_string(r_)));
+  }
+  uint64_t h = it->second;
+  crypto::generate_random_bytes(sizeof(r), &r);
+  if (it != mapping.begin())
+  {
+    uint64_t h_0 = (--it)->second;
+    h = h_0 + r % (h - h_0) + 1; // uniform in (h_0, h]
+  }
+  else
+  {
+    h = r % (h + 1); // uniform in [0, h] youngest bin, includes age 0
+  }
+  return h;
+}
+
 std::vector<uint64_t> decoy_selection_generator::generate_distribution(uint64_t count)
 {
   std::vector<uint64_t> res;
   for (size_t i = 0; i != count; i++)
   {
-    uint64_t r = 0;
-    crypto::generate_random_bytes(sizeof(r), &r);
-    double r_ = map_uint_to_double(r);
-    auto it = m_distribution_mapping.upper_bound(r_);
-    if (it == m_distribution_mapping.end())
-    {
-      throw(std::runtime_error(std::string("_r not found in m_distribution_mapping: ") + std::to_string(r_) ));
-    }
-    uint64_t h = it->second;
-    if (it != m_distribution_mapping.begin())
-    {
-      uint64_t h_0 = (--it)->second;
-      crypto::generate_random_bytes(sizeof(r), &r);
-      h = h_0 + r % (h - h_0) + 1;
-    }
     //scale from nominal to max_h
-    res.push_back(h);  }
+    res.push_back(sample_height_from_distribution(m_distribution_mapping));
+  }
   return res;
 }
 
@@ -115,23 +126,8 @@ void decoy_selection_generator::generate_unique_reversed_distribution(uint64_t c
       throw std::runtime_error("generate_distribution_set: attempt_count hit DECOY_SELECTION_GENERATOR_MAX_ITERATIONS");
     }
 
-    uint64_t r = 0;
-    crypto::generate_random_bytes(sizeof(r), &r);
-    double r_ = map_uint_to_double(r);
-    auto it = m_distribution_mapping.upper_bound(r_);
-    if (it == m_distribution_mapping.end())
-    {
-      throw(std::runtime_error(std::string("_r not found in m_distribution_mapping: ") + std::to_string(r_)));
-    }
-    uint64_t h = it->second;
-    if (it != m_distribution_mapping.begin())
-    {
-      uint64_t h_0 = (--it)->second;
-      crypto::generate_random_bytes(sizeof(r), &r);
-      h = h_0 + r % (h - h_0) + 1;
-    }
     //scale from nominal to max_h
-    set_to_extend.insert(m_max - h);
+    set_to_extend.insert(m_max - sample_height_from_distribution(m_distribution_mapping));
   }
 }
 
@@ -179,17 +175,27 @@ bool decoy_selection_generator::load_distribution(const std::vector<decoy_select
   }
   
 
+  // first derived entry is always {h = 0, ...} the youngest nominal age maps to scaled height 0
+  const size_t first_bin = (derived_distribution.size() >= 2 && derived_distribution[0].h == 0) ? 1 : 0;
+
+  auto bin_width = [&](size_t i) -> uint64_t
+  {
+    if (i == first_bin)
+      return derived_distribution[i].h + 1;
+    return get_distance(derived_distribution, i);
+  };
+
   double total_v = 0;
 
-  for (size_t i = 0; i != derived_distribution.size(); i++)
+  for (size_t i = first_bin; i != derived_distribution.size(); i++)
   {
-    total_v += derived_distribution[i].v * get_distance(derived_distribution, i);
+    total_v += derived_distribution[i].v * bin_width(i);
   }
 
   double summ_current = 0;
-  for (size_t i = 0; i != derived_distribution.size(); i++)
+  for (size_t i = first_bin; i != derived_distribution.size(); i++)
   {
-    double k = (derived_distribution[i].v * get_distance(derived_distribution, i))/ total_v;
+    double k = (derived_distribution[i].v * bin_width(i))/ total_v;
     summ_current += k;
     m_distribution_mapping[summ_current] = derived_distribution[i].h;
   }
