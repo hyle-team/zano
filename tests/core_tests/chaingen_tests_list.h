@@ -50,3 +50,5 @@
 #include "pos_fuse_test.h"
 #include "daemon_rpc.h"
 #include "gbt_pool_invalid_txs.h"
+#include "gw_register_output_rollback_test.h"
+
