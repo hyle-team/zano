@@ -19,7 +19,7 @@ Be sure to clone the repository properly:\
 | [XCode](https://developer.apple.com/downloads/) (macOS) | 12.3 | 14.3 | 15.2 |
 | [CMake](https://cmake.org/download/) | 3.26.3 | 3.26.3 | 3.31.6 |
 | [Boost](https://www.boost.org/users/download/) | 1.75 | 1.84 | 1.84 |
-| [OpenSSL](https://www.openssl.org/source/) [(win)](https://slproweb.com/products/Win32OpenSSL.html) | 1.1.1n | 1.1.1w | 3.4 | 
+| [OpenSSL](https://www.openssl.org/source/) [(win)](https://slproweb.com/products/Win32OpenSSL.html) | 1.1.1n | 3.5.7 | 3.5.7 | 
 | [Qt](https://download.qt.io/archive/qt/) (*only for GUI*) | 5.8.0 | 5.15.2 | 5.15.2 |
 
 Note:\
@@ -77,14 +77,15 @@ Recommended OS versions: Ubuntu 20.04, 22.04 LTS.
 
 6. Install OpenSSL
 
-   We recommend installing OpenSSL v1.1.1w locally unless you would like to use the same version system-wide.\
+   We recommend installing OpenSSL v3.5.7 LTS locally unless you would like to use the same version system-wide.\
    (Assuming that `$HOME` environment variable is set to your home directory. Otherwise, edit line 4 accordingly.)
 
-       curl -OL https://www.openssl.org/source/openssl-1.1.1w.tar.gz
-       echo "cf3098950cb4d853ad95c0841f1f9c6d3dc102dccfcacd521d93925208b76ac8  openssl-1.1.1w.tar.gz" | shasum -c && tar xaf openssl-1.1.1w.tar.gz 
-       cd openssl-1.1.1w/
-       ./config --prefix=$HOME/openssl --openssldir=$HOME/openssl shared zlib
-       make && make test && make install && cd ..
+       curl -OL https://github.com/openssl/openssl/releases/download/openssl-3.5.7/openssl-3.5.7.tar.gz
+       echo "a8c0d28a529ca480f9f36cf5792e2cd21984552a3c8e4aa11a24aa31aeac98e8  openssl-3.5.7.tar.gz" | sha256sum -c && tar xaf openssl-3.5.7.tar.gz
+       cd openssl-3.5.7
+       ./config --prefix=$HOME/openssl --openssldir=$HOME/openssl --libdir=lib no-comp shared
+       make && make test && make install_sw install_ssldirs && cd ..
+
 
 
 7. [*OPTIONAL*] Set global environment variables for convenient use\
