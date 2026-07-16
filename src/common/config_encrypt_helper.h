@@ -20,7 +20,7 @@ namespace tools
 {
   namespace details
   {
-    static const uint64_t APP_DATA_FILE_BINARY_SIGNATURE_V2 = 0x1000111301101011ULL;
+    static const uint64_t APP_DATA_FILE_BINARY_SIGNATURE_V2 = 0x1010110201101011ULL;
     static const uint16_t APP_DATA_FILE_BINARY_VERSION_V2 = 2;
     static const size_t APP_DATA_FILE_BINARY_MAC_SIZE_V2 = 16;
   }
