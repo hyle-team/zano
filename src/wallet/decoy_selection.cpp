@@ -147,8 +147,15 @@ bool decoy_selection_generator::load_distribution(const std::vector<decoy_select
 
   //do prescale of distribution
   std::vector<decoy_selection_generator::distribution_entry> derived_distribution;
+
+  // scaler need to properly scale from distance that stored in the source code, to current distance. 
+  // the scale is non-linear: the first part of the distribution should scale one to one and last part should actually be stretched.
   scaler scl;
+
+  // adjustment_value(normally it's 10) - shifting to minimal confirmations number
   uint64_t adjustment_value = original_distribution[0].h;
+  
+  // config the scale - from original distribution to current max_h
   scl.config_scale(original_distribution.back().h - adjustment_value, max_h);
 
   uint64_t  last_scaled_h = 0;
@@ -159,6 +166,10 @@ bool decoy_selection_generator::load_distribution(const std::vector<decoy_select
   {
     if (i == original_distribution.size()  || (scl.scale(original_distribution[i].h - adjustment_value) != last_scaled_h && last_scaled_array.size()))
     {
+      // if during scaling few items from original distribution projected to one item in derived distribution, 
+      // we need to take average of those items and put it to derived distribution. Might be happening only when destination 
+      // max_h is less than original distribution max_h.
+
       //put avg to data_scaled
       double summ = 0;
       for (auto item: last_scaled_array)
@@ -179,6 +190,12 @@ bool decoy_selection_generator::load_distribution(const std::vector<decoy_select
   }
   
 
+
+  // now we re-map distribution in a way that heights items are distributed based on their weight along the flat X.
+  // this means that first height items (that are heavier) would occupy more space on the X axis, and less heavy items would occupy less space.
+  // then when random number generated, the chances woule be according to the sapce occupied on the X axis, which is exactly what we need.
+
+  // first we calclute total weight mapped to distance, then we calculate cumulative sum of each item weight mapped to distance, and then we map it to the X axis.
   double total_v = 0;
 
   for (size_t i = 0; i != derived_distribution.size(); i++)
@@ -186,6 +203,7 @@ bool decoy_selection_generator::load_distribution(const std::vector<decoy_select
     total_v += derived_distribution[i].v * get_distance(derived_distribution, i);
   }
 
+  // now we map cumulative sum to the X axis, and store it in m_distribution_mapping
   double summ_current = 0;
   for (size_t i = 0; i != derived_distribution.size(); i++)
   {
