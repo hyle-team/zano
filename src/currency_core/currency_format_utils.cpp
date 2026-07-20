@@ -5040,6 +5040,35 @@ namespace currency
     }
   }
   //------------------------------------------------------------------
+#define GATEWAY_ADDRESS_META_INFO_MAX_SIZE  4000
+
+  STATIC_CHECK_TYPE_TOTAL_FIELDS(gateway_address_descriptor_base, 4, "this is the reminder: check validate_gateway_descriptor_base_limits() for missing fields");
+  
+  bool validate_gateway_descriptor_base_limits(const gateway_address_descriptor_base& gadb)
+  {
+    CHECK_AND_ASSERT_MES(gadb.meta_info.size() <= GATEWAY_ADDRESS_META_INFO_MAX_SIZE, false, "gw meta_info is too long: " << gadb.meta_info.size());
+
+    CHECK_AND_ASSERT_MES(gadb.etc.empty(), false, "gw etc isn't empty");
+
+    return true;
+  }
+  //------------------------------------------------------------------
+  bool validate_gateway_descriptor_operation_limits(const gateway_address_descriptor_operation& gado)
+  {
+    VARIANT_SWITCH_BEGIN(gado.operation)
+      VARIANT_CASE_CONST(gateway_address_descriptor_operation_register, gado_reg)
+        if (!validate_gateway_descriptor_base_limits(gado_reg.descriptor))
+          return false;
+      VARIANT_CASE_CONST(gateway_address_descriptor_operation_update, gado_upd)
+        if (!validate_gateway_descriptor_base_limits(gado_upd.descriptor))
+          return false;
+      VARIANT_CASE_OTHER()
+        LOG_ERROR("unsupported gw operation: " << gado.operation.type().name());
+        return false;
+    VARIANT_SWITCH_END()
+    return true;
+  }
+  //------------------------------------------------------------------
   std::string dump_ring_sig_data(const crypto::hash& hash_for_sig, const crypto::key_image& k_image, const std::vector<const crypto::public_key*>& output_keys_ptrs, const std::vector<crypto::signature>& sig)
   {
     std::stringstream s;

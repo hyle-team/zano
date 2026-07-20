@@ -280,6 +280,8 @@ namespace currency
   bool validate_asset_full_name(const std::string& full_name);
   bool validate_asset_ticker_full_name_and_meta_info(const asset_descriptor_base& adb);
   void replace_asset_ticker_and_full_name_if_invalid(asset_descriptor_base& adb, const crypto::public_key& asset_id);
+  bool validate_gateway_descriptor_base_limits(const gateway_address_descriptor_base& gadb);
+  bool validate_gateway_descriptor_operation_limits(const gateway_address_descriptor_operation& gado);
 
   //---------------------------------------------------------------
   bool construct_miner_tx(size_t height, size_t median_size, const boost::multiprecision::uint128_t& already_generated_coins, 

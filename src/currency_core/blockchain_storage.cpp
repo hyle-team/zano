@@ -7199,6 +7199,10 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
       bool has_legacy_pid = has_tx_wide_payment_id(tx);
       CHECK_AND_ASSERT_MES(!has_legacy_pid, false, "legacy tx-wide payment ID is incompatible with gateway outputs");
     }
+
+    gateway_address_descriptor_operation gado{};
+    if (get_type_in_variant_container<gateway_address_descriptor_operation>(tx.extra, gado))
+      CHECK_AND_ASSERT_MES(validate_gateway_descriptor_operation_limits(gado), false, "transaction has invalid gateway descriptor");
   }
 
 

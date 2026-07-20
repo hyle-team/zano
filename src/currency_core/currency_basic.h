@@ -1072,7 +1072,6 @@ namespace currency
 
     BEGIN_VERSIONED_SERIALIZE(0, version)
       FIELD(owner_key)
-      //  FIELD(view_key)
       FIELD(etc)
       FIELD(meta_info)
     END_SERIALIZE()
