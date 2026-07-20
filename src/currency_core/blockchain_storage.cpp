@@ -5393,11 +5393,15 @@ bool blockchain_storage::change_gateway_balance(const crypto::hash& tx_id, const
     balance_entry.amount -= amount;
   }
 
-  //update db
-  m_db_gateway_addresses.set(gw_addr, gw_addr_entry);
+  // update db (but only if there's smth to change)
+  if (balance_before != balance_entry.amount)
+  {
+    m_db_gateway_addresses.set(gw_addr, gw_addr_entry);
 
-  // for debugging
-  LOG_PRINT_L0("gateway address " << gw_addr_str << ", balance changed: " << balance_before << " -> " << balance_entry.amount << " (" << (increase ? "+" : "-") << amount << "), asset_id: " << asset_id);
+    // for debugging
+    LOG_PRINT_L0("gateway address " << gw_addr_str << ", balance changed: " << balance_before << " -> " << balance_entry.amount << " (" << (increase ? "+" : "-") << amount << "), asset_id: " << asset_id);
+  }
+
   return true;
 }
 
