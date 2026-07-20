@@ -1347,7 +1347,7 @@ namespace currency
     return true;
   }  
   //---------------------------------------------------------------
-  bool validate_ado_update_allowed(const asset_descriptor_base& new_ado, const asset_descriptor_base& prev_ado)
+  bool validate_ado_update_allowed(const asset_descriptor_base& new_ado, const asset_descriptor_base& prev_ado, bool hf6_active /* = false */)
   {
     if (new_ado.total_max_supply != prev_ado.total_max_supply) return false;
     if (new_ado.current_supply > prev_ado.total_max_supply) return false;
@@ -1357,13 +1357,17 @@ namespace currency
     //a.meta_info;
     //if (a.owner != b.owner) return false;
     if (new_ado.hidden_supply != prev_ado.hidden_supply) return false;
+    if (hf6_active && !validate_asset_meta_info(new_ado.meta_info)) return false; // ticker and full_name are fixed, thus only meta_info here
     
     return true;
   }
   //---------------------------------------------------------------
-  bool validate_ado_initial(const asset_descriptor_base& new_ado)
+  bool validate_ado_initial(const asset_descriptor_base& new_ado, bool hf6_active /* = false */)
   {
-    if (new_ado.current_supply > new_ado.total_max_supply) return false;
+    if (new_ado.current_supply > new_ado.total_max_supply)
+      return false;
+    if (hf6_active && !validate_asset_ticker_full_name_and_meta_info(new_ado))
+      return false;
     return true;
   }
   //---------------------------------------------------------------

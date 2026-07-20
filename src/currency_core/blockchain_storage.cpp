@@ -4846,7 +4846,9 @@ bool blockchain_storage::validate_asset_operation_hf4(asset_op_verification_cont
 bool blockchain_storage::validate_asset_operation_hf5(asset_op_verification_context& avc) const
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
-  CHECK_AND_ASSERT_MES(is_hardfork_active_for_height(ZANO_HARDFORK_05, avc.height), false, "validate_asset_operation was called before HF5");
+  bool hf5_active = is_hardfork_active_for_height(ZANO_HARDFORK_05, avc.height);
+  bool hf6_active = is_hardfork_active_for_height(ZANO_HARDFORK_06, avc.height);
+  CHECK_AND_ASSERT_MES(hf5_active, false, "validate_asset_operation was called before HF5");
 
   CHECK_AND_ASSERT_MES(get_or_calculate_asset_id(avc.ado, &avc.asset_id_pt, &avc.asset_id), false, "get_or_calculate_asset_id failed");
   avc.asset_op_history = m_db_assets.find(avc.asset_id);
@@ -4861,7 +4863,7 @@ bool blockchain_storage::validate_asset_operation_hf5(asset_op_verification_cont
     CHECK_AND_ASSERT_MES(ado.opt_descriptor.has_value(), false, "opt_descriptor is missing while registering asset " << avc.asset_id);
     avc.amount_to_validate = ado.opt_descriptor.get().current_supply;
     // HF5 specific
-    CHECK_AND_ASSERT_MES(validate_ado_initial(ado.opt_descriptor.get()), false, "validate_ado_initial failed!");
+    CHECK_AND_ASSERT_MES(validate_ado_initial(ado.opt_descriptor.get(), hf6_active), false, "validate_ado_initial failed!");
     CHECK_AND_ASSERT_MES(ado.opt_amount.has_value() && avc.amount_to_validate == ado.opt_amount.get(), false, "opt_amount is missing or incorrect");
   }
   else
@@ -4884,7 +4886,7 @@ bool blockchain_storage::validate_asset_operation_hf5(asset_op_verification_cont
       CHECK_AND_ASSERT_MES(ado.opt_descriptor.has_value(), false, "opt_descriptor is missing (update)");
       //check that total current_supply haven't changed
       CHECK_AND_ASSERT_MES(ado.opt_descriptor.get().current_supply == last_adb.current_supply, false, "update operation attempted to change emission, failed");
-      CHECK_AND_ASSERT_MES(validate_ado_update_allowed(ado.opt_descriptor.get(), last_adb), false, "update operation modifies asset descriptor in a prohibited manner");
+      CHECK_AND_ASSERT_MES(validate_ado_update_allowed(ado.opt_descriptor.get(), last_adb, hf6_active), false, "update operation modifies asset descriptor in a prohibited manner");
       need_to_validate_ao_amount_commitment = false;
     }
     else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT)
@@ -4938,7 +4940,7 @@ bool blockchain_storage::validate_asset_operation(asset_op_verification_context&
 {
   if (is_hardfork_active_for_height(ZANO_HARDFORK_05, height))
   {
-    return validate_asset_operation_hf5(avc);
+    return validate_asset_operation_hf5(avc); // HF5, HF6
   }
   else
   {
