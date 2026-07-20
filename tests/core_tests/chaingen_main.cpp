@@ -1345,6 +1345,7 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY(gw_addr_altchain_created_in_fork);
     GENERATE_AND_PLAY(gw_addr_altchain_no_cross_chain_usage);
     GENERATE_AND_PLAY(gw_addr_altchain_owner_change);
+    GENERATE_AND_PLAY(gw_addr_register_output_rollback);
 
     GENERATE_AND_PLAY_HF(isolate_auditable_and_proof, "2-*");
     
