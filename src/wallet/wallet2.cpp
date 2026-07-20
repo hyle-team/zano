@@ -6001,7 +6001,7 @@ void wallet2::register_gateway_address(const wallet_public::COMMAND_GATEWAY_REGI
 void wallet2::deploy_new_asset(const currency::asset_descriptor_base& asset_info, const std::vector<currency::tx_destination_entry>& destinations, currency::finalized_tx& ft, crypto::public_key& new_asset_id)
 {
   WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(asset_info.decimal_point <= 18, "too big decimal point: " << (int)asset_info.decimal_point);
-  WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(validate_asset_ticker_and_full_name(asset_info), "ticker or full_name are invalid (perhaps they contain invalid symbols)");
+  WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(validate_asset_ticker_full_name_and_meta_info(asset_info), "ticker or full_name are invalid (perhaps they contain invalid symbols)");
 
   asset_descriptor_operation asset_reg_info{};
   fill_ado_version_based_onhardfork(asset_reg_info);

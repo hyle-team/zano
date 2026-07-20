@@ -2611,7 +2611,7 @@ bool simple_wallet::deploy_new_asset(const std::vector<std::string> &args)
     return true;
   }
 
-  if (!validate_asset_ticker_and_full_name(adb))
+  if (!validate_asset_ticker_full_name_and_meta_info(adb))
   {
     fail_msg_writer() << "ticker or full_name are invalid (perhaps they contain invalid symbols)";
     return true;

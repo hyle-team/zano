@@ -278,7 +278,7 @@ namespace currency
   const char* get_asset_operation_type_string(size_t asset_operation_type, bool short_name = false);
   bool validate_asset_ticker(const std::string& ticker);
   bool validate_asset_full_name(const std::string& full_name);
-  bool validate_asset_ticker_and_full_name(const asset_descriptor_base& adb);
+  bool validate_asset_ticker_full_name_and_meta_info(const asset_descriptor_base& adb);
   void replace_asset_ticker_and_full_name_if_invalid(asset_descriptor_base& adb, const crypto::public_key& asset_id);
 
   //---------------------------------------------------------------

@@ -5014,7 +5014,7 @@ namespace currency
     return true;
   }
   //------------------------------------------------------------------
-  bool validate_asset_ticker_and_full_name(const asset_descriptor_base& adb)
+  bool validate_asset_ticker_full_name_and_meta_info(const asset_descriptor_base& adb)
   {
     if (!validate_asset_ticker(adb.ticker))
       return false;
@@ -5025,8 +5025,6 @@ namespace currency
     if(!validate_asset_meta_info(adb.meta_info))
       return false;
 
-    //CHECK_AND_ASSERT_MES(validate_asset_ticker(adb.ticker), false, "asset's ticker isn't valid: " << adb.ticker);
-    //CHECK_AND_ASSERT_MES(validate_asset_full_name(adb.full_name), false, "asset's full_name isn't valid: " << adb.full_name);
     return true;
   }
   //------------------------------------------------------------------
