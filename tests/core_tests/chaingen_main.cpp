@@ -1190,6 +1190,7 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY_HF(wallet_rpc_gateway_reorg_spend, "6-*");
     GENERATE_AND_PLAY_HF(wallet_rpc_gateway_reorg_receive, "6-*");
     GENERATE_AND_PLAY_HF(wallet_rpc_gateway_owner_change_altchain, "6-*");
+    GENERATE_AND_PLAY_HF(wallet_rpc_gateway_limits, "6-*");
     GENERATE_AND_PLAY_HF(wallet_rpc_and_tx_unlock_time, "5-*");
     GENERATE_AND_PLAY_HF(wallet_rpc_sweep_below, "4-*");
     GENERATE_AND_PLAY_HF(wallet_rpc_sweep_below_wo_native, "4-*");
@@ -1387,12 +1388,14 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY_HF(hard_fork_6_and_self_directed_tx_with_payment_id, "6-*");
     GENERATE_AND_PLAY(hard_fork_6_coinbase_size_rules);
     GENERATE_AND_PLAY_HF(hard_fork_6_gw_incompatible_with_mode_separate, "6-*");
+    GENERATE_AND_PLAY(hard_fork_6_asset_descriptor_limits);
 
     // GW address alt-chain tests
     GENERATE_AND_PLAY(gw_addr_altchain_spend_in_both_chains);
     GENERATE_AND_PLAY(gw_addr_altchain_created_in_fork);
     GENERATE_AND_PLAY(gw_addr_altchain_no_cross_chain_usage);
     GENERATE_AND_PLAY(gw_addr_altchain_owner_change);
+    GENERATE_AND_PLAY(gw_addr_register_output_rollback);
 
     GENERATE_AND_PLAY_HF(isolate_auditable_and_proof, "2-*");
     

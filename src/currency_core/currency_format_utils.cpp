@@ -1347,7 +1347,7 @@ namespace currency
     return true;
   }  
   //---------------------------------------------------------------
-  bool validate_ado_update_allowed(const asset_descriptor_base& new_ado, const asset_descriptor_base& prev_ado)
+  bool validate_ado_update_allowed(const asset_descriptor_base& new_ado, const asset_descriptor_base& prev_ado, bool hf6_active /* = false */)
   {
     if (new_ado.total_max_supply != prev_ado.total_max_supply) return false;
     if (new_ado.current_supply > prev_ado.total_max_supply) return false;
@@ -1357,13 +1357,17 @@ namespace currency
     //a.meta_info;
     //if (a.owner != b.owner) return false;
     if (new_ado.hidden_supply != prev_ado.hidden_supply) return false;
+    if (hf6_active && !validate_asset_meta_info(new_ado.meta_info)) return false; // ticker and full_name are fixed, thus only meta_info here
     
     return true;
   }
   //---------------------------------------------------------------
-  bool validate_ado_initial(const asset_descriptor_base& new_ado)
+  bool validate_ado_initial(const asset_descriptor_base& new_ado, bool hf6_active /* = false */)
   {
-    if (new_ado.current_supply > new_ado.total_max_supply) return false;
+    if (new_ado.current_supply > new_ado.total_max_supply)
+      return false;
+    if (hf6_active && !validate_asset_ticker_full_name_and_meta_info(new_ado))
+      return false;
     return true;
   }
   //---------------------------------------------------------------
@@ -5023,7 +5027,7 @@ namespace currency
     return true;
   }
   //------------------------------------------------------------------
-  bool validate_asset_ticker_and_full_name(const asset_descriptor_base& adb)
+  bool validate_asset_ticker_full_name_and_meta_info(const asset_descriptor_base& adb)
   {
     if (!validate_asset_ticker(adb.ticker))
       return false;
@@ -5034,8 +5038,6 @@ namespace currency
     if(!validate_asset_meta_info(adb.meta_info))
       return false;
 
-    //CHECK_AND_ASSERT_MES(validate_asset_ticker(adb.ticker), false, "asset's ticker isn't valid: " << adb.ticker);
-    //CHECK_AND_ASSERT_MES(validate_asset_full_name(adb.full_name), false, "asset's full_name isn't valid: " << adb.full_name);
     return true;
   }
   //------------------------------------------------------------------
@@ -5049,6 +5051,35 @@ namespace currency
       std::string abcd = crypto::pod_to_hex(asset_id).substr(60, 4); // last 4 hex chars
       adb.full_name = "#bad asset name " + abcd + "#";
     }
+  }
+  //------------------------------------------------------------------
+#define GATEWAY_ADDRESS_META_INFO_MAX_SIZE  4000
+
+  STATIC_CHECK_TYPE_TOTAL_FIELDS(gateway_address_descriptor_base, 4, "this is the reminder: check validate_gateway_descriptor_base_limits() for missing fields");
+  
+  bool validate_gateway_descriptor_base_limits(const gateway_address_descriptor_base& gadb)
+  {
+    CHECK_AND_ASSERT_MES(gadb.meta_info.size() <= GATEWAY_ADDRESS_META_INFO_MAX_SIZE, false, "gw meta_info is too long: " << gadb.meta_info.size());
+
+    CHECK_AND_ASSERT_MES(gadb.etc.empty(), false, "gw etc isn't empty");
+
+    return true;
+  }
+  //------------------------------------------------------------------
+  bool validate_gateway_descriptor_operation_limits(const gateway_address_descriptor_operation& gado)
+  {
+    VARIANT_SWITCH_BEGIN(gado.operation)
+      VARIANT_CASE_CONST(gateway_address_descriptor_operation_register, gado_reg)
+        if (!validate_gateway_descriptor_base_limits(gado_reg.descriptor))
+          return false;
+      VARIANT_CASE_CONST(gateway_address_descriptor_operation_update, gado_upd)
+        if (!validate_gateway_descriptor_base_limits(gado_upd.descriptor))
+          return false;
+      VARIANT_CASE_OTHER()
+        LOG_ERROR("unsupported gw operation: " << gado.operation.type().name());
+        return false;
+    VARIANT_SWITCH_END()
+    return true;
   }
   //------------------------------------------------------------------
   std::string dump_ring_sig_data(const crypto::hash& hash_for_sig, const crypto::key_image& k_image, const std::vector<const crypto::public_key*>& output_keys_ptrs, const std::vector<crypto::signature>& sig)

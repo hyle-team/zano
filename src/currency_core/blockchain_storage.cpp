@@ -1060,13 +1060,16 @@ bool blockchain_storage::purge_transaction_from_blockchain(const crypto::hash& t
 
   fee = get_tx_fee(tx_res_ptr->tx);
   purge_transaction_keyimages_from_blockchain(tx, true);
-  
-  bool r = unprocess_blockchain_tx_extra(tx, tx_res_ptr->m_keeper_block_height, tx_id);
-  CHECK_AND_ASSERT_MES(r, false, "failed to unprocess_blockchain_tx_extra for tx " << tx_id);
- 
-  r = unprocess_blockchain_tx_attachments(tx, get_current_blockchain_size(), 0/*TODO: add valid timestamp here in future if need*/);
+
+  bool res_pop_gi = pop_transaction_from_global_index(tx, tx_id);
+  CHECK_AND_ASSERT_MES_NO_RET(res_pop_gi, "serious internal error: pop_transaction_from_global_index() failed for tx " << tx_id);
+
+  bool r = unprocess_blockchain_tx_attachments(tx, get_current_blockchain_size(), 0/*TODO: add valid timestamp here in future if need*/);
 
   unprocess_tx_gateway_history(tx_id, tx_);
+  
+  r = unprocess_blockchain_tx_extra(tx, tx_res_ptr->m_keeper_block_height, tx_id);
+  CHECK_AND_ASSERT_MES(r, false, "failed to unprocess_blockchain_tx_extra for tx " << tx_id);
 
   bool added_to_the_pool = false;
   if(!is_coinbase(tx))
@@ -1075,8 +1078,6 @@ bool blockchain_storage::purge_transaction_from_blockchain(const crypto::hash& t
     added_to_the_pool = m_tx_pool.add_tx(tx, tvc, true, true);
   }
 
-  bool res_pop_gi = pop_transaction_from_global_index(tx, tx_id);
-  CHECK_AND_ASSERT_MES_NO_RET(res_pop_gi, "serious internal error: pop_transaction_from_global_index() failed for tx " << tx_id);
   bool res_erase = m_db_transactions.erase_validate(tx_id);
   CHECK_AND_ASSERT_MES_NO_RET(res_erase, "serious internal error: m_transactions.erase_validate() failed for tx " << tx_id);
 
@@ -4845,7 +4846,9 @@ bool blockchain_storage::validate_asset_operation_hf4(asset_op_verification_cont
 bool blockchain_storage::validate_asset_operation_hf5(asset_op_verification_context& avc) const
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
-  CHECK_AND_ASSERT_MES(is_hardfork_active_for_height(ZANO_HARDFORK_05, avc.height), false, "validate_asset_operation was called before HF5");
+  bool hf5_active = is_hardfork_active_for_height(ZANO_HARDFORK_05, avc.height);
+  bool hf6_active = is_hardfork_active_for_height(ZANO_HARDFORK_06, avc.height);
+  CHECK_AND_ASSERT_MES(hf5_active, false, "validate_asset_operation was called before HF5");
 
   CHECK_AND_ASSERT_MES(get_or_calculate_asset_id(avc.ado, &avc.asset_id_pt, &avc.asset_id), false, "get_or_calculate_asset_id failed");
   avc.asset_op_history = m_db_assets.find(avc.asset_id);
@@ -4860,7 +4863,7 @@ bool blockchain_storage::validate_asset_operation_hf5(asset_op_verification_cont
     CHECK_AND_ASSERT_MES(ado.opt_descriptor.has_value(), false, "opt_descriptor is missing while registering asset " << avc.asset_id);
     avc.amount_to_validate = ado.opt_descriptor.get().current_supply;
     // HF5 specific
-    CHECK_AND_ASSERT_MES(validate_ado_initial(ado.opt_descriptor.get()), false, "validate_ado_initial failed!");
+    CHECK_AND_ASSERT_MES(validate_ado_initial(ado.opt_descriptor.get(), hf6_active), false, "validate_ado_initial failed!");
     CHECK_AND_ASSERT_MES(ado.opt_amount.has_value() && avc.amount_to_validate == ado.opt_amount.get(), false, "opt_amount is missing or incorrect");
   }
   else
@@ -4883,7 +4886,7 @@ bool blockchain_storage::validate_asset_operation_hf5(asset_op_verification_cont
       CHECK_AND_ASSERT_MES(ado.opt_descriptor.has_value(), false, "opt_descriptor is missing (update)");
       //check that total current_supply haven't changed
       CHECK_AND_ASSERT_MES(ado.opt_descriptor.get().current_supply == last_adb.current_supply, false, "update operation attempted to change emission, failed");
-      CHECK_AND_ASSERT_MES(validate_ado_update_allowed(ado.opt_descriptor.get(), last_adb), false, "update operation modifies asset descriptor in a prohibited manner");
+      CHECK_AND_ASSERT_MES(validate_ado_update_allowed(ado.opt_descriptor.get(), last_adb, hf6_active), false, "update operation modifies asset descriptor in a prohibited manner");
       need_to_validate_ao_amount_commitment = false;
     }
     else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT)
@@ -4937,7 +4940,7 @@ bool blockchain_storage::validate_asset_operation(asset_op_verification_context&
 {
   if (is_hardfork_active_for_height(ZANO_HARDFORK_05, height))
   {
-    return validate_asset_operation_hf5(avc);
+    return validate_asset_operation_hf5(avc); // HF5, HF6
   }
   else
   {
@@ -5392,11 +5395,15 @@ bool blockchain_storage::change_gateway_balance(const crypto::hash& tx_id, const
     balance_entry.amount -= amount;
   }
 
-  //update db
-  m_db_gateway_addresses.set(gw_addr, gw_addr_entry);
+  // update db (but only if there's smth to change)
+  if (balance_before != balance_entry.amount)
+  {
+    m_db_gateway_addresses.set(gw_addr, gw_addr_entry);
 
-  // for debugging
-  LOG_PRINT_L0("gateway address " << gw_addr_str << ", balance changed: " << balance_before << " -> " << balance_entry.amount << " (" << (increase ? "+" : "-") << amount << "), asset_id: " << asset_id);
+    // for debugging
+    LOG_PRINT_L0("gateway address " << gw_addr_str << ", balance changed: " << balance_before << " -> " << balance_entry.amount << " (" << (increase ? "+" : "-") << amount << "), asset_id: " << asset_id);
+  }
+
   return true;
 }
 
@@ -7195,6 +7202,10 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
       bool has_legacy_pid = has_tx_wide_payment_id(tx);
       CHECK_AND_ASSERT_MES(!has_legacy_pid, false, "legacy tx-wide payment ID is incompatible with gateway outputs");
     }
+
+    gateway_address_descriptor_operation gado{};
+    if (get_type_in_variant_container<gateway_address_descriptor_operation>(tx.extra, gado))
+      CHECK_AND_ASSERT_MES(validate_gateway_descriptor_operation_limits(gado), false, "transaction has invalid gateway descriptor");
   }
 
 
