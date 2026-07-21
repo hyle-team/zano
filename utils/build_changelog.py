@@ -111,6 +111,13 @@ def render_plain(segments):
 
 
 def main():
+    # emit UTF-8 regardless of the platform codepage (commit subjects may be non-ASCII);
+    # otherwise a redirected stdout on Windows raises UnicodeEncodeError -> "(unavailable)"
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except (AttributeError, ValueError):
+        pass
+
     args = [a for a in sys.argv[1:]]
     plain = "--plain" in args
     args = [a for a in args if a != "--plain"]

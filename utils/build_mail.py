@@ -37,7 +37,7 @@ msg['Subject'] = subject
 msg['From'] = zs_from
 msg['To'] = recipients
 msg.add_header('Content-Type','text/html')
-msg.set_payload(body)
+msg.set_payload(body, 'utf-8')   # charset -> non-ASCII bodies serialize/send correctly
 
 s = smtplib.SMTP(zs_addr, zs_port)
 s.starttls()
