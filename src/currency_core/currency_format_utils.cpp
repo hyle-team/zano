@@ -254,12 +254,15 @@ namespace currency
       const auto& out_v = tx.vout[j];
       VARIANT_SWITCH_BEGIN(out_v)
         VARIANT_CASE_CONST(tx_out_zarcanum, out_zc)
+          size_t confidential_out_index = confidential_outs_count;
           ++confidential_outs_count;
           if (has_only_native_coin_bare_inputs)
           {
             CHECK_AND_ASSERT_MES(out_zc.blinded_asset_id == native_coin_asset_id_1div8, false, "output #" << j << " has a non explicitly native asset id");
-            CHECK_AND_ASSERT_MES(ogc.blinded_asset_ids[j] == currency::native_coin_asset_id_pt, false, "no ZC ins: out #" << j << " has a non-explicit asset id");
-            CHECK_AND_ASSERT_MES(ogc.asset_id_blinding_masks[j] == 0, false, "no ZC ins: out #" << j << " has non-zero asset id blinding mask");
+            CHECK_AND_ASSERT_MES(confidential_out_index < ogc.blinded_asset_ids.size(), false, "unexpected: ogc.blinded_asset_ids.size() = " << ogc.blinded_asset_ids.size());
+            CHECK_AND_ASSERT_MES(ogc.blinded_asset_ids.size() == ogc.asset_id_blinding_masks.size(), false, "unexpected: ogc.blinded_asset_ids.size(" << ogc.blinded_asset_ids.size() << ") != ogc.asset_id_blinding_masks.size(" << ogc.asset_id_blinding_masks.size() << ")" );
+            CHECK_AND_ASSERT_MES(ogc.blinded_asset_ids[confidential_out_index] == currency::native_coin_asset_id_pt, false, "no ZC ins: out #" << j << " has a non-explicit asset id");
+            CHECK_AND_ASSERT_MES(ogc.asset_id_blinding_masks[confidential_out_index] == 0, false, "no ZC ins: out #" << j << " has non-zero asset id blinding mask");
           }
     //  VARIANT_CASE_CONST(tx_out_confidential_gateway, out_cgw)
     //    ++confidential_outs_count;
