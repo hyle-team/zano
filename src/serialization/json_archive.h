@@ -46,6 +46,7 @@ struct json_archive_base
     --depth_;
     make_indent();
     stream_ << "}";
+    object_begin = false;
   }
 
   void begin_variant() { begin_object(); }
