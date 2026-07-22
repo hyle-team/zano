@@ -5545,21 +5545,34 @@ bool blockchain_storage::gateway_get_address_history(const currency::gateway_add
 
   std::vector<crypto::hash> tx_ids;
   m_db_gateway_transactions.get_subitems(addr_id, req.offset, count, tx_ids);
-  crypto::secret_key decrypt_key = {};
-  if (req.gateway_view_secret_key)
-    decrypt_key = *req.gateway_view_secret_key;
-
+  // the view secret key is OPTIONAL, if provided, decrypt server-side, if omitted, the  daemon does NOT decrypt
+  const bool has_key = req.gateway_view_secret_key.has_value() && !(*req.gateway_view_secret_key == currency::null_skey);
 
   for (const auto& tx_id : tx_ids)
   {
     tools::wallet_public::wallet_transfer_info wti = {};
     auto tx_ptr = m_db_transactions.get(tx_id);
     CHECK_AND_ASSERT_MES(tx_ptr, false, "gateway_get_address_history: internal error, tx id " << tx_id << " not found in m_db_transactions");
-    bool r = gateway_prepare_wti(addr_id, tx_id, decrypt_key, wti, *tx_ptr);
-    if(r)
+
+    if (has_key)
+    {
+      bool r = gateway_prepare_wti(addr_id, tx_id, *req.gateway_view_secret_key, wti, *tx_ptr);
+    if (r)
       res.transactions.push_back(wti);
+    }
+    else
+    {
+      bool decrypt_as_income = false;
+      bool found = false;
+      bool r = gateway_prepare_wti_public(addr_id, tx_id, wti, *tx_ptr, decrypt_as_income, found);
+      if (r)
+      {
+        res.raw_txs.push_back(epee::string_tools::buff_to_hex_nodelimer(t_serializable_object_to_blob(wti.tx)));
+        res.transactions.push_back(wti);
+      }
+    }
   }
-  
+
   return true;
 }
 

@@ -484,6 +484,8 @@ namespace currency
   bool validate_ado_update_allowed(const asset_descriptor_base& a, const asset_descriptor_base& b, bool hf6_active = false);
   bool validate_ado_initial(const asset_descriptor_base& a, bool hf6_active = false);
   bool gateway_prepare_wti(const currency::gateway_address_id_type& gw_id, const crypto::hash& tx_id, const crypto::secret_key& decrypt_key, tools::wallet_public::wallet_transfer_info& wti, const transaction_chain_entry& tx_chain_entry);
+  bool gateway_prepare_wti_public(const currency::gateway_address_id_type& gw_id, const crypto::hash& tx_id, tools::wallet_public::wallet_transfer_info& wti, const transaction_chain_entry& tx_chain_entry, bool& out_decrypt_as_income, bool& out_found);
+  bool gateway_decrypt_wti(const crypto::secret_key& view_secret_key, const currency::gateway_address_id_type& gw_id, tools::wallet_public::wallet_transfer_info& wti);
   void normalize_asset_operation_for_hashing(asset_descriptor_operation& op);
   crypto::hash get_signature_hash_for_asset_operation(const asset_descriptor_operation& ado);
 

@@ -82,6 +82,7 @@ file(GLOB_RECURSE SIMPLEWALLET simplewallet/*)
 file(GLOB_RECURSE CONN_TOOL connectivity_tool/*)
 file(GLOB_RECURSE WALLET wallet/*)
 file(GLOB_RECURSE MINER miner/*)
+file(GLOB_RECURSE GATEWAY_RPC_PROXY gateway_rpc_proxy/*)
 
 if(BUILD_GUI)
   if(MSVC)
@@ -107,6 +108,7 @@ source_group(stratum FILES ${STRATUM})
 source_group(simplewallet FILES ${SIMPLEWALLET})
 source_group(connectivity-tool FILES ${CONN_TOOL})
 source_group(wallet FILES ${WALLET})
+source_group(gateway_rpc_proxy FILES ${GATEWAY_RPC_PROXY})
 
 if(BUILD_GUI)
   source_group(qtdaemon FILES ${QTDAEMON})
@@ -198,14 +200,20 @@ ENABLE_SHARED_PCH(connectivity_tool CONN_TOOL)
 ENABLE_SHARED_PCH_EXECUTABLE(connectivity_tool)
 
 add_executable(simplewallet ${SIMPLEWALLET})
-add_dependencies(simplewallet version) 
+add_dependencies(simplewallet version)
 target_link_libraries(simplewallet wallet rpc currency_core crypto common zlibstatic ethash ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES} OpenSSL::SSL OpenSSL::Crypto)
 
 ENABLE_SHARED_PCH(simplewallet SIMPLEWALLET)
 ENABLE_SHARED_PCH_EXECUTABLE(simplewallet)
 
+add_executable(gateway_rpc_proxy ${GATEWAY_RPC_PROXY})
+add_dependencies(gateway_rpc_proxy version)
+target_link_libraries(gateway_rpc_proxy currency_core crypto common zlibstatic ethash ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES} OpenSSL::SSL OpenSSL::Crypto)
+ENABLE_SHARED_PCH(gateway_rpc_proxy GATEWAY_RPC_PROXY)
+ENABLE_SHARED_PCH_EXECUTABLE(gateway_rpc_proxy)
+
 set_property(TARGET common crypto currency_core rpc stratum wallet PROPERTY FOLDER "libs")
-set_property(TARGET daemon simplewallet connectivity_tool PROPERTY FOLDER "prog")
+set_property(TARGET daemon simplewallet connectivity_tool gateway_rpc_proxy PROPERTY FOLDER "prog")
 set_property(TARGET daemon PROPERTY OUTPUT_NAME "zanod")
 
 if(BUILD_GUI)
@@ -282,7 +290,7 @@ endif()
 
 if(SIMPLE_BUNDLE)
   set(INSTALL_DIR "${CMAKE_BINARY_DIR}/hp-${VERSION}")
-  install(TARGETS daemon simplewallet connectivity_tool
+  install(TARGETS daemon simplewallet connectivity_tool gateway_rpc_proxy
       RUNTIME DESTINATION "${INSTALL_DIR}" COMPONENT Runtime
   )
 
