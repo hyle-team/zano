@@ -101,7 +101,8 @@ std::vector<uint64_t> decoy_selection_generator::generate_unique_reversed_distri
 
 void decoy_selection_generator::generate_unique_reversed_distribution(uint64_t count, std::set<uint64_t>& set_to_extend)
 {
-  if (count + set_to_extend.size() > m_max)
+  // count is the final set size, the generated range [0, m_max] is inclusive
+  if (set_to_extend.size() > count || (count > 0 && count - 1 > m_max))
   {
     throw std::runtime_error(std::string("generate_distribution_set with unexpected count=") + std::to_string(count) + ", set_to_extend.size() = " + std::to_string(set_to_extend.size()) + ", m_max: " + std::to_string(m_max));
   }
