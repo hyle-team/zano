@@ -4764,7 +4764,7 @@ bool wallet2::is_transfer_okay_for_pos(const transfer_details& tr, bool is_zarca
     return false;
 
   //prevent staking of after-last-pow-coins
-  if (get_blockchain_current_size() - tr.m_ptx_wallet_info->m_block_height <= m_core_runtime_config.min_coinstake_age)
+  if (get_blockchain_current_size() - tr.m_ptx_wallet_info->m_block_height < m_core_runtime_config.min_coinstake_age)
     return false;
 
   if (tr.m_ptx_wallet_info->m_block_height > m_last_pow_block_h)
@@ -4941,12 +4941,12 @@ void build_pools_from_blocks(const std::vector<currency::COMMAND_RPC_GET_RANDOM_
   }
 }
 
-void wallet2::append_heights_with_distribution(std::vector<uint64_t>& heights, size_t oversample, uint64_t max_height, decoy_selection_generator::dist_kind kind) const
+void wallet2::append_heights_with_distribution(std::vector<uint64_t>& heights, size_t oversample, uint64_t preincluded_height, uint64_t min_height, decoy_selection_generator::dist_kind kind) const
 {
   if (oversample == 0)
     return;
   std::vector<uint64_t> tmp(oversample);
-  build_distribution_for_input(tmp, max_height, kind);
+  build_distribution_for_input(tmp, preincluded_height, min_height, kind);
   heights.reserve(heights.size() + tmp.size());
   heights.insert(heights.end(), tmp.begin(), tmp.end());
 }
@@ -4994,12 +4994,13 @@ void wallet2::plan_decoy_batches_for_sources( size_t fake_outputs_count_, const 
     if (needs_decoys)
     {
       batch_idx = ensure_batch(amount_key);
-      const size_t overs = (target_outputs + 1) * 2;
-      const uint64_t max_h = (td.is_zc() || td.m_ptx_wallet_info->m_block_height < hf4_height)
+      const size_t overs = (target_outputs + 1);
+      const uint64_t preincluded_height = (td.is_zc() || td.m_ptx_wallet_info->m_block_height < hf4_height)
         ? td.m_ptx_wallet_info->m_block_height
         : hf4_height;
+      const uint64_t min_height = td.is_zc() ? hf4_height + 1 : 0;
 
-      append_heights_with_distribution(req4.batches[batch_idx].heights, overs, max_h, decoy_selection_generator::dist_kind::regular);
+      append_heights_with_distribution(req4.batches[batch_idx].heights, overs, preincluded_height, min_height, decoy_selection_generator::dist_kind::regular);
     }
 
     const bool real_is_post = m_core_runtime_config.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, td.m_ptx_wallet_info->m_block_height);
@@ -5159,8 +5160,9 @@ bool wallet2::prepare_pos_zc_input_and_ring(const transfer_details& td, const cu
     {
       auto& batch = decoys_req.batches.at(0);
       batch.input_amount = 0;
-      batch.heights.resize((required_decoys_count + 1) * 2);  // request outs by heights distribution
-      build_distribution_for_input(batch.heights, td.m_ptx_wallet_info->m_block_height, decoy_selection_generator::dist_kind::coinbase);
+      batch.heights.resize(required_decoys_count + 1);  // request outs by heights distribution
+      const uint64_t hf4_height = m_core_runtime_config.hard_forks.get_height_the_hardfork_active_after(ZANO_HARDFORK_04_ZARCANUM);
+      build_distribution_for_input(batch.heights, td.m_ptx_wallet_info->m_block_height, hf4_height + 1, decoy_selection_generator::dist_kind::coinbase);
     }
     r = m_core_proxy->call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4(decoys_req, decoys_resp);
     // TODO @#@# do we need these exceptions?
@@ -7298,32 +7300,49 @@ void wallet2::select_decoys(currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS
   amount_entry.outs = local_outs;
 }
 //----------------------------------------------------------------------------------------------------------------
-void wallet2::build_distribution_for_input(std::vector<uint64_t>& height_distrib, uint64_t own_height, decoy_selection_generator::dist_kind kind) const
+void wallet2::build_distribution_for_input(std::vector<uint64_t>& height_distrib, uint64_t own_height, uint64_t min_height, decoy_selection_generator::dist_kind kind) const
 {
   decoy_selection_generator zarcanum_decoy_set_generator;
   const uint64_t chain_size = get_blockchain_current_size();
+  const uint64_t want = height_distrib.empty() ? m_core_runtime_config.hf4_minimum_mixins : height_distrib.size();
 
   if (chain_size <= WALLET_DEFAULT_TX_SPENDABLE_AGE)
+  {
+    height_distrib.clear();
     return;
+  }
   const uint64_t max_height = chain_size - WALLET_DEFAULT_TX_SPENDABLE_AGE;
 
-  zarcanum_decoy_set_generator.init(max_height, kind);
-  THROW_IF_FALSE_WALLET_INT_ERR_EX(zarcanum_decoy_set_generator.is_initialized(), "decoy_selection_generator is not initialized");
-
-  uint64_t want = height_distrib.size();
-
-  if (want == 0)
+  if (want == 0 || min_height > max_height || own_height < min_height || own_height > max_height)
   {
-    want = m_core_runtime_config.hf4_minimum_mixins;
+    height_distrib.clear();
+    return;
   }
 
-  // limit how many heights we ask the daemon to materialize at once
-  const uint64_t available = max_height > 0 ? (max_height - 1) : 0;
-  if (available == 0)
+  // avoid a zero-sized span
+  if (min_height == max_height)
+  {
+    height_distrib.assign(1, own_height);
     return;
+  }
+
+  // gen work in a zero-base range [0, max_height - min_height]
+  const uint64_t distribution_span = max_height - min_height;
+  zarcanum_decoy_set_generator.init(distribution_span, kind);
+  THROW_IF_FALSE_WALLET_INT_ERR_EX(zarcanum_decoy_set_generator.is_initialized(), "decoy_selection_generator is not initialized");
+
+  // limit how many heights we ask the daemon to materialize at once
+  const uint64_t available = distribution_span + 1;
+  if (available == 0)
+  {
+    height_distrib.clear();
+    return;
+  }
 
   const uint64_t actual_want = std::min<uint64_t>(want, available);
-  height_distrib = zarcanum_decoy_set_generator.generate_unique_reversed_distribution(actual_want, own_height);
+  height_distrib = zarcanum_decoy_set_generator.generate_unique_reversed_distribution(actual_want, own_height - min_height);
+  for (uint64_t& height : height_distrib)
+    height += min_height;
 }
 //----------------------------------------------------------------------------------------------------------------
 void wallet2::build_distribution_for_input(std::vector<uint64_t>& offsets, uint64_t own_index)
