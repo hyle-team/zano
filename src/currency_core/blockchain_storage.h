@@ -568,6 +568,7 @@ namespace currency
     //-----------------------------------------
 
     typedef std::unordered_map<crypto::hash, std::pair<const transaction&, uint64_t> > txs_by_id_and_height_altchain;
+    void measure_db_performance() const;
     
     tx_memory_pool& m_tx_pool;
     mutable bc_attachment_services_manager m_services_mgr;

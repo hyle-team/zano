@@ -34,6 +34,8 @@ namespace currency
   void get_block_longhash(const block& b, crypto::hash& res);
   crypto::hash get_block_longhash(const block& b);
 
+  uint64_t measure_longhash_calculation_time_us(const block& b, crypto::hash& pow_result_out, uint64_t* p_context_build_time_ms = nullptr);
+
   inline uint64_t get_nonce_from_blockblob(const blobdata& bd)
   {
     uint64_t nonce = 0;
