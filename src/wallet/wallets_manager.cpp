@@ -1266,7 +1266,7 @@ std::string wallets_manager::get_recent_transfers(size_t wallet_id, uint64_t off
   return API_RETURN_CODE_OK;
 }
 
-std::string wallets_manager::generate_wallet(const std::wstring& path, const std::string& password, view::open_wallet_response& owr)
+std::string wallets_manager::generate_wallet(const std::wstring& path, const std::string& password, view::open_wallet_response& owr, bool allow_weak_password /* = false */)
 {
   std::shared_ptr<tools::wallet2> w(new tools::wallet2());
   w->set_use_deffered_global_outputs(m_use_deffered_global_outputs);
@@ -1290,7 +1290,7 @@ std::string wallets_manager::generate_wallet(const std::wstring& path, const std
 
   try
   {
-    w->generate(path, password, false);
+    w->generate(path, password, false, allow_weak_password);
     w->set_minimum_height(m_last_daemon_height-1);
     owr.seed = w->get_account().get_seed_phrase("");
     auto& keys = w->get_account().get_keys();

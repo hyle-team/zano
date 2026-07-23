@@ -29,7 +29,7 @@ namespace plain_wallet
 
   std::string open(const std::string& path, const std::string& password);
   std::string restore(const std::string& seed, const std::string& path, const std::string& password, const std::string& seed_password);
-  std::string generate(const std::string& path, const std::string& password);
+  std::string generate(const std::string& path, const std::string& password, bool allow_weak_password = false);
   std::string get_opened_wallets();  
 
 
