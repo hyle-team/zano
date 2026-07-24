@@ -57,6 +57,7 @@ const command_line::arg_descriptor<bool> arg_disable_price_fetch("gui-disable-pr
 
 const command_line::arg_descriptor<std::string> arg_xcode_stub("-NSDocumentRevisionsDebugMode", "Substitute for xcode bug");
 const command_line::arg_descriptor<std::string> arg_sandbox_disable("no-sandbox", "Substitute for ubuntu/linux rendering problem");
+const command_line::arg_descriptor<bool> arg_unsecure_disable_extension_id_check("unsecure-disable-extension-id-check", "Disable official extension ID check for HTTP requests");
 
 wallets_manager::wallets_manager():m_pview(&m_view_stub),
                                  m_stop_singal_sent(false),
@@ -86,7 +87,11 @@ wallets_manager::wallets_manager():m_pview(&m_view_stub),
 #ifndef MOBILE_WALLET_BUILD
   m_offers_service.set_disabled(true);
   m_pproxy_diganostic_info = m_rpc_proxy->get_proxy_diagnostic_info();
+#else
+  m_origin_verifier.set_enabled(false);
 #endif
+
+
 	//m_ccore.get_blockchain_storage().get_attachment_services_manager().add_service(&m_offers_service);
 }
 
@@ -189,6 +194,7 @@ bool wallets_manager::init_command_line(int argc, char* argv[], std::string& fai
   
   command_line::add_arg(desc_cmd_sett, arg_alloc_win_console);
   command_line::add_arg(desc_cmd_sett, arg_sandbox_disable);
+  command_line::add_arg(desc_cmd_sett, arg_unsecure_disable_extension_id_check);
   command_line::add_arg(desc_cmd_sett, arg_html_folder);
   command_line::add_arg(desc_cmd_only, arg_xcode_stub);
   command_line::add_arg(desc_cmd_sett, arg_enable_gui_debug_mode);
@@ -270,7 +276,10 @@ bool wallets_manager::init_command_line(int argc, char* argv[], std::string& fai
 
   m_qt_logs_enbaled = command_line::get_arg(m_vm, arg_enable_qt_logs);
   m_qt_dev_tools = command_line::get_arg(m_vm, arg_qt_dev_tools);
-
+  if(command_line::has_arg(m_vm, arg_unsecure_disable_extension_id_check) && command_line::get_arg(m_vm, arg_unsecure_disable_extension_id_check))
+  {
+    m_origin_verifier.set_enabled(false);
+  }
   return true;
   CATCH_ENTRY2(false);
 }

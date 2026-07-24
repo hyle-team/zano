@@ -31,6 +31,7 @@ DISABLE_VS_WARNINGS(4503)
 #include "wallet2.h"
 #include "wallet_id_adapter.h"
 #include "wallet_rpc_server.h"
+#include "common/extension_http_origin_verifier.h"
 
 POP_VS_WARNINGS
 
@@ -75,7 +76,7 @@ public:
     std::atomic<bool> need_to_update_wallet_info;
     std::atomic<bool> long_refresh_in_progress;
     epee::critical_section long_refresh_in_progress_lock; //secure wallet state and prevent from long wait while long refresh is in work
-
+   
     view::i_view* pview;
     uint64_t wallet_id;
     epee::locked_object<std::list<bc_services::offer_details_ex>> offers;
@@ -221,6 +222,7 @@ private:
   //--------
 
   BEGIN_URI_MAP2_VIRTUAL()
+    CHAIN_TO_PHANDLER(m_ptr_origin_verifier)
     BEGIN_JSON_RPC_MAP("/json_rpc")
       //MULTIWALLET APIs
       MAP_JON_RPC_WE("mw_get_wallets", on_mw_get_wallets, tools::wallet_public::COMMAND_MW_GET_WALLETS)
@@ -283,6 +285,8 @@ private:
   std::atomic<bool> m_is_pos_allowed;
   std::atomic<bool> m_use_tor;
 
+  tools::extension_http_origin_verifier m_origin_verifier;
+  tools::extension_http_origin_verifier* m_ptr_origin_verifier = &m_origin_verifier;
 
   std::map<size_t, wallet_vs_options> m_wallets;
   //mutable critical_section m_wallets_lock;
