@@ -2355,7 +2355,7 @@ bool simple_wallet::get_tx_key(const std::vector<std::string> &args_)
   std::vector<crypto::secret_key> amount_keys;
   if (m_wallet->get_tx_key(txid, tx_key))
   {
-    success_msg_writer() << "tx one-time secret key: " << epee::string_tools::pod_to_hex(tx_key);
+    success_msg_writer_no_log() << "tx one-time secret key: " << epee::string_tools::pod_to_hex(tx_key);
     return true;
   }
   else
@@ -2414,7 +2414,7 @@ bool simple_wallet::check_all_tx_keys(const std::vector<std::string> &args_)
     success_msg_writer() << "\nwallet's tx secret keys:";
     m_wallet->enumerate_tx_keys([&](const crypto::hash& tx_id, const crypto::secret_key& tx_key) -> bool
       {
-        success_msg_writer() << "tx " << tx_id << " -> " << tx_key << (tx_seen_in_history.count(tx_id) == 0 ? "  tx is not in transfer history" : "");
+        success_msg_writer_no_log() << "tx " << tx_id << " -> " << tx_key << (tx_seen_in_history.count(tx_id) == 0 ? "  tx is not in transfer history" : "");
         return true;
       });
   }
@@ -3532,7 +3532,7 @@ int custom_seed_builder()
   }
   const std::string new_seed = acc.get_seed_phrase(passphrase, processed_binary_from_seed);
   
-  success_msg_writer() << "Here is your seed"  << pass_protected_or_not << "\n " << new_seed;
+  success_msg_writer_no_log() << "Here is your seed"  << pass_protected_or_not << "\n " << new_seed;
   return EXIT_SUCCESS;
 }
 
@@ -3637,13 +3637,13 @@ int seed_doctor()
           if (acc.get_public_address_str() == address)
           {
             success_msg_writer(true) << "!!!SUCCESS!!!";
-            success_msg_writer() << "Seed recovered, please write down recovered seed and use it to restore the wallet:\n" << result;
+            success_msg_writer_no_log() << "Seed recovered, please write down recovered seed and use it to restore the wallet:\n" << result;
             return true;
           }
         }
         else
         {
-          success_msg_writer() << "Potential seed candidate:\n" << result << "\nAddress: " << acc.get_public_address_str();
+          success_msg_writer_no_log() << "Potential seed candidate:\n" << result << "\nAddress: " << acc.get_public_address_str();
           candidates_count++;
         }
       }
@@ -3671,13 +3671,13 @@ int seed_doctor()
         if (acc.get_public_address_str() == address)
         {
           success_msg_writer(true) << "!!!SUCCESS!!!";
-          success_msg_writer() << "Seed recovered, please write down recovered seed and use it to restore the wallet:\n" << result;
+          success_msg_writer_no_log() << "Seed recovered, please write down recovered seed and use it to restore the wallet:\n" << result;
           return true;
         }
       }
       else
       {
-        success_msg_writer() << "Potential seed candidate:\n" << result << "\nAddress: " << acc.get_public_address_str();
+        success_msg_writer_no_log() << "Potential seed candidate:\n" << result << "\nAddress: " << acc.get_public_address_str();
         candidates_count++;
       }
     }
@@ -3712,7 +3712,7 @@ int seed_doctor()
       std::string result = boost::algorithm::join(words, " ");
       account_base acc;
       acc.restore_from_seed_phrase(result, passphrase);
-      success_msg_writer() << "Potential seed candidate:\n" << result << "\nAddress: " << acc.get_public_address_str();
+      success_msg_writer_no_log() << "Potential seed candidate:\n" << result << "\nAddress: " << acc.get_public_address_str();
       return EXIT_FAILURE;
     }
     success_msg_writer() << "Brute forcing all each word";
