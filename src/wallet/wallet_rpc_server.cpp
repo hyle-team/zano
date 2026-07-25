@@ -1797,7 +1797,12 @@ namespace tools
   bool wallet_rpc_server::on_decrypt_data(const wallet_public::COMMAND_DECRYPT_DATA::request& req, wallet_public::COMMAND_DECRYPT_DATA::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
     WALLET_RPC_BEGIN_TRY_ENTRY();
-    w.get_wallet()->decrypt_buffer(req.buff, res.res_buff);
+    if (!w.get_wallet()->decrypt_buffer(req.buff, res.res_buff))
+    {
+      er.code = WALLET_RPC_ERROR_CODE_GENERIC_ERROR;
+      er.message = "decryption failed, bad input data given";
+      return false;
+    }
     return true;
     WALLET_RPC_CATCH_TRY_ENTRY();
   }
