@@ -22,12 +22,10 @@ namespace tools
 public:
     bool is_enabled() const { return m_enabled; }
     void set_enabled(bool enabled) {m_enabled = enabled;}
-    bool handle_http_request(const epee::net_utils::http::http_request_info& query_info, epee::net_utils::http::http_response_info& response_info,
-                             epee::net_utils::connection_context_base& conn_context, bool& call_found, documentation& docs = epee::net_utils::http::i_chain_handler::m_empty_documentation)
+    bool is_valid_request(const epee::net_utils::http::http_request_info& query_info)
     {
-
       if(!m_enabled)
-        return false;
+        return true;
 
       auto it = std::find_if(query_info.m_header_info.m_etc_fields.begin(), query_info.m_header_info.m_etc_fields.end(), [](const auto& element)
                              { return element.first == "Origin"; });
@@ -36,13 +34,10 @@ public:
       
       if(it->second != ZANO_EXTENSION_HTTP_ORIGIN_ID)
       {
-        call_found = true;
-        response_info.m_response_code = 403;
-        response_info.m_response_comment = "Forbidden";
-        return true;
+        return false;
       }
       
-      return false;
+      return true;
     }
   };
 }

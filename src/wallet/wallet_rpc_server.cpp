@@ -255,6 +255,12 @@ namespace tools
   //------------------------------------------------------------------------------------------------------------------------------
   bool wallet_rpc_server::auth_http_request(const epee::net_utils::http::http_request_info& query_info, epee::net_utils::http::http_response_info& response, connection_context& conn_context)
   {
+    //verify extension id first
+    if(!m_origin_verifier.is_valid_request(query_info))
+    {
+      return false;
+    }
+
 
     auto it = std::find_if(query_info.m_header_info.m_etc_fields.begin(), query_info.m_header_info.m_etc_fields.end(), [](const auto& element)
                            { return !epee::string_tools::compare_no_case(element.first, ZANO_ACCESS_TOKEN); });

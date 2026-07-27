@@ -31,7 +31,6 @@ DISABLE_VS_WARNINGS(4503)
 #include "wallet2.h"
 #include "wallet_id_adapter.h"
 #include "wallet_rpc_server.h"
-#include "common/extension_http_origin_verifier.h"
 
 POP_VS_WARNINGS
 
@@ -222,7 +221,6 @@ private:
   //--------
 
   BEGIN_URI_MAP2_VIRTUAL()
-    CHAIN_TO_PHANDLER(m_ptr_origin_verifier)
     BEGIN_JSON_RPC_MAP("/json_rpc")
       //MULTIWALLET APIs
       MAP_JON_RPC_WE("mw_get_wallets", on_mw_get_wallets, tools::wallet_public::COMMAND_MW_GET_WALLETS)
@@ -284,10 +282,6 @@ private:
   std::string m_qt_dev_tools;
   std::atomic<bool> m_is_pos_allowed;
   std::atomic<bool> m_use_tor;
-
-  tools::extension_http_origin_verifier m_origin_verifier;
-  tools::extension_http_origin_verifier* m_ptr_origin_verifier = &m_origin_verifier;
-
   std::map<size_t, wallet_vs_options> m_wallets;
   //mutable critical_section m_wallets_lock;
   mutable boost::shared_mutex m_wallets_lock;

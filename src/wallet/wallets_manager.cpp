@@ -54,10 +54,11 @@ const command_line::arg_descriptor<bool> arg_enable_qt_logs  ( "enable-qt-logs",
 const command_line::arg_descriptor<bool> arg_disable_logs_init("disable-logs-init", "Disable log initialization in GUI");
 const command_line::arg_descriptor<std::string> arg_qt_dev_tools  ( "qt-dev-tools", "Enable main web page inspection with Chromium DevTools, <vertical|horizontal>[,scale], e.g. \"horizontal,1.3\"", "");
 const command_line::arg_descriptor<bool> arg_disable_price_fetch("gui-disable-price-fetch", "Disable price fetching in UI(for privacy matter)");
+const command_line::arg_descriptor<bool> arg_unsecure_disable_extension_id_check("unsecure-disable-extension-id-check", "Disable official extension ID check for HTTP requests");
+
 
 const command_line::arg_descriptor<std::string> arg_xcode_stub("-NSDocumentRevisionsDebugMode", "Substitute for xcode bug");
 const command_line::arg_descriptor<std::string> arg_sandbox_disable("no-sandbox", "Substitute for ubuntu/linux rendering problem");
-const command_line::arg_descriptor<bool> arg_unsecure_disable_extension_id_check("unsecure-disable-extension-id-check", "Disable official extension ID check for HTTP requests");
 
 wallets_manager::wallets_manager():m_pview(&m_view_stub),
                                  m_stop_singal_sent(false),
@@ -87,8 +88,6 @@ wallets_manager::wallets_manager():m_pview(&m_view_stub),
 #ifndef MOBILE_WALLET_BUILD
   m_offers_service.set_disabled(true);
   m_pproxy_diganostic_info = m_rpc_proxy->get_proxy_diagnostic_info();
-#else
-  m_origin_verifier.set_enabled(false);
 #endif
 
 
@@ -194,7 +193,6 @@ bool wallets_manager::init_command_line(int argc, char* argv[], std::string& fai
   
   command_line::add_arg(desc_cmd_sett, arg_alloc_win_console);
   command_line::add_arg(desc_cmd_sett, arg_sandbox_disable);
-  command_line::add_arg(desc_cmd_sett, arg_unsecure_disable_extension_id_check);
   command_line::add_arg(desc_cmd_sett, arg_html_folder);
   command_line::add_arg(desc_cmd_only, arg_xcode_stub);
   command_line::add_arg(desc_cmd_sett, arg_enable_gui_debug_mode);
@@ -204,6 +202,7 @@ bool wallets_manager::init_command_line(int argc, char* argv[], std::string& fai
   command_line::add_arg(desc_cmd_sett, arg_disable_logs_init);
   command_line::add_arg(desc_cmd_sett, arg_qt_dev_tools);
   command_line::add_arg(desc_cmd_sett, arg_disable_price_fetch);
+  command_line::add_arg(desc_cmd_sett, arg_unsecure_disable_extension_id_check);
   
   command_line::add_arg(desc_cmd_sett, command_line::arg_enable_tx_socks5_relay_proxy);
   command_line::add_arg(desc_cmd_sett, command_line::arg_tx_relay_url);
@@ -215,6 +214,7 @@ bool wallets_manager::init_command_line(int argc, char* argv[], std::string& fai
 #ifndef MOBILE_WALLET_BUILD
   currency::core::init_options(desc_cmd_sett);
   currency::core_rpc_server::init_options(desc_cmd_sett);
+  //tools::wallet_rpc_server::init_options(desc_cmd_sett);
   nodetool::node_server<currency::t_currency_protocol_handler<currency::core> >::init_options(desc_cmd_sett);
 #ifdef CPU_MINING_ENABLED
   currency::miner::init_options(desc_cmd_sett);
@@ -276,10 +276,6 @@ bool wallets_manager::init_command_line(int argc, char* argv[], std::string& fai
 
   m_qt_logs_enbaled = command_line::get_arg(m_vm, arg_enable_qt_logs);
   m_qt_dev_tools = command_line::get_arg(m_vm, arg_qt_dev_tools);
-  if(command_line::has_arg(m_vm, arg_unsecure_disable_extension_id_check) && command_line::get_arg(m_vm, arg_unsecure_disable_extension_id_check))
-  {
-    m_origin_verifier.set_enabled(false);
-  }
   return true;
   CATCH_ENTRY2(false);
 }
@@ -336,6 +332,11 @@ bool wallets_manager::init(view::i_view* pview_handler)
   {
     m_ui_opt.disable_price_fetch = true;
   }
+  if(command_line::has_arg(m_vm, arg_unsecure_disable_extension_id_check) && command_line::get_arg(m_vm, arg_unsecure_disable_extension_id_check))
+  {
+    m_wallet_rpc_server.get_origin_verifier().set_enabled(false);
+  }
+
   //if (command_line::has_arg(m_vm, command_line::arg_allow_legacy_payment_id_size))
   //{
   //  m_allow_legacy_payment_id_size = true;
