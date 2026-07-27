@@ -1,6 +1,17 @@
 #!/bin/bash
 script_dir=$( dirname "$(readlink -f "$0")" )
 
+case "${1:-}" in
+  --zanod)
+    shift
+    exec "${script_dir}/usr/bin/zanod" "$@"
+    ;;
+  --simplewallet)
+    shift
+    exec "${script_dir}/usr/bin/simplewallet" "$@"
+    ;;
+esac
+
 desktop_dir=~/.local/share/applications
 icon_dir=~/.local/share/icons/hicolor/256x256/apps
 version="$(echo ${APPIMAGE} | rev | cut -d '-' -f1,2 | rev | sed 's/\.AppImage$//')"
