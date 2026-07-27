@@ -145,13 +145,10 @@ bool MainWindow::init_window()
   m_view->page()->setWebChannel(m_channel);
 
   QWidget* central_widget_to_be_set = m_view;
-  double zoom_factor_test = 0.75;
-  m_view->setZoomFactor(zoom_factor_test);
 
   std::string qt_dev_tools_option = m_backend.get_qt_dev_tools_option();
   if (!qt_dev_tools_option.empty())
   {
-#if QT_VERSION >= QT_VERSION_CHECK(5, 11, 0)
     std::vector<std::string> qt_dev_tools_option_parts;
     boost::split(qt_dev_tools_option_parts, qt_dev_tools_option, [](char c) { return c == ','; });
     
@@ -179,9 +176,6 @@ bool MainWindow::init_window()
     spliter->setSizes(Sizes);
 
     central_widget_to_be_set = spliter;
-#else
-    LOG_ERROR("Qt Dev Tool is not available for this Qt version, try building with Qt 5.11.0 or higher");
-#endif
   }
 
   // register QObjects to be exposed to JavaScript
@@ -653,7 +647,7 @@ void MainWindow::restore_pos(bool consider_showed)
   }
   else
   {
-    QPoint point = QApplication::desktop()->screenGeometry().bottomRight();
+    QPoint point = QGuiApplication::primaryScreen()->geometry().bottomRight();
     if (m_config.m_window_position.first + m_config.m_window_size.second > point.x() ||
       m_config.m_window_position.second + m_config.m_window_size.first > point.y()
       )
@@ -1155,7 +1149,7 @@ bool MainWindow::update_tor_status(const view::current_action_status& opt)
   CATCH_ENTRY2(false);
 }
 
-bool MainWindow::nativeEventFilter(const QByteArray &eventType, void *message, long *result)
+bool MainWindow::nativeEventFilter(const QByteArray &eventType, void *message, qintptr *result)
 {
   TRY_ENTRY();
 #ifdef WIN32
