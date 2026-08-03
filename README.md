@@ -81,10 +81,10 @@ Recommended OS versions: Ubuntu 20.04, 22.04 LTS.
    (Assuming that `$HOME` environment variable is set to your home directory. Otherwise, edit line 4 accordingly.)
 
        curl -OL https://github.com/openssl/openssl/releases/download/openssl-3.5.7/openssl-3.5.7.tar.gz
-       echo "a8c0d28a529ca480f9f36cf5792e2cd21984552a3c8e4aa11a24aa31aeac98e8  openssl-3.5.7.tar.gz" | sha256sum -c && tar xaf openssl-3.5.7.tar.gz
+       echo "a8c0d28a529ca480f9f36cf5792e2cd21984552a3c8e4aa11a24aa31aeac98e8  openssl-3.5.7.tar.gz" | sha256sum -c && tar xf openssl-3.5.7.tar.gz
        cd openssl-3.5.7
        ./config --prefix=$HOME/openssl --openssldir=$HOME/openssl --libdir=lib no-comp shared
-       make && make test && make install_sw install_ssldirs && cd ..
+       make && make install_sw install_ssldirs && cd ..
 
 
 
