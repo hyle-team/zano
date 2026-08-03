@@ -18,6 +18,7 @@ namespace tools
     std::atomic<bool> is_busy;
     std::atomic<time_t> last_success_interract_time;
     std::atomic<bool> last_daemon_is_disconnected;
+    std::atomic<bool> incompatible_server;
   };
 
   /*
@@ -73,6 +74,7 @@ namespace tools
     virtual void set_connectivity(unsigned int connection_timeout, size_t repeats_count) {}
     // This method determines if the daemons share the same address space as the caller (which may help decide if some RPC calls can be skipped).
     virtual bool is_daemon_inbox() { return false; }
+    virtual void set_incompatible_server_flag(bool v){if(m_pdiganostic_info)  m_pdiganostic_info->incompatible_server = v;}
   protected: 
     std::shared_ptr<proxy_diagnostic_info> m_pdiganostic_info;
   };

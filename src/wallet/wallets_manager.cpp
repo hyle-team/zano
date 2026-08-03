@@ -1735,11 +1735,21 @@ bool wallets_manager::get_is_remote_daemon_connected()
 std::string wallets_manager::get_connectivity_status()
 {
   view::general_connectivity_info gci{};
-  gci.is_online = get_is_remote_daemon_connected();
-  gci.last_daemon_is_disconnected = m_pproxy_diganostic_info->last_daemon_is_disconnected;
+  if (m_pproxy_diganostic_info->incompatible_server)
+  {
+    gci.is_online = false;
+    gci.last_daemon_is_disconnected = true;
+    gci.incompatible_server = true;
+  }
+  else
+  {
+    gci.is_online                   = get_is_remote_daemon_connected();
+    gci.last_daemon_is_disconnected = m_pproxy_diganostic_info->last_daemon_is_disconnected;
+    gci.last_proxy_communicate_timestamp = m_rpc_proxy->get_last_success_interract_time();
+    gci.incompatible_server = false;
+  }
   gci.is_server_busy = m_pproxy_diganostic_info->is_busy;
   gci.is_remote_node_mode = m_remote_node_mode;
-  gci.last_proxy_communicate_timestamp = m_rpc_proxy->get_last_success_interract_time();
   return epee::serialization::store_t_to_json(gci);
 }
 

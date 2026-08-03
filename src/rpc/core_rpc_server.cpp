@@ -382,6 +382,9 @@ namespace currency
     CHECK_RPC_LIMITS(req.block_ids.size(), RPC_LIMIT_COMMAND_RPC_GET_BLOCKS_DIRECT_BLOCK_IDS);
     LOG_PRINT_L2("[on_get_blocks]: Prevalidating....");
 
+    res.current_height   = m_core.get_blockchain_storage().get_current_blockchain_size();
+    res.current_hardfork = m_core.get_blockchain_storage().get_core_runtime_config().hard_forks.get_the_most_recent_hardfork_id_for_height(res.current_height);
+
     if (req.block_ids.empty())
     {
       res.status = API_RETURN_CODE_GENESIS_MISMATCH;
@@ -408,7 +411,6 @@ namespace currency
       res.status = API_RETURN_CODE_FAIL;
       return false;
     }
-    res.current_hardfork = m_core.get_blockchain_storage().get_core_runtime_config().hard_forks.get_the_most_recent_hardfork_id_for_height(res.current_height);
 
     LOG_PRINT_L2("[on_get_blocks]: Enumerating over blocks ....");
     for (auto& b : bs)

@@ -183,6 +183,7 @@ void wallet2::init(const std::string& daemon_address)
 void wallet2::reset_connection_addr(const std::string& daemon_address)
 {
   m_core_proxy->set_connection_addr(daemon_address);
+  m_core_proxy->set_incompatible_server_flag(false);
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::set_core_proxy(const std::shared_ptr<i_core_proxy>& proxy)
@@ -1819,6 +1820,18 @@ void wallet2::pull_blocks(size_t& blocks_added, std::atomic<bool>& stop, bool& f
   bool r = m_core_proxy->call_COMMAND_RPC_GET_BLOCKS_DIRECT(req, res);
   if (!r)
     throw error::no_connection_to_daemon(LOCATION_STR, "getblocks.bin");
+
+  // check if wallet are "on the same hardfork" with daemon with latest height of daemon
+  if(res.current_hardfork != 0 && res.current_hardfork != get_core_runtime_config().hard_forks.get_the_most_recent_hardfork_id_for_height(res.current_height))
+  {
+    LOG_ERROR("Daemon currently on the hardfork (" << res.current_hardfork
+                                                   << ") at heigh (" << res.current_height << "), while wallet think it's hardfork (" << get_core_runtime_config().hard_forks.get_the_most_recent_hardfork_id_for_height(res.current_height) << ") at a given height");
+    m_debug_events_dispatcher.RAISE_DEBUG_EVENT(wde_pulling_hardforks_missmatch);
+    m_core_proxy->set_incompatible_server_flag(true);
+    THROW_IF_TRUE_WALLET_EX(true, error::wallet_internal_error, "Daemon and wallet ver validation failed, hardforks missmatch");
+  }
+
+
   if (res.status == API_RETURN_CODE_GENESIS_MISMATCH)
   {
     WLT_LOG_MAGENTA("Reseting genesis block...", LOG_LEVEL_0);
@@ -1857,11 +1870,14 @@ void wallet2::pull_blocks(size_t& blocks_added, std::atomic<bool>& stop, bool& f
     " not less than local blockchain size=" + std::to_string(get_blockchain_current_size()));
 
   //check if wallet are "on the same hardfork" with daemon with latest height of daemon
+  //we have two entries of the same code for now, after all daemons would be updated to lates version we can get rid of this
+  //one, as older version doesn't fill current_hardfork if genesis missmatch
   if (res.current_hardfork != 0 && res.current_hardfork != get_core_runtime_config().hard_forks.get_the_most_recent_hardfork_id_for_height(res.current_height))
   {    
     LOG_ERROR("Daemon currently on the hardfork (" << res.current_hardfork 
       << ") at heigh (" << res.current_height << "), while wallet think it's hardfork (" << get_core_runtime_config().hard_forks.get_the_most_recent_hardfork_id_for_height(res.current_height)  << ") at a given height");
     m_debug_events_dispatcher.RAISE_DEBUG_EVENT(wde_pulling_hardforks_missmatch);
+    m_core_proxy->set_incompatible_server_flag(true);
     THROW_IF_TRUE_WALLET_EX(true, error::wallet_internal_error, "Daemon and wallet ver validation failed, hardforks missmatch");
   }
   

@@ -24,6 +24,7 @@ namespace tools
     {
       m_daemon_address = url;
       m_http_client.disconnect();
+      this->set_incompatible_server_flag(false);
     }
     return true;
   }
@@ -50,6 +51,7 @@ namespace tools
     {
       rsp.current_height = res.current_height;
       rsp.start_height = res.start_height;
+      rsp.current_hardfork = res.current_hardfork;
       r = unserialize_block_complete_entry(res, rsp);
     }
     return r;
