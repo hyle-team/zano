@@ -5,6 +5,7 @@
 
 #include <numeric>
 #include <set>
+#include <utility>
 
 #include "chaingen.h"
 #include "wallet_rpc_tests.h"
@@ -4138,6 +4139,30 @@ bool wallet_rpc_sweep_below::generate(std::vector<test_event_entry>& events) con
 
 namespace
 {
+  struct sweep_below_v4_request_capture_proxy : public tools::i_core_proxy
+  {
+    explicit sweep_below_v4_request_capture_proxy(std::shared_ptr<tools::i_core_proxy> delegate)
+      : m_delegate(std::move(delegate))
+    {}
+
+    bool call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4(const currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request& req, currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::response& rsp) override
+    {
+      m_v4_request = req;
+      const bool result = m_delegate->call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4(req, rsp);
+      m_v4_response = rsp;
+      return result;
+    }
+
+    bool call_COMMAND_RPC_SEND_RAW_TX(const currency::COMMAND_RPC_SEND_RAW_TX::request& req, currency::COMMAND_RPC_SEND_RAW_TX::response& rsp) override
+    {
+      return m_delegate->call_COMMAND_RPC_SEND_RAW_TX(req, rsp);
+    }
+
+    std::shared_ptr<tools::i_core_proxy> m_delegate;
+    currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request m_v4_request{};
+    currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::response m_v4_response{};
+  };
+
   // simple rpc wrap for best dev expirience:)
   int call_sweep_below(tools::wallet_rpc_server& rpc, const tools::wallet_public::COMMAND_SWEEP_BELOW::request& req, tools::wallet_public::COMMAND_SWEEP_BELOW::response& res)
   {
@@ -4591,15 +4616,46 @@ bool wallet_rpc_sweep_below::c1(currency::core& c, size_t ev_index, const std::v
     CHECK_AND_ASSERT_MES(r, false, "case WO prep: mine failed");
     dan_wlt->refresh();
 
+    currency::core_runtime_config sweep_decoy_config = c.get_blockchain_storage().get_core_runtime_config();
+    sweep_decoy_config.hf4_minimum_mixins = CURRENCY_HF4_MANDATORY_DECOY_SET_SIZE;
+    c.get_blockchain_storage().set_core_runtime_config(sweep_decoy_config);
+    miner_wlt->set_core_runtime_config(sweep_decoy_config);
+    alice_wlt->set_core_runtime_config(sweep_decoy_config);
+    bob_wlt->set_core_runtime_config(sweep_decoy_config);
+    carol_wlt->set_core_runtime_config(sweep_decoy_config);
+    dan_wlt->set_core_runtime_config(sweep_decoy_config);
+    CHECK_AND_ASSERT_MES(sweep_decoy_config.hf4_minimum_mixins > 0, false, "case WO: hf4_minimum_mixins must be nonzero");
+
     const uint64_t dan_asset_initial  = dan_wlt->balance(custom_asset_id);
     const uint64_t dan_native_initial = dan_wlt->balance(currency::native_coin_asset_id);
     CHECK_AND_ASSERT_MES(dan_asset_initial == 2 * small_asset, false, "case WO: Dan asset balance=" << dan_asset_initial << ", expected " << (2 * small_asset));
     CHECK_AND_ASSERT_MES(dan_native_initial == MK_TEST_COINS(10), false, "case WO: Dan native balance=" << dan_native_initial << ", expected " << MK_TEST_COINS(10));
 
+    // an asset sweep needs at least one native fee input and one asset input
+    // reject an impossible max_inputs value
+    {
+      tools::wallet_rpc_server dan_rpc(dan_wlt);
+      tools::wallet_public::COMMAND_SWEEP_BELOW::request req{};
+      req.mixin = 1;
+      req.address = m_accounts[CAROL_ACC_IDX].get_public_address_str();
+      req.amount = small_asset + 1;
+      req.fee = TESTS_DEFAULT_FEE;
+      req.asset_id = custom_asset_id;
+      req.max_inputs = 1;
+      tools::wallet_public::COMMAND_SWEEP_BELOW::response res{};
+      const int code = call_sweep_below(dan_rpc, req, res);
+
+      CHECK_AND_ASSERT_EQ(code, WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT);
+      CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
+      CHECK_AND_ASSERT_EQ(dan_wlt->balance(custom_asset_id), dan_asset_initial);
+      CHECK_AND_ASSERT_EQ(dan_wlt->balance(currency::native_coin_asset_id), dan_native_initial);
+    }
+
     // build Dan's watch-only twin from Dan's pub keys Dan has never spent anything yet, so the WO sees the same set of unspent outputs as the full wallet
     account_base dan_acc_wo = m_accounts[DAN_ACC_IDX];
     dan_acc_wo.make_account_watch_only();
     std::shared_ptr<tools::wallet2> dan_wlt_wo = init_playtime_test_wallet(events, c, dan_acc_wo);
+    dan_wlt_wo->set_core_runtime_config(sweep_decoy_config);
     dan_wlt_wo->refresh();
     CHECK_AND_ASSERT_MES(dan_wlt_wo->balance(custom_asset_id) == dan_wlt->balance(custom_asset_id), false, "case WO: balances don't match between WO and full wallet (asset)");
     CHECK_AND_ASSERT_MES(dan_wlt_wo->balance(currency::native_coin_asset_id) == dan_wlt->balance(currency::native_coin_asset_id), false, "case WO: balances don't match between WO and full wallet (native)");
@@ -4609,13 +4665,25 @@ bool wallet_rpc_sweep_below::c1(currency::core& c, size_t ev_index, const std::v
 
     // WO calls sweep_below
     tools::wallet_public::COMMAND_SWEEP_BELOW::request req{};
-    req.mixin = 15;
+    req.mixin = 1; // HF4 minimum mixins must override this value for ZC inputs
     req.address = m_accounts[CAROL_ACC_IDX].get_public_address_str();
     req.amount = small_asset + 1; // matches the 2 small asset UTXOs in Dan's wallet
     req.fee = TESTS_DEFAULT_FEE;
     req.asset_id = custom_asset_id;
     tools::wallet_public::COMMAND_SWEEP_BELOW::response res{};
+    const std::shared_ptr<tools::i_core_proxy> original_proxy = dan_wlt_wo->get_core_proxy();
+    auto trace_proxy = std::make_shared<sweep_below_v4_request_capture_proxy>(original_proxy);
+    dan_wlt_wo->set_core_proxy(trace_proxy);
     int code = call_sweep_below(dan_rpc_wo, req, res);
+    dan_wlt_wo->set_core_proxy(original_proxy);
+
+    CHECK_AND_ASSERT_EQ(trace_proxy->m_v4_request.look_up_strategy, std::string(LOOK_UP_STRATEGY_REGULAR_TX));
+    CHECK_AND_ASSERT_EQ(trace_proxy->m_v4_request.height_upper_limit, c.get_top_block_height());
+    CHECK_AND_ASSERT_EQ(trace_proxy->m_v4_request.batches.size(), 1);
+    CHECK_AND_ASSERT_EQ(trace_proxy->m_v4_request.batches[0].input_amount, 0);
+    CHECK_AND_ASSERT_EQ(trace_proxy->m_v4_request.batches[0].heights.size(), 3 * (CURRENCY_HF4_MANDATORY_DECOY_SET_SIZE + 1));
+    CHECK_AND_ASSERT_EQ(trace_proxy->m_v4_response.status, std::string(API_RETURN_CODE_OK));
+    CHECK_AND_ASSERT_EQ(trace_proxy->m_v4_response.blocks_batches.size(), trace_proxy->m_v4_request.batches.size());
     CHECK_AND_ASSERT_MES(code == 0, false, "case WO: sweep_below in WO wallet failed, code=" << code);
 
     // WO response: tx_hash is empty, tx_unsigned_hex is filled
@@ -4645,6 +4713,15 @@ bool wallet_rpc_sweep_below::c1(currency::core& c, size_t ev_index, const std::v
     CHECK_AND_ASSERT_MES(!submit_res.tx_hash.empty(), false, "case WO: empty tx_hash in submit");
     CHECK_AND_ASSERT_MES(submit_res.tx_hash == sign_res.tx_hash, false, "case WO: tx_hash mismatch between sign and submit");
 
+    std::list<transaction> pool_txs;
+    r = c.get_pool_transactions(pool_txs);
+    CHECK_AND_ASSERT_MES(r && pool_txs.size() == 1, false, "case WO: get_pool_transactions failed");
+    CHECK_AND_ASSERT_EQ(pool_txs.front().vin.size(), 3);
+    for (const auto& input : pool_txs.front().vin)
+      CHECK_AND_ASSERT_MES(input.type() == typeid(txin_zc_input), false, "case WO: sweep_below produced a non-ZC input");
+    CHECK_AND_ASSERT_MES(check_mixin_value_for_each_input(CURRENCY_HF4_MANDATORY_DECOY_SET_SIZE, get_transaction_hash(pool_txs.front()), c), false,
+      "case WO: unexpected sweep_below ring size");
+
     // mine and verify Carol received
     carol_wlt->refresh();
     const uint64_t carol_asset_before = carol_wlt->balance(custom_asset_id);
@@ -4654,6 +4731,59 @@ bool wallet_rpc_sweep_below::c1(currency::core& c, size_t ev_index, const std::v
     const uint64_t carol_asset_after = carol_wlt->balance(custom_asset_id);
     CHECK_AND_ASSERT_MES(carol_asset_after == carol_asset_before + 2 * small_asset, false,
       "case WO: Carol asset delta=" << (carol_asset_after - carol_asset_before) << ", expected " << (2 * small_asset));
+  }
+
+  // a full auditable wallet must ignore a nonzero requested mixin and spend
+  // with a zero-decoy ring.
+  {
+    account_base auditable_acc;
+    auditable_acc.generate(true);
+    auditable_acc.set_createtime(m_accounts[MINER_ACC_IDX].get_createtime_precise());
+    account_base sink_acc;
+    sink_acc.generate();
+    sink_acc.set_createtime(m_accounts[MINER_ACC_IDX].get_createtime_precise());
+
+    std::shared_ptr<tools::wallet2> auditable_wlt = init_playtime_test_wallet(events, c, auditable_acc);
+    auditable_wlt->set_core_runtime_config(c.get_blockchain_storage().get_core_runtime_config());
+    CHECK_AND_ASSERT_MES(auditable_wlt->is_auditable() && !auditable_wlt->is_watch_only(), false,
+      "case auditable: expected a full auditable wallet");
+
+    const uint64_t auditable_sweep_amount = MK_TEST_COINS(9);
+    miner_wlt->refresh();
+    miner_wlt->transfer(auditable_sweep_amount, auditable_acc.get_public_address(), currency::native_coin_asset_id);
+    r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+    CHECK_AND_ASSERT_MES(r, false, "case auditable prep: mine failed");
+    auditable_wlt->refresh();
+    CHECK_AND_ASSERT_EQ(auditable_wlt->balance(currency::native_coin_asset_id), auditable_sweep_amount);
+
+    tools::wallet_rpc_server auditable_rpc(auditable_wlt);
+    tools::wallet_public::COMMAND_SWEEP_BELOW::request req{};
+    req.mixin = 1;
+    req.address = sink_acc.get_public_address_str();
+    req.amount = auditable_sweep_amount + 1;
+    req.fee = TESTS_DEFAULT_FEE;
+    tools::wallet_public::COMMAND_SWEEP_BELOW::response res{};
+    const int code = call_sweep_below(auditable_rpc, req, res);
+
+    CHECK_AND_ASSERT_EQ(code, 0);
+    CHECK_AND_ASSERT_EQ(res.outs_total, 1);
+    CHECK_AND_ASSERT_EQ(res.outs_swept, 1);
+    CHECK_AND_ASSERT_EQ(res.amount_total, auditable_sweep_amount);
+    CHECK_AND_ASSERT_EQ(res.amount_swept, auditable_sweep_amount);
+    CHECK_AND_ASSERT_EQ(res.asset_id, currency::native_coin_asset_id);
+
+    std::list<transaction> pool_txs;
+    r = c.get_pool_transactions(pool_txs);
+    CHECK_AND_ASSERT_MES(r && pool_txs.size() == 1, false, "case auditable: get_pool_transactions failed");
+    CHECK_AND_ASSERT_EQ(pool_txs.front().vin.size(), 1);
+    CHECK_AND_ASSERT_MES(pool_txs.front().vin.front().type() == typeid(txin_zc_input), false,
+      "case auditable: sweep_below produced a non-ZC input");
+    CHECK_AND_ASSERT_MES(check_mixin_value_for_each_input(0, get_transaction_hash(pool_txs.front()), c), false,
+      "case auditable: expected zero mixins");
+
+    r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+    CHECK_AND_ASSERT_MES(r, false, "case auditable: mine failed");
+    CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
   }
 
   // cases for max_inputs / min_outputs
@@ -4722,11 +4852,30 @@ bool wallet_rpc_sweep_below::c1(currency::core& c, size_t ev_index, const std::v
     req.fee = TESTS_DEFAULT_FEE;
     req.max_inputs = 2;
     tools::wallet_public::COMMAND_SWEEP_BELOW::response res{};
+    const std::shared_ptr<tools::i_core_proxy> original_proxy = alice_wlt->get_core_proxy();
+    auto trace_proxy = std::make_shared<sweep_below_v4_request_capture_proxy>(original_proxy);
+    alice_wlt->set_core_proxy(trace_proxy);
     int code = call_sweep_below(alice_rpc, req, res);
+    alice_wlt->set_core_proxy(original_proxy);
+
+    CHECK_AND_ASSERT_EQ(trace_proxy->m_v4_request.look_up_strategy, std::string(LOOK_UP_STRATEGY_REGULAR_TX));
+    CHECK_AND_ASSERT_EQ(trace_proxy->m_v4_request.height_upper_limit, c.get_top_block_height());
+    CHECK_AND_ASSERT_EQ(trace_proxy->m_v4_request.batches.size(), 1);
+    CHECK_AND_ASSERT_EQ(trace_proxy->m_v4_request.batches[0].input_amount, 0);
+    CHECK_AND_ASSERT_EQ(trace_proxy->m_v4_request.batches[0].heights.size(), 2 * (CURRENCY_HF4_MANDATORY_DECOY_SET_SIZE + 1));
+    CHECK_AND_ASSERT_EQ(trace_proxy->m_v4_response.status, std::string(API_RETURN_CODE_OK));
+    CHECK_AND_ASSERT_EQ(trace_proxy->m_v4_response.blocks_batches.size(), trace_proxy->m_v4_request.batches.size());
     CHECK_AND_ASSERT_MES(code == 0, false, "case max_inputs=2: sweep failed, code=" << code);
     CHECK_AND_ASSERT_MES(res.outs_total == 4, false, "case max_inputs=2: outs_total=" << res.outs_total << ", expected 4");
     CHECK_AND_ASSERT_MES(res.outs_swept == 2, false, "case max_inputs=2: outs_swept=" << res.outs_swept << ", expected 2");
     CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "unexpected pool txs count: " << c.get_pool_transactions_count());
+
+    std::list<transaction> pool_txs;
+    r = c.get_pool_transactions(pool_txs);
+    CHECK_AND_ASSERT_MES(r && pool_txs.size() == 1, false, "case max_inputs=2: get_pool_transactions failed");
+    CHECK_AND_ASSERT_EQ(pool_txs.front().vin.size(), 2);
+    CHECK_AND_ASSERT_MES(check_mixin_value_for_each_input(CURRENCY_HF4_MANDATORY_DECOY_SET_SIZE, get_transaction_hash(pool_txs.front()), c), false,
+      "case max_inputs=2: unexpected sweep_below ring size");
 
     r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
     CHECK_AND_ASSERT_MES(r, false, "case max_inputs=2: mine failed");

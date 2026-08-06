@@ -4999,11 +4999,11 @@ void wallet2::plan_decoy_batches_for_sources( size_t fake_outputs_count_, const 
     WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(it != m_transfers.end(), "internal error: idx " << tr_idx << " not found in m_transfers");
     const transfer_details& td = it->second;
 
-    size_t target_outputs = fake_outputs_count_;
-    if (td.is_zc() && !this->is_auditable())
-      target_outputs = m_core_runtime_config.hf4_minimum_mixins;
+    const size_t target_outputs = this->is_auditable()
+      ? 0
+      : (td.is_zc() ? m_core_runtime_config.hf4_minimum_mixins : fake_outputs_count_);
 
-    const bool needs_decoys = (!this->is_auditable() && target_outputs > 0);
+    const bool needs_decoys = target_outputs > 0;
     const uint64_t amount_key = td.is_zc() ? uint64_t(0) : td.amount();
     size_t batch_idx = SIZE_MAX;
 
@@ -8779,39 +8779,50 @@ void wallet2::transfer(construct_tx_param& ctp,
 void wallet2::sweep_below(const crypto::public_key& asset_id, size_t fake_outs_count, const currency::account_public_address& destination_addr, uint64_t threshold_amount, const currency::payment_id_t& payment_id,
   uint64_t fee, uint64_t inputs_max, uint64_t outputs_min, size_t& outs_total, uint64_t& amount_total, size_t& outs_swept, uint64_t& amount_swept, currency::transaction* p_result_tx /* = nullptr */, std::string* p_filename_or_unsigned_tx_blob_str /* = nullptr */)
 {
-  bool r = false;
   outs_total = 0;
   amount_total = 0;
   outs_swept = 0;
   amount_swept = 0;
 
-  bool sweeping_asset = asset_id != native_coin_asset_id;
+  const bool sweeping_asset = asset_id != native_coin_asset_id;
+  const size_t minimum_inputs = sweeping_asset ? 2 : 1;
   if (outputs_min < CURRENCY_TX_MIN_ALLOWED_OUTS)
     outputs_min = CURRENCY_TX_MIN_ALLOWED_OUTS;
   WLT_THROW_IF_FALSE_WALLET_EX_MES(outputs_min <= CURRENCY_TX_MAX_ALLOWED_OUTS, error::wallet_error_with_rpc_code, "Outputs minimum exceeds allowed maximum (" STR(CURRENCY_TX_MAX_ALLOWED_OUTS) ")", WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT);
+  WLT_THROW_IF_FALSE_WALLET_EX_MES(inputs_max == 0 || inputs_max >= minimum_inputs, error::wallet_error_with_rpc_code,
+    "max_inputs must be at least " << minimum_inputs << " when sweeping " << (sweeping_asset ? "an asset" : "the native coin"),
+    WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT);
 
   std::vector<uint64_t> selected_transfers;
-  std::unordered_map<size_t, size_t> fake_outs_for_selected_transfers; // tr index -> fake outs count
   selected_transfers.reserve(m_transfers.size());
-  fake_outs_for_selected_transfers.reserve(m_transfers.size());
+  const bool auditable = is_auditable();
+  // getrandom_outs4 filters legacy bare candidates against hf4_minimum_mixins.
+  // Keep an explicit zero, but do not build a smaller non-zero ring than the
+  // daemon-side filter assumes, otherwise a forced-mix decoy may be invalid for
+  // the resulting ring size.
+  const size_t effective_fake_outs_count = auditable || fake_outs_count == 0
+    ? 0
+    : std::max(fake_outs_count, static_cast<size_t>(m_core_runtime_config.hf4_minimum_mixins));
+  auto get_fake_outs_count_for_transfer = [this, auditable, effective_fake_outs_count](const transfer_details& td) -> size_t
+  {
+    return auditable ? 0 : (td.is_zc() ? m_core_runtime_config.hf4_minimum_mixins : effective_fake_outs_count);
+  };
+
   struct {
     uint64_t amount;
-    size_t tid;
-    uint64_t fake_outs_count;
+    uint64_t tid;
   } selected_native_for_fee{};
   for (const auto& tr : m_transfers)
   {
     uint64_t i = tr.first;
     const transfer_details& td = tr.second;
-    size_t fake_outs_count_for_td = is_auditable() ? 0 : (td.is_zc() ? m_core_runtime_config.hf4_minimum_mixins : fake_outs_count);
+    size_t fake_outs_count_for_td = get_fake_outs_count_for_transfer(td);
     uint64_t amount = td.amount();
     if (is_transfer_ready_to_go(td, fake_outs_count_for_td))
     {
       if (amount < threshold_amount && td.get_asset_id() == asset_id)
       {
         selected_transfers.push_back(i);
-        r = fake_outs_for_selected_transfers.insert(std::make_pair(i, fake_outs_count_for_td)).second;
-        WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(r, "unable to insert: " << i << ", " << fake_outs_count_for_td);
         outs_total += 1;
         amount_total += amount;
       }
@@ -8819,9 +8830,6 @@ void wallet2::sweep_below(const crypto::public_key& asset_id, size_t fake_outs_c
       {
         selected_native_for_fee.amount = amount;
         selected_native_for_fee.tid = i;
-        selected_native_for_fee.fake_outs_count = fake_outs_count_for_td;
-        r = fake_outs_for_selected_transfers.insert(std::make_pair(i, fake_outs_count_for_td)).second; // many inserts possible, but that shouldn't be an issue
-        WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(r, "unable to insert: " << i << ", " << fake_outs_count_for_td);
       }
     }
   }
@@ -8841,44 +8849,33 @@ void wallet2::sweep_below(const crypto::public_key& asset_id, size_t fake_outs_c
   if (selected_transfers.size() > CURRENCY_TX_MAX_ALLOWED_INPUTS)
     selected_transfers.erase(selected_transfers.begin() + CURRENCY_TX_MAX_ALLOWED_INPUTS, selected_transfers.end());
 
-  prefetch_global_indicies_if_needed(selected_transfers);
+  size_t st_index_upper_boundary = selected_transfers.size();
+  if (inputs_max > 0 && st_index_upper_boundary > inputs_max)
+    st_index_upper_boundary = inputs_max;
 
   size_t max_fake_outs_count = 0;
-  for (auto tr_idx : selected_transfers)
-    if (max_fake_outs_count < fake_outs_for_selected_transfers[tr_idx])
-      max_fake_outs_count = fake_outs_for_selected_transfers[tr_idx];
+  for (size_t i = 0; i < st_index_upper_boundary; ++i)
+    max_fake_outs_count = std::max(max_fake_outs_count, get_fake_outs_count_for_transfer(m_transfers.at(selected_transfers[i])));
 
   static const size_t estimated_bytes_per_input = 85;
   const size_t estimated_max_inputs = static_cast<size_t>(CURRENCY_MAX_TRANSACTION_BLOB_SIZE / (estimated_bytes_per_input * (max_fake_outs_count + 1.5))); // estimated number of maximum tx inputs under the tx size limit
+  st_index_upper_boundary = std::min(st_index_upper_boundary, estimated_max_inputs);
 
-  typedef COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry out_entry;
-  typedef currency::tx_source_entry::output_entry tx_output_entry;
+  WLT_THROW_IF_FALSE_WALLET_EX_MES(st_index_upper_boundary >= minimum_inputs, error::tx_too_big,
+    "sweep_below requires at least " << minimum_inputs << " input(s), but only " << st_index_upper_boundary << " can be used");
 
-  COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::response rpc_get_random_outs_resp{};
-  if (max_fake_outs_count > 0)
+  // the size search below only shrinks this prefix, so prepare its rings once and reuse them across all transaction construction attempts
+  std::vector<uint64_t> selected_transfers_for_sources(selected_transfers.begin(), selected_transfers.begin() + st_index_upper_boundary);
+  std::vector<currency::tx_source_entry> prepared_sources;
+  prepare_tx_sources(effective_fake_outs_count, prepared_sources, selected_transfers_for_sources);
+  WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(prepared_sources.size() == selected_transfers_for_sources.size(),
+    "prepared_sources.size() = " << prepared_sources.size() << ", selected_transfers_for_sources.size() = " << selected_transfers_for_sources.size());
+  for (size_t i = 0; i < prepared_sources.size(); ++i)
   {
-    COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::request req{};
-    req.height_upper_limit = m_last_pow_block_h;
-    req.use_forced_mix_outs = false;
-    req.decoys_count = max_fake_outs_count + 1;
-    for (uint64_t i : selected_transfers)
-      req.amounts.push_back(m_transfers.at(i).is_zc() ? 0 : m_transfers.at(i).m_amount);
-
-    r = m_core_proxy->call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS(req, rpc_get_random_outs_resp);
-
-    THROW_IF_FALSE_WALLET_EX(r, error::no_connection_to_daemon, "getrandom_outs1.bin");
-    THROW_IF_FALSE_WALLET_EX(rpc_get_random_outs_resp.status != API_RETURN_CODE_BUSY, error::daemon_busy, "getrandom_outs1.bin");
-    THROW_IF_FALSE_WALLET_EX(rpc_get_random_outs_resp.status == API_RETURN_CODE_OK, error::get_random_outs_error, rpc_get_random_outs_resp.status);
-    WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(rpc_get_random_outs_resp.outs.size() == selected_transfers.size(),
-      "daemon returned wrong number of amounts for getrandom_outs1.bin: " << rpc_get_random_outs_resp.outs.size() << ", requested: " << selected_transfers.size());
-
-    std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount> scanty_outs;
-    for (COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount& amount_outs : rpc_get_random_outs_resp.outs)
-    {
-      if (amount_outs.outs.size() < max_fake_outs_count)
-        scanty_outs.push_back(amount_outs);
-    }
-    THROW_IF_FALSE_WALLET_EX(scanty_outs.empty(), error::not_enough_outs_to_mix, scanty_outs, max_fake_outs_count);
+    const crypto::public_key& expected_asset_id = sweeping_asset && i == 0 ? native_coin_asset_id : asset_id;
+    WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(prepared_sources[i].transfer_index == selected_transfers_for_sources[i],
+      "source order mismatch at " << i << ": " << prepared_sources[i].transfer_index << " != " << selected_transfers_for_sources[i]);
+    WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(prepared_sources[i].asset_id == expected_asset_id, "unexpected source asset at " << i);
   }
 
   currency::finalize_tx_param ftp{};
@@ -8905,79 +8902,23 @@ void wallet2::sweep_below(const crypto::public_key& asset_id, size_t fake_outs_c
   auto get_result_t_str = [](try_construct_result_t t) -> const char*
     { return t == rc_ok ? "rc_ok" : t == rc_too_few_outputs ? "rc_too_few_outputs" : t == rc_too_many_outputs ? "rc_too_many_outputs" : t == rc_create_tx_failed ? "rc_create_tx_failed" : "unknown"; };
 
-  auto try_construct_tx = [this, &selected_transfers, &rpc_get_random_outs_resp, &fake_outs_for_selected_transfers, &fee, &destination_addr, &asset_id, sweeping_asset, outputs_min]
+  auto try_construct_tx = [this, &prepared_sources, &fee, &destination_addr, &asset_id, sweeping_asset, outputs_min]
   (size_t st_index_upper_boundary, currency::finalize_tx_param& ftp, uint64_t& amount_swept) -> try_construct_result_t
     {
       uint64_t native_coin_amount = 0;
       amount_swept = 0;
       ftp.gen_context = tx_generation_context{};
-      ftp.sources.clear();
       ftp.prepared_destinations.clear();
 
-      // prepare inputs
-      ftp.sources.resize(st_index_upper_boundary);
-      WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(st_index_upper_boundary <= selected_transfers.size(), "index_upper_boundary = " << st_index_upper_boundary << ", selected_transfers.size() = " << selected_transfers.size());
-      for (size_t st_index = 0; st_index < st_index_upper_boundary; ++st_index)
+      WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(st_index_upper_boundary <= prepared_sources.size(),
+        "index_upper_boundary = " << st_index_upper_boundary << ", prepared_sources.size() = " << prepared_sources.size());
+      ftp.sources.assign(prepared_sources.begin(), prepared_sources.begin() + st_index_upper_boundary);
+      for (const currency::tx_source_entry& src : ftp.sources)
       {
-        currency::tx_source_entry& src = ftp.sources[st_index];
-        uint64_t tr_index = selected_transfers[st_index];
-        transfer_details& td = m_transfers.at(tr_index);
-        src.transfer_index = tr_index;
-        src.amount = td.amount();
-        if (sweeping_asset && td.is_native_coin())
+        if (sweeping_asset && src.asset_id == native_coin_asset_id)
           native_coin_amount += src.amount;
         else
           amount_swept += src.amount;
-
-        // populate src.outputs with mix-ins
-        if (rpc_get_random_outs_resp.outs.size())
-        {
-          rpc_get_random_outs_resp.outs[st_index].outs.sort([](const out_entry& a, const out_entry& b) { return a.global_amount_index < b.global_amount_index; });
-          for (out_entry& daemon_oe : rpc_get_random_outs_resp.outs[st_index].outs)
-          {
-            if (td.m_global_output_index == daemon_oe.global_amount_index)
-              continue;
-            src.outputs.emplace_back(daemon_oe.global_amount_index, daemon_oe.stealth_address, daemon_oe.concealing_point, daemon_oe.amount_commitment, daemon_oe.blinded_asset_id);
-            if (src.outputs.size() >= fake_outs_for_selected_transfers[tr_index])
-              break;
-          }
-        }
-
-        // insert real output into src.outputs
-        // TODO: bad design, we need to get rid of code duplicates below -- sowle
-        auto it_to_insert = std::find_if(src.outputs.begin(), src.outputs.end(), [&](const tx_output_entry& a)
-          {
-            if (a.out_reference.type().hash_code() == typeid(uint64_t).hash_code())
-              return static_cast<bool>(boost::get<uint64_t>(a.out_reference) >= td.m_global_output_index);
-            return false; // TODO: implement deterministics real output placement in case there're ref_by_id outs
-          });
-        tx_output_entry real_oe{};
-        txout_ref_v out_reference = td.m_global_output_index; // TODO: use ref_by_id when neccessary
-        std::vector<tx_output_entry>::iterator interted_it = src.outputs.end();
-        VARIANT_SWITCH_BEGIN(td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index]);
-        VARIANT_CASE_CONST(tx_out_bare, o)
-        {
-          VARIANT_SWITCH_BEGIN(o.target);
-          VARIANT_CASE_CONST(txout_to_key, o)
-            interted_it = src.outputs.emplace(it_to_insert, out_reference, o.key);
-          VARIANT_CASE_OTHER()
-          {
-            WLT_THROW_IF_FALSE_WITH_CODE(false,
-              "Internal error: unexpected type of target: " << o.target.type().name(),
-              API_RETURN_CODE_INTERNAL_ERROR);
-          }
-          VARIANT_SWITCH_END();
-        }
-        VARIANT_CASE_CONST(tx_out_zarcanum, o)
-          interted_it = src.outputs.emplace(it_to_insert, out_reference, o.stealth_address, o.concealing_point, o.amount_commitment, o.blinded_asset_id);
-          WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(td.is_zc(), "transfer #" << tr_index << ", amount: " << print_money_brief(td.amount(), get_asset_decimal_point(td.get_asset_id(), CURRENCY_DISPLAY_DECIMAL_POINT)) << " is not a ZC");
-          src.real_out_amount_blinding_mask   = td.m_zc_info_ptr->amount_blinding_mask;
-          src.real_out_asset_id_blinding_mask = td.m_zc_info_ptr->asset_id_blinding_mask;
-          src.asset_id                        = td.m_zc_info_ptr->asset_id;
-        VARIANT_SWITCH_END();
-        src.real_out_tx_key = get_tx_pub_key_from_extra(td.m_ptx_wallet_info->m_tx);
-        src.real_output = interted_it - src.outputs.begin();
-        src.real_output_in_tx_index = td.m_internal_output_index;
       }
 
       // try to construct a transaction
@@ -9025,10 +8966,6 @@ void wallet2::sweep_below(const crypto::public_key& asset_id, size_t fake_outs_c
       return rc_ok;
     };
 
-  size_t st_index_upper_boundary = std::min(selected_transfers.size(), estimated_max_inputs);
-  if (inputs_max > 0 && st_index_upper_boundary > inputs_max)
-    st_index_upper_boundary = inputs_max;
-
   try_construct_result_t res = try_construct_tx(st_index_upper_boundary, ftp, amount_swept);
 
   WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(res != rc_too_few_outputs, st_index_upper_boundary << " biggest unspent outputs have total amount of " << print_money_brief(amount_swept)
@@ -9037,39 +8974,51 @@ void wallet2::sweep_below(const crypto::public_key& asset_id, size_t fake_outs_c
   if (res == rc_too_many_outputs)
   {
     WLT_LOG_L1("sweep_below: first try of try_construct_tx(" << st_index_upper_boundary << ") returned " << get_result_t_str(res));
-    size_t low_bound = 0;
+    size_t low_bound = minimum_inputs - 1;
     size_t high_bound = st_index_upper_boundary;
-    currency::finalize_tx_param ftp_ok = ftp;
+    currency::finalize_tx_param ftp_ok{};
+    bool has_ok_candidate = false;
     for (;;)
     {
       if (low_bound + 1 >= high_bound)
       {
-        st_index_upper_boundary = low_bound;
-        res = rc_ok;
-        ftp = ftp_ok;
+        if (has_ok_candidate)
+        {
+          st_index_upper_boundary = low_bound;
+          res = rc_ok;
+          ftp = ftp_ok;
+        }
         break;
       }
       st_index_upper_boundary = (low_bound + high_bound) / 2;
-      try_construct_result_t res = try_construct_tx(st_index_upper_boundary, ftp, amount_swept);
+      res = try_construct_tx(st_index_upper_boundary, ftp, amount_swept);
       WLT_LOG_L1("sweep_below: try_construct_tx(" << st_index_upper_boundary << ") returned " << get_result_t_str(res));
       if (res == rc_ok)
       {
         low_bound = st_index_upper_boundary;
         ftp_ok = ftp;
+        has_ok_candidate = true;
       }
       else if (res == rc_too_many_outputs)
       {
         high_bound = st_index_upper_boundary;
       }
+      else if (res == rc_too_few_outputs)
+      {
+        low_bound = st_index_upper_boundary;
+      }
       else
         break;
     }
+
+    WLT_THROW_IF_FALSE_WALLET_EX_MES(has_ok_candidate || res == rc_create_tx_failed, error::tx_too_big,
+      "Unable to construct a sweep transaction: no input count both covers the fee and fits the transaction size limit");
   }
 
   if (res != rc_ok)
   {
     uint64_t amount_min = UINT64_MAX, amount_max = 0, amount_sum = 0;
-    for (auto& i : selected_transfers)
+    for (auto& i : selected_transfers_for_sources)
     {
       uint64_t amount = m_transfers.at(i).amount();
       amount_min = std::min(amount_min, amount);
@@ -9078,11 +9027,16 @@ void wallet2::sweep_below(const crypto::public_key& asset_id, size_t fake_outs_c
     }
     WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(false, "try_construct_tx failed with result: " << get_result_t_str(res) << " (" << res << ")" <<
       ", selected_transfers stats:\n" <<
-      "  outs:       " << selected_transfers.size() << ENDL <<
+      "  outs:       " << selected_transfers_for_sources.size() << ENDL <<
       "  amount min: " << print_money(amount_min) << ENDL <<
       "  amount max: " << print_money(amount_max) << ENDL <<
-      "  amount avg: " << (selected_transfers.empty() ? std::string("n/a") : print_money(amount_sum / selected_transfers.size())));
+      "  amount avg: " << (selected_transfers_for_sources.empty() ? std::string("n/a") : print_money(amount_sum / selected_transfers_for_sources.size())));
   }
+
+  amount_swept = 0;
+  for (const currency::tx_source_entry& src : ftp.sources)
+    if (src.asset_id == asset_id)
+      amount_swept += src.amount;
 
   // populate ftp.selected_transfers from ftp.sources
   ftp.selected_transfers.clear();
