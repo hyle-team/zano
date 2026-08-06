@@ -2288,6 +2288,8 @@ namespace currency
       crypto::hash tx_id;
       crypto::hash tx_hash_to_sign;
       std::string tx_blob;
+      crypto::secret_key tx_secret_key;
+      std::vector<std::string> outputs_addresses;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(status)                                          DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
@@ -2295,6 +2297,8 @@ namespace currency
         KV_SERIALIZE_POD_AS_HEX_STRING(tx_id)                         DOC_DSCR("Actual hash of the transaction") DOC_EXMP("a6e8da986858e6825fce7a192097e6afae4e889cabe853a9c29b964985b23da8") DOC_END
         KV_SERIALIZE_POD_AS_HEX_STRING(tx_hash_to_sign)               DOC_DSCR("Hash to be signed by the current owner for the gateway input") DOC_EXMP("b1c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef012") DOC_END
         KV_SERIALIZE_BLOB_AS_HEX_STRING(tx_blob)                      DOC_DSCR("Hex representation of the transaction blob.") DOC_EXMP("0100000001...") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(tx_secret_key)                 DOC_DSCR("Secret key of the transaction.") DOC_EXMP("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcd0f") DOC_END
+        KV_SERIALIZE(outputs_addresses)                               DOC_DSCR("Destination addresses list for decrypt_tx_details and similar methods") DOC_EXMP_AGGR("ZxDNaMeZjwCjnHuU5gUNyrP1pM3U5vckbakzzV6dEHyDYeCpW8XGLBFTshcaY8LkG9RQn7FsQx8w2JeJzJwPwuDm2NfixPAXf", "ZxBvJDuQjMG9R2j4WnYUhBYNrwZPwuyXrC7FHdVmWqaESgowDvgfWtiXeNGu8Px9B24pkmjsA39fzSSiEQG1ekB225ZnrMTBp") DOC_END
       END_KV_SERIALIZE_MAP()
     };
   };

@@ -917,6 +917,10 @@ namespace currency
 
     res.tx_blob = t_serializable_object_to_blob(ftx.tx);
     res.tx_id = get_transaction_hash(ftx.tx);
+    res.tx_secret_key = ftx.one_time_key;
+    for(const auto& de : ftp.prepared_destinations)
+      if (de.addr.size() == 1)
+        res.outputs_addresses.push_back(currency::get_account_address_as_str(de.addr.back()));
 
     crypto::hash tx_hash_for_input_sig = currency::prepare_prefix_hash_for_sign(ftx.tx, 0, res.tx_id);
     if (tx_hash_for_input_sig == currency::null_hash)
