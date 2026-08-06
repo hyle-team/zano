@@ -4010,6 +4010,264 @@ bool wallet_rpc_gateway_limits::c1(currency::core& c, size_t ev_index, const std
 
 //------------------------------------------------------------------------------
 
+wallet_rpc_gateway_decrypt_op::wallet_rpc_gateway_decrypt_op()
+{
+  REGISTER_CALLBACK_METHOD(wallet_rpc_gateway_decrypt_op, c1);
+}
+
+bool wallet_rpc_gateway_decrypt_op::generate(std::vector<test_event_entry>& events) const
+{
+  // Test idea: make sure decrypt_tx_outs_and_update_op over the products of gateway_create_transfer and
+  // gateway_create_owner_change works well
+
+  uint64_t ts = test_core_time::get_time();
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
+  account_base& bob_acc   = m_accounts[BOB_ACC_IDX];   bob_acc.generate();   bob_acc.set_createtime(ts);
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  DO_CALLBACK(events, "configure_core");
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+  DO_CALLBACK(events, "c1");
+  return true;
+}
+
+bool wallet_rpc_gateway_decrypt_op::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  bool r = false;
+
+  currency::t_currency_protocol_handler<currency::core> cprotocol(c, NULL);
+  nodetool::node_server<currency::t_currency_protocol_handler<currency::core> > dummy_p2p(cprotocol);
+  bc_services::bc_offers_service dummy_bc(nullptr);
+  currency::core_rpc_server core_rpc_wrapper(c, dummy_p2p, dummy_bc);
+  core_rpc_wrapper.set_ignore_connectivity_status(true);
+  core_rpc_wrapper.set_enabled_admin_api(true);
+
+  std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
+  tools::wallet_rpc_server miner_wlt_rpc(miner_wlt);
+
+  const auto& miner_addr    = m_accounts[MINER_ACC_IDX].get_public_address();
+  const std::string bob_str = m_accounts[BOB_ACC_IDX].get_public_address_str();
+
+  crypto::public_key gw_view_pub{};
+  crypto::secret_key gw_view_sec{};
+  crypto::generate_keys(gw_view_pub, gw_view_sec);
+
+  crypto::public_key old_owner_pub{};
+  crypto::secret_key old_owner_sec{};
+  crypto::generate_keys(old_owner_pub, old_owner_sec);
+
+  crypto::public_key new_owner_pub{};
+  crypto::secret_key new_owner_sec{};
+  crypto::generate_keys(new_owner_pub, new_owner_sec);
+
+  miner_wlt->refresh();
+
+  // deploy an asset, keep the whole supply on miner
+  tools::wallet_public::COMMAND_ASSETS_DEPLOY::request deploy_req{};
+  deploy_req.asset_descriptor.current_supply   = 1000;
+  deploy_req.asset_descriptor.decimal_point    = 0;
+  deploy_req.asset_descriptor.full_name        = "Decrypt Op Test Asset";
+  deploy_req.asset_descriptor.ticker           = "DOTA";
+  deploy_req.asset_descriptor.total_max_supply = 1000;
+  deploy_req.destinations.emplace_back(currency::transfer_destination{ 1000, m_accounts[MINER_ACC_IDX].get_public_address_str(), null_pkey });
+  deploy_req.do_not_split_destinations = true;
+  tools::wallet_public::COMMAND_ASSETS_DEPLOY::response deploy_resp{};
+  r = invoke_text_json_for_rpc(miner_wlt_rpc, "deploy_asset", deploy_req, deploy_resp);
+  CHECK_AND_ASSERT_MES(r, false, "deploy_asset failed");
+  crypto::public_key asset_id = deploy_resp.new_asset_id;
+
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 1);
+  CHECK_AND_ASSERT_TRUE(mine_next_pow_blocks_in_playtime(miner_addr, c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW));
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
+
+  // register a gw address owned by old_owner
+  miner_wlt->refresh();
+  tools::wallet_public::COMMAND_GATEWAY_REGISTER_ADDRESS::request gw_reg_req{};
+  tools::wallet_public::COMMAND_GATEWAY_REGISTER_ADDRESS::response gw_reg_resp{};
+  gw_reg_req.view_pub_key = gw_view_pub;
+  gw_reg_req.descriptor_info.opt_owner_custom_schnorr_pub_key = old_owner_pub;
+  gw_reg_req.descriptor_info.meta_info = "decrypt_op_test";
+  r = invoke_text_json_for_rpc_and_check_status(miner_wlt_rpc, "register_gateway_address", gw_reg_req, gw_reg_resp);
+  CHECK_AND_ASSERT_MES(r, false, "register_gateway_address failed");
+
+  CHECK_AND_ASSERT_TRUE(mine_next_pow_blocks_in_playtime(miner_addr, c, 3));
+
+  // fund the gw with native coins and the deployed asset
+  miner_wlt->refresh();
+  tools::wallet_public::COMMAND_RPC_TRANSFER::request fund_req{};
+  tools::wallet_public::COMMAND_RPC_TRANSFER::response fund_resp{};
+  fund_req.destinations.emplace_back(currency::transfer_destination{ MK_TEST_COINS(20), gw_reg_resp.address });
+  fund_req.destinations.emplace_back(currency::transfer_destination{ 50,                gw_reg_resp.address, asset_id });
+  fund_req.fee = TESTS_DEFAULT_FEE;
+  r = invoke_text_json_for_rpc(miner_wlt_rpc, "transfer", fund_req, fund_resp);
+  CHECK_AND_ASSERT_MES(r, false, "transfer to gw failed");
+
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 1);
+  CHECK_AND_ASSERT_TRUE(mine_next_pow_blocks_in_playtime(miner_addr, c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW));
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
+
+  auto gw_get_address_info = [&](currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO::response& resp) -> bool
+  {
+    currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO::request req{};
+    req.gateway_address = gw_reg_resp.address;
+    return invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_get_address_info", req, resp);
+  };
+
+  auto gw_get_balance = [&](const crypto::public_key& aid) -> uint64_t
+  {
+    currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO::response resp{};
+    CHECK_AND_ASSERT_MES(gw_get_address_info(resp), UINT64_MAX, "gateway_get_address_info failed");
+    for (const auto& b : resp.balances)
+      if (b.asset_id == aid)
+        return b.amount;
+    return 0;
+  };
+
+  auto decrypt_op = [&](const std::string& tx_blob_bin, const crypto::secret_key& tx_sec, const std::vector<std::string>& out_addrs,
+                        currency::COMMAND_RPC_DECRYPT_TX_OUTS_AND_UPDATE_OP::response& resp) -> bool
+  {
+    currency::COMMAND_RPC_DECRYPT_TX_OUTS_AND_UPDATE_OP::request req{};
+    req.tx_blob                       = epee::string_tools::buff_to_hex_nodelimer(tx_blob_bin);
+    req.tx_secret_key                 = tx_sec;
+    req.outputs_addresses             = out_addrs;
+    req.strict_output_addresses_match = false;
+    return invoke_text_json_for_rpc(core_rpc_wrapper, "decrypt_tx_outs_and_update_op", req, resp);
+  };
+
+  CHECK_AND_ASSERT_EQ(gw_get_balance(native_coin_asset_id), MK_TEST_COINS(20));
+  CHECK_AND_ASSERT_EQ(gw_get_balance(asset_id),             50);
+
+  //
+  // gateway_create_transfer -> decrypt (normal_transfer) -> sign -> send -> mine
+  //
+  currency::COMMAND_RPC_GATEWAY_CREATE_TRANSFER::request ct_req{};
+  currency::COMMAND_RPC_GATEWAY_CREATE_TRANSFER::response ct_resp{};
+  ct_req.origin_gateway_id       = gw_view_pub;
+  ct_req.gateway_view_secret_key = gw_view_sec;
+  ct_req.fee                     = TESTS_DEFAULT_FEE;
+  ct_req.comment                 = "gw decrypt op transfer";
+  ct_req.destinations.push_back({ MK_TEST_COINS(1), bob_str });
+  ct_req.destinations.push_back({ 5,                bob_str, asset_id });
+  r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_create_transfer", ct_req, ct_resp);
+  CHECK_AND_ASSERT_MES(r, false, "gateway_create_transfer failed");
+
+  {
+    currency::COMMAND_RPC_DECRYPT_TX_OUTS_AND_UPDATE_OP::response dr{};
+    r = decrypt_op(ct_resp.tx_blob, ct_resp.tx_secret_key, ct_resp.outputs_addresses, dr);
+    CHECK_AND_ASSERT_MES(r, false, "decrypt (transfer) failed");
+    CHECK_AND_ASSERT_EQ(dr.verified_tx_id, ct_resp.tx_id);
+    CHECK_AND_ASSERT_TRUE(dr.normal_transfer.has_value());
+    CHECK_AND_ASSERT_FALSE(dr.gw_update.has_value());
+    CHECK_AND_ASSERT_FALSE(dr.asset_update.has_value());
+
+    uint64_t native_sum = 0, asset_sum = 0;
+    for (const auto& o : dr.normal_transfer->decoded_outputs)
+    {
+      CHECK_AND_ASSERT_EQ(o.address, bob_str);
+      if (o.asset_id == native_coin_asset_id)
+        native_sum += o.amount;
+      else if (o.asset_id == asset_id)
+        asset_sum += o.amount;
+    }
+    CHECK_AND_ASSERT_EQ(native_sum, MK_TEST_COINS(1));
+    CHECK_AND_ASSERT_EQ(asset_sum,  5);
+
+    // a wrong tx_secret_key must be rejected
+    currency::COMMAND_RPC_DECRYPT_TX_OUTS_AND_UPDATE_OP::response dr_bad{};
+    crypto::secret_key bad_sec = ct_resp.tx_secret_key;
+    bad_sec.data[0] ^= 0x01;
+    CHECK_AND_ASSERT_FALSE(decrypt_op(ct_resp.tx_blob, bad_sec, ct_resp.outputs_addresses, dr_bad));
+  }
+
+  currency::COMMAND_RPC_GATEWAY_SIGN_TRANSFER::request st_req{};
+  currency::COMMAND_RPC_GATEWAY_SIGN_TRANSFER::response st_resp{};
+  crypto::generic_schnorr_sig_s ct_sig{};
+  r = crypto::generate_schnorr_sig(ct_resp.tx_hash_to_sign, old_owner_sec, ct_sig);
+  CHECK_AND_ASSERT_MES(r, false, "generate_schnorr_sig (transfer) failed");
+  st_req.opt_custom_schnorr_signature = ct_sig;
+  st_req.tx_blob = ct_resp.tx_blob;
+  st_req.tx_id   = ct_resp.tx_id;
+  r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_sign_transfer", st_req, st_resp);
+  CHECK_AND_ASSERT_MES(r, false, "gateway_sign_transfer failed");
+
+  currency::COMMAND_RPC_SEND_RAW_TX::request srt_req{};
+  currency::COMMAND_RPC_SEND_RAW_TX::response srt_resp{};
+  srt_req.tx_as_hex = epee::string_tools::buff_to_hex_nodelimer(st_resp.signed_tx_blob);
+  r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "sendrawtransaction", srt_req, srt_resp);
+  CHECK_AND_ASSERT_MES(r, false, "sendrawtransaction (transfer) failed");
+
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 1);
+  CHECK_AND_ASSERT_TRUE(mine_next_pow_blocks_in_playtime(miner_addr, c, 1));
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
+
+  CHECK_AND_ASSERT_EQ(gw_get_balance(native_coin_asset_id), MK_TEST_COINS(20) - MK_TEST_COINS(1) - TESTS_DEFAULT_FEE);
+  CHECK_AND_ASSERT_EQ(gw_get_balance(asset_id),             45);
+
+  //
+  // gateway_create_owner_change -> decrypt (gw_update) -> submit -> mine
+  //
+  currency::COMMAND_RPC_GATEWAY_CREATE_OWNER_CHANGE::request oc_req{};
+  currency::COMMAND_RPC_GATEWAY_CREATE_OWNER_CHANGE::response oc_resp{};
+  oc_req.address_id = gw_view_pub;
+  oc_req.new_descriptor_info.opt_owner_custom_schnorr_pub_key = new_owner_pub;
+  oc_req.fee = TESTS_DEFAULT_FEE;
+  r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_create_owner_change", oc_req, oc_resp);
+  CHECK_AND_ASSERT_MES(r, false, "gateway_create_owner_change failed");
+
+  {
+    // owner-change tx consumes the whole fee, so it carries no decodable output -> pass empty outputs_addresses
+    currency::COMMAND_RPC_DECRYPT_TX_OUTS_AND_UPDATE_OP::response dr{};
+    r = decrypt_op(oc_resp.tx_blob, oc_resp.tx_secret_key, {}, dr);
+    CHECK_AND_ASSERT_MES(r, false, "decrypt (owner change) failed");
+    CHECK_AND_ASSERT_EQ(dr.verified_tx_id, oc_resp.tx_id);
+    CHECK_AND_ASSERT_TRUE(dr.gw_update.has_value());
+    CHECK_AND_ASSERT_FALSE(dr.normal_transfer.has_value());
+    CHECK_AND_ASSERT_FALSE(dr.asset_update.has_value());
+    CHECK_AND_ASSERT_TRUE(dr.gw_update->gw_updated_descriptor.has_value());
+    const auto& gd = dr.gw_update->gw_updated_descriptor.value();
+    CHECK_AND_ASSERT_TRUE(gd.opt_owner_custom_schnorr_pub_key.has_value());
+    CHECK_AND_ASSERT_EQ(gd.opt_owner_custom_schnorr_pub_key.value(), new_owner_pub);
+    CHECK_AND_ASSERT_TRUE(gd.opt_gateway_address.has_value());
+    CHECK_AND_ASSERT_EQ(gd.opt_gateway_address.value(), gw_reg_resp.address);
+
+    // a wrong tx_secret_key must be rejected
+    currency::COMMAND_RPC_DECRYPT_TX_OUTS_AND_UPDATE_OP::response dr_bad{};
+    crypto::secret_key bad_sec = oc_resp.tx_secret_key;
+    bad_sec.data[0] ^= 0x01;
+    CHECK_AND_ASSERT_FALSE(decrypt_op(oc_resp.tx_blob, bad_sec, {}, dr_bad));
+  }
+
+  currency::COMMAND_RPC_GATEWAY_SUBMIT_OWNER_CHANGE::request so_req{};
+  currency::COMMAND_RPC_GATEWAY_SUBMIT_OWNER_CHANGE::response so_resp{};
+  crypto::generic_schnorr_sig_s oc_transfer_sig{}, oc_ownership_sig{};
+  r = crypto::generate_schnorr_sig(oc_resp.hash_to_sign_transfer, old_owner_sec, oc_transfer_sig);
+  CHECK_AND_ASSERT_MES(r, false, "generate_schnorr_sig (oc transfer) failed");
+  r = crypto::generate_schnorr_sig(oc_resp.hash_to_sign_ownership, old_owner_sec, oc_ownership_sig);
+  CHECK_AND_ASSERT_MES(r, false, "generate_schnorr_sig (oc ownership) failed");
+  so_req.opt_transfer_custom_schnorr_signature  = oc_transfer_sig;
+  so_req.opt_ownership_custom_schnorr_signature = oc_ownership_sig;
+  so_req.tx_blob = oc_resp.tx_blob;
+  so_req.tx_id   = oc_resp.tx_id;
+  r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_submit_owner_change", so_req, so_resp);
+  CHECK_AND_ASSERT_MES(r, false, "gateway_submit_owner_change failed");
+
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 1);
+  CHECK_AND_ASSERT_TRUE(mine_next_pow_blocks_in_playtime(miner_addr, c, 1));
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
+
+  currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO::response final_info{};
+  CHECK_AND_ASSERT_TRUE(gw_get_address_info(final_info));
+  CHECK_AND_ASSERT_TRUE(final_info.descriptor_info.opt_owner_custom_schnorr_pub_key.has_value());
+  CHECK_AND_ASSERT_EQ(final_info.descriptor_info.opt_owner_custom_schnorr_pub_key.value(), new_owner_pub);
+  CHECK_AND_ASSERT_EQ(gw_get_balance(native_coin_asset_id), MK_TEST_COINS(20) - MK_TEST_COINS(1) - 2 * TESTS_DEFAULT_FEE);
+
+  return true;
+}
+
+//------------------------------------------------------------------------------
+
 wallet_rpc_and_tx_unlock_time::wallet_rpc_and_tx_unlock_time()
 {
   REGISTER_CALLBACK_METHOD(wallet_rpc_and_tx_unlock_time, c1);

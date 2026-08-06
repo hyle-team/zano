@@ -1191,6 +1191,7 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY_HF(wallet_rpc_gateway_reorg_receive, "6-*");
     GENERATE_AND_PLAY_HF(wallet_rpc_gateway_owner_change_altchain, "6-*");
     GENERATE_AND_PLAY_HF(wallet_rpc_gateway_limits, "6-*");
+    GENERATE_AND_PLAY_HF(wallet_rpc_gateway_decrypt_op, "6-*");
     GENERATE_AND_PLAY_HF(wallet_rpc_and_tx_unlock_time, "5-*");
     GENERATE_AND_PLAY_HF(wallet_rpc_sweep_below, "4-*");
     GENERATE_AND_PLAY_HF(wallet_rpc_sweep_below_wo_native, "4-*");
