@@ -802,8 +802,7 @@ namespace currency
         bool last_received_block_is_in_mainchain = m_core.get_blockchain_storage().have_block_main(context.m_priv.m_last_fetched_block_ids.get_top_block_id());
         bool far_from_top = context.m_priv.m_last_fetched_block_ids.get_top_block_height() + BLOCKS_IDS_SYNCHRONIZING_DEFAULT_COUNT < m_core.get_blockchain_storage().get_current_blockchain_size();
         if (!last_received_block_is_in_mainchain || (last_received_block_is_in_mainchain && far_from_top))
-        {          
-          block_extended_info blk = AUTO_VAL_INIT(blk);
+        {
           // In this scenario, it's likely the remote daemon is on an alternate chain 
           // where the network split goes deeper than 2000 blocks. The NOTIFY_REQUEST_GET_OBJECTS 
           // call returns a batch of BLOCKS_IDS_SYNCHRONIZING_DEFAULT_COUNT IDs, which may 
@@ -825,6 +824,7 @@ namespace currency
 
       if (!r.block_ids.size())
       {
+        context.m_priv.m_last_fetched_block_ids.clear();
         m_core.get_short_chain_history(r.block_ids);
       }
       LOG_PRINT_L2("[NOTIFY]NOTIFY_REQUEST_CHAIN: m_block_ids.size()=" << r.block_ids.size());
@@ -1082,6 +1082,13 @@ namespace currency
       m_p2p->drop_connection(context);
       m_p2p->add_ip_fail(context.m_remote_ip);
       return 1;
+    }
+
+    //some times other threads might have delivered blocks after last delivery of this thread and before this moment, 
+    //and this thread might continue not from the point it lastly finished but from newer blocks.
+    if (context.m_priv.m_last_fetched_block_ids.get_blockchain_current_size() != arg.start_height)
+    {
+      context.m_priv.m_last_fetched_block_ids.clear();
     }
 
     uint64_t height = arg.start_height;

@@ -13,12 +13,10 @@ namespace tools
 {
   struct proxy_diagnostic_info 
   {
-    proxy_diagnostic_info():is_busy(false), last_success_interract_time(0), last_daemon_is_disconnected(0)
-    {}
-    std::atomic<bool> is_busy;
-    std::atomic<time_t> last_success_interract_time;
-    std::atomic<bool> last_daemon_is_disconnected;
-    std::atomic<bool> incompatible_server;
+    std::atomic<bool> is_busy = false;
+    std::atomic<time_t> last_success_interract_time = 0;
+    std::atomic<bool> last_daemon_is_disconnected = 0;
+    std::atomic<bool> incompatible_server = false;
   };
 
   /*
