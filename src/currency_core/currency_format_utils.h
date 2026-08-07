@@ -266,6 +266,7 @@ namespace currency
     std::shared_ptr< const std::list<asset_descriptor_operation> > asset_op_history;
   };
 
+  bool collect_rangeproofs_data_from_tx(const transaction& tx, const crypto::hash& tx_id, std::vector<zc_outs_range_proofs_with_commitments>& agregated_proofs);
   bool verify_multiple_zc_outs_range_proofs(const std::vector<zc_outs_range_proofs_with_commitments>& range_proofs);
   bool generate_asset_surjection_proof(const crypto::hash& context_hash, bool has_non_zc_inputs, tx_generation_context& ogc, transaction& tx_to_add_proof_to);
   bool verify_asset_surjection_proof(const transaction& tx, const crypto::hash& tx_id);
