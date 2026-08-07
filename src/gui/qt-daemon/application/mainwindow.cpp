@@ -2111,7 +2111,7 @@ QString MainWindow::generate_wallet(const QString& param)
   //return que_call2<view::open_wallet_request>("generate_wallet", param, [this](const view::open_wallet_request& owd, view::api_response& ar){
   PREPARE_ARG_FROM_JSON(view::open_wallet_request, owd);
   PREPARE_RESPONSE(view::open_wallet_response, ar);
-  ar.error_code = m_backend.generate_wallet(epee::string_encoding::utf8_to_wstring(owd.path), owd.pass, ar.response_data);
+  ar.error_code = m_backend.generate_wallet(epee::string_encoding::utf8_to_wstring(owd.path), owd.pass, ar.response_data, owd.allow_weak_password);
   return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }

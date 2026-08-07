@@ -217,6 +217,10 @@ static_assert(CURRENCY_FORMATION_VERSION == 103);
                                                                //which is about 15 years
 #define WALLET_BRAIN_DATE_MAX_WEEKS_COUNT               800
 
+// Password policy
+#define WALLET_PASSWORD_MIN_LENGTH                      8
+#define WALLET_PASSWORD_MAX_LENGTH                      256
+
 #define OFFER_MAXIMUM_LIFE_TIME                         (60*60*24*30)  // 30 days
 
 #define GUI_BLOCKS_DISPLAY_COUNT                        40
