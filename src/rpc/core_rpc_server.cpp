@@ -2073,7 +2073,9 @@ namespace currency
     //as range_proofs are calculated for the whole block due to performance optimization and in case of failure it's not possible to say 
     // which particular tx broke whole thing, we have to check range proos separately for each transactions before we go into the loop.
     std::list<std::pair<crypto::hash, transaction>> txs;
-    size_t tx_count_in_pool = m_core.get_tx_pool().get_all_transactions_list(txs);
+    bool r = m_core.get_tx_pool().get_all_transactions_list(txs);
+    CHECK_AND_ASSERT_MES_NO_RET(r, "get_all_transactions_list() failed");
+    size_t tx_count_in_pool = txs.size();
     for(const auto& tx_pair : txs)
     {
       const auto& tx = tx_pair.second;

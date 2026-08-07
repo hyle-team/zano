@@ -156,7 +156,6 @@ namespace currency
     bool insert_alias_info(const transaction& tx);
     bool remove_alias_info(const transaction& tx);
     bool check_tx_fee(const transaction &tx, uint64_t amount_fee) const;
-    bool check_single_tx_range_proofs(const transaction& tx, const crypto::hash& tx_id);
     std::string get_blacklisted_txs_string() const;
 
     bool is_valid_contract_finalization_tx(const transaction &tx)const;
