@@ -1138,12 +1138,12 @@ namespace tools::wallet_public
       crypto::public_key asset_id = currency::native_coin_asset_id;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(mixin)              DOC_DSCR("Number of outputs from the blockchain to mix with when sending a transaction to improve privacy.") DOC_EXMP(15) DOC_END
+        KV_SERIALIZE(mixin)              DOC_DSCR("Number of outputs from the blockchain to mix with when sending a transaction to improve privacy. Auditable wallets use no decoys. For other wallets, zero requests a direct spend where permitted; a non-zero value for legacy bare inputs is raised to the network minimum used by decoy selection v4, and Zarcanum inputs use the mandatory network minimum.") DOC_EXMP(15) DOC_END
         KV_SERIALIZE(address)            DOC_DSCR("Public address for sending or receiving native coins.") DOC_EXMP("ZxBvJDuQjMG9R2j4WnYUhBYNrwZPwuyXrC7FHdVmWqaESgowDvgfWtiXeNGu8Px9B24pkmjsA39fzSSiEQG1ekB225ZnrMTBp") DOC_END
         KV_SERIALIZE(amount)             DOC_DSCR("Threshold amount of native coins to sweep.") DOC_EXMP(1000000000000) DOC_END
         KV_SERIALIZE(payment_id_hex)     DOC_DSCR("[deprecated] Legacy tx-wide hex-encoded payment_id, that normally used for user database by exchanges") DOC_EXMP_AUTO("")     DOC_END
         KV_SERIALIZE(fee)                DOC_DSCR("Transaction fee required for processing the transaction.") DOC_EXMP(10000000000) DOC_END
-        KV_SERIALIZE(max_inputs)         DOC_DSCR("[optional] Maximum number of inputs in sweeping transaction. Default is the maximum possible.") DOC_EXMP(5) DOC_END
+        KV_SERIALIZE(max_inputs)         DOC_DSCR("[optional] Maximum number of inputs in sweeping transaction. Default is the maximum possible. Asset sweeps require at least two inputs: one native fee input and one asset input.") DOC_EXMP(5) DOC_END
         KV_SERIALIZE(min_outputs)        DOC_DSCR("[optional] Minimum number of outputs in sweeping transaction. Default is the minimum possible.") DOC_EXMP(3) DOC_END
         KV_SERIALIZE_POD_AS_HEX_STRING(asset_id) DOC_DSCR("[optional] Asset ID to filter outputs. Native coin if not specified.") DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
       END_KV_SERIALIZE_MAP()
