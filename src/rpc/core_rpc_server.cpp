@@ -2081,7 +2081,7 @@ namespace currency
       const auto& tx = tx_pair.second;
       if(!currency::check_single_tx_range_proofs(tx, tx_pair.first))
       {
-        LOG_PRINT_MAGENTA("Transaction " << get_transaction_hash(tx) << " has invalid range proof, will be blacklisted", LOG_LEVEL_0);
+        LOG_PRINT_MAGENTA("Transaction " << tx_pair.first << " has invalid range proof, will be blacklisted", LOG_LEVEL_0);
         m_core.get_tx_pool().add_transaction_to_black_list(tx);
       }
     }
