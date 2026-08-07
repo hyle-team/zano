@@ -411,6 +411,7 @@ namespace tools
         return false;
       if (res != MDB_SUCCESS)
       {
+        LOG_ERROR("mdb_get failed on container " << h << ": " << res << ": " << mdb_strerror(res));
         return false;
       }
 
