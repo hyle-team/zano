@@ -2069,7 +2069,26 @@ namespace currency
     size_t sim_count = 0;
     account_base acc;
     acc.generate();
-    while (simulation_result_str == API_RETURN_CODE_SIMULATION_FAILED)
+    
+    //as range_proofs are calculated for the whole block due to performance optimization and in case of failure it's not possible to say 
+    // which particular tx broke whole thing, we have to check range proos separately for each transactions before we go into the loop.
+    std::list<std::pair<crypto::hash, transaction>> txs;
+    size_t tx_count_in_pool = m_core.get_tx_pool().get_all_transactions_list(txs);
+    for(const auto& tx_pair : txs)
+    {
+      const auto& tx = tx_pair.second;
+      if(!currency::check_single_tx_range_proofs(tx, tx_pair.first))
+      {
+        LOG_PRINT_MAGENTA("Transaction " << get_transaction_hash(tx) << " has invalid range proof, will be blacklisted", LOG_LEVEL_0);
+        m_core.get_tx_pool().add_transaction_to_black_list(tx);
+      }
+    }
+
+    // simulation suposed to blacklist failing transactions, so we will try to call getblocktemplate 
+    // in simulation mode until it will return something else than "simulation failed" or until we will 
+    // reach the number of transactions in the pool + 1 (to avoid infinite loop)
+
+    while(simulation_result_str == API_RETURN_CODE_SIMULATION_FAILED && sim_count < tx_count_in_pool+1)
     {
       //calling getblocktemplate in simulation mode
       currency::COMMAND_RPC_GETBLOCKTEMPLATE::request tmpl_req_sim = AUTO_VAL_INIT(tmpl_req_sim);

@@ -602,6 +602,16 @@ namespace currency
     return true;
   }
   //---------------------------------------------------------------------------------
+  bool tx_memory_pool::get_all_transactions_list(std::list<std::pair<crypto::hash, transaction>>& txs) const
+  {
+    m_db_transactions.enumerate_items([&](uint64_t i, const crypto::hash& h, const tx_details& tx_entry)
+                                      {
+      txs.push_back(std::make_pair(h, tx_entry.tx));
+      return true; 
+      });
+    return true;
+  }
+  //---------------------------------------------------------------------------------
   bool tx_memory_pool::get_all_transactions_list(std::list<std::string>& txs)const
   {
     m_db_transactions.enumerate_items([&](uint64_t i, const crypto::hash& h, const tx_details &tx_entry)
@@ -1505,17 +1515,6 @@ namespace currency
           return false;
       }
     }
-
-    return true;
-  }
-  //---------------------------------------------------------------------------------
-  bool tx_memory_pool::check_single_tx_range_proofs(const transaction& tx, const crypto::hash& tx_id)
-  {
-    std::vector<zc_outs_range_proofs_with_commitments> range_proofs_agregated;
-
-    CHECK_AND_ASSERT_MES(collect_rangeproofs_data_from_tx(tx, tx_id, range_proofs_agregated), false, "tx " << tx_id << ": collect_rangeproofs_data_from_tx failed");
-
-    CHECK_AND_ASSERT_MES(verify_multiple_zc_outs_range_proofs(range_proofs_agregated), false, "tx " << tx_id << " has invalid range proofs");
 
     return true;
   }
