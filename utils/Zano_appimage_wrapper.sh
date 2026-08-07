@@ -1,6 +1,159 @@
 #!/bin/bash
 script_dir=$( dirname "$(readlink -f "$0")" )
 
+parse_manual_binary_arguments()
+{
+  local input="$1"
+  local current_argument=""
+  local state="unquoted"
+  local character
+  local argument_started=false
+  local i
+
+  manual_binary_arguments=()
+
+  for ((i = 0; i < ${#input}; ++i)); do
+    character="${input:i:1}"
+
+    case "$state" in
+      unquoted)
+        case "$character" in
+          " "|$'\t'|$'\n')
+            if [ "$argument_started" = true ]; then
+              manual_binary_arguments+=("$current_argument")
+              current_argument=""
+              argument_started=false
+            fi
+            ;;
+          "'")
+            state="single-quoted"
+            argument_started=true
+            ;;
+          '"')
+            state="double-quoted"
+            argument_started=true
+            ;;
+          "\\")
+            state="unquoted-escape"
+            argument_started=true
+            ;;
+          *)
+            current_argument+="$character"
+            argument_started=true
+            ;;
+        esac
+        ;;
+      single-quoted)
+        if [ "$character" = "'" ]; then
+          state="unquoted"
+        else
+          current_argument+="$character"
+        fi
+        ;;
+      double-quoted)
+        case "$character" in
+          '"')
+            state="unquoted"
+            ;;
+          "\\")
+            state="double-quoted-escape"
+            ;;
+          *)
+            current_argument+="$character"
+            ;;
+        esac
+        ;;
+      unquoted-escape)
+        current_argument+="$character"
+        state="unquoted"
+        ;;
+      double-quoted-escape)
+        current_argument+="$character"
+        state="double-quoted"
+        ;;
+    esac
+  done
+
+  if [ "$state" != "unquoted" ]; then
+    echo "Invalid value for --exec-args: unmatched quote or trailing escape." >&2
+    return 1
+  fi
+
+  if [ "$argument_started" = true ]; then
+    manual_binary_arguments+=("$current_argument")
+  fi
+}
+
+
+call_manual_binary()
+{
+  local manual_binary="$1"
+  local manual_binary_path
+
+  case "$manual_binary" in
+    ""|*/*|"."|"..")
+      echo "Invalid value for --exec: specify an executable name from usr/bin." >&2
+      exit 2
+      ;;
+  esac
+
+  manual_binary_path="${script_dir}/usr/bin/${manual_binary}"
+  if [ ! -f "$manual_binary_path" ] || [ ! -x "$manual_binary_path" ]; then
+    echo "Executable '${manual_binary}' was not found in the AppImage usr/bin directory." >&2
+    exit 2
+  fi
+
+  shift
+  cd "$script_dir" || exit 1
+  exec "$manual_binary_path" "$@"
+}
+
+
+manual_binary=""
+manual_binary_arguments_string=""
+manual_binary_option_seen=false
+manual_binary_arguments_option_seen=false
+manual_execution_extra_arguments=()
+
+for argument in "$@"; do
+  case "$argument" in
+    --exec=*)
+      if [ "$manual_binary_option_seen" = true ]; then
+        echo "--exec may only be specified once." >&2
+        exit 2
+      fi
+      manual_binary="${argument#*=}"
+      manual_binary_option_seen=true
+      ;;
+    --exec-args=*)
+      if [ "$manual_binary_arguments_option_seen" = true ]; then
+        echo "--exec-args may only be specified once." >&2
+        exit 2
+      fi
+      manual_binary_arguments_string="${argument#*=}"
+      manual_binary_arguments_option_seen=true
+      ;;
+    *)
+      manual_execution_extra_arguments+=("$argument")
+      ;;
+  esac
+done
+
+if [ "$manual_binary_option_seen" = true ] || [ "$manual_binary_arguments_option_seen" = true ]; then
+  if [ "$manual_binary_option_seen" != true ]; then
+    echo "--exec-args requires --exec." >&2
+    exit 2
+  fi
+
+  if [ ${#manual_execution_extra_arguments[@]} -ne 0 ]; then
+    echo "Arguments for a manually selected executable must be passed through --exec-args." >&2
+    exit 2
+  fi
+
+  parse_manual_binary_arguments "$manual_binary_arguments_string" || exit 2
+  call_manual_binary "$manual_binary" "${manual_binary_arguments[@]}"
+fi
+
 desktop_dir=~/.local/share/applications
 icon_dir=~/.local/share/icons/hicolor/256x256/apps
 version="$(echo ${APPIMAGE} | rev | cut -d '-' -f1,2 | rev | sed 's/\.AppImage$//')"
