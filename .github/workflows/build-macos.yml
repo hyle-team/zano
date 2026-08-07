@@ -1,0 +1,590 @@
+name: macOS build
+
+on:
+  workflow_dispatch:
+    inputs:
+      testnet:
+        description: 'Build testnet binaries (-D TESTNET=TRUE)'
+        type: boolean
+        default: false
+
+env:
+  BOOST_VERSION: 1.84.0
+  BOOST_SHA256: cc4b893acf645c9d4b698e9a0f08ca8846aa5d6c68275c14c3e7949c24109454
+  OPENSSL_VERSION: 1.1.1w
+  OPENSSL_SHA256: cf3098950cb4d853ad95c0841f1f9c6d3dc102dccfcacd521d93925208b76ac8
+
+jobs:
+  build-cli:
+    name: macOS CLI ${{ matrix.arch }}${{ inputs.testnet == true && ' (testnet)' || '' }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: macos-15-intel
+            cmake_arch: x86_64
+            osx_min: '10.15'
+            openssl_target: darwin64-x86_64-cc
+          - arch: arm64
+            runner: macos-15
+            cmake_arch: arm64
+            osx_min: '11.0'
+            openssl_target: darwin64-arm64-cc
+    env:
+      DEPS_DIR: ${{ github.workspace }}/_deps
+    steps:
+      - name: Checkout (with submodules)
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          # full history: src/version.cmake and libmdbx count revisions via git
+          fetch-depth: 0
+
+      - name: Cache Boost & OpenSSL
+        id: deps-cache
+        uses: actions/cache@v6
+        with:
+          path: ${{ env.DEPS_DIR }}
+          key: deps-${{ matrix.runner }}-${{ matrix.arch }}-boost${{ env.BOOST_VERSION }}-openssl${{ env.OPENSSL_VERSION }}-min${{ matrix.osx_min }}-v1
+
+      - name: Build OpenSSL (static)
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p "$DEPS_DIR" && cd "$DEPS_DIR"
+          curl -fL -o "openssl-${OPENSSL_VERSION}.tar.gz" \
+            "https://github.com/openssl/openssl/releases/download/OpenSSL_$(echo "$OPENSSL_VERSION" | tr . _)/openssl-${OPENSSL_VERSION}.tar.gz" \
+          || curl -fL -o "openssl-${OPENSSL_VERSION}.tar.gz" \
+            "https://www.openssl.org/source/old/1.1.1/openssl-${OPENSSL_VERSION}.tar.gz"
+          echo "${OPENSSL_SHA256}  openssl-${OPENSSL_VERSION}.tar.gz" | shasum -a 256 -c
+          tar xzf "openssl-${OPENSSL_VERSION}.tar.gz"
+          cd "openssl-${OPENSSL_VERSION}"
+          ./Configure ${{ matrix.openssl_target }} no-shared no-tests \
+            --prefix="$DEPS_DIR/openssl" --openssldir="$DEPS_DIR/openssl" \
+            -mmacosx-version-min=${{ matrix.osx_min }}
+          make -j"$(sysctl -n hw.ncpu)"
+          make install_sw
+          cd "$DEPS_DIR" && rm -rf "openssl-${OPENSSL_VERSION}" "openssl-${OPENSSL_VERSION}.tar.gz"
+
+      - name: Build Boost (static)
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        run: |
+          boost_und=$(echo "$BOOST_VERSION" | tr . _)
+          mkdir -p "$DEPS_DIR" && cd "$DEPS_DIR"
+          curl -fL -O "https://archives.boost.io/release/${BOOST_VERSION}/source/boost_${boost_und}.tar.bz2"
+          echo "${BOOST_SHA256}  boost_${boost_und}.tar.bz2" | shasum -a 256 -c
+          tar xjf "boost_${boost_und}.tar.bz2"
+          cd "boost_${boost_und}"
+          ./bootstrap.sh --with-libraries=system,filesystem,thread,date_time,chrono,regex,serialization,atomic,program_options,locale,timer,log
+          # static libs; boost.locale uses iconv, linked via -liconv
+          ./b2 -j"$(sysctl -n hw.ncpu)" \
+            link=static runtime-link=shared threading=multi variant=release \
+            boost.locale.icu=off \
+            cxxflags="-mmacosx-version-min=${{ matrix.osx_min }}" \
+            linkflags="-mmacosx-version-min=${{ matrix.osx_min }}" \
+            install --prefix="$DEPS_DIR/boost"
+          cd "$DEPS_DIR" && rm -rf "boost_${boost_und}" "boost_${boost_und}.tar.bz2"
+
+      - name: Configure (CMake)
+        run: |
+          testnet_def=""
+          if [ "${{ inputs.testnet }}" = "true" ]; then testnet_def="-D TESTNET=TRUE"; fi
+          mkdir -p build && cd build
+          # CMAKE_POLICY_VERSION_MINIMUM=3.5: CMake 4.x vs old vendored subprojects
+          # -liconv: required by statically linked boost_locale
+          cmake $testnet_def \
+            -D CMAKE_BUILD_TYPE=Release \
+            -D CMAKE_OSX_ARCHITECTURES=${{ matrix.cmake_arch }} \
+            -D CMAKE_OSX_DEPLOYMENT_TARGET=${{ matrix.osx_min }} \
+            -D CMAKE_POLICY_VERSION_MINIMUM=3.5 \
+            -D CMAKE_EXE_LINKER_FLAGS="-liconv" \
+            -D BOOST_ROOT="$DEPS_DIR/boost" \
+            -D OPENSSL_ROOT_DIR="$DEPS_DIR/openssl" \
+            ..
+
+      - name: Build (zanod, simplewallet, connectivity_tool)
+        run: cd build && make -j"$(sysctl -n hw.ncpu)" daemon simplewallet connectivity_tool
+
+      - name: Check code signing secrets
+        id: signcheck
+        env:
+          CERT: ${{ secrets.MACOS_SIGN_CERT_P12 }}
+        run: |
+          if [ -n "$CERT" ]; then
+            echo "sign=true" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Code signing::ENABLED -MACOS_SIGN_CERT_P12 secret found, binaries will be signed"
+          else
+            echo "sign=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Code signing::SKIPPED -no MACOS_SIGN_CERT_P12 secret, producing unsigned build"
+          fi
+
+      - name: Sign binaries (Developer ID)
+        if: steps.signcheck.outputs.sign == 'true'
+        env:
+          CERT_P12_B64: ${{ secrets.MACOS_SIGN_CERT_P12 }}
+          CERT_PASSWORD: ${{ secrets.MACOS_SIGN_CERT_PASSWORD }}
+        run: |
+          keychain="$RUNNER_TEMP/sign.keychain-db"
+          kc_pass=$(uuidgen)
+          security create-keychain -p "$kc_pass" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$kc_pass" "$keychain"
+          echo "$CERT_P12_B64" | base64 -d > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$keychain" -P "$CERT_PASSWORD" -T /usr/bin/codesign
+          rm -f "$RUNNER_TEMP/cert.p12"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$kc_pass" "$keychain" > /dev/null
+          security list-keychains -d user -s "$keychain" login.keychain
+          identity=$(security find-identity -v -p codesigning "$keychain" | awk -F'"' '/Developer ID Application/ { print $2; exit }')
+          if [ -z "$identity" ]; then
+            echo "::error::No 'Developer ID Application' identity found in the imported .p12"
+            exit 1
+          fi
+          echo "Signing with identity: $identity"
+          cd build/src
+          for b in zanod simplewallet connectivity_tool; do
+            codesign --force --options runtime --timestamp --keychain "$keychain" --sign "$identity" "$b"
+            codesign -dv "$b" 2>&1 | head -3
+          done
+
+      - name: Smoke test
+        run: |
+          cd build/src
+          file zanod simplewallet connectivity_tool
+          lipo -archs zanod
+          ./zanod --version
+          ./simplewallet --version
+          ./connectivity_tool --version
+
+      - name: Package
+        run: |
+          cd build/src
+          version_str=$(./zanod --version | awk '/^Zano/ { print $2; exit }')
+          suffix=""
+          if [ "${{ inputs.testnet }}" = "true" ]; then suffix="-testnet"; fi
+          pkg="zano-macos-${{ matrix.arch }}-cli${suffix}-${version_str}"
+          mkdir "$pkg"
+          cp zanod simplewallet connectivity_tool "$pkg/"
+          tar -cjf "$pkg.tar.bz2" "$pkg"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: zano-macos-${{ matrix.arch }}-cli${{ inputs.testnet == true && '-testnet' || '' }}
+          # file name contains [commit] brackets, so use a wildcard
+          path: build/src/zano-macos-*.tar.bz2
+          if-no-files-found: error
+
+  make-universal:
+    name: macOS Universal CLI (lipo)
+    needs: build-cli
+    runs-on: macos-15
+    timeout-minutes: 15
+    steps:
+      - name: Download both artifacts
+        uses: actions/download-artifact@v8
+        with:
+          pattern: zano-macos-*-cli*
+          merge-multiple: true
+          path: artifacts
+
+      - name: Glue with lipo
+        run: |
+          shopt -s nullglob
+          x64_tar=(artifacts/zano-macos-x64-cli*.tar.bz2)
+          arm_tar=(artifacts/zano-macos-arm64-cli*.tar.bz2)
+          mkdir x64 arm64
+          tar -xjf "${x64_tar[0]}" --strip-components=1 -C x64
+          tar -xjf "${arm_tar[0]}" --strip-components=1 -C arm64
+          base=$(basename "${x64_tar[0]}" .tar.bz2)
+          pkg="zano-macos-universal-${base#zano-macos-x64-}"
+          mkdir "$pkg"
+          for b in zanod simplewallet connectivity_tool; do
+            lipo -create -output "$pkg/$b" "x64/$b" "arm64/$b"
+            lipo -archs "$pkg/$b"
+          done
+          echo "PKG=$pkg" >> "$GITHUB_ENV"
+
+      - name: Check code signing secrets
+        id: signcheck
+        env:
+          CERT: ${{ secrets.MACOS_SIGN_CERT_P12 }}
+        run: |
+          if [ -n "$CERT" ]; then
+            echo "sign=true" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Code signing::ENABLED -universal binaries will be re-signed"
+          else
+            echo "sign=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Code signing::SKIPPED -no MACOS_SIGN_CERT_P12 secret, universal binaries stay unsigned"
+          fi
+
+      - name: Sign universal binaries (Developer ID)
+        if: steps.signcheck.outputs.sign == 'true'
+        env:
+          CERT_P12_B64: ${{ secrets.MACOS_SIGN_CERT_P12 }}
+          CERT_PASSWORD: ${{ secrets.MACOS_SIGN_CERT_PASSWORD }}
+        run: |
+          keychain="$RUNNER_TEMP/sign.keychain-db"
+          kc_pass=$(uuidgen)
+          security create-keychain -p "$kc_pass" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$kc_pass" "$keychain"
+          echo "$CERT_P12_B64" | base64 -d > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$keychain" -P "$CERT_PASSWORD" -T /usr/bin/codesign
+          rm -f "$RUNNER_TEMP/cert.p12"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$kc_pass" "$keychain" > /dev/null
+          security list-keychains -d user -s "$keychain" login.keychain
+          identity=$(security find-identity -v -p codesigning "$keychain" | awk -F'"' '/Developer ID Application/ { print $2; exit }')
+          if [ -z "$identity" ]; then
+            echo "::error::No 'Developer ID Application' identity found in the imported .p12"
+            exit 1
+          fi
+          echo "Signing with identity: $identity"
+          for b in zanod simplewallet connectivity_tool; do
+            codesign --force --options runtime --timestamp --keychain "$keychain" --sign "$identity" "$PKG/$b"
+            codesign -dv "$PKG/$b" 2>&1 | head -3
+          done
+
+      - name: Package universal
+        run: |
+          "./$PKG/zanod" --version
+          tar -cjf "$PKG.tar.bz2" "$PKG"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: zano-macos-universal-cli${{ inputs.testnet == true && '-testnet' || '' }}
+          path: zano-macos-universal-*.tar.bz2
+          if-no-files-found: error
+
+  # Release-style GUI build (Zano.app packed into a dmg)
+  build-gui-x64:
+    name: macOS GUI x64 (Qt 6.8)${{ inputs.testnet == true && ' (testnet)' || '' }}
+    runs-on: macos-15-intel
+    timeout-minutes: 240
+    env:
+      DEPS_DIR: ${{ github.workspace }}/_deps
+      OSX_MIN: '10.15'
+    steps:
+      - name: Checkout (with submodules)
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      # same key as the CLI x64 job -> shares its Boost/OpenSSL cache
+      - name: Cache Boost & OpenSSL
+        id: deps-cache
+        uses: actions/cache@v6
+        with:
+          path: ${{ env.DEPS_DIR }}
+          key: deps-macos-15-intel-x64-boost${{ env.BOOST_VERSION }}-openssl${{ env.OPENSSL_VERSION }}-min10.15-v1
+
+      - name: Build OpenSSL (static)
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p "$DEPS_DIR" && cd "$DEPS_DIR"
+          curl -fL -o "openssl-${OPENSSL_VERSION}.tar.gz" \
+            "https://github.com/openssl/openssl/releases/download/OpenSSL_$(echo "$OPENSSL_VERSION" | tr . _)/openssl-${OPENSSL_VERSION}.tar.gz" \
+          || curl -fL -o "openssl-${OPENSSL_VERSION}.tar.gz" \
+            "https://www.openssl.org/source/old/1.1.1/openssl-${OPENSSL_VERSION}.tar.gz"
+          echo "${OPENSSL_SHA256}  openssl-${OPENSSL_VERSION}.tar.gz" | shasum -a 256 -c
+          tar xzf "openssl-${OPENSSL_VERSION}.tar.gz"
+          cd "openssl-${OPENSSL_VERSION}"
+          ./Configure darwin64-x86_64-cc no-shared no-tests \
+            --prefix="$DEPS_DIR/openssl" --openssldir="$DEPS_DIR/openssl" \
+            -mmacosx-version-min=$OSX_MIN
+          make -j"$(sysctl -n hw.ncpu)"
+          make install_sw
+          cd "$DEPS_DIR" && rm -rf "openssl-${OPENSSL_VERSION}" "openssl-${OPENSSL_VERSION}.tar.gz"
+
+      - name: Build Boost (static)
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        run: |
+          boost_und=$(echo "$BOOST_VERSION" | tr . _)
+          mkdir -p "$DEPS_DIR" && cd "$DEPS_DIR"
+          curl -fL -O "https://archives.boost.io/release/${BOOST_VERSION}/source/boost_${boost_und}.tar.bz2"
+          echo "${BOOST_SHA256}  boost_${boost_und}.tar.bz2" | shasum -a 256 -c
+          tar xjf "boost_${boost_und}.tar.bz2"
+          cd "boost_${boost_und}"
+          ./bootstrap.sh --with-libraries=system,filesystem,thread,date_time,chrono,regex,serialization,atomic,program_options,locale,timer,log
+          ./b2 -j"$(sysctl -n hw.ncpu)" \
+            link=static runtime-link=shared threading=multi variant=release \
+            boost.locale.icu=off \
+            cxxflags="-mmacosx-version-min=$OSX_MIN" \
+            linkflags="-mmacosx-version-min=$OSX_MIN" \
+            install --prefix="$DEPS_DIR/boost"
+          cd "$DEPS_DIR" && rm -rf "boost_${boost_und}" "boost_${boost_und}.tar.bz2"
+
+      - name: Install Qt 6.8 (with WebEngine)
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.3'
+          arch: clang_64
+          modules: 'qtwebengine qtwebchannel qtpositioning'
+          cache: true
+
+      - name: Configure (CMake, BUILD_GUI)
+        run: |
+          testnet_def=""
+          if [ "${{ inputs.testnet }}" = "true" ]; then testnet_def="-D TESTNET=TRUE"; fi
+          mkdir -p build && cd build
+          # deployment target 12.0: minimum supported by Qt 6.8
+          cmake $testnet_def \
+            -D CMAKE_BUILD_TYPE=Release \
+            -D BUILD_GUI=TRUE \
+            -D CMAKE_PREFIX_PATH="$QT_ROOT_DIR" \
+            -D CMAKE_OSX_ARCHITECTURES=x86_64 \
+            -D CMAKE_OSX_DEPLOYMENT_TARGET=12.0 \
+            -D CMAKE_POLICY_VERSION_MINIMUM=3.5 \
+            -D CMAKE_EXE_LINKER_FLAGS="-liconv" \
+            -D BOOST_ROOT="$DEPS_DIR/boost" \
+            -D OPENSSL_ROOT_DIR="$DEPS_DIR/openssl" \
+            ..
+
+      - name: Build (Zano.app, zanod, simplewallet)
+        run: cd build && make -j"$(sysctl -n hw.ncpu)" Zano daemon simplewallet
+
+      - name: Assemble Zano.app
+        run: |
+          cd build/src
+          # align the binary name with the bundle (no-op if already 'Zano')
+          mv Zano.app/Contents/MacOS/zano Zano.app/Contents/MacOS/Zano || true
+          cp zanod simplewallet Zano.app/Contents/MacOS/
+          "$QT_ROOT_DIR/bin/macdeployqt" Zano.app
+          # ship html layout as in the official package
+          rsync -a ../../src/gui/qt-daemon/layout/html Zano.app/Contents/MacOS --exclude less --exclude package.json --exclude gulpfile.js
+          cp ../../src/gui/qt-daemon/app.icns Zano.app/Contents/Resources/
+
+      - name: Check code signing secrets
+        id: signcheck
+        env:
+          CERT: ${{ secrets.MACOS_SIGN_CERT_P12 }}
+        run: |
+          if [ -n "$CERT" ]; then
+            echo "sign=true" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Code signing::ENABLED -Zano.app will be signed with Developer ID"
+          else
+            echo "sign=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Code signing::SKIPPED -no MACOS_SIGN_CERT_P12 secret, Zano.app gets an ad-hoc signature"
+          fi
+
+      - name: Sign Zano.app (Developer ID)
+        if: steps.signcheck.outputs.sign == 'true'
+        env:
+          CERT_P12_B64: ${{ secrets.MACOS_SIGN_CERT_P12 }}
+          CERT_PASSWORD: ${{ secrets.MACOS_SIGN_CERT_PASSWORD }}
+        run: |
+          keychain="$RUNNER_TEMP/sign.keychain-db"
+          kc_pass=$(uuidgen)
+          security create-keychain -p "$kc_pass" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$kc_pass" "$keychain"
+          echo "$CERT_P12_B64" | base64 -d > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$keychain" -P "$CERT_PASSWORD" -T /usr/bin/codesign
+          rm -f "$RUNNER_TEMP/cert.p12"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$kc_pass" "$keychain" > /dev/null
+          security list-keychains -d user -s "$keychain" login.keychain
+          identity=$(security find-identity -v -p codesigning "$keychain" | awk -F'"' '/Developer ID Application/ { print $2; exit }')
+          if [ -z "$identity" ]; then
+            echo "::error::No 'Developer ID Application' identity found in the imported .p12"
+            exit 1
+          fi
+          echo "Signing with identity: $identity"
+          codesign --force --deep --timestamp --options runtime \
+            --entitlements utils/macos_entitlements.plist \
+            --keychain "$keychain" --sign "$identity" build/src/Zano.app
+          codesign --verify --deep --strict build/src/Zano.app
+
+      - name: Sign Zano.app (ad-hoc)
+        if: steps.signcheck.outputs.sign != 'true'
+        run: |
+          codesign --force --deep --sign - build/src/Zano.app
+          codesign --verify --deep build/src/Zano.app
+
+      - name: Package dmg
+        run: |
+          cd build/src
+          version_str=$(./zanod --version | awk '/^Zano/ { print $2; exit }')
+          suffix=""
+          if [ "${{ inputs.testnet }}" = "true" ]; then suffix="-testnet"; fi
+          mkdir package_folder
+          mv Zano.app package_folder/
+          ln -s /Applications package_folder/Applications
+          dmg="zano-macos-x64-gui${suffix}-${version_str}.dmg"
+          hdiutil create -volname "Zano" -srcfolder package_folder -ov -format UDZO "$dmg"
+          ls -lh "$dmg"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: zano-macos-x64-gui${{ inputs.testnet == true && '-testnet' || '' }}
+          path: build/src/zano-macos-x64-gui*.dmg
+          if-no-files-found: error
+
+  # Native Apple Silicon GUI (Qt 6.8, macOS 12+)
+  build-gui-arm64:
+    name: macOS GUI arm64 (Qt 6.8)${{ inputs.testnet == true && ' (testnet)' || '' }}
+    runs-on: macos-15
+    timeout-minutes: 240
+    env:
+      DEPS_DIR: ${{ github.workspace }}/_deps
+      OSX_MIN: '11.0' # for the cached deps (same key as the CLI arm64 job)
+    steps:
+      - name: Checkout (with submodules)
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      # same key as the CLI arm64 job -> shares its Boost/OpenSSL cache
+      - name: Cache Boost & OpenSSL
+        id: deps-cache
+        uses: actions/cache@v6
+        with:
+          path: ${{ env.DEPS_DIR }}
+          key: deps-macos-15-arm64-boost${{ env.BOOST_VERSION }}-openssl${{ env.OPENSSL_VERSION }}-min11.0-v1
+
+      - name: Build OpenSSL (static)
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p "$DEPS_DIR" && cd "$DEPS_DIR"
+          curl -fL -o "openssl-${OPENSSL_VERSION}.tar.gz" \
+            "https://github.com/openssl/openssl/releases/download/OpenSSL_$(echo "$OPENSSL_VERSION" | tr . _)/openssl-${OPENSSL_VERSION}.tar.gz" \
+          || curl -fL -o "openssl-${OPENSSL_VERSION}.tar.gz" \
+            "https://www.openssl.org/source/old/1.1.1/openssl-${OPENSSL_VERSION}.tar.gz"
+          echo "${OPENSSL_SHA256}  openssl-${OPENSSL_VERSION}.tar.gz" | shasum -a 256 -c
+          tar xzf "openssl-${OPENSSL_VERSION}.tar.gz"
+          cd "openssl-${OPENSSL_VERSION}"
+          ./Configure darwin64-arm64-cc no-shared no-tests \
+            --prefix="$DEPS_DIR/openssl" --openssldir="$DEPS_DIR/openssl" \
+            -mmacosx-version-min=$OSX_MIN
+          make -j"$(sysctl -n hw.ncpu)"
+          make install_sw
+          cd "$DEPS_DIR" && rm -rf "openssl-${OPENSSL_VERSION}" "openssl-${OPENSSL_VERSION}.tar.gz"
+
+      - name: Build Boost (static)
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        run: |
+          boost_und=$(echo "$BOOST_VERSION" | tr . _)
+          mkdir -p "$DEPS_DIR" && cd "$DEPS_DIR"
+          curl -fL -O "https://archives.boost.io/release/${BOOST_VERSION}/source/boost_${boost_und}.tar.bz2"
+          echo "${BOOST_SHA256}  boost_${boost_und}.tar.bz2" | shasum -a 256 -c
+          tar xjf "boost_${boost_und}.tar.bz2"
+          cd "boost_${boost_und}"
+          ./bootstrap.sh --with-libraries=system,filesystem,thread,date_time,chrono,regex,serialization,atomic,program_options,locale,timer,log
+          ./b2 -j"$(sysctl -n hw.ncpu)" \
+            link=static runtime-link=shared threading=multi variant=release \
+            boost.locale.icu=off \
+            cxxflags="-mmacosx-version-min=$OSX_MIN" \
+            linkflags="-mmacosx-version-min=$OSX_MIN" \
+            install --prefix="$DEPS_DIR/boost"
+          cd "$DEPS_DIR" && rm -rf "boost_${boost_und}" "boost_${boost_und}.tar.bz2"
+
+      - name: Install Qt 6.8 (with WebEngine)
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.3'
+          arch: clang_64
+          modules: 'qtwebengine qtwebchannel qtpositioning'
+          cache: true
+
+      - name: Configure (CMake, BUILD_GUI, Qt 6)
+        run: |
+          testnet_def=""
+          if [ "${{ inputs.testnet }}" = "true" ]; then testnet_def="-D TESTNET=TRUE"; fi
+          mkdir -p build && cd build
+          # deployment target 12.0: minimum supported by Qt 6.8
+          cmake $testnet_def \
+            -D CMAKE_BUILD_TYPE=Release \
+            -D BUILD_GUI=TRUE \
+            -D CMAKE_PREFIX_PATH="$QT_ROOT_DIR" \
+            -D CMAKE_OSX_ARCHITECTURES=arm64 \
+            -D CMAKE_OSX_DEPLOYMENT_TARGET=12.0 \
+            -D CMAKE_POLICY_VERSION_MINIMUM=3.5 \
+            -D CMAKE_EXE_LINKER_FLAGS="-liconv" \
+            -D BOOST_ROOT="$DEPS_DIR/boost" \
+            -D OPENSSL_ROOT_DIR="$DEPS_DIR/openssl" \
+            ..
+
+      - name: Build (Zano.app, zanod, simplewallet)
+        run: cd build && make -j"$(sysctl -n hw.ncpu)" Zano daemon simplewallet
+
+      - name: Assemble Zano.app
+        run: |
+          cd build/src
+          # align the binary name with the bundle (no-op if already 'Zano')
+          mv Zano.app/Contents/MacOS/zano Zano.app/Contents/MacOS/Zano || true
+          cp zanod simplewallet Zano.app/Contents/MacOS/
+          "$QT_ROOT_DIR/bin/macdeployqt" Zano.app
+          rsync -a ../../src/gui/qt-daemon/layout/html Zano.app/Contents/MacOS --exclude less --exclude package.json --exclude gulpfile.js
+          cp ../../src/gui/qt-daemon/app.icns Zano.app/Contents/Resources/
+          echo "--- architecture check ---"
+          lipo -archs Zano.app/Contents/MacOS/Zano
+
+      - name: Check code signing secrets
+        id: signcheck
+        env:
+          CERT: ${{ secrets.MACOS_SIGN_CERT_P12 }}
+        run: |
+          if [ -n "$CERT" ]; then
+            echo "sign=true" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Code signing::ENABLED -Zano.app will be signed with Developer ID"
+          else
+            echo "sign=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Code signing::SKIPPED -no MACOS_SIGN_CERT_P12 secret, Zano.app gets an ad-hoc signature"
+          fi
+
+      - name: Sign Zano.app (Developer ID)
+        if: steps.signcheck.outputs.sign == 'true'
+        env:
+          CERT_P12_B64: ${{ secrets.MACOS_SIGN_CERT_P12 }}
+          CERT_PASSWORD: ${{ secrets.MACOS_SIGN_CERT_PASSWORD }}
+        run: |
+          keychain="$RUNNER_TEMP/sign.keychain-db"
+          kc_pass=$(uuidgen)
+          security create-keychain -p "$kc_pass" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$kc_pass" "$keychain"
+          echo "$CERT_P12_B64" | base64 -d > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$keychain" -P "$CERT_PASSWORD" -T /usr/bin/codesign
+          rm -f "$RUNNER_TEMP/cert.p12"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$kc_pass" "$keychain" > /dev/null
+          security list-keychains -d user -s "$keychain" login.keychain
+          identity=$(security find-identity -v -p codesigning "$keychain" | awk -F'"' '/Developer ID Application/ { print $2; exit }')
+          if [ -z "$identity" ]; then
+            echo "::error::No 'Developer ID Application' identity found in the imported .p12"
+            exit 1
+          fi
+          echo "Signing with identity: $identity"
+          codesign --force --deep --timestamp --options runtime \
+            --entitlements utils/macos_entitlements.plist \
+            --keychain "$keychain" --sign "$identity" build/src/Zano.app
+          codesign --verify --deep --strict build/src/Zano.app
+
+      - name: Sign Zano.app (ad-hoc)
+        if: steps.signcheck.outputs.sign != 'true'
+        run: |
+          codesign --force --deep --sign - build/src/Zano.app
+          codesign --verify --deep build/src/Zano.app
+
+      - name: Package dmg
+        run: |
+          cd build/src
+          version_str=$(./zanod --version | awk '/^Zano/ { print $2; exit }')
+          suffix=""
+          if [ "${{ inputs.testnet }}" = "true" ]; then suffix="-testnet"; fi
+          mkdir package_folder
+          mv Zano.app package_folder/
+          ln -s /Applications package_folder/Applications
+          dmg="zano-macos-arm64-gui${suffix}-${version_str}.dmg"
+          hdiutil create -volname "Zano" -srcfolder package_folder -ov -format UDZO "$dmg"
+          ls -lh "$dmg"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: zano-macos-arm64-gui${{ inputs.testnet == true && '-testnet' || '' }}
+          path: build/src/zano-macos-arm64-gui*.dmg
+          if-no-files-found: error

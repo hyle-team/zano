@@ -242,7 +242,7 @@ private:
   virtual bool set_options(const view::gui_options& opt);
   virtual bool update_tor_status(const view::current_action_status& opt);
   //--------- QAbstractNativeEventFilter ---------------------------
-  virtual bool nativeEventFilter(const QByteArray &eventType, void *message, long *result);
+  virtual bool nativeEventFilter(const QByteArray &eventType, void *message, qintptr *result);
   //----------------------------------------------
 
 
