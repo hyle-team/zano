@@ -462,7 +462,7 @@ namespace currency
 
       if (p_verification_result->m_verification_failed || !p_verification_result->m_added_to_main_chain)
       {
-        LOG_PRINT2("failed_mined_blocks.log", "verification_failed: " << p_verification_result->m_verification_failed << ", added_to_main_chain: " << p_verification_result->m_added_to_main_chain << ENDL <<
+        LOG_PRINT2("failed_mined_blocks.log", "block " << get_block_hash(b) << " @ height " << get_block_height(b) << ", verification_failed: " << p_verification_result->m_verification_failed << ", added_to_main_chain: " << p_verification_result->m_added_to_main_chain << ENDL <<
           currency::obj_to_json_str(b), LOG_LEVEL_0);
       }
       CHECK_AND_ASSERT_MES(!p_verification_result->m_verification_failed, false, "mined block has failed to pass verification: id " << get_block_hash(b) << " @ height " << get_block_height(b) << " prev_id: " << b.prev_id);
