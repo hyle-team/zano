@@ -590,6 +590,7 @@ bool wallets_manager::init_local_daemon()
   m_pview->update_daemon_status(dsi);
   res = m_ccore.init(m_vm);
   CHECK_AND_ASSERT_AND_SET_GUI(res,  "Failed to initialize core");
+  m_ccore.get_blockchain_storage().measure_db_performance();
   LOG_PRINT_L0("Core initialized OK");
 
   //check if offers module synchronized with blockchaine storage
