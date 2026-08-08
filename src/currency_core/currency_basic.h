@@ -716,7 +716,7 @@ namespace currency
 
     BEGIN_SERIALIZE()
       FIELD(m_alias)
-      FIELDS(*static_cast<extra_alias_entry_base_old*>(this))
+      CHAIN_BASE(extra_alias_entry_base_old)
    END_SERIALIZE()
   };
 
@@ -756,7 +756,7 @@ namespace currency
 
     BEGIN_SERIALIZE()
       FIELD(m_alias)
-      FIELDS(*static_cast<extra_alias_entry_base*>(this))
+      CHAIN_BASE(extra_alias_entry_base)
     END_SERIALIZE()
 
     extra_alias_entry_old to_old() const
@@ -1228,7 +1228,7 @@ namespace currency
     std::vector<proof_v> proofs;
 
     BEGIN_SERIALIZE_OBJECT()
-      FIELDS(*static_cast<transaction_prefix *>(this))
+      CHAIN_BASE(transaction_prefix)
       CHAIN_TRANSITION_VER(TRANSACTION_VERSION_INITAL, transaction_v1)
       CHAIN_TRANSITION_VER(TRANSACTION_VERSION_PRE_HF4, transaction_v1)
       FIELD(attachment)
@@ -1276,7 +1276,7 @@ namespace currency
     std::vector<crypto::hash> tx_hashes;
     
     BEGIN_SERIALIZE_OBJECT()
-      FIELDS(*static_cast<block_header *>(this))
+      CHAIN_BASE(block_header)
       FIELD(miner_tx)
       FIELD(tx_hashes)
     END_SERIALIZE()
