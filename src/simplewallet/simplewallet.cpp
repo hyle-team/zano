@@ -1711,10 +1711,17 @@ bool simple_wallet::show_payments(const std::vector<std::string> &args)
     "  height\t       amount        \tunlock time";
 
   bool payments_found = false;
-  for(std::string arg : args)
+  for (const std::string& arg : args)
   {
+    currency::payment_id_t payment_id;
+    if (!currency::parse_payment_id_from_hex_str(arg, payment_id))
+    {
+      fail_msg_writer() << "invalid payment id given: '" << arg << "', hex-encoded string was expected";
+      continue;
+    }
+
     std::list<tools::payment_details> payments;
-    m_wallet->get_payments(arg, payments);
+    m_wallet->get_payments(payment_id, payments);
     if (payments.empty())
     {
       success_msg_writer() << "No payments with id " << arg;
