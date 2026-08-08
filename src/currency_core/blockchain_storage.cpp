@@ -690,6 +690,8 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
       ENDL << "Blockchain DB was successfully scanned for pruned txs.", LOG_LEVEL_0);
   }
 
+  measure_db_performance();
+
   return true;
 }
 
