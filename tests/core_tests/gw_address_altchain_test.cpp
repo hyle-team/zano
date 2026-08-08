@@ -615,3 +615,82 @@ bool gw_addr_altchain_owner_change::c1(currency::core& c, size_t ev_index, const
 {
   return true;
 }
+
+
+gw_addr_register_output_rollback::gw_addr_register_output_rollback()
+{
+  REGISTER_CALLBACK_METHOD(gw_addr_register_output_rollback, c1);
+
+  m_hardforks.clear();
+  m_hardforks.set_hardfork_height(ZANO_HARDFORK_04_ZARCANUM, 1);
+  m_hardforks.set_hardfork_height(ZANO_HARDFORK_06, 1);
+}
+
+bool gw_addr_register_output_rollback::generate(std::vector<test_event_entry>& events) const
+{
+  //
+  // HF6 gateway register + credit in the same tx detach-ordering
+  //
+  //            blk_1r  (split point)
+  //              |
+  //              B:  blk_b1[reg+credit] - blk_b2  <- main chain, 2 blocks
+  //              |
+  //              C:  blk_c1 - blk_c2 - blk_c3 <- alt chain, 3 blocks (heavier)
+  bool r = false;
+  uint64_t ts = test_core_time::get_time();
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
+  DO_CALLBACK(events, "configure_core");
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+
+  DO_CALLBACK_PARAMS(events, "check_hardfork_active", static_cast<size_t>(ZANO_HARDFORK_06));
+
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_1r, blk_0r, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 5);
+
+  // blk_1r is the split point
+  m_gw_addr_view  = keypair::generate();
+  m_gw_addr_spend = keypair::generate();
+
+  gateway_address_descriptor_operation gwdo{};
+  gateway_address_descriptor_operation_register gwdo_reg{};
+  gwdo_reg.view_pub_key      = m_gw_addr_view.pub;
+  gwdo_reg.descriptor.meta_info = "gw_register_and_credit_same_tx";
+  gwdo_reg.descriptor.owner_key = m_gw_addr_spend.pub;
+  gwdo.operation = gwdo_reg;
+
+  std::vector<tx_destination_entry> destinations;
+  destinations.emplace_back(MK_TEST_COINS(20), m_gw_addr_view.pub);
+
+  transaction tx_reg_and_credit{};
+  r = construct_tx_to_key(m_hardforks, events, tx_reg_and_credit, blk_1r, miner_acc, destinations,
+    CURRENCY_GATEWAY_ADDRESS_REGISTRATION_FEE, 0, CURRENCY_TO_KEY_OUT_RELAXED, std::vector<extra_v>({ gwdo }));
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx_to_key (register + credit) failed");
+  ADD_CUSTOM_EVENT(events, tx_reg_and_credit);
+  MAKE_NEXT_BLOCK_TX1(events, blk_b1, blk_1r, miner_acc, tx_reg_and_credit);
+  MAKE_NEXT_BLOCK(events, blk_b2, blk_b1, miner_acc);
+
+  DO_CALLBACK_PARAMS_STR(events, "check_gw_balance",
+    t_serializable_object_to_blob(gw_address_balance_check_param{ m_gw_addr_view.pub, MK_TEST_COINS(20) }));
+
+  // chain C: a heavier competing branch from blk_1r, without the gateway
+  MAKE_NEXT_BLOCK(events, blk_c1, blk_1r, miner_acc);
+  MAKE_NEXT_BLOCK(events, blk_c2, blk_c1, miner_acc);
+  //adding blk_c3 triggers the reorg that detaches
+  MAKE_NEXT_BLOCK(events, blk_c3, blk_c2, miner_acc);
+
+  // reached only if the reorg succeeds
+  DO_CALLBACK(events, "c1");
+
+  return true;
+}
+
+bool gw_addr_register_output_rollback::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  // chain C is main; it never contained the gateway registration, so it must not exist here
+  const blockchain_storage& bcs = c.get_blockchain_storage();
+  std::shared_ptr<const currency::gateway_address_data> pd = bcs.get_gateway_address_info(m_gw_addr_view.pub);
+  CHECK_AND_ASSERT_MES(!pd, false, "after reorg to chain C, gateway address must NOT exist, but it was found");
+  return true;
+}

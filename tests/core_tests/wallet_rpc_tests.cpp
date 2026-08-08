@@ -8,6 +8,7 @@
 #include "wallet_test_core_proxy.h"
 #include "currency_core/currency_core.h"
 #include "currency_core/bc_offers_service.h"
+#include "currency_core/crypto_config.h" // CRYPTO_HDS_GW_* hash domain separators
 #include "rpc/core_rpc_server.h"
 #include "currency_protocol/currency_protocol_handler.h"
 #include "wallet/wallet2.h"
@@ -3577,6 +3578,212 @@ bool wallet_rpc_gateway_owner_change_altchain::c1(currency::core& c, size_t ev_i
   CHECK_AND_ASSERT_MES(check_gw_owner(new_owner_pub), false, "C: owner still new");
 
   LOG_PRINT_GREEN_L0("wallet_rpc_gateway_owner_change_altchain PASSED: B<->C switches with owner change verified");
+  return true;
+}
+
+//------------------------------------------------------------------------------
+
+wallet_rpc_gateway_limits::wallet_rpc_gateway_limits()
+{
+  REGISTER_CALLBACK_METHOD(wallet_rpc_gateway_limits, c1);
+}
+
+bool wallet_rpc_gateway_limits::generate(std::vector<test_event_entry>& events) const
+{
+  uint64_t ts = test_core_time::get_time();
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
+  account_base& bob_acc   = m_accounts[BOB_ACC_IDX];   bob_acc.generate();   bob_acc.set_createtime(ts);
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  DO_CALLBACK(events, "configure_core");
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+  DO_CALLBACK(events, "c1");
+  return true;
+}
+
+bool wallet_rpc_gateway_limits::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  // Test idea: check consensus enforcement of gateway descriptor limits (validate_gateway_descriptor_operation_limits),
+  // For both register and update operations:
+  //   - meta_info size limit (GATEWAY_ADDRESS_META_INFO_MAX_SIZE = 4000): == limit accepted, > limit rejected
+  //   - etc must be empty: any non-empty etc rejected
+  // The check lives in validate_tx_for_hardfork_specific_terms (runs at pool add and block add), so we assert at
+  // the pool via add_tx. Every descriptor is built with valid signatures, so the only variable is its content.
+
+  bool r = false;
+  const size_t GW_META_MAX = 4000; // mirrors GATEWAY_ADDRESS_META_INFO_MAX_SIZE (currency_format_utils.cpp)
+
+  currency::t_currency_protocol_handler<currency::core> cprotocol(c, NULL);
+  nodetool::node_server<currency::t_currency_protocol_handler<currency::core> > dummy_p2p(cprotocol);
+  bc_services::bc_offers_service dummy_bc(nullptr);
+  currency::core_rpc_server core_rpc_wrapper(c, dummy_p2p, dummy_bc);
+  core_rpc_wrapper.set_ignore_connectivity_status(true);
+  core_rpc_wrapper.set_enabled_admin_api(true);
+
+  std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
+  tools::wallet_rpc_server miner_wlt_rpc(miner_wlt);
+  const auto& miner_addr = m_accounts[MINER_ACC_IDX].get_public_address();
+
+  // the pool is cleared first to avoid input/key-image cross-talk between cases
+  auto submit_to_pool = [&](const currency::transaction& tx) -> bool
+  {
+    c.get_tx_pool().clear();
+    currency::tx_verification_context tvc{};
+    bool added = c.get_tx_pool().add_tx(tx, tvc, false);
+    return added && !tvc.m_verification_failed;
+  };
+
+  // keys for the gw we register (in the register pool checks) and then update
+  crypto::public_key gw_view_pub{}; crypto::secret_key gw_view_sec{};
+  crypto::generate_keys(gw_view_pub, gw_view_sec);
+  crypto::public_key owner_pub{}; crypto::secret_key owner_sec{};
+  crypto::generate_keys(owner_pub, owner_sec);
+  crypto::public_key new_owner_pub{}; crypto::secret_key new_owner_sec{};
+  crypto::generate_keys(new_owner_pub, new_owner_sec);
+  const std::string gw_address = currency::get_account_address_as_str(gw_view_pub);
+
+  //
+  // register operation
+  //
+  auto build_register_tx = [&](const std::string& meta_info, bool add_etc) -> currency::transaction
+  {
+    currency::gateway_address_descriptor_operation_register op_reg{};
+    op_reg.view_pub_key = gw_view_pub;
+    op_reg.descriptor.owner_key = owner_pub;
+    op_reg.descriptor.meta_info = meta_info;
+    if (add_etc)
+      op_reg.descriptor.etc.push_back(currency::dummy{});
+    currency::gateway_address_descriptor_operation gw_op{};
+    gw_op.operation = op_reg;
+
+    miner_wlt->reset_history();
+    miner_wlt->refresh();
+    tools::construct_tx_param ctp = miner_wlt->get_default_construct_tx_param();
+    ctp.fee = CURRENCY_GATEWAY_ADDRESS_REGISTRATION_FEE;
+    currency::tx_destination_entry td{};
+    td.addr.push_back(miner_wlt->get_account().get_public_address());
+    td.amount = COIN / 100;
+    td.asset_id = currency::native_coin_asset_id;
+    ctp.dsts.push_back(td);
+    ctp.extra.push_back(gw_op);
+    ctp.need_at_least_1_zc = true;
+    ctp.tx_meaning_for_logs = "gateway registration (limits test)";
+
+    currency::finalized_tx ft{};
+    miner_wlt->transfer(ctp, ft, false);
+    return ft.tx;
+  };
+
+  // meta_info at the limit, empty etc -> accepted (this one we then confirm and update)
+  currency::transaction reg_tx = build_register_tx(std::string(GW_META_MAX, 'x'), false);
+  CHECK_AND_ASSERT_MES(submit_to_pool(reg_tx), false, "register with meta_info at the limit should be accepted");
+  // meta_info one byte over the limit -> rejected
+  CHECK_AND_ASSERT_MES(!submit_to_pool(build_register_tx(std::string(GW_META_MAX + 1, 'x'), false)), false, "register with oversized meta_info should be rejected");
+  // non-empty etc -> rejected
+  CHECK_AND_ASSERT_MES(!submit_to_pool(build_register_tx("ok", true)), false, "register with non-empty etc should be rejected");
+
+
+  // confirm the accepted registration so we have a real gw to update
+  CHECK_AND_ASSERT_MES(submit_to_pool(reg_tx), false, "accepted registration should re-enter the pool");
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 1);
+  r = mine_next_pow_blocks_in_playtime(miner_addr, c, 3);
+  CHECK_AND_ASSERT_TRUE(r);
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
+
+  // fund the gw with native coins to pay the update fee
+  miner_wlt->refresh();
+  tools::wallet_public::COMMAND_RPC_TRANSFER::request fund_req = {};
+  tools::wallet_public::COMMAND_RPC_TRANSFER::response fund_resp = {};
+  fund_req.destinations.emplace_back(currency::transfer_destination{ MK_TEST_COINS(30), gw_address });
+  fund_req.fee = TESTS_DEFAULT_FEE;
+  r = invoke_text_json_for_rpc(miner_wlt_rpc, "transfer", fund_req, fund_resp);
+  CHECK_AND_ASSERT_MES(r, false, "funding transfer to gw failed");
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 1);
+  r = mine_next_pow_blocks_in_playtime(miner_addr, c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  CHECK_AND_ASSERT_TRUE(r);
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
+
+  //
+  // update operation
+  //
+  auto build_update_tx = [&](const std::string& meta_info, bool add_etc, currency::transaction& out_tx) -> bool
+  {
+    currency::COMMAND_RPC_GATEWAY_CREATE_OWNER_CHANGE::request oc_req = {};
+    currency::COMMAND_RPC_GATEWAY_CREATE_OWNER_CHANGE::response oc_resp = {};
+    oc_req.address_id = gw_view_pub;
+    oc_req.new_descriptor_info.opt_owner_custom_schnorr_pub_key = new_owner_pub;
+    oc_req.new_descriptor_info.meta_info = meta_info;
+    oc_req.fee = TESTS_DEFAULT_FEE;
+    bool ok = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_create_owner_change", oc_req, oc_resp);
+    CHECK_AND_ASSERT_MES(ok, false, "gateway_create_owner_change failed");
+
+    ok = t_unserializable_object_from_blob(out_tx, oc_resp.tx_blob);
+    CHECK_AND_ASSERT_MES(ok, false, "failed to deserialize update tx blob");
+
+    if (add_etc)
+    {
+      bool patched = false;
+      for (auto& e : out_tx.extra)
+      {
+        if (e.type() == typeid(currency::gateway_address_descriptor_operation))
+        {
+          currency::gateway_address_descriptor_operation& gw_op = boost::get<currency::gateway_address_descriptor_operation>(e);
+          currency::gateway_address_descriptor_operation_update& op_upd = boost::get<currency::gateway_address_descriptor_operation_update>(gw_op.operation);
+          op_upd.descriptor.etc.push_back(currency::dummy{});
+          patched = true;
+        }
+      }
+      CHECK_AND_ASSERT_MES(patched, false, "gateway_address_descriptor_operation not found in tx extra");
+    }
+
+    // re-derive the signing hashes over the (possibly patched) tx and sign with the current owner key, mirroring
+    // on_gateway_create_owner_change / on_gateway_submit_owner_change
+    crypto::hash tx_id = currency::get_transaction_hash(out_tx);
+    crypto::hash prefix_hash_for_input = currency::prepare_prefix_hash_for_sign(out_tx, 0, tx_id);
+    crypto::hash hash_to_sign_transfer  = crypto::hash_helper_t::h(CRYPTO_HDS_GW_INPUT_SIGNATURE, prefix_hash_for_input);
+    crypto::hash hash_to_sign_ownership = crypto::hash_helper_t::h(CRYPTO_HDS_GW_CHANGE_OWNER_SIGNATURE, tx_id);
+
+    crypto::generic_schnorr_sig_s transfer_sig{};
+    ok = crypto::generate_schnorr_sig(hash_to_sign_transfer, owner_sec, transfer_sig);
+    CHECK_AND_ASSERT_MES(ok, false, "generate_schnorr_sig (transfer) failed");
+    crypto::generic_schnorr_sig_s ownership_sig{};
+    ok = crypto::generate_schnorr_sig(hash_to_sign_ownership, owner_sec, ownership_sig);
+    CHECK_AND_ASSERT_MES(ok, false, "generate_schnorr_sig (ownership) failed");
+
+    // attach the gateway input signature (fee) and the ownership proof
+    for (auto& sig : out_tx.signatures)
+    {
+      CHECK_AND_ASSERT_MES(sig.type() == typeid(currency::gateway_sig), false, "unexpected signature type in update tx");
+      boost::get<currency::gateway_sig>(sig).s = currency::gateway_signature_v(transfer_sig);
+    }
+    currency::gateway_address_ownership_proof gaoop{};
+    gaoop.sign = ownership_sig;
+    out_tx.proofs.push_back(gaoop);
+    return true;
+  };
+
+  // meta_info at the limit, empty etc -> accepted
+  currency::transaction upd_tx_ok{};
+  CHECK_AND_ASSERT_MES(build_update_tx(std::string(GW_META_MAX, 'x'), false, upd_tx_ok), false, "build update (limit) failed");
+  CHECK_AND_ASSERT_MES(submit_to_pool(upd_tx_ok), false, "update with meta_info at the limit should be accepted");
+  // meta_info one byte over the limit -> rejected
+  currency::transaction upd_tx_big{};
+  CHECK_AND_ASSERT_MES(build_update_tx(std::string(GW_META_MAX + 1, 'x'), false, upd_tx_big), false, "build update (oversized) failed");
+  CHECK_AND_ASSERT_MES(!submit_to_pool(upd_tx_big), false, "update with oversized meta_info should be rejected");
+  // non-empty etc -> rejected
+  currency::transaction upd_tx_etc{};
+  CHECK_AND_ASSERT_MES(build_update_tx("ok", true, upd_tx_etc), false, "build update (etc) failed");
+  CHECK_AND_ASSERT_MES(!submit_to_pool(upd_tx_etc), false, "update with non-empty etc should be rejected");
+  
+
+  // confirm the accepted update in a block
+  CHECK_AND_ASSERT_MES(submit_to_pool(upd_tx_ok), false, "accepted update should re-enter the pool");
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 1);
+  r = mine_next_pow_blocks_in_playtime(miner_addr, c, 1);
+  CHECK_AND_ASSERT_TRUE(r);
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
   return true;
 }
 

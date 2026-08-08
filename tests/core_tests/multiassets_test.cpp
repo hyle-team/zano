@@ -916,7 +916,7 @@ asset_operation_and_hardfork_checks::asset_operation_and_hardfork_checks()
   m_adb_hello.total_max_supply = 1'000'000'000'000'000'000;
   m_adb_hello.current_supply = 1'000'000'000'000'000'000;
   m_adb_hello.ticker = "HLO";
-  m_adb_hello.full_name = "HELLO_WORLD";
+  m_adb_hello.full_name = "HELLO WORLD";
   m_adb_hello.meta_info = "Hello, world!";
   m_adb_hello.hidden_supply = false;
 
@@ -927,7 +927,7 @@ asset_operation_and_hardfork_checks::asset_operation_and_hardfork_checks()
   m_adb_bye.total_max_supply = 1'000'000'000'000'000'000;
   m_adb_bye.current_supply = 1'000'000'000'000'000'000;
   m_adb_bye.ticker = "BYE";
-  m_adb_bye.full_name = "BYE_WORLD";
+  m_adb_bye.full_name = "BYE WORLD";
   m_adb_bye.meta_info = "Bye, world!";
   m_adb_bye.hidden_supply = false;
 

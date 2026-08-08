@@ -1532,7 +1532,7 @@ namespace tools
     //make local req so we can modify it (if needed)
     wallet_public::COMMAND_ASSETS_DEPLOY::request req = req_;
 
-    if (!currency::validate_asset_ticker_and_full_name(req.asset_descriptor))
+    if (!currency::validate_asset_ticker_full_name_and_meta_info(req.asset_descriptor))
     {
       er.code = WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT;
       er.message = "asset ticker or full_name is invalid";

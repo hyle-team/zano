@@ -1060,13 +1060,16 @@ bool blockchain_storage::purge_transaction_from_blockchain(const crypto::hash& t
 
   fee = get_tx_fee(tx_res_ptr->tx);
   purge_transaction_keyimages_from_blockchain(tx, true);
-  
-  bool r = unprocess_blockchain_tx_extra(tx, tx_res_ptr->m_keeper_block_height, tx_id);
-  CHECK_AND_ASSERT_MES(r, false, "failed to unprocess_blockchain_tx_extra for tx " << tx_id);
- 
-  r = unprocess_blockchain_tx_attachments(tx, get_current_blockchain_size(), 0/*TODO: add valid timestamp here in future if need*/);
+
+  bool res_pop_gi = pop_transaction_from_global_index(tx, tx_id);
+  CHECK_AND_ASSERT_MES_NO_RET(res_pop_gi, "serious internal error: pop_transaction_from_global_index() failed for tx " << tx_id);
+
+  bool r = unprocess_blockchain_tx_attachments(tx, get_current_blockchain_size(), 0/*TODO: add valid timestamp here in future if need*/);
 
   unprocess_tx_gateway_history(tx_id, tx_);
+  
+  r = unprocess_blockchain_tx_extra(tx, tx_res_ptr->m_keeper_block_height, tx_id);
+  CHECK_AND_ASSERT_MES(r, false, "failed to unprocess_blockchain_tx_extra for tx " << tx_id);
 
   bool added_to_the_pool = false;
   if(!is_coinbase(tx))
@@ -1075,8 +1078,6 @@ bool blockchain_storage::purge_transaction_from_blockchain(const crypto::hash& t
     added_to_the_pool = m_tx_pool.add_tx(tx, tvc, true, true);
   }
 
-  bool res_pop_gi = pop_transaction_from_global_index(tx, tx_id);
-  CHECK_AND_ASSERT_MES_NO_RET(res_pop_gi, "serious internal error: pop_transaction_from_global_index() failed for tx " << tx_id);
   bool res_erase = m_db_transactions.erase_validate(tx_id);
   CHECK_AND_ASSERT_MES_NO_RET(res_erase, "serious internal error: m_transactions.erase_validate() failed for tx " << tx_id);
 
@@ -4845,7 +4846,9 @@ bool blockchain_storage::validate_asset_operation_hf4(asset_op_verification_cont
 bool blockchain_storage::validate_asset_operation_hf5(asset_op_verification_context& avc) const
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
-  CHECK_AND_ASSERT_MES(is_hardfork_active_for_height(ZANO_HARDFORK_05, avc.height), false, "validate_asset_operation was called before HF5");
+  bool hf5_active = is_hardfork_active_for_height(ZANO_HARDFORK_05, avc.height);
+  bool hf6_active = is_hardfork_active_for_height(ZANO_HARDFORK_06, avc.height);
+  CHECK_AND_ASSERT_MES(hf5_active, false, "validate_asset_operation was called before HF5");
 
   CHECK_AND_ASSERT_MES(get_or_calculate_asset_id(avc.ado, &avc.asset_id_pt, &avc.asset_id), false, "get_or_calculate_asset_id failed");
   avc.asset_op_history = m_db_assets.find(avc.asset_id);
@@ -4860,7 +4863,7 @@ bool blockchain_storage::validate_asset_operation_hf5(asset_op_verification_cont
     CHECK_AND_ASSERT_MES(ado.opt_descriptor.has_value(), false, "opt_descriptor is missing while registering asset " << avc.asset_id);
     avc.amount_to_validate = ado.opt_descriptor.get().current_supply;
     // HF5 specific
-    CHECK_AND_ASSERT_MES(validate_ado_initial(ado.opt_descriptor.get()), false, "validate_ado_initial failed!");
+    CHECK_AND_ASSERT_MES(validate_ado_initial(ado.opt_descriptor.get(), hf6_active), false, "validate_ado_initial failed!");
     CHECK_AND_ASSERT_MES(ado.opt_amount.has_value() && avc.amount_to_validate == ado.opt_amount.get(), false, "opt_amount is missing or incorrect");
   }
   else
@@ -4883,7 +4886,7 @@ bool blockchain_storage::validate_asset_operation_hf5(asset_op_verification_cont
       CHECK_AND_ASSERT_MES(ado.opt_descriptor.has_value(), false, "opt_descriptor is missing (update)");
       //check that total current_supply haven't changed
       CHECK_AND_ASSERT_MES(ado.opt_descriptor.get().current_supply == last_adb.current_supply, false, "update operation attempted to change emission, failed");
-      CHECK_AND_ASSERT_MES(validate_ado_update_allowed(ado.opt_descriptor.get(), last_adb), false, "update operation modifies asset descriptor in a prohibited manner");
+      CHECK_AND_ASSERT_MES(validate_ado_update_allowed(ado.opt_descriptor.get(), last_adb, hf6_active), false, "update operation modifies asset descriptor in a prohibited manner");
       need_to_validate_ao_amount_commitment = false;
     }
     else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT)
@@ -4937,7 +4940,7 @@ bool blockchain_storage::validate_asset_operation(asset_op_verification_context&
 {
   if (is_hardfork_active_for_height(ZANO_HARDFORK_05, height))
   {
-    return validate_asset_operation_hf5(avc);
+    return validate_asset_operation_hf5(avc); // HF5, HF6
   }
   else
   {
@@ -5392,11 +5395,15 @@ bool blockchain_storage::change_gateway_balance(const crypto::hash& tx_id, const
     balance_entry.amount -= amount;
   }
 
-  //update db
-  m_db_gateway_addresses.set(gw_addr, gw_addr_entry);
+  // update db (but only if there's smth to change)
+  if (balance_before != balance_entry.amount)
+  {
+    m_db_gateway_addresses.set(gw_addr, gw_addr_entry);
 
-  // for debugging
-  LOG_PRINT_L0("gateway address " << gw_addr_str << ", balance changed: " << balance_before << " -> " << balance_entry.amount << " (" << (increase ? "+" : "-") << amount << "), asset_id: " << asset_id);
+    // for debugging
+    LOG_PRINT_L0("gateway address " << gw_addr_str << ", balance changed: " << balance_before << " -> " << balance_entry.amount << " (" << (increase ? "+" : "-") << amount << "), asset_id: " << asset_id);
+  }
+
   return true;
 }
 
@@ -7194,6 +7201,10 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
       bool has_legacy_pid = has_tx_wide_payment_id(tx);
       CHECK_AND_ASSERT_MES(!has_legacy_pid, false, "legacy tx-wide payment ID is incompatible with gateway outputs");
     }
+
+    gateway_address_descriptor_operation gado{};
+    if (get_type_in_variant_container<gateway_address_descriptor_operation>(tx.extra, gado))
+      CHECK_AND_ASSERT_MES(validate_gateway_descriptor_operation_limits(gado), false, "transaction has invalid gateway descriptor");
   }
 
 
@@ -7571,82 +7582,6 @@ bool get_tx_from_cache(const crypto::hash& tx_id, transactions_map& tx_cache, tr
   return true;
 }
 //------------------------------------------------------------------
-bool blockchain_storage::collect_rangeproofs_data_from_tx(const transaction& tx, const crypto::hash& tx_id, std::vector<zc_outs_range_proofs_with_commitments>& agregated_proofs)
-{
-  if (tx.version <= TRANSACTION_VERSION_PRE_HF4)
-    return true;
-
-  size_t confidential_outs_count = 0;
-  for(auto& out_v : tx.vout)
-  {
-    VARIANT_SWITCH_BEGIN(out_v)
-      VARIANT_CASE_CONST(tx_out_zarcanum, out_zc)
-        ++confidential_outs_count;
-    //  VARIANT_CASE_CONST(tx_out_confidential_gateway, out_cgw)
-    //  ++confidential_outs_count;
-      VARIANT_CASE_CONST(tx_out_gateway, out_gw)
-        // nothing
-      VARIANT_CASE_OTHER()
-        LOG_ERROR("unexpected output type: " << out_v.type().name());
-        return false;
-    VARIANT_SWITCH_END()
-  }
-
-
-  size_t range_proofs_count = 0;
-  size_t out_index_offset = 0; //Consolidated Transactions have multiple zc_outs_range_proof entries
-  for (const auto& a : tx.proofs)
-  {
-    if (a.type() == typeid(zc_outs_range_proof))
-    {
-      const zc_outs_range_proof& zcrp = boost::get<zc_outs_range_proof>(a);
-
-      // validate aggregation proof, collect commitments from confidential outputs
-      std::vector<const crypto::public_key*> amount_commitment_ptrs_1div8, blinded_asset_id_ptrs_1div8;
-      for(size_t j = out_index_offset; j < tx.vout.size(); ++j)
-      {
-        VARIANT_SWITCH_BEGIN(tx.vout[j])
-          VARIANT_CASE_CONST(tx_out_zarcanum, out_zc) // other types are checked at the beggining
-            amount_commitment_ptrs_1div8.push_back(&out_zc.amount_commitment);
-            blinded_asset_id_ptrs_1div8.push_back(&out_zc.blinded_asset_id);
-        VARIANT_SWITCH_END()
-      }
-      uint8_t err = 0;
-      bool r = crypto::verify_vector_UG_aggregation_proof(tx_id, amount_commitment_ptrs_1div8, blinded_asset_id_ptrs_1div8, zcrp.aggregation_proof, &err);
-      CHECK_AND_ASSERT_MES(r, false, "verify_vector_UG_aggregation_proof failed with err code " << (int)err);
-
-
-      agregated_proofs.emplace_back(zcrp);
-
-      // convert amount commitments for aggregation from public_key to point_t form
-      // TODO: consider refactoring this ugly code
-      for (size_t i = 0; i != zcrp.aggregation_proof.amount_commitments_for_rp_aggregation.size(); i++)
-        agregated_proofs.back().amount_commitments.emplace_back(zcrp.aggregation_proof.amount_commitments_for_rp_aggregation[i]);
-
-      out_index_offset += zcrp.aggregation_proof.amount_commitments_for_rp_aggregation.size();
-      range_proofs_count++;
-    }
-  }
-
-
-  if (tx.hardfork_id >= ZANO_HARDFORK_06)
-  {
-    CHECK_AND_ASSERT_MES((confidential_outs_count == 0) == (range_proofs_count == 0), false, "transaction " << tx_id << " has inconsistent confidential outputs count (" << confidential_outs_count << ") and RPs count (" << range_proofs_count << ")");
-    CHECK_AND_ASSERT_MES(out_index_offset == confidential_outs_count, false, "range proof elements count doesn't match with confidential outputs count: " << out_index_offset << " != " << confidential_outs_count);
-    CHECK_AND_ASSERT_MES(confidential_outs_count == 0 || range_proofs_count == 1 || (get_tx_flags(tx) & TX_FLAG_SIGNATURE_MODE_SEPARATE), false, "transaction " << tx_id 
-      << " has confidential outputs, doesn't have TX_FLAG_SIGNATURE_MODE_SEPARATE, but has range_proofs_count = " << range_proofs_count);
-  }
-  else
-  {
-    CHECK_AND_ASSERT_MES(out_index_offset == confidential_outs_count, false, "range proof elements count doesn't match with confidential outputs count: " << out_index_offset << " != " << confidential_outs_count);
-    CHECK_AND_ASSERT_MES(range_proofs_count > 0, false, "transaction " << get_transaction_hash(tx) << " doesn't have range proofs");
-    CHECK_AND_ASSERT_MES(range_proofs_count == 1 || (get_tx_flags(tx) & TX_FLAG_SIGNATURE_MODE_SEPARATE), false, "transaction " << get_transaction_hash(tx) 
-      << " doesn't have TX_FLAG_SIGNATURE_MODE_SEPARATE but has range_proofs_count = " << range_proofs_count);
-  }
-
-  return true;
-}
-
 bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypto::hash& id, block_verification_context& bvc)
 {
   TIME_MEASURE_START_PD_MS(block_processing_time_0_ms);

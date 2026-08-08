@@ -547,6 +547,82 @@ namespace currency
     return true;
   }
   //---------------------------------------------------------------
+  bool collect_rangeproofs_data_from_tx(const transaction& tx, const crypto::hash& tx_id, std::vector<zc_outs_range_proofs_with_commitments>& agregated_proofs)
+  {
+    if (tx.version <= TRANSACTION_VERSION_PRE_HF4)
+      return true;
+
+    size_t confidential_outs_count = 0;
+    for(auto& out_v : tx.vout)
+    {
+      VARIANT_SWITCH_BEGIN(out_v)
+        VARIANT_CASE_CONST(tx_out_zarcanum, out_zc)
+        ++confidential_outs_count;
+      //  VARIANT_CASE_CONST(tx_out_confidential_gateway, out_cgw)
+      //  ++confidential_outs_count;
+      VARIANT_CASE_CONST(tx_out_gateway, out_gw)
+        // nothing
+        VARIANT_CASE_OTHER()
+        LOG_ERROR("unexpected output type: " << out_v.type().name());
+      return false;
+      VARIANT_SWITCH_END()
+    }
+
+
+    size_t range_proofs_count = 0;
+    size_t out_index_offset = 0; //Consolidated Transactions have multiple zc_outs_range_proof entries
+    for (const auto& a : tx.proofs)
+    {
+      if (a.type() == typeid(zc_outs_range_proof))
+      {
+        const zc_outs_range_proof& zcrp = boost::get<zc_outs_range_proof>(a);
+
+        // validate aggregation proof, collect commitments from confidential outputs
+        std::vector<const crypto::public_key*> amount_commitment_ptrs_1div8, blinded_asset_id_ptrs_1div8;
+        for(size_t j = out_index_offset; j < tx.vout.size(); ++j)
+        {
+          VARIANT_SWITCH_BEGIN(tx.vout[j])
+            VARIANT_CASE_CONST(tx_out_zarcanum, out_zc) // other types are checked at the beggining
+            amount_commitment_ptrs_1div8.push_back(&out_zc.amount_commitment);
+          blinded_asset_id_ptrs_1div8.push_back(&out_zc.blinded_asset_id);
+          VARIANT_SWITCH_END()
+        }
+        uint8_t err = 0;
+        bool r = crypto::verify_vector_UG_aggregation_proof(tx_id, amount_commitment_ptrs_1div8, blinded_asset_id_ptrs_1div8, zcrp.aggregation_proof, &err);
+        CHECK_AND_ASSERT_MES(r, false, "verify_vector_UG_aggregation_proof failed with err code " << (int)err);
+
+
+        agregated_proofs.emplace_back(zcrp);
+
+        // convert amount commitments for aggregation from public_key to point_t form
+        // TODO: consider refactoring this ugly code
+        for (size_t i = 0; i != zcrp.aggregation_proof.amount_commitments_for_rp_aggregation.size(); i++)
+          agregated_proofs.back().amount_commitments.emplace_back(zcrp.aggregation_proof.amount_commitments_for_rp_aggregation[i]);
+
+        out_index_offset += zcrp.aggregation_proof.amount_commitments_for_rp_aggregation.size();
+        range_proofs_count++;
+      }
+    }
+
+
+    if (tx.hardfork_id >= ZANO_HARDFORK_06)
+    {
+      CHECK_AND_ASSERT_MES((confidential_outs_count == 0) == (range_proofs_count == 0), false, "transaction " << tx_id << " has inconsistent confidential outputs count (" << confidential_outs_count << ") and RPs count (" << range_proofs_count << ")");
+      CHECK_AND_ASSERT_MES(out_index_offset == confidential_outs_count, false, "range proof elements count doesn't match with confidential outputs count: " << out_index_offset << " != " << confidential_outs_count);
+      CHECK_AND_ASSERT_MES(confidential_outs_count == 0 || range_proofs_count == 1 || (get_tx_flags(tx) & TX_FLAG_SIGNATURE_MODE_SEPARATE), false, "transaction " << tx_id 
+        << " has confidential outputs, doesn't have TX_FLAG_SIGNATURE_MODE_SEPARATE, but has range_proofs_count = " << range_proofs_count);
+    }
+    else
+    {
+      CHECK_AND_ASSERT_MES(out_index_offset == confidential_outs_count, false, "range proof elements count doesn't match with confidential outputs count: " << out_index_offset << " != " << confidential_outs_count);
+      CHECK_AND_ASSERT_MES(range_proofs_count > 0, false, "transaction " << get_transaction_hash(tx) << " doesn't have range proofs");
+      CHECK_AND_ASSERT_MES(range_proofs_count == 1 || (get_tx_flags(tx) & TX_FLAG_SIGNATURE_MODE_SEPARATE), false, "transaction " << get_transaction_hash(tx) 
+        << " doesn't have TX_FLAG_SIGNATURE_MODE_SEPARATE but has range_proofs_count = " << range_proofs_count);
+    }
+
+    return true;
+  }
+  //---------------------------------------------------------------
   bool verify_multiple_zc_outs_range_proofs(const std::vector<zc_outs_range_proofs_with_commitments>& range_proofs)
   {
     if (range_proofs.empty())
@@ -1347,7 +1423,7 @@ namespace currency
     return true;
   }  
   //---------------------------------------------------------------
-  bool validate_ado_update_allowed(const asset_descriptor_base& new_ado, const asset_descriptor_base& prev_ado)
+  bool validate_ado_update_allowed(const asset_descriptor_base& new_ado, const asset_descriptor_base& prev_ado, bool hf6_active /* = false */)
   {
     if (new_ado.total_max_supply != prev_ado.total_max_supply) return false;
     if (new_ado.current_supply > prev_ado.total_max_supply) return false;
@@ -1357,13 +1433,17 @@ namespace currency
     //a.meta_info;
     //if (a.owner != b.owner) return false;
     if (new_ado.hidden_supply != prev_ado.hidden_supply) return false;
+    if (hf6_active && !validate_asset_meta_info(new_ado.meta_info)) return false; // ticker and full_name are fixed, thus only meta_info here
     
     return true;
   }
   //---------------------------------------------------------------
-  bool validate_ado_initial(const asset_descriptor_base& new_ado)
+  bool validate_ado_initial(const asset_descriptor_base& new_ado, bool hf6_active /* = false */)
   {
-    if (new_ado.current_supply > new_ado.total_max_supply) return false;
+    if (new_ado.current_supply > new_ado.total_max_supply)
+      return false;
+    if (hf6_active && !validate_asset_ticker_full_name_and_meta_info(new_ado))
+      return false;
     return true;
   }
   //---------------------------------------------------------------
@@ -5014,7 +5094,7 @@ namespace currency
     return true;
   }
   //------------------------------------------------------------------
-  bool validate_asset_ticker_and_full_name(const asset_descriptor_base& adb)
+  bool validate_asset_ticker_full_name_and_meta_info(const asset_descriptor_base& adb)
   {
     if (!validate_asset_ticker(adb.ticker))
       return false;
@@ -5025,8 +5105,6 @@ namespace currency
     if(!validate_asset_meta_info(adb.meta_info))
       return false;
 
-    //CHECK_AND_ASSERT_MES(validate_asset_ticker(adb.ticker), false, "asset's ticker isn't valid: " << adb.ticker);
-    //CHECK_AND_ASSERT_MES(validate_asset_full_name(adb.full_name), false, "asset's full_name isn't valid: " << adb.full_name);
     return true;
   }
   //------------------------------------------------------------------
@@ -5040,6 +5118,35 @@ namespace currency
       std::string abcd = crypto::pod_to_hex(asset_id).substr(60, 4); // last 4 hex chars
       adb.full_name = "#bad asset name " + abcd + "#";
     }
+  }
+  //------------------------------------------------------------------
+#define GATEWAY_ADDRESS_META_INFO_MAX_SIZE  4000
+
+  STATIC_CHECK_TYPE_TOTAL_FIELDS(gateway_address_descriptor_base, 4, "this is the reminder: check validate_gateway_descriptor_base_limits() for missing fields");
+  
+  bool validate_gateway_descriptor_base_limits(const gateway_address_descriptor_base& gadb)
+  {
+    CHECK_AND_ASSERT_MES(gadb.meta_info.size() <= GATEWAY_ADDRESS_META_INFO_MAX_SIZE, false, "gw meta_info is too long: " << gadb.meta_info.size());
+
+    CHECK_AND_ASSERT_MES(gadb.etc.empty(), false, "gw etc isn't empty");
+
+    return true;
+  }
+  //------------------------------------------------------------------
+  bool validate_gateway_descriptor_operation_limits(const gateway_address_descriptor_operation& gado)
+  {
+    VARIANT_SWITCH_BEGIN(gado.operation)
+      VARIANT_CASE_CONST(gateway_address_descriptor_operation_register, gado_reg)
+        if (!validate_gateway_descriptor_base_limits(gado_reg.descriptor))
+          return false;
+      VARIANT_CASE_CONST(gateway_address_descriptor_operation_update, gado_upd)
+        if (!validate_gateway_descriptor_base_limits(gado_upd.descriptor))
+          return false;
+      VARIANT_CASE_OTHER()
+        LOG_ERROR("unsupported gw operation: " << gado.operation.type().name());
+        return false;
+    VARIANT_SWITCH_END()
+    return true;
   }
   //------------------------------------------------------------------
   std::string dump_ring_sig_data(const crypto::hash& hash_for_sig, const crypto::key_image& k_image, const std::vector<const crypto::public_key*>& output_keys_ptrs, const std::vector<crypto::signature>& sig)
