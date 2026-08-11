@@ -136,6 +136,22 @@ TEST(wallet_kdf_romix, correctness)
   ASSERT_NE(0, std::memcmp(out1, out5, 32));
 }
 
+TEST(wallet_kdf_romix, cost_parameter_policy)
+{
+  const uint8_t max_N_log2 = WALLET_KDF_ROMIX_N_LOG2_MAX;
+
+  EXPECT_FALSE(crypto::is_romix_keccak_cost_within_limits(9, 0, max_N_log2));
+  EXPECT_TRUE(crypto::is_romix_keccak_cost_within_limits(10, 0, max_N_log2));
+  EXPECT_TRUE(crypto::is_romix_keccak_cost_within_limits(WALLET_KDF_ROMIX_N_LOG2, WALLET_KDF_ROMIX_PHASE2_LOG2_REDUCTION, max_N_log2));
+  EXPECT_TRUE(crypto::is_romix_keccak_cost_within_limits(max_N_log2, 0, max_N_log2));
+  EXPECT_TRUE(crypto::is_romix_keccak_cost_within_limits(max_N_log2, (uint8_t)(max_N_log2 - 1), max_N_log2));
+
+  EXPECT_FALSE(crypto::is_romix_keccak_cost_within_limits((uint8_t)(max_N_log2 + 1), 0, max_N_log2));
+  EXPECT_FALSE(crypto::is_romix_keccak_cost_within_limits(255, 0, max_N_log2));
+  EXPECT_FALSE(crypto::is_romix_keccak_cost_within_limits(WALLET_KDF_ROMIX_N_LOG2,  WALLET_KDF_ROMIX_N_LOG2, max_N_log2));
+  EXPECT_FALSE(crypto::is_romix_keccak_cost_within_limits(WALLET_KDF_ROMIX_N_LOG2, 255, max_N_log2));
+}
+
 TEST(wallet_kdf_romix, brute_force_cost_report)
 {
   const std::string password = "hunter2hunter2hu";

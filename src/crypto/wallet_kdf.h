@@ -17,6 +17,13 @@ namespace crypto
     #include "keccak.h"
   }
 
+  constexpr uint8_t ROMIX_KECCAK_N_LOG2 = 10;
+
+  inline bool is_romix_keccak_cost_within_limits(uint8_t N_log2, uint8_t phase2_log2_reduction, uint8_t max_N_log2)
+  {
+    return N_log2 >= ROMIX_KECCAK_N_LOG2 && N_log2 <= max_N_log2 && phase2_log2_reduction < N_log2;
+  }
+
   // memory-hard password stretching for wallet file encryption
   //
   // construction is the ROMix algorithm from scrypt (C. Percival, 2009, "Stronger Key Derivation via Sequential Memory-Hard Functions"),
@@ -27,8 +34,8 @@ namespace crypto
     uint8_t N_log2, uint8_t phase2_log2_reduction,
     uint8_t (&out_stretched)[32])
   {
-    if (N_log2 < 10)
-      N_log2 = 10; // 32kb ram min
+    if (N_log2 < ROMIX_KECCAK_N_LOG2)
+      N_log2 = ROMIX_KECCAK_N_LOG2; // 32kb ram min
     if (N_log2 > 30)
       N_log2 = 30; // 32gb ram max
     const uint64_t N = (uint64_t)1 << N_log2;
