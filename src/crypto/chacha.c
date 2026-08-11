@@ -19,11 +19,31 @@ Public domain.
 #define U32V(v) ((uint32_t)(v) & UINT32_C(0xFFFFFFFF))
 
 /*
- * The following macros load words from an array of bytes with
- * different types of endianness, and vice versa.
+ * The following functions load/store words from an array of bytes with
+ * little-endian ordering.
+ *
+ * They must not cast the byte pointer to uint32_t*: callers routinely pass
+ * unaligned pointers (e.g. chacha_iv sits at offset 1 inside the packed
+ * wallet keys_file_data struct), and the cast lets the compiler emit
+ * alignment-assuming instructions (LDM/LDRD on ARM32) that fault on
+ * unaligned addresses. memcpy compiles to a single load/store where
+ * unaligned access is allowed and to safe byte accesses elsewhere.
  */
-#define U8TO32_LITTLE(p) SWAP32LE(((uint32_t*)(p))[0])
-#define U32TO8_LITTLE(p, v) (((uint32_t*)(p))[0] = SWAP32LE(v))
+static inline uint32_t u8to32_little(const void* p)
+{
+  uint32_t v;
+  memcpy(&v, p, sizeof(v));
+  return SWAP32LE(v);
+}
+
+static inline void u32to8_little(void* p, uint32_t v)
+{
+  v = SWAP32LE(v);
+  memcpy(p, &v, sizeof(v));
+}
+
+#define U8TO32_LITTLE(p) u8to32_little(p)
+#define U32TO8_LITTLE(p, v) u32to8_little((p), (v))
 
 #define ROTATE(v,c) (rol32(v,c))
 #define XOR(v,w) ((v) ^ (w))

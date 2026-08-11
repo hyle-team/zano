@@ -1415,6 +1415,7 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY_HF(zarcanum_in_alt_chain_2, "4-*");
     GENERATE_AND_PLAY(assets_and_explicit_native_coins_in_outs);
     GENERATE_AND_PLAY(zarcanum_block_with_txs);
+    GENERATE_AND_PLAY_HF(txs_and_invalid_range_proofs, "5-*");
     GENERATE_AND_PLAY(asset_depoyment_and_few_zc_utxos);
     GENERATE_AND_PLAY_HF(assets_and_pos_mining, "4-*");
     GENERATE_AND_PLAY_HF(asset_emission_and_unconfirmed_balance, "4-*");

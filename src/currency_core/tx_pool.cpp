@@ -602,6 +602,16 @@ namespace currency
     return true;
   }
   //---------------------------------------------------------------------------------
+  bool tx_memory_pool::get_all_transactions_list(std::list<std::pair<crypto::hash, transaction>>& txs) const
+  {
+    m_db_transactions.enumerate_items([&](uint64_t i, const crypto::hash& h, const tx_details& tx_entry)
+                                      {
+      txs.push_back(std::make_pair(h, tx_entry.tx));
+      return true; 
+      });
+    return true;
+  }
+  //---------------------------------------------------------------------------------
   bool tx_memory_pool::get_all_transactions_list(std::list<std::string>& txs)const
   {
     m_db_transactions.enumerate_items([&](uint64_t i, const crypto::hash& h, const tx_details &tx_entry)

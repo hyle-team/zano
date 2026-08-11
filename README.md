@@ -17,7 +17,7 @@ Be sure to clone the repository properly:\
 | llvm/clang (Linux) | UNKNOWN | 7.0.1 | 8.0.0 |
 | [MSVC](https://visualstudio.microsoft.com/downloads/) (Windows) | 2017 (15.9.30) | 2022 (17.11.5) | 2022 (17.12.3) |
 | [XCode](https://developer.apple.com/downloads/) (macOS) | 12.3 | 14.3 | 15.2 |
-| [CMake](https://cmake.org/download/) | 3.26.3 | 3.26.3 | 3.31.6 |
+| [CMake](https://cmake.org/download/) | 3.30.0 | 3.30.0 | 3.31.6 |
 | [Boost](https://www.boost.org/users/download/) | 1.83 | 1.84 | 1.84 |
 | [OpenSSL](https://www.openssl.org/source/) [(win)](https://slproweb.com/products/Win32OpenSSL.html) | 1.1.1n | 3.5.7 | 3.5.7 | 
 | [Qt](https://download.qt.io/archive/qt/) (*only for GUI*) | 5.8.0 | 5.15.2 | 5.15.2 |
@@ -81,10 +81,10 @@ Recommended OS versions: Ubuntu 20.04, 22.04 LTS.
    (Assuming that `$HOME` environment variable is set to your home directory. Otherwise, edit line 4 accordingly.)
 
        curl -OL https://github.com/openssl/openssl/releases/download/openssl-3.5.7/openssl-3.5.7.tar.gz
-       echo "a8c0d28a529ca480f9f36cf5792e2cd21984552a3c8e4aa11a24aa31aeac98e8  openssl-3.5.7.tar.gz" | sha256sum -c && tar xaf openssl-3.5.7.tar.gz
+       echo "a8c0d28a529ca480f9f36cf5792e2cd21984552a3c8e4aa11a24aa31aeac98e8  openssl-3.5.7.tar.gz" | sha256sum -c && tar xf openssl-3.5.7.tar.gz
        cd openssl-3.5.7
        ./config --prefix=$HOME/openssl --openssldir=$HOME/openssl --libdir=lib no-comp shared
-       make && make test && make install_sw install_ssldirs && cd ..
+       make && make install_sw install_ssldirs && cd ..
 
 
 

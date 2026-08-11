@@ -61,3 +61,13 @@ struct zarcanum_in_alt_chain_2 : public wallet_test
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };
 
+struct txs_and_invalid_range_proofs : public test_chain_unit_enchanced
+{
+  txs_and_invalid_range_proofs();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+
+  mutable currency::account_base              m_miner_acc;
+  mutable currency::transaction               m_good_tx;
+  mutable std::vector<currency::transaction>  m_bad_txs;
+};

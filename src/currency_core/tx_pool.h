@@ -123,6 +123,7 @@ namespace currency
     bool get_all_transactions_details(std::list<tx_rpc_extended_info>& txs)const;
     bool get_all_transactions_brief_details(std::list<tx_rpc_brief_info>& txs)const;
     bool get_all_transactions_list(std::list<std::string>& txs)const;
+    bool get_all_transactions_list(std::list<std::pair<crypto::hash, transaction>>& txs) const;
     bool get_transactions_details(const std::list<std::string>& ids, std::list<tx_rpc_extended_info>& txs)const;
     bool get_transactions_brief_details(const std::list<std::string>& ids, std::list<tx_rpc_brief_info>& txs)const;
 

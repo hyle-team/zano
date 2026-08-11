@@ -1074,6 +1074,15 @@ namespace currency
     for (const auto& ad : addr_)
       addr.push_back(ad);
   }
+  //---------------------------------------------------------------------------------
+  bool check_single_tx_range_proofs(const transaction& tx, const crypto::hash& tx_id)
+  {
+    std::vector<zc_outs_range_proofs_with_commitments> range_proofs_agregated;
 
+    CHECK_AND_ASSERT_MES(collect_rangeproofs_data_from_tx(tx, tx_id, range_proofs_agregated), false, "tx " << tx_id << ": collect_rangeproofs_data_from_tx failed");
 
+    CHECK_AND_ASSERT_MES(verify_multiple_zc_outs_range_proofs(range_proofs_agregated), false, "tx " << tx_id << " has invalid range proofs");
+
+    return true;
+  }
 } // namespace currency
