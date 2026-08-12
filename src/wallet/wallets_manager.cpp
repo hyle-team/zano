@@ -2313,7 +2313,11 @@ void wallets_manager::wallet_vs_options::worker_func()
 
   while (!major_stop)
   {
+    // as not every path in the loop is guaranteed to sleep if it's at the end, we need to put sleep here to avoid busy loop
+    boost::this_thread::sleep_for(boost::chrono::milliseconds(100));
     stop_for_refresh = false;
+    if(major_stop)
+      break;
     try
     {
       if (m_pproxy_diagnostig_info->last_daemon_is_disconnected.load())
@@ -2330,14 +2334,14 @@ void wallets_manager::wallet_vs_options::worker_func()
       //sync zone
       if (*plast_daemon_network_state == currency::COMMAND_RPC_GET_INFO::daemon_network_state_online)
       {
-        if (*plast_daemon_height != last_wallet_synch_height)
+        if (*plast_daemon_height > last_wallet_synch_height)
         {
           wsi.is_mining = do_mining;
           bool show_progress = true;
-          if (last_wallet_synch_height && *plast_daemon_height - last_wallet_synch_height < 3)
+          if(last_wallet_synch_height && *plast_daemon_height >= last_wallet_synch_height && *plast_daemon_height - last_wallet_synch_height < 3)
             show_progress = false;
 
-          if(*plast_daemon_height - last_wallet_synch_height > 10)
+          if(*plast_daemon_height >= last_wallet_synch_height && *plast_daemon_height - last_wallet_synch_height > 10)
           {
             CRITICAL_REGION_LOCAL(long_refresh_in_progress_lock);
             long_refresh_in_progress = true;
@@ -2351,20 +2355,28 @@ void wallets_manager::wallet_vs_options::worker_func()
             pview->update_wallet_status(wsi);
           }
           w->get()->refresh(stop_for_refresh);
+          if(major_stop)
+            break;
+          last_wallet_synch_height = w->get()->get_blockchain_current_size();
+          if((stop_for_refresh && !major_stop) || (*plast_daemon_height >= last_wallet_synch_height && *plast_daemon_height - last_wallet_synch_height > 3))
+          {            
+            // something wrong with the refresh, let's wait a bit and try again
+            for(size_t i = 0; i < 50 && !major_stop; ++i) boost::this_thread::sleep_for(boost::chrono::milliseconds(100));
+
+            continue;
+          }
+
           long_refresh_in_progress = false;
           w->get()->resend_unconfirmed();
-          {
-            auto w_ptr = *w; // get locked exclusive access to the wallet first (it's more likely that wallet is locked for a long time than 'offers')
-            auto offers_list_proxy = *offers; // than get locked exclusive access to offers
-            offers_list_proxy->clear();
-            (*w_ptr)->get_actual_offers(*offers_list_proxy);
-          }
 
           wallet_state = wsi.wallet_state = view::wallet_status_info::wallet_state_ready;
           prepare_wallet_status_info(*this, wsi);
           pview->update_wallet_status(wsi);
-          //do refresh
-          last_wallet_synch_height = static_cast<uint64_t>(*plast_daemon_height);
+          //do refresh          
+        }
+        else
+        {
+          long_refresh_in_progress = false;
         }
 
         scan_pool_interval.do_call([&](){
@@ -2383,7 +2395,7 @@ void wallets_manager::wallet_vs_options::worker_func()
         });
       }
 
-      if (major_stop || stop_for_refresh)
+      if (major_stop)
         break;
       //******************************************************************************************
       //mining zone
@@ -2431,7 +2443,6 @@ void wallets_manager::wallet_vs_options::worker_func()
       pview->update_wallet_status(wsi);
       continue;
     }
-    boost::this_thread::sleep_for(boost::chrono::milliseconds(100));
   }
   LOG_PRINT_GREEN("[WALLET_HANDLER] Wallet thread thread stopped", LOG_LEVEL_0);
 }
