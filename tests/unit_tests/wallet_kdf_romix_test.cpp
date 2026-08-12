@@ -140,16 +140,21 @@ TEST(wallet_kdf_romix, cost_parameter_policy)
 {
   const uint8_t max_N_log2 = WALLET_KDF_ROMIX_N_LOG2_MAX;
 
-  EXPECT_FALSE(crypto::is_romix_keccak_cost_within_limits(9, 0, max_N_log2));
-  EXPECT_TRUE(crypto::is_romix_keccak_cost_within_limits(10, 0, max_N_log2));
-  EXPECT_TRUE(crypto::is_romix_keccak_cost_within_limits(WALLET_KDF_ROMIX_N_LOG2, WALLET_KDF_ROMIX_PHASE2_LOG2_REDUCTION, max_N_log2));
-  EXPECT_TRUE(crypto::is_romix_keccak_cost_within_limits(max_N_log2, 0, max_N_log2));
-  EXPECT_TRUE(crypto::is_romix_keccak_cost_within_limits(max_N_log2, (uint8_t)(max_N_log2 - 1), max_N_log2));
+  const auto is_cost_within_limits = [max_N_log2](uint8_t N_log2, uint8_t phase2_log2_reduction)
+  {
+    return N_log2 >= crypto::ROMIX_KECCAK_N_LOG2 && N_log2 <= max_N_log2 && phase2_log2_reduction < N_log2;
+  };
 
-  EXPECT_FALSE(crypto::is_romix_keccak_cost_within_limits((uint8_t)(max_N_log2 + 1), 0, max_N_log2));
-  EXPECT_FALSE(crypto::is_romix_keccak_cost_within_limits(255, 0, max_N_log2));
-  EXPECT_FALSE(crypto::is_romix_keccak_cost_within_limits(WALLET_KDF_ROMIX_N_LOG2,  WALLET_KDF_ROMIX_N_LOG2, max_N_log2));
-  EXPECT_FALSE(crypto::is_romix_keccak_cost_within_limits(WALLET_KDF_ROMIX_N_LOG2, 255, max_N_log2));
+  EXPECT_FALSE(is_cost_within_limits(9, 0));
+  EXPECT_TRUE(is_cost_within_limits(10, 0));
+  EXPECT_TRUE(is_cost_within_limits(WALLET_KDF_ROMIX_N_LOG2, WALLET_KDF_ROMIX_PHASE2_LOG2_REDUCTION));
+  EXPECT_TRUE(is_cost_within_limits(max_N_log2, 0));
+  EXPECT_TRUE(is_cost_within_limits(max_N_log2, (uint8_t)(max_N_log2 - 1)));
+
+  EXPECT_FALSE(is_cost_within_limits((uint8_t)(max_N_log2 + 1), 0));
+  EXPECT_FALSE(is_cost_within_limits(255, 0));
+  EXPECT_FALSE(is_cost_within_limits(WALLET_KDF_ROMIX_N_LOG2, WALLET_KDF_ROMIX_N_LOG2));
+  EXPECT_FALSE(is_cost_within_limits(WALLET_KDF_ROMIX_N_LOG2, 255));
 }
 
 TEST(wallet_kdf_romix, brute_force_cost_report)

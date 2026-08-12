@@ -3060,6 +3060,12 @@ namespace
       return password;
     CHECK_AND_ASSERT_THROW_MES(kf_data.kdf_algo == WALLET_KDF_ALGO_ROMIX_KECCAK, "unsupported wallet KDF algo: " << (int)kf_data.kdf_algo);
     CHECK_AND_ASSERT_THROW_MES(kf_data.kdf_salt.size() == WALLET_KDF_SALT_SIZE, "unexpected wallet KDF salt size: " << kf_data.kdf_salt.size());
+    CHECK_AND_ASSERT_THROW_MES(
+      kf_data.kdf_N_log2 >= crypto::ROMIX_KECCAK_N_LOG2 &&
+      kf_data.kdf_N_log2 <= WALLET_KDF_ROMIX_N_LOG2_MAX &&
+      kf_data.kdf_phase2_log2_reduction < kf_data.kdf_N_log2,
+      "wallet KDF cost parameters are out of range: N_log2=" << (int)kf_data.kdf_N_log2 <<
+      ", phase2_log2_reduction=" << (int)kf_data.kdf_phase2_log2_reduction);
 
     uint8_t stretched[32];
     crypto::derive_key_romix_keccak(CRYPTO_HDS_WALLET_KDF_ROMIX, password.data(), password.size(),
