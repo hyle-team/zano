@@ -142,7 +142,7 @@ int main(int argc, char* argv[])
     srv.send_stop_signal();
   });
 
-  LOG_PRINT_GREEN("gateway_rpc_proxy rpc server started, listening on port " << srv.get_binded_port(), LOG_LEVEL_0);
+  LOG_PRINT_GREEN("gateway_rpc_proxy rpc server started, listening on port " << srv.get_bound_port(), LOG_LEVEL_0);
   srv.run(GATEWAY_RPC_PROXY_DEFAULT_RPC_THREADS, true);
   LOG_PRINT_L0("gateway_rpc_proxy rpc server stopped");
 
