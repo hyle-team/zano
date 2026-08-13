@@ -2207,6 +2207,33 @@ bool wallet_rpc_gateway_address::c1(currency::core& c, size_t ev_index, const st
   CHECK_AND_ASSERT_EQ(gw_get_info_resp.descriptor_info.opt_owner_custom_schnorr_pub_key.value(), gw_reg_req.descriptor_info.opt_owner_custom_schnorr_pub_key.value());
   CHECK_AND_ASSERT_EQ(gw_get_info_resp.payment_id, "");
 
+  // decrypt the ZC -> GW tx and make sure gateway outputs decode with the correct amount and asset id
+  {
+    crypto::hash gw_tx_id{};
+    CHECK_AND_ASSERT_TRUE(crypto::parse_tpod_from_hex_string(tr_to_gw_res.tx_hash, gw_tx_id));
+    crypto::secret_key gw_tx_key{};
+    CHECK_AND_ASSERT_TRUE(alice_wlt->get_tx_key(gw_tx_id, gw_tx_key));
+
+    currency::COMMAND_RPC_DECRYPT_TX_DETAILS::request  dec_req{};
+    dec_req.tx_id = tr_to_gw_res.tx_hash;
+    dec_req.tx_secret_key = gw_tx_key;
+    dec_req.strict_output_addresses_match = false;
+    dec_req.outputs_addresses.push_back(gw_reg_resp.address);
+    currency::COMMAND_RPC_DECRYPT_TX_DETAILS::response dec_resp{};
+    epee::json_rpc::error jerr{};
+    tools::wallet_rpc_server::connection_context ctx{};
+    r = core_rpc_wrapper.on_decrypt_tx_details(dec_req, dec_resp, jerr, ctx);
+    CHECK_AND_ASSERT_MES(r, false, "on_decrypt_tx_details failed: " << jerr.message);
+
+    std::unordered_map<crypto::public_key, uint64_t> decoded_by_asset;
+    for (auto& o : dec_resp.decoded_outputs)
+      decoded_by_asset[o.asset_id] += o.amount;
+
+    CHECK_AND_ASSERT_EQ(dec_resp.decoded_outputs.size(), 2);
+    CHECK_AND_ASSERT_EQ(decoded_by_asset[native_coin_asset_id], MK_TEST_COINS(2));
+    CHECK_AND_ASSERT_EQ(decoded_by_asset[deployed_asset_id],    10);
+  }
+
   //
   // GW -> ZC
   //
