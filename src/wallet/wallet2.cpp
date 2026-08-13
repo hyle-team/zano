@@ -5269,21 +5269,23 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, uint64_t ful
     stake_input.amount = pe.amount;
 
     // get decoys outputs and construct miner tx
-    COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::response decoys_resp = AUTO_VAL_INIT(decoys_resp);
+    COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::response decoys_resp = AUTO_VAL_INIT(decoys_resp);
     std::vector<const crypto::public_key*> ring;
     uint64_t secret_index = 0; // index of the real stake output
     if (m_required_decoys_count > 0 && !is_auditable())
     {
-      COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::request decoys_req = AUTO_VAL_INIT(decoys_req);
+      COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::request decoys_req = AUTO_VAL_INIT(decoys_req);
       decoys_req.height_upper_limit = std::min(m_last_pow_block_h, m_last_known_daemon_height > m_core_runtime_config.min_coinstake_age ? m_last_known_daemon_height - m_core_runtime_config.min_coinstake_age : m_last_pow_block_h);
       decoys_req.use_forced_mix_outs = false;
-      decoys_req.decoys_count = m_required_decoys_count + 1; // one more to be able to skip a decoy in case it hits the real output
-      decoys_req.amounts.push_back(pe.amount); // request one batch of decoys
+      decoys_req.coinbase_percents = 0;
+      decoys_req.amounts.resize(1); // request one batch of decoys
+      decoys_req.amounts[0].amount = pe.amount;
+      decoys_req.amounts[0].global_offsets.resize(m_required_decoys_count + 1); // one more to be able to skip a decoy in case it hits the real output
 
-      r = m_core_proxy->call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS(decoys_req, decoys_resp);
+      r = m_core_proxy->call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3(decoys_req, decoys_resp);
       // TODO @#@# do we need these exceptions?
-      THROW_IF_FALSE_WALLET_EX(r, error::no_connection_to_daemon, "getrandom_outs1.bin");
-      THROW_IF_FALSE_WALLET_EX(decoys_resp.status != API_RETURN_CODE_BUSY, error::daemon_busy, "getrandom_outs1.bin");
+      THROW_IF_FALSE_WALLET_EX(r, error::no_connection_to_daemon, "getrandom_outs3.bin");
+      THROW_IF_FALSE_WALLET_EX(decoys_resp.status != API_RETURN_CODE_BUSY, error::daemon_busy, "getrandom_outs3.bin");
       THROW_IF_FALSE_WALLET_EX(decoys_resp.status == API_RETURN_CODE_OK, error::get_random_outs_error, decoys_resp.status);
       WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(decoys_resp.outs.size() == 1, "got wrong number of decoys batches: " << decoys_resp.outs.size());
 
