@@ -1528,6 +1528,9 @@ namespace currency
           auto& decoded_out = res.decoded_outputs.emplace_back();
           decoded_out.out_index = out_idx;
           decoded_out.address = req.outputs_addresses[addr_idx];
+          decoded_out.amount = gwo.amount;
+          if (!crypto::pub_key_mul8(gwo.asset_id, decoded_out.asset_id))
+            decoded_out.asset_id = currency::null_pkey;
           return currency::decode_output_data(gwo, derivation, out_idx, decoded_out.payment_id);
         VARIANT_CASE_OTHER()
           unknown_output_type = true;
