@@ -488,21 +488,6 @@ namespace currency
     return true;
   }
 
-    //------------------------------------------------------------------------------------------------------------------------------
-  bool core_rpc_server::on_get_random_outs1(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::request& req, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::response& res, connection_context& cntx)
-  {
-    CHECK_CORE_READY();
-    CHECK_RPC_LIMITS(req.amounts.size(), RPC_LIMIT_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS);
-    res.status = API_RETURN_CODE_FAIL;
-
-    if(!m_core.get_random_outs_for_amounts(req, res))
-    {
-      return true;
-    }
-
-    res.status = API_RETURN_CODE_OK;
-    return true;
-  }
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_get_random_outs3(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::request& req, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::response& res, connection_context& cntx)
   {
