@@ -186,6 +186,7 @@ bool MainWindow::init_window()
   connect(m_view, SIGNAL(loadFinished(bool)), SLOT(on_load_finished(bool)));
 
   setCentralWidget(central_widget_to_be_set);
+  setMinimumSize(800, 600);
   //this->setMouseTracking(true);
 
   m_view->page()->settings()->setAttribute(QWebEngineSettings::LocalContentCanAccessFileUrls, true);
