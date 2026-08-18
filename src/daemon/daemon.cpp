@@ -348,6 +348,7 @@ int main(int argc, char* argv[])
   LOG_PRINT_L0("Initializing core...");
   res = ccore.init(vm);
   CHECK_AND_ASSERT_MES(res, 1, "Failed to initialize core");
+  ccore.get_blockchain_storage().measure_db_performance();
   LOG_PRINT_L0("Core initialized OK");
 
   if (stratum_enabled)

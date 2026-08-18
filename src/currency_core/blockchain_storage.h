@@ -525,6 +525,7 @@ namespace currency
     void print_blockchain_outs(const std::string& file) const;
     void print_blockchain_outs_stats() const;
     void print_db_cache_perfeormance_data() const;
+    void measure_db_performance() const;
     void print_last_n_difficulty_numbers(uint64_t n) const;
     bool calc_tx_cummulative_blob(const block& bl)const;
     bool get_outs_index_stat(outs_index_stat& outs_stat)const;
