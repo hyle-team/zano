@@ -2550,7 +2550,7 @@ namespace currency
     COMMAND_RPC_GET_ALIAS_DETAILS::request req2 = AUTO_VAL_INIT(req2);
     COMMAND_RPC_GET_ALIAS_DETAILS::response res2 = AUTO_VAL_INIT(res2);
 
-    std::set<std::string> aliases = m_core.get_blockchain_storage().get_aliases_by_address(addr);
+    std::set<std::string> aliases = m_core.get_blockchain_storage().get_aliases_by_address(addr, res.default_alias);
 
     if (!aliases.size())
     {
