@@ -127,3 +127,58 @@ struct gen_alias_in_coinbase : gen_alias_tests
   bool generate(std::vector<test_event_entry>& events) const;
   bool check(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };
+
+//
+// default alias tests
+//
+// The "default alias" feature lets an address that owns several aliases mark one of them as the one
+// UIs should display. It is set by an alias update that re-assigns an alias to its current owner
+// without touching anything else (same address, same comment, same view key). The daemon keeps the
+// choice in a per-address stack keyed by tx id, so that a chain switch can roll it back.
+//
+
+struct gen_alias_default_alias : gen_alias_tests
+{
+  gen_alias_default_alias();
+  bool generate(std::vector<test_event_entry>& events) const;
+
+  bool check_after_first_reg(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+  bool check_after_second_alias(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+  bool check_after_third_alias(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+  bool check_after_set_default(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+  bool check_after_default_transferred(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+  bool check_after_transfer_rolled_back(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+  bool check_after_set_default_rolled_back(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+
+private:
+  mutable currency::account_public_address m_alice_addr;
+  mutable currency::account_public_address m_bob_addr;
+};
+
+struct gen_alias_default_alias_last_alias_reorg : gen_alias_tests
+{
+  gen_alias_default_alias_last_alias_reorg();
+  bool generate(std::vector<test_event_entry>& events) const;
+
+  bool check_after_reg(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+  bool check_after_transfer(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+  bool check_after_rollback(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+  bool check_after_regained_second_alias(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+
+private:
+  mutable currency::account_public_address m_alice_addr;
+  mutable currency::account_public_address m_bob_addr;
+};
+
+struct gen_alias_default_alias_info_update : gen_alias_tests
+{
+  gen_alias_default_alias_info_update();
+  bool generate(std::vector<test_event_entry>& events) const;
+
+  bool check_before_info_update(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+  bool check_after_info_update(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+  bool check_after_info_update_rolled_back(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+
+private:
+  mutable currency::account_public_address m_alice_addr;
+};
