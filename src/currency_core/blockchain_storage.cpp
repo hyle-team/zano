@@ -4531,6 +4531,7 @@ bool blockchain_storage::migrate_default_aliases_container()
   CRITICAL_REGION_LOCAL(m_read_lock);
   size_t updated_count = 0;
   size_t total_addresses_count = 0;
+  size_t total_aliases_count = 0;
   LOG_PRINT_L0("Migrating default aliases container started...");
   m_db_addr_to_alias.enumerate_items([&](uint64_t i, const account_public_address& addr, const std::set<std::string>& aliases)
         {
@@ -4546,11 +4547,12 @@ bool blockchain_storage::migrate_default_aliases_container()
               updated_count++;
             }
           }
-          total_addresses_count++;
+          total_aliases_count += aliases.size();
+          total_addresses_count++;        
           return true;  // continue
         });
 
-  LOG_PRINT_L0("Migrating default aliases container finished! Updated " << updated_count << " out of " << total_addresses_count << " addresses.");
+  LOG_PRINT_L0("Migrating default aliases container finished! Updated " << updated_count << " out of " << total_addresses_count << " addresses, total aliases count = " << total_aliases_count << ".");
   return true;
 }
 //------------------------------------------------------------------
