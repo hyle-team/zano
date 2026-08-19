@@ -142,7 +142,7 @@ TEST(wallet_kdf_romix, cost_parameter_policy)
 
   const auto is_cost_within_limits = [max_N_log2](uint8_t N_log2, uint8_t phase2_log2_reduction)
   {
-    return N_log2 >= crypto::ROMIX_KECCAK_N_LOG2 && N_log2 <= max_N_log2 && phase2_log2_reduction < N_log2;
+    return N_log2 >= crypto::ROMIX_KECCAK_N_LOG2_MIN && N_log2 <= max_N_log2 && phase2_log2_reduction < N_log2;
   };
 
   EXPECT_FALSE(is_cost_within_limits(9, 0));

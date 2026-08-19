@@ -17,7 +17,8 @@ namespace crypto
     #include "keccak.h"
   }
 
-  constexpr uint8_t ROMIX_KECCAK_N_LOG2 = 10;
+  constexpr uint8_t ROMIX_KECCAK_N_LOG2_MIN = 10;
+  constexpr uint8_t ROMIX_KECCAK_N_LOG2_MAX = 30;
 
   // memory-hard password stretching for wallet file encryption
   //
@@ -29,10 +30,10 @@ namespace crypto
     uint8_t N_log2, uint8_t phase2_log2_reduction,
     uint8_t (&out_stretched)[32])
   {
-    if (N_log2 < ROMIX_KECCAK_N_LOG2)
-      N_log2 = ROMIX_KECCAK_N_LOG2; // 32kb ram min
-    if (N_log2 > 30)
-      N_log2 = 30; // 32gb ram max
+    if (N_log2 < ROMIX_KECCAK_N_LOG2_MIN)
+      N_log2 = ROMIX_KECCAK_N_LOG2_MIN; // 32kb ram min
+    if (N_log2 > ROMIX_KECCAK_N_LOG2_MAX)
+      N_log2 = ROMIX_KECCAK_N_LOG2_MAX; // 32gb ram max
     const uint64_t N = (uint64_t)1 << N_log2;
     const uint64_t mask = N - 1; // N is power of 2 -> "x & mask" == "x % N"
 
