@@ -1608,7 +1608,7 @@ bool wallet2::process_payment_id_for_wti_and_populate_subtransfers(wallet_public
           wstbp.subtransfers.push_back(wsti);
         }
       }
-      if (intrinsic_payment_id != 0 && has_balance_increase)
+      if (intrinsic_payment_id != 0 && has_balance_increase && wti.height != 0)
       {
         pd.m_tx_hash = wti.tx_hash;
         pd.m_block_height = wti.height;
@@ -1652,7 +1652,7 @@ bool wallet2::process_payment_id_for_wti_and_populate_subtransfers(wallet_public
         wstbp.subtransfers.push_back(wsti);
       }
     }
-    if (!wti.tx_wide_payment_id.empty() && has_balance_increase)
+    if (!wti.tx_wide_payment_id.empty() && has_balance_increase && wti.height != 0)
     {
       payment.m_tx_hash = wti.tx_hash;
       payment.m_block_height = wti.height;

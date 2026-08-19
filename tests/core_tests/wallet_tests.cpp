@@ -1326,6 +1326,75 @@ bool gen_wallet_payment_id::c2(currency::core& c, size_t ev_index, const std::ve
 
 //------------------------------------------------------------------------------
 
+gen_wallet_payment_id_mempool::gen_wallet_payment_id_mempool()
+{
+  REGISTER_CALLBACK_METHOD(gen_wallet_payment_id_mempool, c1);
+  REGISTER_CALLBACK_METHOD(gen_wallet_payment_id_mempool, c2);
+}
+
+bool gen_wallet_payment_id_mempool::generate(std::vector<test_event_entry>& events) const
+{
+  GENERATE_ACCOUNT(preminer_acc);
+  GENERATE_ACCOUNT(miner_acc);
+  m_accounts.push_back(miner_acc);
+  GENERATE_ACCOUNT(alice_acc);
+  m_accounts.push_back(alice_acc);
+
+  currency::block blk_0 = AUTO_VAL_INIT(blk_0);
+  generator.construct_genesis_block(blk_0, preminer_acc, test_core_time::get_time());
+  events.push_back(blk_0);
+
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  m_payment_id = epee::string_tools::pod_to_hex(get_block_hash(blk_0));
+  std::vector<currency::attachment_v> attachments;
+  bool r = currency::set_payment_id_to_tx(attachments, m_payment_id);
+  CHECK_AND_ASSERT_MES(r, false, "set_payment_id_to_tx failed");
+  MAKE_TX_ATTACH(events, tx_unconfirmed, miner_acc, alice_acc, MK_TEST_COINS(5), blk_0r, attachments);
+
+  DO_CALLBACK(events, "c1");
+  MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_unconfirmed);
+  DO_CALLBACK(events, "c2");
+
+  return true;
+}
+
+bool gen_wallet_payment_id_mempool::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  m_alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
+  m_alice_wlt->refresh();
+
+  bool has_related_alias = false;
+  m_alice_wlt->scan_tx_pool(has_related_alias);
+
+  auto payment_range = m_alice_wlt->m_payments.equal_range(m_payment_id);
+  CHECK_AND_ASSERT_MES(payment_range.first == payment_range.second, false, "unconfirmed payment was added to m_payments");
+
+  std::list<tools::payment_details> payments;
+  m_alice_wlt->get_payments(m_payment_id, payments);
+  CHECK_AND_ASSERT_MES(payments.empty(), false, "get_payments returned an unconfirmed payment");
+
+  return true;
+}
+
+bool gen_wallet_payment_id_mempool::c2(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  CHECK_AND_ASSERT_MES(m_alice_wlt, false, "wallet was not initialized in c1");
+
+  m_alice_wlt->refresh();
+
+  std::list<tools::payment_details> payments;
+  m_alice_wlt->get_payments(m_payment_id, payments);
+  CHECK_AND_ASSERT_MES(payments.size() == 1, false, "confirmed payment was not added exactly once");
+  CHECK_AND_ASSERT_MES(payments.front().m_block_height != 0, false, "confirmed payment has zero block height");
+  CHECK_AND_ASSERT_MES(payments.front().m_amount == MK_TEST_COINS(5), false, "confirmed payment has wrong amount");
+
+  m_alice_wlt.reset();
+  return true;
+}
+
+//------------------------------------------------------------------------------
+
 gen_wallet_oversized_payment_id::gen_wallet_oversized_payment_id()
 {
   REGISTER_CALLBACK_METHOD(gen_wallet_oversized_payment_id, c1);

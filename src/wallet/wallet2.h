@@ -226,7 +226,28 @@ namespace tools
       a & m_rollback_events;
       a & m_whitelisted_assets;
       a & m_use_assets_whitelisting;
-      a & m_last_zc_global_indexs;      
+      a & m_last_zc_global_indexs;
+
+      // v171 is wallet version that doesn't store mempool payments in m_payments
+      // and we remove legacy height-0 entries when loading an older wallet
+      if (t_archive::is_loading::value && ver < 171) 
+      {
+        size_t removed_count = 0;
+        for (auto it = m_payments.begin(); it != m_payments.end(); )
+        {
+          if (it->second.m_block_height == 0)
+          {
+            it = m_payments.erase(it);
+            ++removed_count;
+          }
+          else
+          {
+            ++it;
+          }
+        }
+
+        LOG_PRINT_L0("Wallet migration: removed " << removed_count << " legacy unconfirmed payment entries");
+      }
     }
   };
   

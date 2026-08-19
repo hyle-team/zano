@@ -1146,6 +1146,7 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY(gen_wallet_unlock_by_block_and_by_time);
     GENERATE_AND_PLAY(wallet_unlock_time_tx_spend_detection);
     GENERATE_AND_PLAY(gen_wallet_payment_id);
+    GENERATE_AND_PLAY(gen_wallet_payment_id_mempool);
     GENERATE_AND_PLAY(gen_wallet_oversized_payment_id);
     GENERATE_AND_PLAY(gen_wallet_transfers_and_outdated_unconfirmed_txs);
     GENERATE_AND_PLAY(gen_wallet_transfers_and_chain_switch);

@@ -104,6 +104,18 @@ struct gen_wallet_payment_id : public wallet_test
   mutable std::string m_payment_id;
 };
 
+struct gen_wallet_payment_id_mempool : public wallet_test
+{
+  gen_wallet_payment_id_mempool();
+
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+  bool c2(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+
+  mutable std::string m_payment_id;
+  std::shared_ptr<tools::wallet2> m_alice_wlt;
+};
+
 struct gen_wallet_oversized_payment_id : public wallet_test
 {
   gen_wallet_oversized_payment_id();
