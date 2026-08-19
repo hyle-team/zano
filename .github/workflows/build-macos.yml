@@ -11,8 +11,8 @@ on:
 env:
   BOOST_VERSION: 1.84.0
   BOOST_SHA256: cc4b893acf645c9d4b698e9a0f08ca8846aa5d6c68275c14c3e7949c24109454
-  OPENSSL_VERSION: 1.1.1w
-  OPENSSL_SHA256: cf3098950cb4d853ad95c0841f1f9c6d3dc102dccfcacd521d93925208b76ac8
+  OPENSSL_VERSION: 3.5.7
+  OPENSSL_SHA256: a8c0d28a529ca480f9f36cf5792e2cd21984552a3c8e4aa11a24aa31aeac98e8
 
 jobs:
   build-cli:
@@ -55,14 +55,12 @@ jobs:
         run: |
           mkdir -p "$DEPS_DIR" && cd "$DEPS_DIR"
           curl -fL -o "openssl-${OPENSSL_VERSION}.tar.gz" \
-            "https://github.com/openssl/openssl/releases/download/OpenSSL_$(echo "$OPENSSL_VERSION" | tr . _)/openssl-${OPENSSL_VERSION}.tar.gz" \
-          || curl -fL -o "openssl-${OPENSSL_VERSION}.tar.gz" \
-            "https://www.openssl.org/source/old/1.1.1/openssl-${OPENSSL_VERSION}.tar.gz"
+            "https://github.com/openssl/openssl/releases/download/openssl-${OPENSSL_VERSION}/openssl-${OPENSSL_VERSION}.tar.gz"
           echo "${OPENSSL_SHA256}  openssl-${OPENSSL_VERSION}.tar.gz" | shasum -a 256 -c
           tar xzf "openssl-${OPENSSL_VERSION}.tar.gz"
           cd "openssl-${OPENSSL_VERSION}"
           ./Configure ${{ matrix.openssl_target }} no-shared no-tests \
-            --prefix="$DEPS_DIR/openssl" --openssldir="$DEPS_DIR/openssl" \
+            --prefix="$DEPS_DIR/openssl" --openssldir="$DEPS_DIR/openssl" --libdir=lib \
             -mmacosx-version-min=${{ matrix.osx_min }}
           make -j"$(sysctl -n hw.ncpu)"
           make install_sw
@@ -286,14 +284,12 @@ jobs:
         run: |
           mkdir -p "$DEPS_DIR" && cd "$DEPS_DIR"
           curl -fL -o "openssl-${OPENSSL_VERSION}.tar.gz" \
-            "https://github.com/openssl/openssl/releases/download/OpenSSL_$(echo "$OPENSSL_VERSION" | tr . _)/openssl-${OPENSSL_VERSION}.tar.gz" \
-          || curl -fL -o "openssl-${OPENSSL_VERSION}.tar.gz" \
-            "https://www.openssl.org/source/old/1.1.1/openssl-${OPENSSL_VERSION}.tar.gz"
+            "https://github.com/openssl/openssl/releases/download/openssl-${OPENSSL_VERSION}/openssl-${OPENSSL_VERSION}.tar.gz"
           echo "${OPENSSL_SHA256}  openssl-${OPENSSL_VERSION}.tar.gz" | shasum -a 256 -c
           tar xzf "openssl-${OPENSSL_VERSION}.tar.gz"
           cd "openssl-${OPENSSL_VERSION}"
           ./Configure darwin64-x86_64-cc no-shared no-tests \
-            --prefix="$DEPS_DIR/openssl" --openssldir="$DEPS_DIR/openssl" \
+            --prefix="$DEPS_DIR/openssl" --openssldir="$DEPS_DIR/openssl" --libdir=lib \
             -mmacosx-version-min=$OSX_MIN
           make -j"$(sysctl -n hw.ncpu)"
           make install_sw
@@ -451,14 +447,12 @@ jobs:
         run: |
           mkdir -p "$DEPS_DIR" && cd "$DEPS_DIR"
           curl -fL -o "openssl-${OPENSSL_VERSION}.tar.gz" \
-            "https://github.com/openssl/openssl/releases/download/OpenSSL_$(echo "$OPENSSL_VERSION" | tr . _)/openssl-${OPENSSL_VERSION}.tar.gz" \
-          || curl -fL -o "openssl-${OPENSSL_VERSION}.tar.gz" \
-            "https://www.openssl.org/source/old/1.1.1/openssl-${OPENSSL_VERSION}.tar.gz"
+            "https://github.com/openssl/openssl/releases/download/openssl-${OPENSSL_VERSION}/openssl-${OPENSSL_VERSION}.tar.gz"
           echo "${OPENSSL_SHA256}  openssl-${OPENSSL_VERSION}.tar.gz" | shasum -a 256 -c
           tar xzf "openssl-${OPENSSL_VERSION}.tar.gz"
           cd "openssl-${OPENSSL_VERSION}"
           ./Configure darwin64-arm64-cc no-shared no-tests \
-            --prefix="$DEPS_DIR/openssl" --openssldir="$DEPS_DIR/openssl" \
+            --prefix="$DEPS_DIR/openssl" --openssldir="$DEPS_DIR/openssl" --libdir=lib \
             -mmacosx-version-min=$OSX_MIN
           make -j"$(sysctl -n hw.ncpu)"
           make install_sw
