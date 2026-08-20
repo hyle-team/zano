@@ -318,7 +318,7 @@ namespace currency
     bool get_tx_outputs_gindexs(const crypto::hash& tx_id, std::vector<uint64_t>& indexs)const;
     bool get_alias_info(const std::string& alias, extra_alias_entry_base& info)const;
     std::string get_alias_by_address(const account_public_address& addr)const;
-    std::set<std::string> get_aliases_by_address(const account_public_address& addr)const;
+    std::set<std::string> get_aliases_by_address(const account_public_address& addr, std::string& default_alias) const;
     template<typename cb_t>
     bool enumerate_aliases(cb_t cb) const;
     template<typename cb_t>
@@ -555,6 +555,8 @@ namespace currency
 
     typedef tools::db::cached_key_value_accessor<std::string, std::list<extra_alias_entry_base>, true, true> aliases_container; 
     typedef tools::db::cached_key_value_accessor<account_public_address, std::set<std::string>, true, false> address_to_aliases_container;
+    typedef tools::db::cached_key_value_accessor<account_public_address, std::list<default_alias_entry>, true, false> address_to_default_alias_container;
+
     typedef tools::db::cached_key_value_accessor<crypto::hash, ms_output_entry, false, false> multisig_outs_container;// ms out id => ms_output_entry
     typedef tools::db::cached_key_value_accessor<uint64_t, uint64_t, false, true> solo_options_container;
     typedef tools::db::basic_key_value_accessor<uint32_t, block_gindex_increments, true> per_block_gindex_increments_container; // height => [(amount, gindex_increment), ...]
@@ -607,6 +609,7 @@ namespace currency
     multisig_outs_container m_db_multisig_outs;
     aliases_container m_db_aliases;
     address_to_aliases_container m_db_addr_to_alias;
+    address_to_default_alias_container m_db_addr_to_default_alias;
     per_block_gindex_increments_container m_db_per_block_gindex_incs;
     
     assets_container m_db_assets;
@@ -723,7 +726,7 @@ namespace currency
     uint64_t get_tx_fee_median_effective_index(uint64_t h) const;    
     void on_abort_transaction();
     void load_targetdata_cache(bool is_pos) const;
-
+    bool migrate_default_aliases_container();
 
 
     uint64_t get_adjusted_time()const;
@@ -733,8 +736,13 @@ namespace currency
     bool unprocess_blockchain_tx_extra(const transaction& tx, const uint64_t height, const crypto::hash& tx_id);
     bool process_blockchain_tx_attachments(const transaction& tx, uint64_t h, const crypto::hash& bl_id, uint64_t timestamp);
     bool unprocess_blockchain_tx_attachments(const transaction& tx, uint64_t h, uint64_t timestamp);
-    bool pop_alias_info(const extra_alias_entry& ai);
-    bool put_alias_info(const transaction& tx, extra_alias_entry& ai);
+    bool pop_alias_info(const extra_alias_entry& ai, const crypto::hash& tx_id);
+    bool put_alias_info(const transaction& tx, extra_alias_entry& ai, const crypto::hash& tx_id);
+    void pop_default_alias(const account_public_address& addr, const crypto::hash& tx_id);
+    void push_default_alias(const account_public_address& addr, const std::string& default_alias, const crypto::hash& tx_id);
+    void add_alias_to_address(const account_public_address& addr, const std::string& alias, bool is_during_put_process, const crypto::hash& tx_id);
+    void remove_alias_from_address(const account_public_address& addr, const std::string& alias, const aliases_container::t_value_type& local_alias_history, bool is_during_put_process, const crypto::hash& tx_id);
+
     bool pop_asset_info(const asset_descriptor_operation& ado, const uint64_t height);
     bool put_asset_info(const transaction& tx, const crypto::hash& tx_id, const asset_descriptor_operation& ado, const uint64_t height);
     bool put_gw_address_operation(const transaction& tx, const crypto::hash& tx_id, const gateway_address_descriptor_operation& ado, const uint64_t height);

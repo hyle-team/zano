@@ -1133,6 +1133,9 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY_HF(gen_alias_too_many_regs_in_block_template, "3"); // disabled in HF4 due to tx outputs count limitation
     GENERATE_AND_PLAY_HF(gen_alias_update_for_free, "3-*");
     GENERATE_AND_PLAY_HF(gen_alias_in_coinbase, "3-*");
+    GENERATE_AND_PLAY_HF(gen_alias_default_alias, "3-*");
+    GENERATE_AND_PLAY_HF(gen_alias_default_alias_last_alias_reorg, "3-*");
+    GENERATE_AND_PLAY_HF(gen_alias_default_alias_info_update, "3-*");
 
     GENERATE_AND_PLAY(gen_wallet_basic_transfer);
     GENERATE_AND_PLAY(gen_wallet_refreshing_on_chain_switch);

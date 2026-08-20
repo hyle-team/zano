@@ -744,6 +744,18 @@ namespace currency
     END_SERIALIZE()
   };
 
+  struct default_alias_entry
+  {
+    std::string alias;
+    crypto::hash tx_id;
+
+    BEGIN_SERIALIZE()
+      FIELD(alias)
+      FIELD(tx_id)
+    END_SERIALIZE()
+  };
+
+
   struct extra_alias_entry : public extra_alias_entry_base
   {
     extra_alias_entry() = default;

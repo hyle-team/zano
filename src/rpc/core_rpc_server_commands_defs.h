@@ -1561,11 +1561,13 @@ namespace currency
     struct response
     {
       std::vector<alias_rpc_details> alias_info_list;
+      std::string default_alias;
       std::string status;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(alias_info_list)            DOC_DSCR("List of alias_rpc_details objects, each containing detailed information about each alias registered to the specified address.") DOC_EXMP_AUTO(1) DOC_END
         KV_SERIALIZE(status)                     DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
+        KV_SERIALIZE(default_alias)              DOC_DSCR("Alias that should be used in UI by default.") DOC_EXMP("zina") DOC_END
       END_KV_SERIALIZE_MAP()
     };
   };
