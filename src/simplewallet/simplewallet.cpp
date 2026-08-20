@@ -126,7 +126,7 @@ namespace
   const command_line::arg_descriptor<std::string>   arg_daemon_address  ("daemon-address", "Use daemon instance at <host>:<port>", "");
   const command_line::arg_descriptor<std::string>   arg_daemon_host  ("daemon-host", "Use daemon instance at host <arg> instead of localhost", "");
   const command_line::arg_descriptor<std::string>   arg_password  ("password", "Wallet password");
-  const command_line::arg_descriptor<bool>          arg_allow_weak_password  ( "allow-weak-password", "Allow creating a new wallet with a password that doesn't meet the password policy");
+  const command_line::arg_descriptor<bool>          arg_allow_weak_password  ( "allow-weak-password", "Allow creating or restoring a wallet with a password that doesn't meet the password policy");
   const command_line::arg_descriptor<bool>          arg_dont_refresh  ( "no-refresh", "Do not refresh after load");
   const command_line::arg_descriptor<bool>          arg_dont_set_date  ( "no-set-creation-date", "Do not set wallet creation date", false);
   const command_line::arg_descriptor<int>           arg_daemon_port  ("daemon-port", "Use daemon instance at port <arg> instead of default", 0);
@@ -630,7 +630,7 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
         return false;
       }
     }
-    bool r = restore_wallet(m_restore_wallet, restore_seed_container.password(), pwd_container.password(), looks_like_tracking_seed, seed_password_container.password());
+    bool r = restore_wallet(m_restore_wallet, restore_seed_container.password(), pwd_container.password(), looks_like_tracking_seed, seed_password_container.password(), allow_weak_password);
     CHECK_AND_ASSERT_MES(r, false, "wallet restoring failed");
   }
   else
@@ -793,7 +793,7 @@ bool simple_wallet::new_wallet(const string &wallet_file, const std::string& pas
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-bool simple_wallet::restore_wallet(const std::string& wallet_file, const std::string& seed_or_tracking_seed, const std::string& password, bool tracking_wallet, const std::string& seed_password)
+bool simple_wallet::restore_wallet(const std::string& wallet_file, const std::string& seed_or_tracking_seed, const std::string& password, bool tracking_wallet, const std::string& seed_password, bool allow_weak_password /* = false */)
 {
   m_wallet_file = wallet_file;
 
@@ -809,13 +809,13 @@ bool simple_wallet::restore_wallet(const std::string& wallet_file, const std::st
     if (tracking_wallet)
     {
       // auditable watch-only aka tracking wallet
-      m_wallet->restore(epee::string_encoding::utf8_to_wstring(wallet_file), password, seed_or_tracking_seed, true, "");
+      m_wallet->restore(epee::string_encoding::utf8_to_wstring(wallet_file), password, seed_or_tracking_seed, true, "", allow_weak_password);
       message_writer(epee::log_space::console_color_white, true) << "Tracking wallet restored: " << m_wallet->get_account().get_public_address_str();
     }
     else
     {
       // normal or auditable wallet
-      m_wallet->restore(epee::string_encoding::utf8_to_wstring(wallet_file), password, seed_or_tracking_seed, false, seed_password);
+      m_wallet->restore(epee::string_encoding::utf8_to_wstring(wallet_file), password, seed_or_tracking_seed, false, seed_password, allow_weak_password);
       message_writer(epee::log_space::console_color_white, true) << (m_wallet->is_auditable() ? "Auditable wallet" : "Wallet") << " restored: " << m_wallet->get_account().get_public_address_str();
       std::cout << "view key: " << string_tools::pod_to_hex(m_wallet->get_account().get_keys().view_secret_key) << std::endl << std::flush;
       if (m_wallet->is_auditable())

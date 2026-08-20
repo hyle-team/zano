@@ -3268,10 +3268,13 @@ void wallet2::generate(const std::wstring& path, const std::string& pass, bool a
   store();
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::restore(const std::wstring& path, const std::string& pass, const std::string& seed_or_tracking_seed, bool tracking_wallet, const std::string& seed_password)
+void wallet2::restore(const std::wstring& path, const std::string& pass, const std::string& seed_or_tracking_seed, bool tracking_wallet, const std::string& seed_password, bool allow_weak_password /* = false */)
 {
-  WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(validate_password(pass, WALLET_PASSWORD_MIN_LENGTH, WALLET_PASSWORD_MAX_LENGTH),
-    "wallet restoration failed: password does not meet the password policy (allowed characters only, length must be " << WALLET_PASSWORD_MIN_LENGTH << ".." << WALLET_PASSWORD_MAX_LENGTH << ")")
+  if (!allow_weak_password)
+  {
+    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(validate_password(pass, WALLET_PASSWORD_MIN_LENGTH, WALLET_PASSWORD_MAX_LENGTH),
+      "wallet restoration failed: password does not meet the password policy (allowed characters only, length must be " << WALLET_PASSWORD_MIN_LENGTH << ".." << WALLET_PASSWORD_MAX_LENGTH << ")")
+  }
   bool r = false;
   clear();
   prepare_file_names(path);
