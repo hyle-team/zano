@@ -37,7 +37,7 @@ jobs:
       DEPS_DIR: ${{ github.workspace }}/_deps
     steps:
       - name: Checkout (with submodules)
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           submodules: recursive
           # full history: src/version.cmake and libmdbx count revisions via git
@@ -45,7 +45,7 @@ jobs:
 
       - name: Cache Boost & OpenSSL
         id: deps-cache
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ${{ env.DEPS_DIR }}
           key: deps-${{ matrix.runner }}-${{ matrix.arch }}-boost${{ env.BOOST_VERSION }}-openssl${{ env.OPENSSL_VERSION }}-min${{ matrix.osx_min }}-v1
@@ -167,7 +167,7 @@ jobs:
           tar -cjf "$pkg.tar.bz2" "$pkg"
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: zano-macos-${{ matrix.arch }}-cli${{ inputs.testnet == true && '-testnet' || '' }}
           # file name contains [commit] brackets, so use a wildcard
@@ -181,7 +181,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Download both artifacts
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           pattern: zano-macos-*-cli*
           merge-multiple: true
@@ -250,7 +250,7 @@ jobs:
           tar -cjf "$PKG.tar.bz2" "$PKG"
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: zano-macos-universal-cli${{ inputs.testnet == true && '-testnet' || '' }}
           path: zano-macos-universal-*.tar.bz2
@@ -266,7 +266,7 @@ jobs:
       OSX_MIN: '10.15'
     steps:
       - name: Checkout (with submodules)
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           submodules: recursive
           fetch-depth: 0
@@ -274,7 +274,7 @@ jobs:
       # same key as the CLI x64 job -> shares its Boost/OpenSSL cache
       - name: Cache Boost & OpenSSL
         id: deps-cache
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ${{ env.DEPS_DIR }}
           key: deps-macos-15-intel-x64-boost${{ env.BOOST_VERSION }}-openssl${{ env.OPENSSL_VERSION }}-min10.15-v1
@@ -313,13 +313,20 @@ jobs:
             install --prefix="$DEPS_DIR/boost"
           cd "$DEPS_DIR" && rm -rf "boost_${boost_und}" "boost_${boost_und}.tar.bz2"
 
+      - name: Set up Python for Qt installer
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.13.3'
+
       - name: Install Qt 6.8 (with WebEngine)
-        uses: jurplel/install-qt-action@v4
+        uses: jurplel/install-qt-action/action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4
         with:
           version: '6.8.3'
           arch: clang_64
           modules: 'qtwebengine qtwebchannel qtpositioning'
           cache: true
+          aqtversion: '==3.3.0'
+          py7zrversion: '==1.0.0'
 
       - name: Configure (CMake, BUILD_GUI)
         run: |
@@ -413,7 +420,7 @@ jobs:
           ls -lh "$dmg"
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: zano-macos-x64-gui${{ inputs.testnet == true && '-testnet' || '' }}
           path: build/src/zano-macos-x64-gui*.dmg
@@ -429,7 +436,7 @@ jobs:
       OSX_MIN: '11.0' # for the cached deps (same key as the CLI arm64 job)
     steps:
       - name: Checkout (with submodules)
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           submodules: recursive
           fetch-depth: 0
@@ -437,7 +444,7 @@ jobs:
       # same key as the CLI arm64 job -> shares its Boost/OpenSSL cache
       - name: Cache Boost & OpenSSL
         id: deps-cache
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ${{ env.DEPS_DIR }}
           key: deps-macos-15-arm64-boost${{ env.BOOST_VERSION }}-openssl${{ env.OPENSSL_VERSION }}-min11.0-v1
@@ -476,13 +483,20 @@ jobs:
             install --prefix="$DEPS_DIR/boost"
           cd "$DEPS_DIR" && rm -rf "boost_${boost_und}" "boost_${boost_und}.tar.bz2"
 
+      - name: Set up Python for Qt installer
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.13.3'
+
       - name: Install Qt 6.8 (with WebEngine)
-        uses: jurplel/install-qt-action@v4
+        uses: jurplel/install-qt-action/action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4
         with:
           version: '6.8.3'
           arch: clang_64
           modules: 'qtwebengine qtwebchannel qtpositioning'
           cache: true
+          aqtversion: '==3.3.0'
+          py7zrversion: '==1.0.0'
 
       - name: Configure (CMake, BUILD_GUI, Qt 6)
         run: |
@@ -577,7 +591,7 @@ jobs:
           ls -lh "$dmg"
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: zano-macos-arm64-gui${{ inputs.testnet == true && '-testnet' || '' }}
           path: build/src/zano-macos-arm64-gui*.dmg
