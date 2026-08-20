@@ -421,10 +421,12 @@ public:
   {
     uint64_t wallet_id = 0;
     std::string pass;
+    bool allow_weak_password = false;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(wallet_id)
       KV_SERIALIZE(pass)
+      KV_SERIALIZE(allow_weak_password)
     END_KV_SERIALIZE_MAP()
   };
 

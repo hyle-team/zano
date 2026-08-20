@@ -3092,10 +3092,13 @@ bool wallet2::backup_keys(const std::string& path)
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::reset_password(const std::string& pass)
+bool wallet2::reset_password(const std::string& pass, bool allow_weak_password /* = false */)
 {
-  WLT_CHECK_AND_ASSERT_MES(validate_password(pass, WALLET_PASSWORD_MIN_LENGTH, WALLET_PASSWORD_MAX_LENGTH), false,
-    "password reset failed: password does not meet the password policy (allowed characters only, length must be " << WALLET_PASSWORD_MIN_LENGTH << ".." << WALLET_PASSWORD_MAX_LENGTH << ")");
+  if (!allow_weak_password)
+  {
+    WLT_CHECK_AND_ASSERT_MES(validate_password(pass, WALLET_PASSWORD_MIN_LENGTH, WALLET_PASSWORD_MAX_LENGTH), false,
+      "password reset failed: password does not meet the password policy (allowed characters only, length must be " << WALLET_PASSWORD_MIN_LENGTH << ".." << WALLET_PASSWORD_MAX_LENGTH << ")");
+  }
   m_password = pass;
   return true;
 }

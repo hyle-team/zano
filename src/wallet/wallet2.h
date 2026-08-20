@@ -713,7 +713,7 @@ namespace tools
     void set_core_runtime_config(const currency::core_runtime_config& pc);  
     currency::core_runtime_config& get_core_runtime_config();
     bool backup_keys(const std::string& path);
-    bool reset_password(const std::string& pass);
+    bool reset_password(const std::string& pass, bool allow_weak_password = false);
     bool is_password_valid(const std::string& pass);
     bool get_actual_offers(std::list<bc_services::offer_details_ex>& offers);
     bool process_contract_info(wallet_public::wallet_transfer_info& wti, const std::vector<currency::payload_items_v>& decrypted_attach);

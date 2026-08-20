@@ -1920,10 +1920,10 @@ std::string wallets_manager::backup_wallet(uint64_t wallet_id, const std::wstrin
   }
   return API_RETURN_CODE_OK;
 }
-std::string wallets_manager::reset_wallet_password(uint64_t wallet_id, const std::string& pass)
+std::string wallets_manager::reset_wallet_password(uint64_t wallet_id, const std::string& pass, bool allow_weak_password /* = false */)
 {
   GET_WALLET_OPT_BY_ID(wallet_id, w);
-  if (w.w->get()->reset_password(pass))
+  if (w.w->get()->reset_password(pass, allow_weak_password))
     return API_RETURN_CODE_OK;
   else
     return API_RETURN_CODE_FAIL;

@@ -934,11 +934,11 @@ namespace plain_wallet
     return sanitized_store_to_json(wei);
     PLAIN_WALLET_CATCH();
   }
-  std::string reset_wallet_password(hwallet h, const std::string& password)
+  std::string reset_wallet_password(hwallet h, const std::string& password, bool allow_weak_password /* = false */)
   {
     PLAIN_WALLET_BEGIN_TRY_ENTRY();
     GET_INSTANCE_PTR(inst_ptr);
-    return inst_ptr->gwm.reset_wallet_password(h, password);
+    return inst_ptr->gwm.reset_wallet_password(h, password, allow_weak_password);
     PLAIN_WALLET_CATCH();
   }
 

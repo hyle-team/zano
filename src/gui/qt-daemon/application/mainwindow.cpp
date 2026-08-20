@@ -2430,7 +2430,7 @@ QString MainWindow::reset_wallet_password(const QString& param)
   TRY_ENTRY();
   LOG_API_TIMING();
   PREPARE_ARG_FROM_JSON(view::reset_pass_request, me);
-  default_ar.error_code = m_backend.reset_wallet_password(me.wallet_id, me.pass);
+  default_ar.error_code = m_backend.reset_wallet_password(me.wallet_id, me.pass, me.allow_weak_password);
   return MAKE_RESPONSE(default_ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
