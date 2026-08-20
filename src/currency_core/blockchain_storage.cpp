@@ -7784,6 +7784,8 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
         bvc.m_verification_failed = true; 
         };
 
+      TRY_ENTRY()
+
       CHECK_AND_ASSERT_MES_CUSTOM(collect_rangeproofs_data_from_tx(tx, tx_id, range_proofs_agregated), false, cleanup(),
         "block " << id << ", tx " << tx_id << ": collect_rangeproofs_data_from_tx failed");
 
@@ -7792,6 +7794,9 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
 
       CHECK_AND_ASSERT_MES_CUSTOM(verify_asset_surjection_proof(tx, tx_id), false, cleanup(),
         "block " << id << ", tx " << tx_id << ": verify_asset_surjection_proof failed");
+
+      CATCH_ENTRY_RETHROW_BAD_ALLOC()
+      CATCH_ENTRY_CUSTOM_LOG_OP(LOG_PRINT_RED_L0, LOCATION_SS, cleanup(), false);
     }
 
     TIME_MEASURE_START_PD(tx_add_one_tx_time);
