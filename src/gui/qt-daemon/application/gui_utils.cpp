@@ -134,7 +134,7 @@ namespace gui_tools
       {
         // Get the current executable path
         TCHAR pszExePath[MAX_PATH];
-        GetModuleFileName(NULL, pszExePath, sizeof(pszExePath));
+        GetModuleFileName(NULL, pszExePath, _countof(pszExePath));
 
         // Start client minimized
         //QString strArgs = "-min";
