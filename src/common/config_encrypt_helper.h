@@ -57,14 +57,6 @@ namespace tools
     return phdr->m_signature == details::APP_DATA_FILE_BINARY_SIGNATURE_V2;
   }
 
-  inline bool constant_time_equal(const uint8_t* lhs, const uint8_t* rhs, size_t size)
-  {
-    uint8_t diff = 0;
-    for (size_t i = 0; i < size; ++i)
-      diff |= lhs[i] ^ rhs[i];
-    return diff == 0;
-  }
-
   inline std::string validate_app_data_header_v2(const app_data_file_binary_header_v2& hdr)
   {
     if (hdr.m_version != details::APP_DATA_FILE_BINARY_VERSION_V2 || hdr.m_header_size != sizeof(app_data_file_binary_header_v2))
@@ -103,16 +95,15 @@ namespace tools
     std::memset(hdr_for_mac.m_payload_mac, 0, sizeof(hdr_for_mac.m_payload_mac));
 
     std::string buff;
-    buff.reserve(32 + sizeof(hdr_for_mac) + encrypted_payload_size + sizeof(chacha_key.data));
+    buff.reserve(32 + sizeof(hdr_for_mac) + encrypted_payload_size + sizeof(chacha_key));
     buff.append(CRYPTO_HDS_APP_CONFIG_MAC, 32);
-    buff.append(reinterpret_cast<const char*>(&hdr_for_mac), sizeof(hdr_for_mac));
+    epst::append_pod_to_strbuff(hdr_for_mac, buff);
     if (encrypted_payload_size)
       buff.append(encrypted_payload_data, encrypted_payload_size);
-    buff.append(reinterpret_cast<const char*>(chacha_key.data), sizeof(chacha_key.data));
+    epst::append_pod_to_strbuff(chacha_key, buff);
 
     crypto::hash h = crypto::cn_fast_hash(buff.data(), buff.size());
     std::memcpy(mac, &h, sizeof(mac));
-    crypto::wipe(&h, sizeof(h));
     crypto::wipe(&buff[0], buff.size());
   }
 
@@ -135,38 +126,24 @@ namespace tools
 
     uint8_t expected_mac[details::APP_DATA_FILE_BINARY_MAC_SIZE_V2];
     calculate_app_data_mac_v2(*phdr, chacha_key, app_data_buff.data() + encrypted_payload_offset, encrypted_payload_size, expected_mac);
-    if (!constant_time_equal(expected_mac, phdr->m_payload_mac, sizeof(expected_mac)))
-    {
-      crypto::wipe(expected_mac, sizeof(expected_mac));
+    if (std::memcmp(expected_mac, phdr->m_payload_mac, sizeof(expected_mac)) != 0)
       return API_RETURN_CODE_WRONG_PASSWORD;
-    }
-    crypto::wipe(expected_mac, sizeof(expected_mac));
 
     std::string payload(encrypted_payload_size, '\0');
     crypto::chacha20(app_data_buff.data() + encrypted_payload_offset, encrypted_payload_size, chacha_key, phdr->m_iv, &payload[0]);
 
     const app_data_file_binary_header* payload_hdr = reinterpret_cast<const app_data_file_binary_header*>(payload.data());
     if (payload_hdr->m_signature != signature)
-    {
-      crypto::wipe(&payload[0], payload.size());
       return API_RETURN_CODE_WRONG_PASSWORD;
-    }
 
     if (payload_hdr->m_cb_body > std::numeric_limits<size_t>::max() - sizeof(app_data_file_binary_header))
-    {
-      crypto::wipe(&payload[0], payload.size());
       return API_RETURN_CODE_INVALID_FILE;
-    }
 
     const size_t expected_body_size = static_cast<size_t>(payload_hdr->m_cb_body);
     if (payload.size() != sizeof(app_data_file_binary_header) + expected_body_size)
-    {
-      crypto::wipe(&payload[0], payload.size());
       return API_RETURN_CODE_INVALID_FILE;
-    }
 
     body.assign(payload.data() + sizeof(app_data_file_binary_header), expected_body_size);
-    crypto::wipe(&payload[0], payload.size());
     return API_RETURN_CODE_OK;
   }
 
@@ -180,13 +157,9 @@ namespace tools
 
     const app_data_file_binary_header* phdr = reinterpret_cast<const app_data_file_binary_header*>(app_data_buff.data());
     if (phdr->m_signature != signature)
-    {
-      crypto::wipe(&app_data_buff[0], app_data_buff.size());
       return API_RETURN_CODE_WRONG_PASSWORD;
-    }
 
     body.assign(app_data_buff.data() + sizeof(app_data_file_binary_header), app_data_buff.size() - sizeof(app_data_file_binary_header));
-    crypto::wipe(&app_data_buff[0], app_data_buff.size());
     return API_RETURN_CODE_OK;
   }
 
@@ -230,7 +203,9 @@ namespace tools
     payload_hdr.m_signature = signature;
     payload_hdr.m_cb_body = body.size();
 
-    std::string payload(reinterpret_cast<const char*>(&payload_hdr), sizeof(payload_hdr));
+    std::string payload;
+    payload.reserve(sizeof(payload_hdr) + body.size());
+    epst::append_pod_to_strbuff(payload_hdr, payload);
     payload.append(body);
 
     crypto::chacha_key chacha_key;
@@ -242,11 +217,10 @@ namespace tools
     crypto::chacha20(payload.data(), payload.size(), chacha_key, hdr.m_iv, &encrypted_payload[0]);
     calculate_app_data_mac_v2(hdr, chacha_key, encrypted_payload.data(), encrypted_payload.size(), hdr.m_payload_mac);
 
-    std::string buff(reinterpret_cast<const char*>(&hdr), sizeof(hdr));
+    std::string buff;
+    buff.reserve(sizeof(hdr) + encrypted_payload.size());
+    epst::append_pod_to_strbuff(hdr, buff);
     buff.append(encrypted_payload);
-
-    crypto::wipe(&payload[0], payload.size());
-    crypto::wipe(&encrypted_payload[0], encrypted_payload.size());
 
     bool r = epee::file_io_utils::save_string_to_file(path, buff);
     if (r)
