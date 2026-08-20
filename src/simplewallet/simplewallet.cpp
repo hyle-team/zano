@@ -754,7 +754,7 @@ bool simple_wallet::new_wallet(const string &wallet_file, const std::string& pas
 {
   if (!allow_weak_password && !currency::validate_password(password, WALLET_PASSWORD_MIN_LENGTH, WALLET_PASSWORD_MAX_LENGTH))
   {
-    fail_msg_writer() << R"(Provided password doesn't meet the password policy. Allowed characters: letters, numbers and ~!?@#$%^&*_+|{}[]()<>:;"'-=/., ; length must be 8..256. Use --allow-unsecure-password to bypass.)" << ENDL;
+    fail_msg_writer() << R"(Provided password doesn't meet the password policy. Allowed characters: letters, numbers and ~!?@#$%^&*_+|{}[]()<>:;"'-=/., ; length must be 8..256. Use --allow-weak-password to bypass.)" << ENDL;
     return false;
   }
 
