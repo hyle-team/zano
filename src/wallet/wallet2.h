@@ -246,7 +246,8 @@ namespace tools
           }
         }
 
-        LOG_PRINT_L0("Wallet migration: removed " << removed_count << " legacy unconfirmed payment entries");
+        if (removed_count != 0)
+          LOG_PRINT_L0("Wallet migration: removed " << removed_count << " legacy unconfirmed payment entries");
       }
     }
   };
