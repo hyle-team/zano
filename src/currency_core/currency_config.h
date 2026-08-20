@@ -207,6 +207,7 @@ static_assert(CURRENCY_FORMATION_VERSION == 103);
 #define WALLET_KDF_ALGO_NONE                            0
 #define WALLET_KDF_ALGO_ROMIX_KECCAK                    1
 #define WALLET_KDF_ROMIX_N_LOG2                         20 //phase 1: the buffer size is V = 2^(N_log2) * 32 bytes, where N_log2 = 20 -> 1 million blocks * 32 bytes = 32 MiB
+#define WALLET_KDF_ROMIX_N_LOG2_MAX                     22
 #define WALLET_KDF_ROMIX_PHASE2_LOG2_REDUCTION          3  //phase 2: iteration reduction: 0 = full N phase 2 iterations, 1 = N/2 iterations 2 = N/4, 3 = N/8, 4 = N/16 ... (still 32 MiB at N_log2=20)
 #define WALLET_KDF_SALT_SIZE                            16
 
@@ -347,6 +348,7 @@ static_assert(CURRENCY_FORMATION_VERSION == 103);
 
 static_assert(CURRENCY_MINER_TX_MAX_OUTS <= CURRENCY_TX_MAX_ALLOWED_OUTS, "Miner tx must obey normal tx max outs limit");
 static_assert(PREMINE_AMOUNT / WALLET_MAX_ALLOWED_OUTPUT_AMOUNT < CURRENCY_MINER_TX_MAX_OUTS, "Premine can't be divided into reasonable number of outs");
+static_assert(WALLET_KDF_ROMIX_N_LOG2 <= WALLET_KDF_ROMIX_N_LOG2_MAX, "Default wallet KDF cost must fit the wallet-file load policy");
 
 #define CURRENCY_RELAY_TXS_MAX_COUNT                    5
 

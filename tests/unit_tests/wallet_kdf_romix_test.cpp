@@ -136,6 +136,27 @@ TEST(wallet_kdf_romix, correctness)
   ASSERT_NE(0, std::memcmp(out1, out5, 32));
 }
 
+TEST(wallet_kdf_romix, cost_parameter_policy)
+{
+  const uint8_t max_N_log2 = WALLET_KDF_ROMIX_N_LOG2_MAX;
+
+  const auto is_cost_within_limits = [max_N_log2](uint8_t N_log2, uint8_t phase2_log2_reduction)
+  {
+    return N_log2 >= crypto::ROMIX_KECCAK_N_LOG2_MIN && N_log2 <= max_N_log2 && phase2_log2_reduction < N_log2;
+  };
+
+  EXPECT_FALSE(is_cost_within_limits(9, 0));
+  EXPECT_TRUE(is_cost_within_limits(10, 0));
+  EXPECT_TRUE(is_cost_within_limits(WALLET_KDF_ROMIX_N_LOG2, WALLET_KDF_ROMIX_PHASE2_LOG2_REDUCTION));
+  EXPECT_TRUE(is_cost_within_limits(max_N_log2, 0));
+  EXPECT_TRUE(is_cost_within_limits(max_N_log2, (uint8_t)(max_N_log2 - 1)));
+
+  EXPECT_FALSE(is_cost_within_limits((uint8_t)(max_N_log2 + 1), 0));
+  EXPECT_FALSE(is_cost_within_limits(255, 0));
+  EXPECT_FALSE(is_cost_within_limits(WALLET_KDF_ROMIX_N_LOG2, WALLET_KDF_ROMIX_N_LOG2));
+  EXPECT_FALSE(is_cost_within_limits(WALLET_KDF_ROMIX_N_LOG2, 255));
+}
+
 TEST(wallet_kdf_romix, brute_force_cost_report)
 {
   const std::string password = "hunter2hunter2hu";
