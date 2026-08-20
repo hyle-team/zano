@@ -126,7 +126,7 @@ namespace
   const command_line::arg_descriptor<std::string>   arg_daemon_address  ("daemon-address", "Use daemon instance at <host>:<port>", "");
   const command_line::arg_descriptor<std::string>   arg_daemon_host  ("daemon-host", "Use daemon instance at host <arg> instead of localhost", "");
   const command_line::arg_descriptor<std::string>   arg_password  ("password", "Wallet password");
-  const command_line::arg_descriptor<bool>          arg_allow_unsecure_password  ( "allow-unsecure-password", "Allow creating a new wallet with a password that doesn't meet the password policy");
+  const command_line::arg_descriptor<bool>          arg_allow_weak_password  ( "allow-weak-password", "Allow creating a new wallet with a password that doesn't meet the password policy");
   const command_line::arg_descriptor<bool>          arg_dont_refresh  ( "no-refresh", "Do not refresh after load");
   const command_line::arg_descriptor<bool>          arg_dont_set_date  ( "no-set-creation-date", "Do not set wallet creation date", false);
   const command_line::arg_descriptor<int>           arg_daemon_port  ("daemon-port", "Use daemon instance at port <arg> instead of default", 0);
@@ -585,16 +585,16 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
   m_password_salt = crypto::rand<uint64_t>();
   m_password_hash = get_hash_from_pass_and_salt(pwd_container.password(), m_password_salt);
 
-  bool allow_unsecure_password = command_line::has_arg(vm, arg_allow_unsecure_password);
+  bool allow_weak_password = command_line::has_arg(vm, arg_allow_weak_password);
   bool was_open = false;
   if (!m_generate_new.empty())
   {
-    bool r = new_wallet(m_generate_new, pwd_container.password(), false, allow_unsecure_password);
+    bool r = new_wallet(m_generate_new, pwd_container.password(), false, allow_weak_password);
     CHECK_AND_ASSERT_MES(r, false, "failed to create new wallet");
   }
   else if (!m_generate_new_aw.empty())
   {
-    bool r = new_wallet(m_generate_new_aw, pwd_container.password(), true, allow_unsecure_password);
+    bool r = new_wallet(m_generate_new_aw, pwd_container.password(), true, allow_weak_password);
     CHECK_AND_ASSERT_MES(r, false, "failed to create new auditable wallet");
   }
   else if (!m_restore_wallet.empty())
@@ -3759,7 +3759,7 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_params, arg_generate_new_wallet);
   command_line::add_arg(desc_params, arg_generate_new_auditable_wallet);
   command_line::add_arg(desc_params, arg_password);
-  command_line::add_arg(desc_params, arg_allow_unsecure_password);
+  command_line::add_arg(desc_params, arg_allow_weak_password);
   command_line::add_arg(desc_params, arg_daemon_address);
   command_line::add_arg(desc_params, arg_daemon_host);
   command_line::add_arg(desc_params, arg_daemon_port);
