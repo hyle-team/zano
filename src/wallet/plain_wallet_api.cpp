@@ -567,14 +567,14 @@ namespace plain_wallet
     return restore(path, password, cb);
   }
 
-  std::string generate(const std::string& path, const std::string& password, bool allow_weak_password)
+  std::string generate(const std::string& path, const std::string& password)
   {
     PLAIN_WALLET_BEGIN_TRY_ENTRY();
     GET_INSTANCE_PTR(inst_ptr);
 
     std::string full_path = get_wallets_folder() + path;
     epee::json_rpc::response<view::open_wallet_response, epee::json_rpc::dummy_error> ok_response = AUTO_VAL_INIT(ok_response);
-    std::string rsp = inst_ptr->gwm.generate_wallet(epee::string_encoding::convert_to_unicode(full_path), password, ok_response.result, allow_weak_password);
+    std::string rsp = inst_ptr->gwm.generate_wallet(epee::string_encoding::convert_to_unicode(full_path), password, ok_response.result);
     if (rsp == API_RETURN_CODE_OK || rsp == API_RETURN_CODE_FILE_RESTORED)
     {
       if (rsp == API_RETURN_CODE_FILE_RESTORED)
@@ -934,11 +934,11 @@ namespace plain_wallet
     return sanitized_store_to_json(wei);
     PLAIN_WALLET_CATCH();
   }
-  std::string reset_wallet_password(hwallet h, const std::string& password, bool allow_weak_password /* = false */)
+  std::string reset_wallet_password(hwallet h, const std::string& password)
   {
     PLAIN_WALLET_BEGIN_TRY_ENTRY();
     GET_INSTANCE_PTR(inst_ptr);
-    return inst_ptr->gwm.reset_wallet_password(h, password, allow_weak_password);
+    return inst_ptr->gwm.reset_wallet_password(h, password);
     PLAIN_WALLET_CATCH();
   }
 

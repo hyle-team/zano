@@ -44,9 +44,9 @@ namespace currency
 
     bool run_console_handler();
 
-    bool new_wallet(const std::string &wallet_file, const std::string& password, bool create_auditable_wallet, bool allow_weak_password = false);
+    bool new_wallet(const std::string &wallet_file, const std::string& password, bool create_auditable_wallet);
     bool open_wallet(const std::string &wallet_file, const std::string& password);
-    bool restore_wallet(const std::string& wallet_file, const std::string& seed_or_tracking_seed, const std::string& password, bool tracking_wallet, const std::string& seed_password, bool allow_weak_password = false);
+    bool restore_wallet(const std::string& wallet_file, const std::string& seed_or_tracking_seed, const std::string& password, bool tracking_wallet, const std::string& seed_password);
     bool close_wallet();
 
     bool help(const std::vector<std::string> &args = std::vector<std::string>());
@@ -209,6 +209,7 @@ namespace currency
     std::string m_voting_config_file;
     bool m_no_password_confirmations = false;
     bool m_no_whitelist = false;
+    bool m_allow_weak_password = false;
     std::string m_restore_ki_in_wo_wallet;
     std::string m_enable_tx_socks5_relay_proxy;
     std::string m_tx_relay_url;

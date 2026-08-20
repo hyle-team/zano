@@ -1053,7 +1053,7 @@ bool hard_fork_2_awo_wallets_basic_test<before_hf_2>::c1(currency::core& c, size
 
   boost::filesystem::remove(bob_wo_restored_filename, ec);
 
-  bob_wlt_awo_restored->restore(bob_wo_restored_filename, "", bob_tracking_seed, true, "", true);
+  bob_wlt_awo_restored->restore(bob_wo_restored_filename, "", bob_tracking_seed, true, "");
   bob_wlt_awo_restored->set_core_runtime_config(c.get_blockchain_storage().get_core_runtime_config());
   bob_wlt_awo_restored->set_core_proxy(m_core_proxy);
   bob_wlt_awo_restored->set_disable_tor_relay(true);
@@ -1092,7 +1092,7 @@ bool hard_fork_2_awo_wallets_basic_test<before_hf_2>::c1(currency::core& c, size
 
   boost::filesystem::remove(bob_non_auditable_filename, ec);
 
-  bob_wlt_non_auditable->restore(bob_non_auditable_filename, "", bob_seed, false, "", true);
+  bob_wlt_non_auditable->restore(bob_non_auditable_filename, "", bob_seed, false, "");
   bob_wlt_non_auditable->set_core_runtime_config(c.get_blockchain_storage().get_core_runtime_config());
   bob_wlt_non_auditable->set_core_proxy(m_core_proxy);
   bob_wlt_non_auditable->set_disable_tor_relay(true);

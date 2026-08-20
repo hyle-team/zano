@@ -54,6 +54,7 @@ const command_line::arg_descriptor<bool> arg_enable_qt_logs  ( "enable-qt-logs",
 const command_line::arg_descriptor<bool> arg_disable_logs_init("disable-logs-init", "Disable log initialization in GUI");
 const command_line::arg_descriptor<std::string> arg_qt_dev_tools  ( "qt-dev-tools", "Enable main web page inspection with Chromium DevTools, <vertical|horizontal>[,scale], e.g. \"horizontal,1.3\"", "");
 const command_line::arg_descriptor<bool> arg_disable_price_fetch("gui-disable-price-fetch", "Disable price fetching in UI(for privacy matter)");
+const command_line::arg_descriptor<bool> arg_allow_weak_password("allow-weak-password", "Allow setting a wallet password that doesn't meet the password policy");
 
 const command_line::arg_descriptor<std::string> arg_xcode_stub("-NSDocumentRevisionsDebugMode", "Substitute for xcode bug");
 const command_line::arg_descriptor<std::string> arg_sandbox_disable("no-sandbox", "Substitute for ubuntu/linux rendering problem");
@@ -198,6 +199,7 @@ bool wallets_manager::init_command_line(int argc, char* argv[], std::string& fai
   command_line::add_arg(desc_cmd_sett, arg_disable_logs_init);
   command_line::add_arg(desc_cmd_sett, arg_qt_dev_tools);
   command_line::add_arg(desc_cmd_sett, arg_disable_price_fetch);
+  command_line::add_arg(desc_cmd_only, arg_allow_weak_password);
   
   command_line::add_arg(desc_cmd_sett, command_line::arg_enable_tx_socks5_relay_proxy);
   command_line::add_arg(desc_cmd_sett, command_line::arg_tx_relay_url);
@@ -1266,7 +1268,7 @@ std::string wallets_manager::get_recent_transfers(size_t wallet_id, uint64_t off
   return API_RETURN_CODE_OK;
 }
 
-std::string wallets_manager::generate_wallet(const std::wstring& path, const std::string& password, view::open_wallet_response& owr, bool allow_weak_password /* = false */)
+std::string wallets_manager::generate_wallet(const std::wstring& path, const std::string& password, view::open_wallet_response& owr)
 {
   std::shared_ptr<tools::wallet2> w(new tools::wallet2());
   w->set_use_deffered_global_outputs(m_use_deffered_global_outputs);
@@ -1290,7 +1292,7 @@ std::string wallets_manager::generate_wallet(const std::wstring& path, const std
 
   try
   {
-    w->generate(path, password, false, allow_weak_password);
+    w->generate(path, password, false);
     w->set_minimum_height(m_last_daemon_height-1);
     owr.seed = w->get_account().get_seed_phrase("");
     auto& keys = w->get_account().get_keys();
@@ -1920,10 +1922,10 @@ std::string wallets_manager::backup_wallet(uint64_t wallet_id, const std::wstrin
   }
   return API_RETURN_CODE_OK;
 }
-std::string wallets_manager::reset_wallet_password(uint64_t wallet_id, const std::string& pass, bool allow_weak_password /* = false */)
+std::string wallets_manager::reset_wallet_password(uint64_t wallet_id, const std::string& pass)
 {
   GET_WALLET_OPT_BY_ID(wallet_id, w);
-  if (w.w->get()->reset_password(pass, allow_weak_password))
+  if (w.w->get()->reset_password(pass))
     return API_RETURN_CODE_OK;
   else
     return API_RETURN_CODE_FAIL;

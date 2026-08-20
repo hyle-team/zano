@@ -313,12 +313,3 @@ TEST(wallet, rpc_sign_message)
   ASSERT_EQ(val_res.status, API_RETURN_CODE_OK) << "binary message v2 signature wasn't accepted";
   ASSERT_EQ(val_res.sig_format, "v2");
 }
-
-TEST(wallet, reset_password_policy_bypass)
-{
-  tools::wallet2 wallet;
-
-  ASSERT_FALSE(wallet.reset_password("1"));
-  ASSERT_TRUE(wallet.reset_password("1", true));
-  ASSERT_TRUE(wallet.is_password_valid("1"));
-}

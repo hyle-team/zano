@@ -126,7 +126,7 @@ namespace
   const command_line::arg_descriptor<std::string>   arg_daemon_address  ("daemon-address", "Use daemon instance at <host>:<port>", "");
   const command_line::arg_descriptor<std::string>   arg_daemon_host  ("daemon-host", "Use daemon instance at host <arg> instead of localhost", "");
   const command_line::arg_descriptor<std::string>   arg_password  ("password", "Wallet password");
-  const command_line::arg_descriptor<bool>          arg_allow_weak_password  ( "allow-weak-password", "Allow creating or restoring a wallet with a password that doesn't meet the password policy");
+  const command_line::arg_descriptor<bool>          arg_allow_weak_password  ( "allow-weak-password", "Allow setting a wallet password that doesn't meet the password policy");
   const command_line::arg_descriptor<bool>          arg_dont_refresh  ( "no-refresh", "Do not refresh after load");
   const command_line::arg_descriptor<bool>          arg_dont_set_date  ( "no-set-creation-date", "Do not set wallet creation date", false);
   const command_line::arg_descriptor<int>           arg_daemon_port  ("daemon-port", "Use daemon instance at port <arg> instead of default", 0);
@@ -585,16 +585,16 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
   m_password_salt = crypto::rand<uint64_t>();
   m_password_hash = get_hash_from_pass_and_salt(pwd_container.password(), m_password_salt);
 
-  bool allow_weak_password = command_line::has_arg(vm, arg_allow_weak_password);
+  m_allow_weak_password = command_line::has_arg(vm, arg_allow_weak_password);
   bool was_open = false;
   if (!m_generate_new.empty())
   {
-    bool r = new_wallet(m_generate_new, pwd_container.password(), false, allow_weak_password);
+    bool r = new_wallet(m_generate_new, pwd_container.password(), false);
     CHECK_AND_ASSERT_MES(r, false, "failed to create new wallet");
   }
   else if (!m_generate_new_aw.empty())
   {
-    bool r = new_wallet(m_generate_new_aw, pwd_container.password(), true, allow_weak_password);
+    bool r = new_wallet(m_generate_new_aw, pwd_container.password(), true);
     CHECK_AND_ASSERT_MES(r, false, "failed to create new auditable wallet");
   }
   else if (!m_restore_wallet.empty())
@@ -630,7 +630,7 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
         return false;
       }
     }
-    bool r = restore_wallet(m_restore_wallet, restore_seed_container.password(), pwd_container.password(), looks_like_tracking_seed, seed_password_container.password(), allow_weak_password);
+    bool r = restore_wallet(m_restore_wallet, restore_seed_container.password(), pwd_container.password(), looks_like_tracking_seed, seed_password_container.password());
     CHECK_AND_ASSERT_MES(r, false, "wallet restoring failed");
   }
   else
@@ -750,9 +750,9 @@ bool simple_wallet::try_connect_to_daemon()
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-bool simple_wallet::new_wallet(const string &wallet_file, const std::string& password, bool create_auditable_wallet, bool allow_weak_password /* = false */)
+bool simple_wallet::new_wallet(const string &wallet_file, const std::string& password, bool create_auditable_wallet)
 {
-  if (!allow_weak_password && !currency::validate_password(password, WALLET_PASSWORD_MIN_LENGTH, WALLET_PASSWORD_MAX_LENGTH))
+  if (!m_allow_weak_password && !currency::validate_password(password, WALLET_PASSWORD_MIN_LENGTH, WALLET_PASSWORD_MAX_LENGTH))
   {
     fail_msg_writer() << R"(Provided password doesn't meet the password policy. Allowed characters: letters, numbers and ~!?@#$%^&*_+|{}[]()<>:;"'-=/., ; length must be 8..256. Use --allow-weak-password to bypass.)" << ENDL;
     return false;
@@ -769,7 +769,7 @@ bool simple_wallet::new_wallet(const string &wallet_file, const std::string& pas
   m_wallet->set_do_rise_transfer(false);
   try
   {
-    m_wallet->generate(epee::string_encoding::utf8_to_wstring(m_wallet_file), password, create_auditable_wallet, allow_weak_password);
+    m_wallet->generate(epee::string_encoding::utf8_to_wstring(m_wallet_file), password, create_auditable_wallet);
     message_writer(epee::log_space::console_color_white, true) << "Generated new " << (create_auditable_wallet ? "AUDITABLE" : "") << " wallet: " << m_wallet->get_account().get_public_address_str();
     display_vote_info(*m_wallet);
     preconfig_wallet_obj();
@@ -793,8 +793,14 @@ bool simple_wallet::new_wallet(const string &wallet_file, const std::string& pas
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-bool simple_wallet::restore_wallet(const std::string& wallet_file, const std::string& seed_or_tracking_seed, const std::string& password, bool tracking_wallet, const std::string& seed_password, bool allow_weak_password /* = false */)
+bool simple_wallet::restore_wallet(const std::string& wallet_file, const std::string& seed_or_tracking_seed, const std::string& password, bool tracking_wallet, const std::string& seed_password)
 {
+  if (!m_allow_weak_password && !currency::validate_password(password, WALLET_PASSWORD_MIN_LENGTH, WALLET_PASSWORD_MAX_LENGTH))
+  {
+    fail_msg_writer() << R"(Provided password doesn't meet the password policy. Allowed characters: letters, numbers and ~!?@#$%^&*_+|{}[]()<>:;"'-=/., ; length must be 8..256. Use --allow-weak-password to bypass.)" << ENDL;
+    return false;
+  }
+
   m_wallet_file = wallet_file;
 
   m_wallet.reset(new tools::wallet2());
@@ -809,13 +815,13 @@ bool simple_wallet::restore_wallet(const std::string& wallet_file, const std::st
     if (tracking_wallet)
     {
       // auditable watch-only aka tracking wallet
-      m_wallet->restore(epee::string_encoding::utf8_to_wstring(wallet_file), password, seed_or_tracking_seed, true, "", allow_weak_password);
+      m_wallet->restore(epee::string_encoding::utf8_to_wstring(wallet_file), password, seed_or_tracking_seed, true, "");
       message_writer(epee::log_space::console_color_white, true) << "Tracking wallet restored: " << m_wallet->get_account().get_public_address_str();
     }
     else
     {
       // normal or auditable wallet
-      m_wallet->restore(epee::string_encoding::utf8_to_wstring(wallet_file), password, seed_or_tracking_seed, false, seed_password, allow_weak_password);
+      m_wallet->restore(epee::string_encoding::utf8_to_wstring(wallet_file), password, seed_or_tracking_seed, false, seed_password);
       message_writer(epee::log_space::console_color_white, true) << (m_wallet->is_auditable() ? "Auditable wallet" : "Wallet") << " restored: " << m_wallet->get_account().get_public_address_str();
       std::cout << "view key: " << string_tools::pod_to_hex(m_wallet->get_account().get_keys().view_secret_key) << std::endl << std::flush;
       if (m_wallet->is_auditable())
@@ -2460,6 +2466,12 @@ bool simple_wallet::save_watch_only(const std::vector<std::string> &args)
       return true;
     }
     password = pwd_container.password();
+  }
+
+  if (!m_allow_weak_password && !currency::validate_password(password, WALLET_PASSWORD_MIN_LENGTH, WALLET_PASSWORD_MAX_LENGTH))
+  {
+    fail_msg_writer() << R"(Provided password doesn't meet the password policy. Allowed characters: letters, numbers and ~!?@#$%^&*_+|{}[]()<>:;"'-=/., ; length must be 8..256. Use --allow-weak-password to bypass.)" << ENDL;
+    return true;
   }
 
   try

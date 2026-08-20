@@ -380,14 +380,12 @@ public:
     std::string path;
     uint64_t txs_to_return;
     bool exclude_mining_txs;
-    bool allow_weak_password = false;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(pass)
       KV_SERIALIZE(path)
       KV_SERIALIZE(txs_to_return)
       KV_SERIALIZE(exclude_mining_txs)
-      KV_SERIALIZE(allow_weak_password)
     END_KV_SERIALIZE_MAP()
   };
 
@@ -421,12 +419,10 @@ public:
   {
     uint64_t wallet_id = 0;
     std::string pass;
-    bool allow_weak_password = false;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(wallet_id)
       KV_SERIALIZE(pass)
-      KV_SERIALIZE(allow_weak_password)
     END_KV_SERIALIZE_MAP()
   };
 

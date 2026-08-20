@@ -3092,13 +3092,8 @@ bool wallet2::backup_keys(const std::string& path)
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::reset_password(const std::string& pass, bool allow_weak_password /* = false */)
+bool wallet2::reset_password(const std::string& pass)
 {
-  if (!allow_weak_password)
-  {
-    WLT_CHECK_AND_ASSERT_MES(validate_password(pass, WALLET_PASSWORD_MIN_LENGTH, WALLET_PASSWORD_MAX_LENGTH), false,
-      "password reset failed: password does not meet the password policy (allowed characters only, length must be " << WALLET_PASSWORD_MIN_LENGTH << ".." << WALLET_PASSWORD_MAX_LENGTH << ")");
-  }
   m_password = pass;
   return true;
 }
@@ -3249,12 +3244,8 @@ void wallet2::assign_account(const currency::account_base& acc)
     m_watch_only = true;
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::generate(const std::wstring& path, const std::string& pass, bool auditable_wallet, bool allow_weak_password /* = false */)
+void wallet2::generate(const std::wstring& path, const std::string& pass, bool auditable_wallet)
 {
-  if (!allow_weak_password)
-  {
-    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(validate_password(pass, WALLET_PASSWORD_MIN_LENGTH, WALLET_PASSWORD_MAX_LENGTH), "new wallet generation failed: password does not meet the password policy (allowed characters only, length must be " << WALLET_PASSWORD_MIN_LENGTH << ".." << WALLET_PASSWORD_MAX_LENGTH << ")")
-  }
   clear();
   prepare_file_names(path);
 
@@ -3271,13 +3262,8 @@ void wallet2::generate(const std::wstring& path, const std::string& pass, bool a
   store();
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::restore(const std::wstring& path, const std::string& pass, const std::string& seed_or_tracking_seed, bool tracking_wallet, const std::string& seed_password, bool allow_weak_password /* = false */)
+void wallet2::restore(const std::wstring& path, const std::string& pass, const std::string& seed_or_tracking_seed, bool tracking_wallet, const std::string& seed_password)
 {
-  if (!allow_weak_password)
-  {
-    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(validate_password(pass, WALLET_PASSWORD_MIN_LENGTH, WALLET_PASSWORD_MAX_LENGTH),
-      "wallet restoration failed: password does not meet the password policy (allowed characters only, length must be " << WALLET_PASSWORD_MIN_LENGTH << ".." << WALLET_PASSWORD_MAX_LENGTH << ")")
-  }
   bool r = false;
   clear();
   prepare_file_names(path);

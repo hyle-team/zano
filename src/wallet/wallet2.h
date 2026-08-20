@@ -387,8 +387,8 @@ namespace tools
     public:
 
     void assign_account(const currency::account_base& acc);
-    void generate(const std::wstring& path, const std::string& password, bool auditable_wallet, bool allow_weak_password = false);
-    void restore(const std::wstring& path, const std::string& pass, const std::string& seed_or_tracking_seed, bool tracking_wallet, const std::string& seed_password, bool allow_weak_password = false);
+    void generate(const std::wstring& path, const std::string& password, bool auditable_wallet);
+    void restore(const std::wstring& path, const std::string& pass, const std::string& seed_or_tracking_seed, bool tracking_wallet, const std::string& seed_password);
     void restore(const std::wstring& path, const std::string& pass, const std::string& secret_derivation, bool is_auditabe_wallet, uint64_t creation_timestamp);
     void load(const std::wstring& path, const std::string& password, bool skip_pending_ki_load = false);
     void store();
@@ -713,7 +713,7 @@ namespace tools
     void set_core_runtime_config(const currency::core_runtime_config& pc);  
     currency::core_runtime_config& get_core_runtime_config();
     bool backup_keys(const std::string& path);
-    bool reset_password(const std::string& pass, bool allow_weak_password = false);
+    bool reset_password(const std::string& pass);
     bool is_password_valid(const std::string& pass);
     bool get_actual_offers(std::list<bc_services::offer_details_ex>& offers);
     bool process_contract_info(wallet_public::wallet_transfer_info& wti, const std::vector<currency::payload_items_v>& decrypted_attach);

@@ -29,7 +29,7 @@ namespace plain_wallet
 
   std::string open(const std::string& path, const std::string& password);
   std::string restore(const std::string& seed, const std::string& path, const std::string& password, const std::string& seed_password);
-  std::string generate(const std::string& path, const std::string& password, bool allow_weak_password = false);
+  std::string generate(const std::string& path, const std::string& password);
   std::string get_opened_wallets();  
 
 
@@ -45,7 +45,7 @@ namespace plain_wallet
   //cake wallet api extension
   bool is_wallet_exist(const std::string& path);
   std::string get_wallet_info(hwallet h);
-  std::string reset_wallet_password(hwallet h, const std::string& password, bool allow_weak_password = false);
+  std::string reset_wallet_password(hwallet h, const std::string& password);
   uint64_t get_current_tx_fee(uint64_t priority); // 0 (default), 1 (unimportant), 2 (normal), 3 (elevated), 4 (priority)
   
   //callback-mode for async calls
