@@ -127,8 +127,9 @@ namespace currency
     return true;
   }
   //--------------------------------------------------------------------------------
-  bool verify_asset_surjection_proof_hf4(const transaction& tx, const crypto::hash& tx_id)
+  bool verify_asset_surjection_proof_hf4(const transaction& tx, const crypto::hash& tx_id) noexcept
   {
+    TRY_ENTRY()
     if (tx.version <= TRANSACTION_VERSION_PRE_HF4)
       return true;
 
@@ -195,6 +196,7 @@ namespace currency
     }
 
     return true;
+    CATCH_ENTRY_L0_RED(LOCATION_SS, false);
   }
   //--------------------------------------------------------------------------------
   bool generate_asset_surjection_proof_hf6(const crypto::hash& context_hash, bool has_native_coin_bare_inputs_, tx_generation_context& ogc, transaction& tx)
@@ -486,7 +488,7 @@ namespace currency
     return true;
   }
   //--------------------------------------------------------------------------------
-  bool verify_asset_surjection_proof(const transaction& tx, const crypto::hash& tx_id)
+  bool verify_asset_surjection_proof(const transaction& tx, const crypto::hash& tx_id) noexcept
   {
     if (tx.version >= TRANSACTION_VERSION_POST_HF6)
       return verify_asset_surjection_proof_hf6(tx, tx_id);
