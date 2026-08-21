@@ -278,6 +278,7 @@ private:
 
   // DATA
   wallets_manager m_backend;
+  bool m_allow_weak_password = false;
   //std::atomic<bool> m_quit_requested;
   std::atomic<bool> m_gui_deinitialize_done_1;
   std::atomic<bool> m_backend_stopped_2;

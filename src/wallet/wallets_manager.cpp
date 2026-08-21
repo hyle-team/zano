@@ -54,6 +54,7 @@ const command_line::arg_descriptor<bool> arg_enable_qt_logs  ( "enable-qt-logs",
 const command_line::arg_descriptor<bool> arg_disable_logs_init("disable-logs-init", "Disable log initialization in GUI");
 const command_line::arg_descriptor<std::string> arg_qt_dev_tools  ( "qt-dev-tools", "Enable main web page inspection with Chromium DevTools, <vertical|horizontal>[,scale], e.g. \"horizontal,1.3\"", "");
 const command_line::arg_descriptor<bool> arg_disable_price_fetch("gui-disable-price-fetch", "Disable price fetching in UI(for privacy matter)");
+const command_line::arg_descriptor<bool> arg_allow_weak_password("allow-weak-password", "Allow setting a wallet password that doesn't meet the password policy");
 const command_line::arg_descriptor<bool> arg_unsecure_disable_extension_id_check("unsecure-disable-extension-id-check", "Disable official extension ID check for HTTP requests");
 
 
@@ -202,6 +203,7 @@ bool wallets_manager::init_command_line(int argc, char* argv[], std::string& fai
   command_line::add_arg(desc_cmd_sett, arg_disable_logs_init);
   command_line::add_arg(desc_cmd_sett, arg_qt_dev_tools);
   command_line::add_arg(desc_cmd_sett, arg_disable_price_fetch);
+  command_line::add_arg(desc_cmd_only, arg_allow_weak_password);
   command_line::add_arg(desc_cmd_sett, arg_unsecure_disable_extension_id_check);
   
   command_line::add_arg(desc_cmd_sett, command_line::arg_enable_tx_socks5_relay_proxy);

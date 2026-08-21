@@ -972,6 +972,7 @@ bool MainWindow::init_backend(int argc, char* argv[])
     this->show_msg_box(command_line_fail_details);
     return false;
   }
+  m_allow_weak_password = m_backend.get_arguments()["allow-weak-password"].as<bool>();
 
   if (command_line::has_arg(m_backend.get_arguments(), command_line::arg_deeplink))
   {
@@ -2108,6 +2109,11 @@ QString MainWindow::generate_wallet(const QString& param)
   //return que_call2<view::open_wallet_request>("generate_wallet", param, [this](const view::open_wallet_request& owd, view::api_response& ar){
   PREPARE_ARG_FROM_JSON(view::open_wallet_request, owd);
   PREPARE_RESPONSE(view::open_wallet_response, ar);
+  if (!m_allow_weak_password && !currency::validate_password(owd.pass, WALLET_PASSWORD_MIN_LENGTH, WALLET_PASSWORD_MAX_LENGTH))
+  {
+    ar.error_code = API_RETURN_CODE_BAD_ARG_INVALID_PASSWORD;
+    return MAKE_RESPONSE(ar);
+  }
   ar.error_code = m_backend.generate_wallet(epee::string_encoding::utf8_to_wstring(owd.path), owd.pass, ar.response_data);
   return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
@@ -2121,6 +2127,11 @@ QString MainWindow::restore_wallet(const QString& param)
   //return que_call2<view::restore_wallet_request>("restore_wallet", param, [this](const view::restore_wallet_request& owd, view::api_response& ar){
   PREPARE_ARG_FROM_JSON(view::restore_wallet_request, owd);
   PREPARE_RESPONSE(view::open_wallet_response, ar);
+  if (!m_allow_weak_password && !currency::validate_password(owd.pass, WALLET_PASSWORD_MIN_LENGTH, WALLET_PASSWORD_MAX_LENGTH))
+  {
+    ar.error_code = API_RETURN_CODE_BAD_ARG_INVALID_PASSWORD;
+    return MAKE_RESPONSE(ar);
+  }
   ar.error_code = m_backend.restore_wallet(epee::string_encoding::utf8_to_wstring(owd.path), owd.pass, owd.seed_phrase, owd.seed_pass, ar.response_data);
   return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
@@ -2427,6 +2438,11 @@ QString MainWindow::reset_wallet_password(const QString& param)
   TRY_ENTRY();
   LOG_API_TIMING();
   PREPARE_ARG_FROM_JSON(view::reset_pass_request, me);
+  if (!m_allow_weak_password && !currency::validate_password(me.pass, WALLET_PASSWORD_MIN_LENGTH, WALLET_PASSWORD_MAX_LENGTH))
+  {
+    default_ar.error_code = API_RETURN_CODE_BAD_ARG_INVALID_PASSWORD;
+    return MAKE_RESPONSE(default_ar);
+  }
   default_ar.error_code = m_backend.reset_wallet_password(me.wallet_id, me.pass);
   return MAKE_RESPONSE(default_ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
