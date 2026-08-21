@@ -6740,12 +6740,10 @@ bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, 
 
   const ZC_sig& sig = boost::get<ZC_sig>(tx.signatures[in_index]);
 
-  //TIME_MEASURE_START_PD(tx_input_check_clsag_ggx);
-
+  TRY_ENTRY()
   bool r = crypto::verify_CLSAG_GGX(tx_hash_for_signature, ring, sig.pseudo_out_amount_commitment, sig.pseudo_out_blinded_asset_id, zc_in.k_image, sig.clsags_ggx);
   CHECK_AND_ASSERT_MES(r, false, "verify_CLSAG_GGX failed");
-
-  //TIME_MEASURE_FINISH_PD(tx_input_check_clsag_ggx);
+  CATCH_ENTRY("check_tx_input(ZC) -> verify_CLSAG_GGX", false);
 
   return true;
 }
@@ -9205,8 +9203,10 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
       CHECK_AND_ASSERT_MES(input_index < input_tx.signatures.size(), false, "input_index = " << input_index << ", isn't less than input_tx.signatures.size() = " << input_tx.signatures.size());
       CHECK_AND_ASSERT_MES(input_tx.signatures[input_index].type() == typeid(ZC_sig), false, "input_tx.signatures[" << input_index << "] has wrong type: " << input_tx.signatures[input_index].type().name());
       const ZC_sig& sig = boost::get<ZC_sig>(input_tx.signatures[input_index]);
+      TRY_ENTRY()
       bool r = crypto::verify_CLSAG_GGX(tx_hash_for_signature, zc_input_ring, sig.pseudo_out_amount_commitment, sig.pseudo_out_blinded_asset_id, input_key_image, sig.clsags_ggx);
       CHECK_AND_ASSERT_MES(r, false, "verify_CLSAG_GGX failed");
+      CATCH_ENTRY("validate_alt_block_input -> verify_CLSAG_GGX", false);
     }
   VARIANT_CASE_OTHER()
     LOG_ERROR("unexpected input type: " << input_v.type().name());
