@@ -165,6 +165,8 @@ namespace tools
     // variables that should be part of state data object but should not be stored during serialization
     mutable std::atomic<bool> m_whitelist_updated = false;
     //===============================================================
+    void migrate_unconfirmed_payments_171();
+
     template <class t_archive>
     inline void serialize(t_archive &a, const unsigned int ver)
     {
@@ -226,7 +228,12 @@ namespace tools
       a & m_rollback_events;
       a & m_whitelisted_assets;
       a & m_use_assets_whitelisting;
-      a & m_last_zc_global_indexs;      
+      a & m_last_zc_global_indexs;
+
+      // v171 is wallet version that doesn't store mempool payments in m_payments
+      // and we remove legacy height-0 entries when loading an older wallet
+      if (t_archive::is_loading::value && ver < 171)
+        migrate_unconfirmed_payments_171();
     }
   };
   

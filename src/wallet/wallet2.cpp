@@ -93,6 +93,26 @@ namespace tools
     // do nothing
   }
   //---------------------------------------------------------------
+  void wallet2_base_state::migrate_unconfirmed_payments_171()
+  {
+    size_t removed_count = 0;
+    for (auto it = m_payments.begin(); it != m_payments.end(); )
+    {
+      if (it->second.m_block_height == 0)
+      {
+        it = m_payments.erase(it);
+        ++removed_count;
+      }
+      else
+      {
+        ++it;
+      }
+    }
+
+    if (removed_count != 0)
+      LOG_PRINT_L0("Wallet migration: removed " << removed_count << " legacy unconfirmed payment entries");
+  }
+  //---------------------------------------------------------------
   void legacy::wallet_transfer_info_hf5::restore_fee_from_tx()
   {
     fee = currency::is_coinbase(tx) ? 0 : currency::get_tx_fee(tx);
@@ -1608,7 +1628,7 @@ bool wallet2::process_payment_id_for_wti_and_populate_subtransfers(wallet_public
           wstbp.subtransfers.push_back(wsti);
         }
       }
-      if (intrinsic_payment_id != 0 && has_balance_increase)
+      if (intrinsic_payment_id != 0 && has_balance_increase && wti.height != 0)
       {
         pd.m_tx_hash = wti.tx_hash;
         pd.m_block_height = wti.height;
@@ -1652,7 +1672,7 @@ bool wallet2::process_payment_id_for_wti_and_populate_subtransfers(wallet_public
         wstbp.subtransfers.push_back(wsti);
       }
     }
-    if (!wti.tx_wide_payment_id.empty() && has_balance_increase)
+    if (!wti.tx_wide_payment_id.empty() && has_balance_increase && wti.height != 0)
     {
       payment.m_tx_hash = wti.tx_hash;
       payment.m_block_height = wti.height;
