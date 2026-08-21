@@ -4,7 +4,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 //
 // This file contains implementation of the original d-CLSAG (s.a. https://eprint.iacr.org/2019/654.pdf by Goodel at el)
-// and the extended d/v-CLSAG version (s.a. https://github.com/hyle-team/docs/blob/master/zano/dv-CLSAG-extension/ by sowle)
+// and the extended d/v-CLSAG version (s.a. https://eprint.iacr.org/2025/2335 by sowle)
 //
 #include "clsag.h"
 //#include "misc_log_ex.h"
@@ -180,9 +180,9 @@ namespace crypto
   //---------------------------------------------------------------
 
   //
-  // Disclaimer: extensions to the CLSAG implemented below are non-standard and are in proof-of-concept state.
-  // They shouldn't be used in production code until formal security proofs are done and (ideally) the code is peer-reviewed.
-  // -- sowle
+  // d/v-CLSAG implementation
+  // paper:  https://eprint.iacr.org/2025/2335
+  // review: https://github.com/cypherstack/zano-clsag-review
   //
 
 
