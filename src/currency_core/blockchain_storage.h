@@ -11,6 +11,7 @@
 #include <boost/program_options.hpp>
 
 #include <boost/interprocess/sync/named_mutex.hpp>
+#include <boost/unordered/concurrent_flat_map.hpp>
 
 #include <boost/serialization/serialization.hpp>
 #include <boost/serialization/version.hpp>
@@ -254,7 +255,9 @@ namespace currency
     //void get_all_known_block_ids(std::list<crypto::hash> &main, std::list<crypto::hash> &alt, std::list<crypto::hash> &invalid) const;
     bool is_pre_hardfork_tx_freeze_period_active() const;
     bool is_block_fit_for_strategy(uint64_t h, const std::string& strategy) const;
+    bool is_block_fit_for_strategy(const block& blk, const std::string& strategy) const;
     bool collect_all_outs_in_block(uint64_t input_amount, uint64_t height, std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry>& outs) const;
+    bool collect_all_outs_in_block(uint64_t input_amount, const block_extended_info& bei, std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry>& outs) const;
     size_t get_current_hardfork_id() const;
 
 
@@ -315,7 +318,7 @@ namespace currency
     bool get_tx_outputs_gindexs(const crypto::hash& tx_id, std::vector<uint64_t>& indexs)const;
     bool get_alias_info(const std::string& alias, extra_alias_entry_base& info)const;
     std::string get_alias_by_address(const account_public_address& addr)const;
-    std::set<std::string> get_aliases_by_address(const account_public_address& addr)const;
+    std::set<std::string> get_aliases_by_address(const account_public_address& addr, std::string& default_alias) const;
     template<typename cb_t>
     bool enumerate_aliases(cb_t cb) const;
     template<typename cb_t>
@@ -522,6 +525,7 @@ namespace currency
     void print_blockchain_outs(const std::string& file) const;
     void print_blockchain_outs_stats() const;
     void print_db_cache_perfeormance_data() const;
+    void measure_db_performance() const;
     void print_last_n_difficulty_numbers(uint64_t n) const;
     bool calc_tx_cummulative_blob(const block& bl)const;
     bool get_outs_index_stat(outs_index_stat& outs_stat)const;
@@ -551,6 +555,8 @@ namespace currency
 
     typedef tools::db::cached_key_value_accessor<std::string, std::list<extra_alias_entry_base>, true, true> aliases_container; 
     typedef tools::db::cached_key_value_accessor<account_public_address, std::set<std::string>, true, false> address_to_aliases_container;
+    typedef tools::db::cached_key_value_accessor<account_public_address, std::list<default_alias_entry>, true, false> address_to_default_alias_container;
+
     typedef tools::db::cached_key_value_accessor<crypto::hash, ms_output_entry, false, false> multisig_outs_container;// ms out id => ms_output_entry
     typedef tools::db::cached_key_value_accessor<uint64_t, uint64_t, false, true> solo_options_container;
     typedef tools::db::basic_key_value_accessor<uint32_t, block_gindex_increments, true> per_block_gindex_increments_container; // height => [(amount, gindex_increment), ...]
@@ -603,6 +609,7 @@ namespace currency
     multisig_outs_container m_db_multisig_outs;
     aliases_container m_db_aliases;
     address_to_aliases_container m_db_addr_to_alias;
+    address_to_default_alias_container m_db_addr_to_default_alias;
     per_block_gindex_increments_container m_db_per_block_gindex_incs;
     
     assets_container m_db_assets;
@@ -630,7 +637,7 @@ namespace currency
     mutable i_core_event_handler m_event_handler_stub;
 
     //tools::median_db_cache<uint64_t, uint64_t> m_tx_fee_median;
-    mutable std::unordered_map<size_t, uint64_t> m_timestamps_median_cache;
+    mutable boost::concurrent_flat_map<size_t, uint64_t> m_timestamps_median_cache;
     mutable performnce_data m_performance_data;
     std::list<core_event> m_core_events_pack;
     mutable epee::file_io_utils::native_filesystem_handle m_interprocess_locker_file;
@@ -665,7 +672,6 @@ namespace currency
     wide_difficulty_type get_next_difficulty_for_alternative_chain(const alt_chain_type& alt_chain, block_extended_info& bei, bool pos) const;
     bool handle_block_to_main_chain(const block& bl, block_verification_context& bvc);
     bool handle_block_to_main_chain(const block& bl, const crypto::hash& id, block_verification_context& bvc);
-    bool collect_rangeproofs_data_from_tx(const transaction& tx, const crypto::hash& tx_id, std::vector<zc_outs_range_proofs_with_commitments>& agregated_proofs);
     std::string print_alt_chain(alt_chain_type alt_chain);
     bool handle_alternative_block(const block& b, const crypto::hash& id, block_verification_context& bvc);
     bool is_reorganize_required(const block_extended_info& main_chain_bei, const alt_chain_type& alt_chain, const crypto::hash& proof_alt);
@@ -702,6 +708,7 @@ namespace currency
     bool push_transaction_to_global_outs_index(const transaction& tx, const crypto::hash& tx_id, std::vector<uint64_t>& global_indexes, const crypto::hash& bl_id, const uint64_t bl_height);
     bool pop_transaction_from_global_index(const transaction& tx, const crypto::hash& tx_id);
     bool build_random_out_entry(uint64_t amount, size_t g_index, uint64_t mix_count, bool use_only_forced_to_mix, uint64_t height_upper_limit, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry& oen) const;
+    bool build_random_out_entry_from_tx_entry(const transaction_chain_entry& tx_entry, uint64_t out_no, uint64_t amount, uint64_t g_index, uint64_t mix_count, bool use_only_forced_to_mix, uint64_t height_upper_limit, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry& oen) const;
     bool add_out_to_get_random_outs(COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount& result_outs, uint64_t amount, size_t i, uint64_t mix_count, bool use_only_forced_to_mix = false, uint64_t height_upper_limit = 0) const;
     bool get_target_outs_for_amount_prezarcanum(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::request& req, const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::offsets_distribution& details, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount& result_outs, std::map<uint64_t, uint64_t>& amounts_to_up_index_limit_cache) const;
     bool get_target_outs_for_postzarcanum(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::request& req, const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::offsets_distribution& details, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount& result_outs, std::map<uint64_t, uint64_t>& amounts_to_up_index_limit_cache) const;
@@ -719,7 +726,7 @@ namespace currency
     uint64_t get_tx_fee_median_effective_index(uint64_t h) const;    
     void on_abort_transaction();
     void load_targetdata_cache(bool is_pos) const;
-
+    bool migrate_default_aliases_container();
 
 
     uint64_t get_adjusted_time()const;
@@ -729,8 +736,13 @@ namespace currency
     bool unprocess_blockchain_tx_extra(const transaction& tx, const uint64_t height, const crypto::hash& tx_id);
     bool process_blockchain_tx_attachments(const transaction& tx, uint64_t h, const crypto::hash& bl_id, uint64_t timestamp);
     bool unprocess_blockchain_tx_attachments(const transaction& tx, uint64_t h, uint64_t timestamp);
-    bool pop_alias_info(const extra_alias_entry& ai);
-    bool put_alias_info(const transaction& tx, extra_alias_entry& ai);
+    bool pop_alias_info(const extra_alias_entry& ai, const crypto::hash& tx_id);
+    bool put_alias_info(const transaction& tx, extra_alias_entry& ai, const crypto::hash& tx_id);
+    void pop_default_alias(const account_public_address& addr, const crypto::hash& tx_id);
+    void push_default_alias(const account_public_address& addr, const std::string& default_alias, const crypto::hash& tx_id);
+    void add_alias_to_address(const account_public_address& addr, const std::string& alias, bool is_during_put_process, const crypto::hash& tx_id);
+    void remove_alias_from_address(const account_public_address& addr, const std::string& alias, const aliases_container::t_value_type& local_alias_history, bool is_during_put_process, const crypto::hash& tx_id);
+
     bool pop_asset_info(const asset_descriptor_operation& ado, const uint64_t height);
     bool put_asset_info(const transaction& tx, const crypto::hash& tx_id, const asset_descriptor_operation& ado, const uint64_t height);
     bool put_gw_address_operation(const transaction& tx, const crypto::hash& tx_id, const gateway_address_descriptor_operation& ado, const uint64_t height);

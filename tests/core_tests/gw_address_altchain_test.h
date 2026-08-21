@@ -48,3 +48,14 @@ protected:
   mutable currency::keypair m_gw_addr_spend{};
   mutable currency::keypair m_gw_addr_new_spend{}; // new owner for chain C
 };
+
+struct gw_addr_register_output_rollback : public wallet_test
+{
+  gw_addr_register_output_rollback();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+
+protected:
+  mutable currency::keypair m_gw_addr_view{};
+  mutable currency::keypair m_gw_addr_spend{};
+};

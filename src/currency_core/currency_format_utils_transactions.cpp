@@ -361,7 +361,7 @@ namespace currency
       VARIANT_SWITCH_BEGIN(in_v)
         VARIANT_CASE_CONST(txin_gen, in_g)
         VARIANT_CASE_CONST(txin_to_key, in_tk)
-          bare_inputs_native_amounts_sum += in_tk.amount;
+          CHECK_AND_ASSERT_MES(assign_add_with_overflow_check(in_tk.amount, bare_inputs_native_amounts_sum), false, "txin_to_key amount overflow");
         VARIANT_CASE_CONST(txin_zc_input, in_zc)
           has_only_native_coin_bare_inputs = false;
           ++zc_inputs_count;
@@ -369,7 +369,7 @@ namespace currency
         VARIANT_CASE_CONST(txin_gateway, in_gw)
           if (in_gw.asset_id == native_coin_asset_id_1div8)
           {
-            bare_inputs_native_amounts_sum += in_gw.amount;
+            CHECK_AND_ASSERT_MES(assign_add_with_overflow_check(in_gw.amount, bare_inputs_native_amounts_sum), false, "txin_gateway amount overflow");
           }
           else
           {
@@ -397,7 +397,7 @@ namespace currency
           outs_commitments_sum += crypto::point_t(out_zc.amount_commitment); // amount_commitment premultiplied by 1/8
         VARIANT_CASE_CONST(tx_out_gateway, out_gw)
           if (out_gw.asset_id == native_coin_asset_id_1div8)
-            bare_outs_native_amounts_sum += out_gw.amount;
+            CHECK_AND_ASSERT_MES(assign_add_with_overflow_check(out_gw.amount, bare_outs_native_amounts_sum), false, "tx_out_gateway amount overflow");
           else
             outs_commitments_sum += out_gw.amount * crypto::point_t(out_gw.asset_id); // *1/8
     //  VARIANT_CASE_CONST(tx_out_confidential_gateway, out_cgw)
@@ -1074,6 +1074,15 @@ namespace currency
     for (const auto& ad : addr_)
       addr.push_back(ad);
   }
+  //---------------------------------------------------------------------------------
+  bool check_single_tx_range_proofs(const transaction& tx, const crypto::hash& tx_id)
+  {
+    std::vector<zc_outs_range_proofs_with_commitments> range_proofs_agregated;
 
+    CHECK_AND_ASSERT_MES(collect_rangeproofs_data_from_tx(tx, tx_id, range_proofs_agregated), false, "tx " << tx_id << ": collect_rangeproofs_data_from_tx failed");
 
+    CHECK_AND_ASSERT_MES(verify_multiple_zc_outs_range_proofs(range_proofs_agregated), false, "tx " << tx_id << " has invalid range proofs");
+
+    return true;
+  }
 } // namespace currency

@@ -532,6 +532,8 @@ namespace currency
   template<class t_core>
   int t_currency_protocol_handler<t_core>::handle_response_get_objects(int command, NOTIFY_RESPONSE_GET_OBJECTS::request& arg, currency_connection_context& context)
   {
+    TIME_MEASURE_START_MS(total_time);
+
     //LOG_PRINT_MAGENTA("[NOTIFY_RESPONSE_GET_OBJECTS] count=" << context.m_priv.m_expected_NOTIFY_RESPONSE_GET_OBJECTS_count, LOG_LEVEL_0);
     if (context.m_priv.m_expected_NOTIFY_RESPONSE_GET_OBJECTS_count == 0)
     {
@@ -695,11 +697,14 @@ namespace currency
         ++count;
       }
     }
-    uint64_t current_size = m_core.get_blockchain_storage().get_current_blockchain_size();
-    LOG_PRINT_YELLOW(">>>>>>>>> sync progress: " << arg.blocks.size() << " blocks added, now have "
+    TIME_MEASURE_FINISH_MS(total_time);
+
+    int64_t current_size = m_core.get_current_blockchain_size();
+    std::string sync_speed_str = m_sync_speed_calculator.process_blocks_and_return_speed_str(arg.blocks.size());
+    LOG_PRINT_YELLOW(">>>>>>>>> sync progress: " << arg.blocks.size() << " blocks added ( " << std::fixed << std::setprecision(1) << total_time / 1000.0f << "s ), now have "
       << current_size << " of " << context.m_remote_blockchain_size
       << " ( " << std::fixed << std::setprecision(2) << current_size * 100.0 / context.m_remote_blockchain_size << "% ) and "
-      << context.m_remote_blockchain_size - current_size << " blocks left"
+      << static_cast<int64_t>(context.m_remote_blockchain_size) - current_size << " blocks left" << sync_speed_str
       , LOG_LEVEL_0);
 
     request_missing_objects(context, true);
@@ -724,6 +729,7 @@ namespace currency
     {
       LOG_PRINT_MAGENTA("Synchronized set to FALSE (" << synchronized_connections_count << " of " << total_connections_count << " conn. synced)", LOG_LEVEL_0);
       m_synchronized = false;
+      m_sync_speed_calculator.reset();
     }
 
     return m_core.on_idle();
@@ -796,8 +802,7 @@ namespace currency
         bool last_received_block_is_in_mainchain = m_core.get_blockchain_storage().have_block_main(context.m_priv.m_last_fetched_block_ids.get_top_block_id());
         bool far_from_top = context.m_priv.m_last_fetched_block_ids.get_top_block_height() + BLOCKS_IDS_SYNCHRONIZING_DEFAULT_COUNT < m_core.get_blockchain_storage().get_current_blockchain_size();
         if (!last_received_block_is_in_mainchain || (last_received_block_is_in_mainchain && far_from_top))
-        {          
-          block_extended_info blk = AUTO_VAL_INIT(blk);
+        {
           // In this scenario, it's likely the remote daemon is on an alternate chain 
           // where the network split goes deeper than 2000 blocks. The NOTIFY_REQUEST_GET_OBJECTS 
           // call returns a batch of BLOCKS_IDS_SYNCHRONIZING_DEFAULT_COUNT IDs, which may 
@@ -819,6 +824,7 @@ namespace currency
 
       if (!r.block_ids.size())
       {
+        context.m_priv.m_last_fetched_block_ids.clear();
         m_core.get_short_chain_history(r.block_ids);
       }
       LOG_PRINT_L2("[NOTIFY]NOTIFY_REQUEST_CHAIN: m_block_ids.size()=" << r.block_ids.size());
@@ -1078,6 +1084,13 @@ namespace currency
       return 1;
     }
 
+    //some times other threads might have delivered blocks after last delivery of this thread and before this moment, 
+    //and this thread might continue not from the point it lastly finished but from newer blocks.
+    if (context.m_priv.m_last_fetched_block_ids.get_blockchain_current_size() != arg.start_height)
+    {
+      context.m_priv.m_last_fetched_block_ids.clear();
+    }
+
     uint64_t height = arg.start_height;
     BOOST_FOREACH(auto& bl_details, arg.m_block_ids)
     {
@@ -1167,6 +1180,44 @@ namespace currency
         }
         return true; // = continue
       });
+  }
+  //-----------------------------------------------------------------------------------------------------------------------  
+  template<class t_core>
+  std::string t_currency_protocol_handler<t_core>::sync_speed_calculator_t::process_blocks_and_return_speed_str(size_t blocks_count)
+  {
+    CRITICAL_REGION_LOCAL(m_lock);
+    static constexpr double ema_alpha = 0.2;
+
+    time_t now = time(NULL);
+
+    if (m_last_objects_handled_ts == 0)
+    {
+      m_last_objects_handled_ts = now;
+      return "";
+    }
+
+    time_t period = now - m_last_objects_handled_ts;
+    if (period <= 0)
+      return "";
+    m_last_objects_handled_ts = now;
+    
+    int64_t current_speed_b_h = 3600 * blocks_count / period;
+    if (m_accumulator != 0)
+      m_accumulator = (1.0 - ema_alpha) * m_accumulator + ema_alpha * current_speed_b_h;
+    else
+      m_accumulator = current_speed_b_h;
+
+    std::string sync_speed_str = ", sync speed: " + epst::num_to_string_fast(static_cast<int64_t>(m_accumulator)) + " b/h";
+    return sync_speed_str;
+  }
+
+  template<class t_core>
+  void t_currency_protocol_handler<t_core>::sync_speed_calculator_t::reset()
+  {
+    CRITICAL_REGION_LOCAL(m_lock);
+
+    m_last_objects_handled_ts = 0;
+    m_accumulator = 0;
   }
 
 

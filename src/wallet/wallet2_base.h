@@ -469,7 +469,7 @@ namespace tools
     BEGIN_BOOST_SERIALIZATION()
       BOOST_SERIALIZE(asset_id)
       BOOST_SERIALIZE(amount)
-      END_BOOST_SERIALIZATION_TOTAL_FIELDS(2)
+    END_BOOST_SERIALIZATION_TOTAL_FIELDS(2)
   };
 
   struct payment_details
@@ -486,7 +486,7 @@ namespace tools
       BOOST_SERIALIZE(m_block_height)
       BOOST_SERIALIZE(m_unlock_time)
       BOOST_SERIALIZE(subtransfers)
-      END_BOOST_SERIALIZATION_TOTAL_FIELDS(5)
+    END_BOOST_SERIALIZATION_TOTAL_FIELDS(5)
   };
 
   struct expiration_entry_info
@@ -501,7 +501,7 @@ namespace tools
       BOOST_SERIALIZE(expiration_time)
       BOOST_SERIALIZE(related_tx_id)
       BOOST_SERIALIZE(receved)
-      END_BOOST_SERIALIZATION_TOTAL_FIELDS(4)
+    END_BOOST_SERIALIZATION_TOTAL_FIELDS(4)
   };
 
   typedef std::unordered_multimap<std::string, payment_details> payment_container;

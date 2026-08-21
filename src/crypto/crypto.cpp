@@ -17,6 +17,7 @@
 #include "warnings.h"
 #include "crypto.h"
 #include "hash.h"
+#include <openssl/crypto.h>
 
 #if !defined(NDEBUG)
 #  define crypto_assert(expression) assert(expression); CRYPTO_CHECK_AND_THROW_MES(expression, #expression)
@@ -415,6 +416,11 @@ POP_VS_WARNINGS
     hash_to_scalar(buf, rs_comm_size(pubs_count), h);
     sc_sub(&h, &h, &sum);
     return sc_isnonzero(&h) == 0;
+  }
+
+  void wipe(void* p, size_t n) noexcept
+  {
+    OPENSSL_cleanse(p, n); // C function, cannot throw
   }
 
 } // namespace crypto

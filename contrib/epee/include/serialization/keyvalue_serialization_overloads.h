@@ -340,6 +340,21 @@ namespace epee
 
       }
 
+      // Removes a previously-serialized entry from the doc storage so it does not
+      // appear in the generated example JSON or descriptions. No-op unless the
+      // storage opted into documentation (use_descriptions == true_type).
+      template<class t_storage>
+      static bool serialize_and_hide(t_storage& stg, typename t_storage::hsection hparent_section, const char* pname)
+      {
+        if constexpr (t_storage::use_descriptions::value)
+        {
+          stg.remove_entry_from_doc(hparent_section, pname);
+          return true;
+        }
+        else
+          return false;
+      }
+
       template<class t_type, class t_storage>
       static bool serialize_stl_container_pod_val_as_blob(const t_type& d, t_storage& stg, typename t_storage::hsection hparent_section, const char* pname)
       {

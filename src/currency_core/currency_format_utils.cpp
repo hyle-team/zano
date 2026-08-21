@@ -127,8 +127,9 @@ namespace currency
     return true;
   }
   //--------------------------------------------------------------------------------
-  bool verify_asset_surjection_proof_hf4(const transaction& tx, const crypto::hash& tx_id)
+  bool verify_asset_surjection_proof_hf4(const transaction& tx, const crypto::hash& tx_id) noexcept
   {
+    TRY_ENTRY()
     if (tx.version <= TRANSACTION_VERSION_PRE_HF4)
       return true;
 
@@ -195,6 +196,7 @@ namespace currency
     }
 
     return true;
+    CATCH_ENTRY_L0_RED(LOCATION_SS, false);
   }
   //--------------------------------------------------------------------------------
   bool generate_asset_surjection_proof_hf6(const crypto::hash& context_hash, bool has_native_coin_bare_inputs_, tx_generation_context& ogc, transaction& tx)
@@ -254,12 +256,15 @@ namespace currency
       const auto& out_v = tx.vout[j];
       VARIANT_SWITCH_BEGIN(out_v)
         VARIANT_CASE_CONST(tx_out_zarcanum, out_zc)
+          size_t confidential_out_index = confidential_outs_count;
           ++confidential_outs_count;
           if (has_only_native_coin_bare_inputs)
           {
             CHECK_AND_ASSERT_MES(out_zc.blinded_asset_id == native_coin_asset_id_1div8, false, "output #" << j << " has a non explicitly native asset id");
-            CHECK_AND_ASSERT_MES(ogc.blinded_asset_ids[j] == currency::native_coin_asset_id_pt, false, "no ZC ins: out #" << j << " has a non-explicit asset id");
-            CHECK_AND_ASSERT_MES(ogc.asset_id_blinding_masks[j] == 0, false, "no ZC ins: out #" << j << " has non-zero asset id blinding mask");
+            CHECK_AND_ASSERT_MES(confidential_out_index < ogc.blinded_asset_ids.size(), false, "unexpected: ogc.blinded_asset_ids.size() = " << ogc.blinded_asset_ids.size());
+            CHECK_AND_ASSERT_MES(ogc.blinded_asset_ids.size() == ogc.asset_id_blinding_masks.size(), false, "unexpected: ogc.blinded_asset_ids.size(" << ogc.blinded_asset_ids.size() << ") != ogc.asset_id_blinding_masks.size(" << ogc.asset_id_blinding_masks.size() << ")" );
+            CHECK_AND_ASSERT_MES(ogc.blinded_asset_ids[confidential_out_index] == currency::native_coin_asset_id_pt, false, "no ZC ins: out #" << j << " has a non-explicit asset id");
+            CHECK_AND_ASSERT_MES(ogc.asset_id_blinding_masks[confidential_out_index] == 0, false, "no ZC ins: out #" << j << " has non-zero asset id blinding mask");
           }
     //  VARIANT_CASE_CONST(tx_out_confidential_gateway, out_cgw)
     //    ++confidential_outs_count;
@@ -483,7 +488,7 @@ namespace currency
     return true;
   }
   //--------------------------------------------------------------------------------
-  bool verify_asset_surjection_proof(const transaction& tx, const crypto::hash& tx_id)
+  bool verify_asset_surjection_proof(const transaction& tx, const crypto::hash& tx_id) noexcept
   {
     if (tx.version >= TRANSACTION_VERSION_POST_HF6)
       return verify_asset_surjection_proof_hf6(tx, tx_id);
@@ -543,6 +548,82 @@ namespace currency
     CHECK_AND_ASSERT_MES(r, false, "bpp_gen failed with error " << (int)err);
 
     tx.proofs.push_back(std::move(range_proof));
+
+    return true;
+  }
+  //---------------------------------------------------------------
+  bool collect_rangeproofs_data_from_tx(const transaction& tx, const crypto::hash& tx_id, std::vector<zc_outs_range_proofs_with_commitments>& agregated_proofs)
+  {
+    if (tx.version <= TRANSACTION_VERSION_PRE_HF4)
+      return true;
+
+    size_t confidential_outs_count = 0;
+    for(auto& out_v : tx.vout)
+    {
+      VARIANT_SWITCH_BEGIN(out_v)
+        VARIANT_CASE_CONST(tx_out_zarcanum, out_zc)
+        ++confidential_outs_count;
+      //  VARIANT_CASE_CONST(tx_out_confidential_gateway, out_cgw)
+      //  ++confidential_outs_count;
+      VARIANT_CASE_CONST(tx_out_gateway, out_gw)
+        // nothing
+        VARIANT_CASE_OTHER()
+        LOG_ERROR("unexpected output type: " << out_v.type().name());
+      return false;
+      VARIANT_SWITCH_END()
+    }
+
+
+    size_t range_proofs_count = 0;
+    size_t out_index_offset = 0; //Consolidated Transactions have multiple zc_outs_range_proof entries
+    for (const auto& a : tx.proofs)
+    {
+      if (a.type() == typeid(zc_outs_range_proof))
+      {
+        const zc_outs_range_proof& zcrp = boost::get<zc_outs_range_proof>(a);
+
+        // validate aggregation proof, collect commitments from confidential outputs
+        std::vector<const crypto::public_key*> amount_commitment_ptrs_1div8, blinded_asset_id_ptrs_1div8;
+        for(size_t j = out_index_offset; j < tx.vout.size(); ++j)
+        {
+          VARIANT_SWITCH_BEGIN(tx.vout[j])
+            VARIANT_CASE_CONST(tx_out_zarcanum, out_zc) // other types are checked at the beggining
+            amount_commitment_ptrs_1div8.push_back(&out_zc.amount_commitment);
+          blinded_asset_id_ptrs_1div8.push_back(&out_zc.blinded_asset_id);
+          VARIANT_SWITCH_END()
+        }
+        uint8_t err = 0;
+        bool r = crypto::verify_vector_UG_aggregation_proof(tx_id, amount_commitment_ptrs_1div8, blinded_asset_id_ptrs_1div8, zcrp.aggregation_proof, &err);
+        CHECK_AND_ASSERT_MES(r, false, "verify_vector_UG_aggregation_proof failed with err code " << (int)err);
+
+
+        agregated_proofs.emplace_back(zcrp);
+
+        // convert amount commitments for aggregation from public_key to point_t form
+        // TODO: consider refactoring this ugly code
+        for (size_t i = 0; i != zcrp.aggregation_proof.amount_commitments_for_rp_aggregation.size(); i++)
+          agregated_proofs.back().amount_commitments.emplace_back(zcrp.aggregation_proof.amount_commitments_for_rp_aggregation[i]);
+
+        out_index_offset += zcrp.aggregation_proof.amount_commitments_for_rp_aggregation.size();
+        range_proofs_count++;
+      }
+    }
+
+
+    if (tx.hardfork_id >= ZANO_HARDFORK_06)
+    {
+      CHECK_AND_ASSERT_MES((confidential_outs_count == 0) == (range_proofs_count == 0), false, "transaction " << tx_id << " has inconsistent confidential outputs count (" << confidential_outs_count << ") and RPs count (" << range_proofs_count << ")");
+      CHECK_AND_ASSERT_MES(out_index_offset == confidential_outs_count, false, "range proof elements count doesn't match with confidential outputs count: " << out_index_offset << " != " << confidential_outs_count);
+      CHECK_AND_ASSERT_MES(confidential_outs_count == 0 || range_proofs_count == 1 || (get_tx_flags(tx) & TX_FLAG_SIGNATURE_MODE_SEPARATE), false, "transaction " << tx_id 
+        << " has confidential outputs, doesn't have TX_FLAG_SIGNATURE_MODE_SEPARATE, but has range_proofs_count = " << range_proofs_count);
+    }
+    else
+    {
+      CHECK_AND_ASSERT_MES(out_index_offset == confidential_outs_count, false, "range proof elements count doesn't match with confidential outputs count: " << out_index_offset << " != " << confidential_outs_count);
+      CHECK_AND_ASSERT_MES(range_proofs_count > 0, false, "transaction " << get_transaction_hash(tx) << " doesn't have range proofs");
+      CHECK_AND_ASSERT_MES(range_proofs_count == 1 || (get_tx_flags(tx) & TX_FLAG_SIGNATURE_MODE_SEPARATE), false, "transaction " << get_transaction_hash(tx) 
+        << " doesn't have TX_FLAG_SIGNATURE_MODE_SEPARATE but has range_proofs_count = " << range_proofs_count);
+    }
 
     return true;
   }
@@ -1347,7 +1428,7 @@ namespace currency
     return true;
   }  
   //---------------------------------------------------------------
-  bool validate_ado_update_allowed(const asset_descriptor_base& new_ado, const asset_descriptor_base& prev_ado)
+  bool validate_ado_update_allowed(const asset_descriptor_base& new_ado, const asset_descriptor_base& prev_ado, bool hf6_active /* = false */)
   {
     if (new_ado.total_max_supply != prev_ado.total_max_supply) return false;
     if (new_ado.current_supply > prev_ado.total_max_supply) return false;
@@ -1357,13 +1438,17 @@ namespace currency
     //a.meta_info;
     //if (a.owner != b.owner) return false;
     if (new_ado.hidden_supply != prev_ado.hidden_supply) return false;
+    if (hf6_active && !validate_asset_meta_info(new_ado.meta_info)) return false; // ticker and full_name are fixed, thus only meta_info here
     
     return true;
   }
   //---------------------------------------------------------------
-  bool validate_ado_initial(const asset_descriptor_base& new_ado)
+  bool validate_ado_initial(const asset_descriptor_base& new_ado, bool hf6_active /* = false */)
   {
-    if (new_ado.current_supply > new_ado.total_max_supply) return false;
+    if (new_ado.current_supply > new_ado.total_max_supply)
+      return false;
+    if (hf6_active && !validate_asset_ticker_full_name_and_meta_info(new_ado))
+      return false;
     return true;
   }
   //---------------------------------------------------------------
@@ -3592,7 +3677,9 @@ namespace currency
       }
       else if (in.type() == typeid(txin_gateway))
       {
-        //TODO: @Val do we need to check anything here?
+        CHECKED_GET_SPECIFIC_VARIANT(in, const txin_gateway, gw_in, false);
+        if (gw_in.asset_id == currency::native_coin_asset_id_1div8)
+          this_amount = gw_in.amount;
       }
       else
       {
@@ -3611,14 +3698,18 @@ namespace currency
     uint64_t money = 0;
     for(const auto& o : tx.vout)
     {
+      uint64_t this_amount = 0;
       VARIANT_SWITCH_BEGIN(o);
       VARIANT_CASE_CONST(tx_out_bare, o)
-        if (money > o.amount + money)
-          return false;
-        money += o.amount;
-      // VARIANT_CASE_CONST(tx_out_zarcanum, o)
-        // ignore inputs with hidden amounts
+        this_amount = o.amount;
+      VARIANT_CASE_CONST(tx_out_gateway, out_gw)
+        if (out_gw.asset_id == native_coin_asset_id_1div8)
+          this_amount = out_gw.amount;
       VARIANT_SWITCH_END();
+      
+      if (money > this_amount + money)
+          return false;
+      money += this_amount;
     }
     return true;
   }
@@ -4058,7 +4149,7 @@ namespace currency
 
     for (const auto ch : al)
     {
-      CHECK_AND_ASSERT_MES(alphabet[static_cast<unsigned char>(ch)], false, "Wrong character in alias: '" << ch << "'");
+      CHECK_AND_ASSERT_MES(alphabet[static_cast<unsigned char>(ch)], false, "Wrong character in alias: 0x" << std::hex << (int)static_cast<unsigned char>(ch));
     }
     return true;
   }
@@ -5023,7 +5114,7 @@ namespace currency
     return true;
   }
   //------------------------------------------------------------------
-  bool validate_asset_ticker_and_full_name(const asset_descriptor_base& adb)
+  bool validate_asset_ticker_full_name_and_meta_info(const asset_descriptor_base& adb)
   {
     if (!validate_asset_ticker(adb.ticker))
       return false;
@@ -5034,8 +5125,6 @@ namespace currency
     if(!validate_asset_meta_info(adb.meta_info))
       return false;
 
-    //CHECK_AND_ASSERT_MES(validate_asset_ticker(adb.ticker), false, "asset's ticker isn't valid: " << adb.ticker);
-    //CHECK_AND_ASSERT_MES(validate_asset_full_name(adb.full_name), false, "asset's full_name isn't valid: " << adb.full_name);
     return true;
   }
   //------------------------------------------------------------------
@@ -5049,6 +5138,35 @@ namespace currency
       std::string abcd = crypto::pod_to_hex(asset_id).substr(60, 4); // last 4 hex chars
       adb.full_name = "#bad asset name " + abcd + "#";
     }
+  }
+  //------------------------------------------------------------------
+#define GATEWAY_ADDRESS_META_INFO_MAX_SIZE  4000
+
+  STATIC_CHECK_TYPE_TOTAL_FIELDS(gateway_address_descriptor_base, 4, "this is the reminder: check validate_gateway_descriptor_base_limits() for missing fields");
+  
+  bool validate_gateway_descriptor_base_limits(const gateway_address_descriptor_base& gadb)
+  {
+    CHECK_AND_ASSERT_MES(gadb.meta_info.size() <= GATEWAY_ADDRESS_META_INFO_MAX_SIZE, false, "gw meta_info is too long: " << gadb.meta_info.size());
+
+    CHECK_AND_ASSERT_MES(gadb.etc.empty(), false, "gw etc isn't empty");
+
+    return true;
+  }
+  //------------------------------------------------------------------
+  bool validate_gateway_descriptor_operation_limits(const gateway_address_descriptor_operation& gado)
+  {
+    VARIANT_SWITCH_BEGIN(gado.operation)
+      VARIANT_CASE_CONST(gateway_address_descriptor_operation_register, gado_reg)
+        if (!validate_gateway_descriptor_base_limits(gado_reg.descriptor))
+          return false;
+      VARIANT_CASE_CONST(gateway_address_descriptor_operation_update, gado_upd)
+        if (!validate_gateway_descriptor_base_limits(gado_upd.descriptor))
+          return false;
+      VARIANT_CASE_OTHER()
+        LOG_ERROR("unsupported gw operation: " << gado.operation.type().name());
+        return false;
+    VARIANT_SWITCH_END()
+    return true;
   }
   //------------------------------------------------------------------
   std::string dump_ring_sig_data(const crypto::hash& hash_for_sig, const crypto::key_image& k_image, const std::vector<const crypto::public_key*>& output_keys_ptrs, const std::vector<crypto::signature>& sig)
@@ -5313,9 +5431,9 @@ namespace currency
     }
   }
   //-----------------------------------------------------------------------------------------------------
-  bool gateway_prepare_wti(const currency::gateway_address_id_type& gw_id, const crypto::hash& tx_id, const crypto::secret_key& decrypt_key, tools::wallet_public::wallet_transfer_info& wti, const transaction_chain_entry& tx_chain_entry)
+  bool gateway_prepare_wti_public(const currency::gateway_address_id_type& gw_id, const crypto::hash& tx_id, tools::wallet_public::wallet_transfer_info& wti, const transaction_chain_entry& tx_chain_entry, bool& out_decrypt_as_income, bool& out_found)
   {
-    PROFILE_FUNC("wallet2::prepare_wti");
+    PROFILE_FUNC("currency::gateway_prepare_wti_public");
     wti.tx = tx_chain_entry.tx;
 
     wti.height = tx_chain_entry.m_keeper_block_height;
@@ -5325,22 +5443,16 @@ namespace currency
     wti.tx_hash = tx_id;
     load_wallet_transfer_info_flags(wti);
 
-    // escrow transactions, which are built with TX_FLAG_SIGNATURE_MODE_SEPARATE flag actually encrypt attachments 
-    // with buyer as a sender, and seller as receiver, despite the fact that for both sides transaction seen as outgoing.
-    // so here to decrypt tx properly we need to figure out, if this transaction is actually escrow acceptance. 
-    //we check if spent_indices have zero then input do not belong to this account, which means that we are seller for this 
-    //escrow, and decryption should be processed as income flag
-
-    //bool is_income = false;
-    //bool is_outcome = false;
+    // this is the public keyless half of gateway_prepare_wti, it only reads public gateway
+    // inputs/outputs and preserves the raw tx (wti.tx) so that gateway_decrypt_wti() can later recover
+    // the encrypted payment_id / attachments using the gateway view secret key
     bool is_outcome_native_coins = false;
-    bool found = false;
+    out_found = false;
     for (const auto& in : wti.tx.vin)
     {
       if(in.type() == typeid(txin_gateway) && boost::get<txin_gateway>(in).gateway_addr == gw_id)
       {
-        //is_outcome = true;
-        found = true;
+        out_found = true;
         if (boost::get<txin_gateway>(in).asset_id == currency::native_coin_asset_id_1div8)
         {
           is_outcome_native_coins = true;
@@ -5352,23 +5464,45 @@ namespace currency
     {
       if (out.type() == typeid(tx_out_gateway) && boost::get<tx_out_gateway>(out).gateway_addr == gw_id)
       {
-        //is_income = true;
-        found = true;
+        out_found = true;
       }
     }
 
-    if (!found)
+    if (!out_found)
     {
       LOG_ERROR("Detected transaction that don't have expected gatewate inputs/outputs, tx_id: " << tx_id << ", gw_id: " << gw_id);
+      out_decrypt_as_income = false;
       return true;
     }
 
     //let's assume that the one who pays for tx fee is sender of tx
+    out_decrypt_as_income = !(is_outcome_native_coins);
+    return true;
+  }
+  //-----------------------------------------------------------------------------------------------------
+  bool gateway_decrypt_wti(const crypto::secret_key& view_secret_key, const currency::gateway_address_id_type& gw_id, tools::wallet_public::wallet_transfer_info& wti)
+  {
+    PROFILE_FUNC("currency::gateway_decrypt_wti");
+    const crypto::hash& tx_id = wti.tx_hash;
+
+    wti.subtransfers_by_pid.clear();
+    wti.service_entries.clear();
+    wti.remote_addresses.clear();
+
+    bool is_outcome_native_coins = false;
+    for (const auto& in : wti.tx.vin)
+    {
+      if (in.type() == typeid(txin_gateway) && boost::get<txin_gateway>(in).gateway_addr == gw_id
+          && boost::get<txin_gateway>(in).asset_id == currency::native_coin_asset_id_1div8)
+      {
+        is_outcome_native_coins = true;
+      }
+    }
     bool decrypt_attachment_as_income = !(is_outcome_native_coins);
 
     currency::account_keys keys = {};
-    keys.spend_secret_key = decrypt_key;
-    keys.view_secret_key = decrypt_key; // for gateway transactions we use the same key for view and spend, so it doesn't matter which one we use for decryption
+    keys.spend_secret_key = view_secret_key;
+    keys.view_secret_key = view_secret_key; // for gateway transactions we use the same key for view and spend, so it doesn't matter which one we use for decryption
 
     std::vector<currency::payload_items_v> decrypted_att;
     crypto::key_derivation derivation = {};
@@ -5389,7 +5523,7 @@ namespace currency
     }
 
     out_index = 0;
-    std::map<uint64_t, std::unordered_map<crypto::public_key, boost::multiprecision::int128_t>> total_balance_change_per_payment_id; // { intrinsic_payment_id -> { asset_id -> balance_change } }    
+    std::map<uint64_t, std::unordered_map<crypto::public_key, boost::multiprecision::int128_t>> total_balance_change_per_payment_id; // { intrinsic_payment_id -> { asset_id -> balance_change } }
     std::unordered_map<crypto::public_key, std::map<uint64_t, boost::multiprecision::int128_t>> total_balance_change_per_asset_id; // { asset_id -> { intrinsic_payment_id -> balance_change } }
 
     for (const auto& out : wti.tx.vout)
@@ -5432,6 +5566,18 @@ namespace currency
     prepare_wti_decrypted_attachments(wti, decrypted_att); // should be called after wti subtransfer are populated
 
     return true;
+  }
+  //-----------------------------------------------------------------------------------------------------
+  bool gateway_prepare_wti(const currency::gateway_address_id_type& gw_id, const crypto::hash& tx_id, const crypto::secret_key& decrypt_key, tools::wallet_public::wallet_transfer_info& wti, const transaction_chain_entry& tx_chain_entry)
+  {
+    PROFILE_FUNC("wallet2::prepare_wti");
+    bool decrypt_as_income = false;
+    bool found = false;
+    if (!gateway_prepare_wti_public(gw_id, tx_id, wti, tx_chain_entry, decrypt_as_income, found))
+      return false;
+    if (!found)
+      return true; // nothing to decrypt; preserves legacy behavior
+    return gateway_decrypt_wti(decrypt_key, gw_id, wti);
   }
 
 

@@ -190,13 +190,13 @@ IF %ERRORLEVEL% NEQ 0 (
 )
 call :sha256 %build_zip_path% build_zip_checksum
 
-for /f "delims=" %%i in ('python ..\utils\build_changelog.py') do set "changelog=%%i"
+python ..\utils\build_changelog.py > changelog.html
 
-set mail_msg="New %build_prefix% %TESTNET_LABEL%build for win-x64:<br>INST: <a href='https://build.zano.org/builds/%installer_file%'>https://build.zano.org/builds/%installer_file%</a> <br>sha256: %installer_checksum%<br><br>ZIP:  <a href='https://build.zano.org/builds/%build_zip_filename%'>https://build.zano.org/builds/%build_zip_filename%</a> <br>sha256: %build_zip_checksum%<br><br>%changelog%"
+set mail_head="New %build_prefix% %TESTNET_LABEL%build for win-x64:<br>INST: <a href='https://build.zano.org/builds/%installer_file%'>https://build.zano.org/builds/%installer_file%</a> <br>sha256: %installer_checksum%<br><br>ZIP:  <a href='https://build.zano.org/builds/%build_zip_filename%'>https://build.zano.org/builds/%build_zip_filename%</a> <br>sha256: %build_zip_checksum%<br><br>"
 
-echo %mail_msg%
+echo %mail_head%
 
-python ../utils/build_mail.py "Zano win-x64 %build_prefix% %TESTNET_LABEL%build %version%" "%emails%" %mail_msg%
+python ../utils/build_mail.py "Zano win-x64 %build_prefix% %TESTNET_LABEL%build %version%" "%emails%" %mail_head% --body-file changelog.html
 
 goto success
 

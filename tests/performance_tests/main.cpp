@@ -172,15 +172,18 @@ void storage_test()
 }
 void test_plain_wallet_concurent()
 {
-  std::string res = plain_wallet::init("https://node.zano.org", "443", "C:\\Users\\roky\\home\\temp\\plain_wallet_sendbox", LOG_LEVEL_0);
+  //testnet http://37.27.100.59:10505
+  std::string res = plain_wallet::init("http://37.27.100.59", "10505", "C:\\Users\\roky\\home\\temp\\plain_wallet_sendbox", LOG_LEVEL_0);
+  //std::string res = plain_wallet::init("https://node.zano.org", "443", "C:\\Users\\roky\\home\\temp\\plain_wallet_sendbox", LOG_LEVEL_0);
+  //std::string res = plain_wallet::init("127.0.0.1", "11211", "C:\\Users\\roky\\home\\temp\\plain_wallet_sendbox", LOG_LEVEL_0);
 
   uint64_t instance_id = 0;
-  //res = plain_wallet::open("test_restored_3.zan", "111");
+  res = plain_wallet::open("test_restored_3.zan", "111");
   //epee::json_rpc::request<tools::wallet_public::COMMAND_RPC_GET_WALLET_RESTORE_INFO::request> req_secret = AUTO_VAL_INIT(req_secret);
   //req_secret.method = "get_restore_info";
   //res = plain_wallet::invoke(instance_id, epee::serialization::store_t_to_json(req_secret));
   //epee::json_rpc::response<tools::wallet_public::COMMAND_RPC_GET_WALLET_RESTORE_INFO::response, epee::json_rpc::dummy_error> resp_secret = AUTO_VAL_INIT(resp_secret);
-
+  /*
   //std::string res_back = res;
   //epee::serialization::load_t_from_json(resp_secret, res);
   srand(static_cast<unsigned int>(time(nullptr)));
@@ -216,7 +219,7 @@ void test_plain_wallet_concurent()
   rst_req.secret_derivation.clear();
   epee::string_tools::append_pod_to_strbuff(derivation_tmp, rst_req.secret_derivation);
   res = plain_wallet::sync_call("restore_from_derivations", 0, epee::serialization::store_t_to_json(rst_req));
-
+  */
 
   while (true)
   {   
@@ -275,7 +278,7 @@ void test_plain_wallet_concurent()
   std::string res3 = plain_wallet::sync_call("invoke", instance_id, invoke_body);
 
 
-  //invoke_body = "{\r\n  \"method\": \"transfer\",\r\n  \"params\": {\r\n    \"destinations\": [\r\n      {\r\n        \"amount\": \"1000000000000\",\r\n        \"address\": \"ZxD9oVwGwW6ULix9Pqttnr7JDpaoLvDVA1KJ9eA9KRxPMRZT5X7WwtU94XH1Z6q6XTMxNbHmbV2xfZ429XxV6fST2DxEg4BQV\",\r\n        \"asset_id\": \"cc4e69455e63f4a581257382191de6856c2156630b3fba0db4bdd73ffcfb36b6\"\r\n      }\r\n    ],\r\n    \"fee\": 10000000000,\r\n    \"mixin\": 10,\r\n    \"payment_id\": \"\",\r\n    \"comment\": \"\",\r\n    \"push_payer\": false,\r\n    \"hide_receiver\": true\r\n  }\r\n}";
+  //invoke_body = "{\r\n  \"method\": \"transfer\",\r\n  \"params\": {\r\n    \"destinations\": [\r\n      {\r\n        \"amount\": \"1000000000000\",\r\n        \"address\": \"ZxD9oVwGwW6ULix9Pqttnr7JDpaoLvDVA1KJ9eA9KRxPMRZT5X7WwtU94XH1Z6q6XTMxNbHmbV2xfZ429XxV6fST2DxEg4BQV\",\r\n        \"asset_id\": \"cc4e69455e63f4a581257382191de6856c2156630b3fba0db4bdd73ffcfb36b6\"\r\n      }\r\n    ],\r\n    \"fee\": 10000000000,\r\n    \"mixin\": 10,\r\n    \"payment_id\": \"\",\r\n    \"comment\": \"\",\r\n    \r\n  }\r\n}";
   //std::string res4 = plain_wallet::sync_call("invoke", instance_id, invoke_body);
 
 
@@ -427,7 +430,7 @@ void test_plain_wallet()
   std::string res3 = plain_wallet::sync_call("invoke", instance_id, invoke_body);
 
 
-  //invoke_body = "{\r\n  \"method\": \"transfer\",\r\n  \"params\": {\r\n    \"destinations\": [\r\n      {\r\n        \"amount\": \"1000000000000\",\r\n        \"address\": \"ZxD9oVwGwW6ULix9Pqttnr7JDpaoLvDVA1KJ9eA9KRxPMRZT5X7WwtU94XH1Z6q6XTMxNbHmbV2xfZ429XxV6fST2DxEg4BQV\",\r\n        \"asset_id\": \"cc4e69455e63f4a581257382191de6856c2156630b3fba0db4bdd73ffcfb36b6\"\r\n      }\r\n    ],\r\n    \"fee\": 10000000000,\r\n    \"mixin\": 10,\r\n    \"payment_id\": \"\",\r\n    \"comment\": \"\",\r\n    \"push_payer\": false,\r\n    \"hide_receiver\": true\r\n  }\r\n}";
+  //invoke_body = "{\r\n  \"method\": \"transfer\",\r\n  \"params\": {\r\n    \"destinations\": [\r\n      {\r\n        \"amount\": \"1000000000000\",\r\n        \"address\": \"ZxD9oVwGwW6ULix9Pqttnr7JDpaoLvDVA1KJ9eA9KRxPMRZT5X7WwtU94XH1Z6q6XTMxNbHmbV2xfZ429XxV6fST2DxEg4BQV\",\r\n        \"asset_id\": \"cc4e69455e63f4a581257382191de6856c2156630b3fba0db4bdd73ffcfb36b6\"\r\n      }\r\n    ],\r\n    \"fee\": 10000000000,\r\n    \"mixin\": 10,\r\n    \"payment_id\": \"\",\r\n    \"comment\": \"\",\r\n    }\r\n}";
   //std::string res4 = plain_wallet::sync_call("invoke", instance_id, invoke_body);
 
   //LOG_PRINT_L0(res);
@@ -486,10 +489,10 @@ int main(int argc, char** argv)
   //multithread_test_of_get_coinbase_hash_cached();
   //test_tx_json_serialization();
   //test_base64_serialization();
-  test_plain_wallet();
+  //test_plain_wallet();
   //parse_weird_tx();
   //thread_pool_tests();
-  //test_plain_wallet_concurent();
+  test_plain_wallet_concurent();
   //storage_test();
 
 //   std::string buf1 = tools::get_varint_data<uint64_t>(CURRENCY_PUBLIC_ADDRESS_BASE58_PREFIX);

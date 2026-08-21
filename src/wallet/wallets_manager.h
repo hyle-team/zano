@@ -75,7 +75,7 @@ public:
     std::atomic<bool> need_to_update_wallet_info;
     std::atomic<bool> long_refresh_in_progress;
     epee::critical_section long_refresh_in_progress_lock; //secure wallet state and prevent from long wait while long refresh is in work
-
+   
     view::i_view* pview;
     uint64_t wallet_id;
     epee::locked_object<std::list<bc_services::offer_details_ex>> offers;
@@ -282,8 +282,6 @@ private:
   std::string m_qt_dev_tools;
   std::atomic<bool> m_is_pos_allowed;
   std::atomic<bool> m_use_tor;
-
-
   std::map<size_t, wallet_vs_options> m_wallets;
   //mutable critical_section m_wallets_lock;
   mutable boost::shared_mutex m_wallets_lock;

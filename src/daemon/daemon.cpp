@@ -342,12 +342,13 @@ int main(int argc, char* argv[])
   LOG_PRINT_L0("Initializing core rpc server...");
   res = rpc_server.init(vm);
   CHECK_AND_ASSERT_MES(res, 1, "Failed to initialize core rpc server.");
-  LOG_PRINT_GREEN("Core rpc server initialized OK on port: " << rpc_server.get_binded_port(), LOG_LEVEL_0);
+  LOG_PRINT_GREEN("Core rpc server initialized OK on port: " << rpc_server.get_bound_port(), LOG_LEVEL_0);
 
   //initialize core here
   LOG_PRINT_L0("Initializing core...");
   res = ccore.init(vm);
   CHECK_AND_ASSERT_MES(res, 1, "Failed to initialize core");
+  ccore.get_blockchain_storage().measure_db_performance();
   LOG_PRINT_L0("Core initialized OK");
 
   if (stratum_enabled)

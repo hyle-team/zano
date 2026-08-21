@@ -27,3 +27,26 @@ struct random_outs_and_burnt_coins : public wallet_test
   mutable uint64_t m_amount;
   static constexpr uint64_t m_fake_amounts_count = 3;
 };
+
+struct decoy_set_oob_on_multisig_out : public wallet_test
+{
+  decoy_set_oob_on_multisig_out();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+
+private:
+  mutable currency::account_base m_mining_accunt;
+  mutable currency::account_base m_accunt_a;
+  mutable currency::account_base m_accunt_b;
+};
+
+struct decoy_set_on_zero_output_tx : public test_chain_unit_enchanced
+{
+  decoy_set_on_zero_output_tx();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool check_decoys(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+
+private:
+  mutable crypto::hash m_zero_out_txid;
+  mutable uint64_t m_zero_out_tx_height = 0;
+};

@@ -1011,3 +1011,326 @@ bool zarcanum_in_alt_chain_2::c1(currency::core& c, size_t ev_index, const std::
 {
   return true;
 }
+
+//------------------------------------------------------------------------------
+// block_template_and_invalid_tx_proofs
+//------------------------------------------------------------------------------
+
+// ways to plant an invalid group element into a tx's range proof or asset surjection proof
+enum bad_proof_kind : uint64_t
+{
+  // zc_outs_range_proof (Bulletproof+)
+  bpk_rp_a0_off_curve,                // A0 set off-curve
+  bpk_rp_a0_torsion,                  // A0 set to a torsion point
+  bpk_rp_commitment_off_curve,        // an aggregation commitment set off-curve
+  // zc_asset_surjection_proof (BGE)
+  bpk_asp_bge_A_off_curve,            // bge_proofs[0].A set off-curve
+  bpk_asp_bge_B_off_curve,            // bge_proofs[0].B set off-curve
+  bpk_asp_bge_Pk0_off_curve,          // bge_proofs[0].Pk[0] set off-curve
+  bpk_asp_blinded_asset_id_off_curve, // an output's blinded_asset_id set off-curve
+  bpk_asp_pseudo_out_off_curve,       // an input's pseudo_out_blinded_asset_id set off-curve
+};
+
+// an off-curve point encoding and an on-curve order-8 torsion point
+static bool get_invalid_test_points(crypto::public_key& pk_off_curve, crypto::public_key& pk_torsion)
+{
+  CHECK_AND_ASSERT_TRUE(epee::string_tools::hex_to_pod("02b056c3eba674f2dcd0e3b7679d1ba29e7745a41b84a0d731cdfd6805539bda", pk_off_curve));
+  CHECK_AND_ASSERT_TRUE(epee::string_tools::hex_to_pod("26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc05", pk_torsion));
+
+  crypto::point_t tmp{};
+  CHECK_AND_ASSERT_TRUE(!tmp.from_public_key(pk_off_curve)); // off-curve encoding really doesn't decode
+  CHECK_AND_ASSERT_TRUE(tmp.from_public_key(pk_torsion));
+  CHECK_AND_ASSERT_TRUE(!tmp.is_in_main_subgroup());
+  return true;
+}
+
+const char* get_bad_proof_kind_name(bad_proof_kind k)
+{
+  switch (k)
+  {
+  case bpk_rp_a0_off_curve:                return "range-proof A0 off-curve";
+  case bpk_rp_a0_torsion:                  return "range-proof A0 torsion";
+  case bpk_rp_commitment_off_curve:        return "range-proof aggregation commitment off-curve";
+  case bpk_asp_bge_A_off_curve:            return "ASP BGE A off-curve";
+  case bpk_asp_bge_B_off_curve:            return "ASP BGE B off-curve";
+  case bpk_asp_bge_Pk0_off_curve:          return "ASP BGE Pk[0] off-curve";
+  case bpk_asp_blinded_asset_id_off_curve: return "ASP output blinded_asset_id off-curve";
+  case bpk_asp_pseudo_out_off_curve:       return "ASP input pseudo_out_blinded_asset_id off-curve";
+  default:                                 return "unknown";
+  }
+}
+
+// plant an off-curve / torsion point into the zc_outs_range_proof (Bulletproof+) of tx
+static bool corrupt_zc_outs_range_proof(currency::transaction& tx, bad_proof_kind k, const crypto::public_key& pk_off_curve, const crypto::public_key& pk_torsion)
+{
+  for (auto& pv : tx.proofs)
+  {
+    if (pv.type() == typeid(currency::zc_outs_range_proof))
+    {
+      currency::zc_outs_range_proof& zcrp = boost::get<currency::zc_outs_range_proof>(pv);
+      switch (k)
+      {
+      case bpk_rp_a0_off_curve: zcrp.bpp.A0 = pk_off_curve; break;
+      case bpk_rp_a0_torsion:   zcrp.bpp.A0 = pk_torsion;   break;
+      case bpk_rp_commitment_off_curve:
+        CHECK_AND_ASSERT_MES(!zcrp.aggregation_proof.amount_commitments_for_rp_aggregation.empty(), false, "no aggregation commitments to corrupt");
+        zcrp.aggregation_proof.amount_commitments_for_rp_aggregation[0] = pk_off_curve;
+        break;
+      default: CHECK_AND_ASSERT_MES(false, false, "unexpected kind for range-proof corruption");
+      }
+      return true;
+    }
+  }
+  LOG_ERROR("tx " << get_transaction_hash(tx) << " has no zc_outs_range_proof to corrupt");
+  return false;
+}
+
+// plant an off-curve point into a BGE_proof element of the zc_asset_surjection_proof of tx
+static bool corrupt_zc_asset_surjection_proof(currency::transaction& tx, bad_proof_kind k, const crypto::public_key& pk_off_curve)
+{
+  for (auto& pv : tx.proofs)
+  {
+    if (pv.type() == typeid(currency::zc_asset_surjection_proof))
+    {
+      currency::zc_asset_surjection_proof& asp = boost::get<currency::zc_asset_surjection_proof>(pv);
+      CHECK_AND_ASSERT_MES(!asp.bge_proofs.empty(), false, "no bge_proofs to corrupt");
+      crypto::BGE_proof_s& bge = asp.bge_proofs[0];
+      switch (k)
+      {
+      case bpk_asp_bge_A_off_curve: bge.A = pk_off_curve; break;
+      case bpk_asp_bge_B_off_curve: bge.B = pk_off_curve; break;
+      case bpk_asp_bge_Pk0_off_curve:
+        CHECK_AND_ASSERT_MES(!bge.Pk.empty(), false, "bge_proofs[0] has no Pk to corrupt");
+        bge.Pk[0] = pk_off_curve;
+        break;
+      default: CHECK_AND_ASSERT_MES(false, false, "unexpected kind for ASP BGE corruption");
+      }
+      return true;
+    }
+  }
+  LOG_ERROR("tx " << get_transaction_hash(tx) << " has no zc_asset_surjection_proof to corrupt");
+  return false;
+}
+
+// dispatch a corruption of the requested kind into the appropriate part of tx
+bool corrupt_tx_proof(currency::transaction& tx, bad_proof_kind k)
+{
+  crypto::public_key pk_off_curve{}, pk_torsion{};
+  CHECK_AND_ASSERT_TRUE(get_invalid_test_points(pk_off_curve, pk_torsion));
+
+  switch (k)
+  {
+  case bpk_rp_a0_off_curve:
+  case bpk_rp_a0_torsion:
+  case bpk_rp_commitment_off_curve:
+    return corrupt_zc_outs_range_proof(tx, k, pk_off_curve, pk_torsion);
+
+  case bpk_asp_bge_A_off_curve:
+  case bpk_asp_bge_B_off_curve:
+  case bpk_asp_bge_Pk0_off_curve:
+    return corrupt_zc_asset_surjection_proof(tx, k, pk_off_curve);
+
+  case bpk_asp_blinded_asset_id_off_curve:
+    // corrupt the blinded_asset_id of the first zarcanum output
+    for (auto& out_v : tx.vout)
+    {
+      if (out_v.type() == typeid(currency::tx_out_zarcanum))
+      {
+        boost::get<currency::tx_out_zarcanum>(out_v).blinded_asset_id = pk_off_curve;
+        return true;
+      }
+    }
+    LOG_ERROR("tx " << get_transaction_hash(tx) << " has no tx_out_zarcanum to corrupt");
+    return false;
+
+  case bpk_asp_pseudo_out_off_curve:
+    // corrupt the pseudo_out_blinded_asset_id of the first ZC input
+    for (auto& s : tx.signatures)
+    {
+      if (s.type() == typeid(currency::ZC_sig))
+      {
+        boost::get<currency::ZC_sig>(s).pseudo_out_blinded_asset_id = pk_off_curve;
+        return true;
+      }
+    }
+    LOG_ERROR("tx " << get_transaction_hash(tx) << " has no ZC_sig to corrupt");
+    return false;
+  }
+  CHECK_AND_ASSERT_MES(false, false, "unknown bad_proof_kind");
+}
+
+block_template_and_invalid_tx_proofs::block_template_and_invalid_tx_proofs()
+{
+  REGISTER_CALLBACK_METHOD(block_template_and_invalid_tx_proofs, c1);
+}
+
+bool block_template_and_invalid_tx_proofs::generate(std::vector<test_event_entry>& events) const
+{
+  // Test idea: a tx with an invalid tx proof must not break block-template creation or simulation. A valid
+  // good tx sits in the pool too and should keep being processed normally, while each bad tx should be
+  // rejected and blacklisted so it is not repeatedly selected into subsequent block templates.
+  // RP and ASP are corrupted, in several ways each (see bad_proof_kind).
+
+  GENERATE_ACCOUNT(miner_acc);
+  GENERATE_ACCOUNT(alice_acc);
+  GENERATE_ACCOUNT(bob_acc);
+  m_miner_acc = miner_acc;
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  DO_CALLBACK(events, "configure_core"); // necessary to set m_hardforks
+
+  // mine enough
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+
+  // fund Alice and Bob from separate coinbase outputs, so the good tx (from Alice) and the bad txs (from
+  // Bob) never share a key image
+  std::vector<currency::tx_destination_entry> fund_dsts;
+  fund_dsts.emplace_back(MK_TEST_COINS(100), alice_acc.get_public_address());
+  fund_dsts.emplace_back(MK_TEST_COINS(100), bob_acc.get_public_address());
+  currency::transaction tx_fund{};
+  bool r = construct_tx_to_key(m_hardforks, events, tx_fund, blk_0r, miner_acc, fund_dsts);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx_to_key(fund) failed");
+  ADD_CUSTOM_EVENT(events, tx_fund);
+  MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_fund);
+  REWIND_BLOCKS_N(events, blk_1r, blk_1, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  // prepare (but do not mine) a valid good tx: Alice -> miner
+  {
+    std::vector<currency::tx_destination_entry> dsts;
+    dsts.emplace_back(MK_TEST_COINS(10), miner_acc.get_public_address());
+    r = construct_tx_to_key(m_hardforks, events, m_good_tx, blk_1r, alice_acc, dsts);
+    CHECK_AND_ASSERT_MES(r, false, "construct_tx_to_key(good) failed");
+  }
+
+  // prepare one bad tx (Bob -> miner) per invalid-proof flavour; all spend Bob's single output (distinct
+  // amounts -> distinct tx ids), which is fine because c1 processes them one at a time
+  const bad_proof_kind kinds[] = {
+    bpk_rp_a0_off_curve, bpk_rp_a0_torsion, bpk_rp_commitment_off_curve,               // RP
+    bpk_asp_bge_A_off_curve, bpk_asp_bge_B_off_curve, bpk_asp_bge_Pk0_off_curve,       // ASP (BGE elements)
+    bpk_asp_blinded_asset_id_off_curve, bpk_asp_pseudo_out_off_curve                   // ASP (non BGE)
+  };
+  size_t i = 0;
+  for (bad_proof_kind k : kinds)
+  {
+    currency::transaction bad_tx{};
+    std::vector<currency::tx_destination_entry> dsts;
+    dsts.emplace_back(MK_TEST_COINS(10 + i), miner_acc.get_public_address());
+    r = construct_tx_to_key(m_hardforks, events, bad_tx, blk_1r, bob_acc, dsts);
+    CHECK_AND_ASSERT_MES(r, false, "construct_tx_to_key(bad) failed");
+    r = corrupt_tx_proof(bad_tx, k);
+    CHECK_AND_ASSERT_MES(r, false, "corrupt_tx_proof failed for variant " << get_bad_proof_kind_name(k));
+    m_bad_txs.emplace_back(static_cast<uint64_t>(k), bad_tx);
+    ++i;
+  }
+
+  DO_CALLBACK(events, "c1");
+  return true;
+}
+
+bool block_template_and_invalid_tx_proofs::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  const currency::account_public_address miner_addr = m_miner_acc.get_public_address();
+  const crypto::hash good_tx_id = get_transaction_hash(m_good_tx);
+
+  // submit blocks via the submitblock2 RPC, which triggers block-template simulation when a block is rejected
+  currency::t_currency_protocol_handler<currency::core> cph(c, nullptr);
+  nodetool::node_server<currency::t_currency_protocol_handler<currency::core>> p2p(cph);
+  bc_services::bc_offers_service offers_service(nullptr);
+  currency::core_rpc_server core_rpc(c, p2p, offers_service);
+  core_rpc.set_ignore_connectivity_status(true);
+  boost::program_options::options_description core_desc_options;
+  currency::core_rpc_server::init_options(core_desc_options);
+  boost::program_options::variables_map vm;
+  const char* const argv[] = { "", "--rpc-bind-port=0" };
+  boost::program_options::store(boost::program_options::parse_command_line(static_cast<int>(sizeof argv / sizeof argv[0]), argv, core_desc_options), vm);
+  CHECK_AND_ASSERT_MES(core_rpc.init(vm), false, "core_rpc.init() failed");
+
+  // the pool starts empty (the funding tx has already been mined)
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
+
+  // the good tx is admitted to the pool
+  currency::tx_verification_context tvc{};
+  CHECK_AND_ASSERT_MES(c.handle_incoming_tx(m_good_tx, tvc, false) && tvc.m_added_to_pool, false, "good tx was not accepted into the pool");
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 1);
+
+  // each variant is exercised and checked independently; we record a per-variant verdict and fail once at
+  // the end, so a single run reports the outcome for every variant
+  size_t violations = 0;
+  for (const auto& kv : m_bad_txs)
+  {
+    const bad_proof_kind         k      = static_cast<bad_proof_kind>(kv.first);
+    const currency::transaction& bad_tx = kv.second;
+    const crypto::hash bad_tx_id = get_transaction_hash(bad_tx);
+    const char* name = get_bad_proof_kind_name(k);
+    LOG_PRINT_CYAN("=== invalid-proof variant: " << name << " ===", LOG_LEVEL_0);
+
+    // the bad tx is expected to be admitted (proofs are not validated at pool admission); if a variant is
+    // rejected here instead, that is an acceptable outcome too
+    tvc = currency::tx_verification_context{};
+    const bool admitted = c.handle_incoming_tx(bad_tx, tvc, false) && tvc.m_added_to_pool;
+    if (!admitted)
+    {
+      LOG_PRINT_YELLOW("  variant " << name << ": rejected at pool admission (acceptable: never enters the pool)", LOG_LEVEL_0);
+      continue;
+    }
+    CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 2);
+    CHECK_AND_ASSERT_MES(!c.get_tx_pool().is_tx_blacklisted(bad_tx_id), false, "bad tx " << name << " was blacklisted before the simulation");
+
+    // build a block template from the pool (now holding the bad tx) and mine it, exactly as a miner would
+    currency::block top_block{};
+    c.get_blockchain_storage().get_top_block(top_block);
+    currency::create_block_template_params cbtp{};
+    cbtp.ignore_pow_ts_check = true;
+    cbtp.miner_address = miner_addr;
+    currency::create_block_template_response cbtr{};
+    CHECK_AND_ASSERT_MES(c.get_block_template(cbtp, cbtr), false, "get_block_template failed (variant " << name << ")");
+    currency::block tmpl = cbtr.b;
+    tmpl.timestamp = top_block.timestamp + DIFFICULTY_POW_TARGET;
+    test_core_time::adjust(tmpl.timestamp);
+    CHECK_AND_ASSERT_MES(currency::find_nonce_for_given_block(tmpl, cbtr.diffic, cbtr.height), false, "find_nonce_for_given_block failed (variant " << name << ")");
+
+    // submit it via the submitblock2 RPC (triggers block-template simulation)
+    currency::COMMAND_RPC_SUBMITBLOCK2::request sb_req{};
+    sb_req.b = t_serializable_object_to_blob(tmpl);
+    currency::COMMAND_RPC_SUBMITBLOCK2::response sb_res{};
+    invoke_text_json_for_rpc(core_rpc, "submitblock2", sb_req, sb_res);
+
+    CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 2); // both txs shuld be still there
+    // desired outcome: the bad tx is blacklisted, the good tx is not, and the submitted block was not accepted
+    const bool bad_blacklisted  = c.get_tx_pool().is_tx_blacklisted(bad_tx_id);
+    const bool good_blacklisted = c.get_tx_pool().is_tx_blacklisted(good_tx_id);
+    currency::block new_top{};
+    c.get_blockchain_storage().get_top_block(new_top);
+    const bool chain_unchanged = get_block_hash(new_top) == get_block_hash(top_block);
+    
+
+    if (bad_blacklisted && !good_blacklisted && chain_unchanged)
+    {
+      LOG_PRINT_GREEN("  variant " << name << ": handled correctly (bad tx blacklisted, good tx preserved, chain unchanged)", LOG_LEVEL_0);
+    }
+    else
+    {
+      LOG_PRINT_RED("  variant " << name << ": NOT handled correctly -- bad_blacklisted=" << bad_blacklisted
+        << ", good_blacklisted=" << good_blacklisted << ", chain_unchanged=" << chain_unchanged, LOG_LEVEL_0);
+      ++violations;
+    }
+
+    // drop the bad tx from the pool; the good tx stays put for the next variant
+    // (all bad txs share Bob's key image, so the current one must be removed before the next is admitted)
+    currency::transaction removed_tx{};
+    size_t removed_blob_size = 0;
+    uint64_t removed_fee = 0;
+    CHECK_AND_ASSERT_MES(c.get_tx_pool().take_tx(bad_tx_id, removed_tx, removed_blob_size, removed_fee), false, "failed to remove bad tx " << name << " from the pool");
+    CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 1);
+  }
+
+  // none of the bad txs was ever mined; the good tx, still in the pool and not blacklisted, now passes
+  // mine a block to confirm it
+  CHECK_AND_ASSERT_MES(mine_next_pow_block_in_playtime(miner_addr, c), false, "the good tx block was not accepted");
+  CHECK_AND_ASSERT_MES(c.get_blockchain_storage().have_tx(good_tx_id), false, "the good tx did not make it into the blockchain");
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
+
+  // fail once, after every variant has been exercised and logged
+  CHECK_AND_ASSERT_MES(violations == 0, false, violations << " invalid-proof variant(s) were NOT handled correctly "
+    "(the bad tx must be rejected and blacklisted; see the per-variant log above)");
+  return true;
+}

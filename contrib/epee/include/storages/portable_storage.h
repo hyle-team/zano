@@ -182,7 +182,7 @@ namespace epee
       }
       if(pbuff->m_ver != PORTABLE_STORAGE_FORMAT_VER)
       {
-        LOG_ERROR("portable_storage: wrong binary format - unknown format ver = " << pbuff->m_ver);
+        LOG_ERROR("portable_storage: wrong binary format - unknown format ver = " << (int)pbuff->m_ver);
         return false;
       }
       TRY_ENTRY();

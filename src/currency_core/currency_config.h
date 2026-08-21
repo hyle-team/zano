@@ -207,6 +207,7 @@ static_assert(CURRENCY_FORMATION_VERSION == 103);
 #define WALLET_KDF_ALGO_NONE                            0
 #define WALLET_KDF_ALGO_ROMIX_KECCAK                    1
 #define WALLET_KDF_ROMIX_N_LOG2                         20 //phase 1: the buffer size is V = 2^(N_log2) * 32 bytes, where N_log2 = 20 -> 1 million blocks * 32 bytes = 32 MiB
+#define WALLET_KDF_ROMIX_N_LOG2_MAX                     22
 #define WALLET_KDF_ROMIX_PHASE2_LOG2_REDUCTION          3  //phase 2: iteration reduction: 0 = full N phase 2 iterations, 1 = N/2 iterations 2 = N/4, 3 = N/8, 4 = N/16 ... (still 32 MiB at N_log2=20)
 #define WALLET_KDF_SALT_SIZE                            16
 
@@ -254,7 +255,6 @@ static_assert(CURRENCY_FORMATION_VERSION == 103);
 #define ALIAS_MINIMUM_PUBLIC_SHORT_NAME_ALLOWED         6
 #define ALIAS_SHORT_NAMES_VALIDATION_PUB_KEY            "37947f7b6a5268c5d0a48bde73d7a426f0b5f24648f74024279540207dc70031" 
 
-
 #define ALIAS_NAME_MAX_LEN                              255
 #define ALIAS_VALID_CHARS                               "0123456789abcdefghijklmnopqrstuvwxyz-."
 #define ALIAS_COMMENT_MAX_SIZE_BYTES                    400
@@ -290,15 +290,15 @@ static_assert(CURRENCY_FORMATION_VERSION == 103);
 #define CURRENT_BLOCK_EXTENDED_INFO_ARCHIVE_VER         1
 
 #define BLOCKCHAIN_STORAGE_MAJOR_COMPATIBILITY_VERSION  CURRENCY_FORMATION_VERSION + 11
-#define BLOCKCHAIN_STORAGE_MINOR_COMPATIBILITY_VERSION  2
+#define BLOCKCHAIN_STORAGE_MINOR_COMPATIBILITY_VERSION  3
 
 
 #define BC_OFFERS_CURRENT_OFFERS_SERVICE_ARCHIVE_VER    CURRENCY_FORMATION_VERSION + BLOCKCHAIN_STORAGE_MAJOR_COMPATIBILITY_VERSION + 9
 #define BC_OFFERS_CURRENCY_MARKET_FILENAME              "market.bin"
 
 
-#define WALLET_FILE_SERIALIZATION_VERSION               169
-#define WALLET_FILE_LAST_SUPPORTED_VERSION              169
+#define WALLET_FILE_SERIALIZATION_VERSION               170
+#define WALLET_FILE_LAST_SUPPORTED_VERSION              170
 
 #define CURRENT_MEMPOOL_ARCHIVE_VER                     (CURRENCY_FORMATION_VERSION+31)
 
@@ -319,8 +319,8 @@ static_assert(CURRENCY_FORMATION_VERSION == 103);
 #define ZANO_HARDFORK_05_AFTER_HEIGHT                   3076400   // 2025-03-18 15:13:39
 #define ZANO_HARDFORK_05_MIN_BUILD_VER                  382
 
-#define ZANO_HARDFORK_06_AFTER_HEIGHT                   999999999999999999
-#define ZANO_HARDFORK_06_MIN_BUILD_VER                  382
+#define ZANO_HARDFORK_06_AFTER_HEIGHT                   3833000
+#define ZANO_HARDFORK_06_MIN_BUILD_VER                  501
 #else
 // Testnet
 #define ZANO_HARDFORK_01_AFTER_HEIGHT                   0
@@ -352,6 +352,7 @@ static_assert(CURRENCY_FORMATION_VERSION == 103);
 
 static_assert(CURRENCY_MINER_TX_MAX_OUTS <= CURRENCY_TX_MAX_ALLOWED_OUTS, "Miner tx must obey normal tx max outs limit");
 static_assert(PREMINE_AMOUNT / WALLET_MAX_ALLOWED_OUTPUT_AMOUNT < CURRENCY_MINER_TX_MAX_OUTS, "Premine can't be divided into reasonable number of outs");
+static_assert(WALLET_KDF_ROMIX_N_LOG2 <= WALLET_KDF_ROMIX_N_LOG2_MAX, "Default wallet KDF cost must fit the wallet-file load policy");
 
 #define CURRENCY_RELAY_TXS_MAX_COUNT                    5
 

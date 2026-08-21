@@ -373,7 +373,7 @@ namespace currency
 
   std::string transform_tx_to_str(const transaction& tx);
   transaction transform_str_to_tx(const std::string& tx_str);
-
+  bool check_single_tx_range_proofs(const transaction& tx, const crypto::hash& tx_id);
 
 
 } // namespace currency

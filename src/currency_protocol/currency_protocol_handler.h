@@ -105,6 +105,16 @@ namespace currency
     void process_current_relay_que(const std::list<relay_que_entry>& que);
     bool check_stop_flag_and_drop_cc(currency_connection_context& context);
     int handle_new_transaction_from_net(NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::request& req, NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::response& rsp, currency_connection_context& context, bool is_notify);
+    
+    struct sync_speed_calculator_t
+    {
+      std::mutex m_lock;
+      time_t m_last_objects_handled_ts = 0;
+      double m_accumulator = 0;
+      std::string process_blocks_and_return_speed_str(size_t blocks_count);
+      void reset();
+    };
+    
     t_core& m_core;
 
     nodetool::p2p_endpoint_stub<connection_context> m_p2p_stub;
@@ -113,6 +123,7 @@ namespace currency
     std::atomic<bool> m_have_been_synchronized;
     std::atomic<uint64_t> m_max_height_seen;
     std::atomic<uint64_t> m_core_inital_height;
+    sync_speed_calculator_t m_sync_speed_calculator;
 
     std::unordered_set<crypto::hash> m_blocks_id_que;
     std::recursive_mutex m_blocks_id_que_lock;

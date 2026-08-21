@@ -392,7 +392,7 @@ namespace tools::wallet_public
 
     static bool wti2_to_payment_id(const wallet_transfer_info_v2& wti2, std::string &val)
     {
-      val = wti2.tx_wide_payment_id;
+      val = epee::string_tools::buff_to_hex_nodelimer(wti2.tx_wide_payment_id);
       return true;
     }
     static bool wti2_to_subtransfers(const wallet_transfer_info_v2& wti2, std::vector<wallet_sub_transfer_info> &val)
@@ -920,8 +920,6 @@ namespace tools::wallet_public
       uint64_t mixin;
       std::string payment_id; // hex-encoded
       std::string comment; 
-      bool push_payer;
-      bool hide_receiver;
       bool service_entries_permanent;
       std::vector<currency::tx_service_attachment> service_entries;
       std::vector<uint64_t> out_ids_to_spend;
@@ -930,10 +928,8 @@ namespace tools::wallet_public
         KV_SERIALIZE(destinations)     DOC_DSCR("List of destinations") DOC_EXMP_AUTO(1)     DOC_END
         KV_SERIALIZE(fee)              DOC_DSCR("Fee to be paid on behalf of sender's wallet(paid in native coins)") DOC_EXMP_AUTO(10000000000)     DOC_END
         KV_SERIALIZE(mixin)            DOC_DSCR("Specifies number of mixins (decoys) that would be used to create input, actual for pre-Zarcanum outputs, for post-Zarcanum outputs instead of this option, number that is defined by network hard rules (15+)") DOC_EXMP(15)     DOC_END
-        KV_SERIALIZE(payment_id)       DOC_DSCR("[deprecated] Legacy tx-wide hex-encoded payment_id, that normally used for user database by exchanges") DOC_EXMP_AUTO("")     DOC_END
+        KV_SERIALIZE(payment_id)       DOC_HIDE
         KV_SERIALIZE(comment)          DOC_DSCR("Text comment that is displayed in UI") DOC_EXMP_AUTO("Thanks for the coffe")     DOC_END
-        KV_SERIALIZE(push_payer)       DOC_DSCR("[deprecated] Reveal information about sender of this transaction, basically add sender address to transaction in encrypted way, so only receiver can see who sent transaction") DOC_EXMP(false)     DOC_END
-        KV_SERIALIZE(hide_receiver)    DOC_DSCR("[deprecated] This add to transaction information about remote address(destination), might be needed when the wallet restored from seed phrase and fully resynched, if this option were true, then sender won't be able to see remote address for sent transactions anymore.") DOC_EXMP(true)     DOC_END
         KV_SERIALIZE(service_entries)  DOC_DSCR("Service entries that might be used by different apps that works on top of Zano network, not part of consensus") DOC_EXMP_AUTO(1)     DOC_END
         KV_SERIALIZE(service_entries_permanent) DOC_DSCR("Point to wallet that service_entries should be placed to 'extra' section of transaction(which won't be pruned after checkpoints)") DOC_EXMP_AUTO(1)     DOC_END
         KV_SERIALIZE(out_ids_to_spend) DOC_DSCR("[optional] List of output IDs that should only be used for this transfer. If empty or not present -- no restriction (default).") DOC_EXMP_AGGR({10, 15, 305}) DOC_END
@@ -949,7 +945,7 @@ namespace tools::wallet_public
       std::vector<uint64_t> used_out_ids;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(tx_hash)           DOC_DSCR("Has of the generated transaction(if succeded)") DOC_EXMP("01220e8304d46b940a86e383d55ca5887b34f158a7365bbcdd17c5a305814a93")     DOC_END
+        KV_SERIALIZE(tx_hash)           DOC_DSCR("Hash of the generated transaction(if succeeded)") DOC_EXMP("01220e8304d46b940a86e383d55ca5887b34f158a7365bbcdd17c5a305814a93")     DOC_END
         KV_SERIALIZE(tx_unsigned_hex)   DOC_DSCR("Has unsigned tx blob in hex encoding") DOC_EXMP("e383d55ca5887b34f158a7365bbcd01220e8304d46b940a86e383d55ca5887b34f158a7365bbcdd17c5a305814a9301220e8304d46b940a86e383d55ca5887b34f158a7365bbcdd17c5a305814a9301220e8304d46b940a86e383d55ca5887b34f158a7365bbcdd17c5a305814a93")     DOC_END
         KV_SERIALIZE(tx_size)           DOC_DSCR("Transaction size in bytes") DOC_EXMP(1234)     DOC_END
         KV_SERIALIZE(tx_details)        DOC_DSCR("Tx details[optional]")      DOC_EXMP_AGGR()    DOC_END
@@ -998,20 +994,34 @@ namespace tools::wallet_public
     };
   };
 
+  struct payment_subtransfer
+  {
+    crypto::public_key  asset_id = currency::null_pkey;
+    uint64_t            amount   = 0;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE_POD_AS_HEX_STRING(asset_id)  DOC_DSCR("Asset ID of the corresponding subtransfer.") DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
+      KV_SERIALIZE(amount)                      DOC_DSCR("Amount of the asset transferred.") DOC_EXMP(8000) DOC_END
+    END_KV_SERIALIZE_MAP()
+  };
+  
+  
   struct payment_details
   {
-    std::string payment_id;
+    std::string payment_id;       // hex-encoded
     std::string tx_hash;
     uint64_t amount;
     uint64_t block_height;
     uint64_t unlock_time;
+    std::vector<payment_subtransfer> payment_subtransfers;
 
     BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(payment_id)     DOC_DSCR("Payment id that related to this payment") DOC_EXMP("1dfe5a88ff9effb3")     DOC_END
+      KV_SERIALIZE(payment_id)     DOC_DSCR("Hex-encoded payment ID that related to this payment") DOC_EXMP("1dfe5a88ff9effb3")     DOC_END
       KV_SERIALIZE(tx_hash)        DOC_DSCR("Transaction ID that is holding this payment") DOC_EXMP("01220e8304d46b940a86e383d55ca5887b34f158a7365bbcdd17c5a305814a93")     DOC_END
-      KV_SERIALIZE(amount)         DOC_DSCR("Amount of native coins transfered") DOC_EXMP(100000000000)     DOC_END
+      KV_SERIALIZE(amount)         DOC_DSCR("Amount of native coins transfered (native coins are always accounted in this field)") DOC_EXMP(100000000000)     DOC_END
       KV_SERIALIZE(block_height)   DOC_DSCR("Block height that holds transaction") DOC_EXMP(12321)     DOC_END
       KV_SERIALIZE(unlock_time)    DOC_DSCR("Timestamp/blocknumber after which this money would become availabe, recommended don't count transfers that has this field not 0") DOC_EXMP(0)     DOC_END
+      KV_SERIALIZE(payment_subtransfers) DOC_DSCR("List of subtransfers that this payment has (only for assets being transferred)") DOC_EXMP_AUTO(1)     DOC_END
     END_KV_SERIALIZE_MAP()
   };
 
@@ -1026,7 +1036,7 @@ namespace tools::wallet_public
       bool allow_locked_transactions;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(payment_id)                  DOC_DSCR("Payment id that is used to identify transfers") DOC_EXMP("1dfe5a88ff9effb3")     DOC_END
+        KV_SERIALIZE(payment_id)                  DOC_DSCR("Hex-encoded payment ID that is used to identify transfers") DOC_EXMP("1dfe5a88ff9effb3")     DOC_END
         KV_SERIALIZE(allow_locked_transactions)   DOC_DSCR("Says to wallet if locked transfers should be included or not (false is strongly recomennded)") DOC_EXMP(false)     DOC_END
       END_KV_SERIALIZE_MAP()
     };
@@ -1048,12 +1058,12 @@ namespace tools::wallet_public
 
     struct request
     {
-      std::vector<std::string> payment_ids;
+      std::vector<std::string> payment_ids;     // hex-encoded
       uint64_t min_block_height;
       bool allow_locked_transactions;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(payment_ids)                DOC_DSCR("Payment ids that is used to identify transfers")  DOC_EXMP_AUTO(2, "1dfe5a88ff9effb3")     DOC_END
+        KV_SERIALIZE(payment_ids)                DOC_DSCR("Hex-encoded payment IDs that is used to identify transfers")  DOC_EXMP_AUTO(2, "1dfe5a88ff9effb3")     DOC_END
         KV_SERIALIZE(min_block_height)           DOC_DSCR("Minimal block height to consider")  DOC_EXMP(0)     DOC_END
         KV_SERIALIZE(allow_locked_transactions)  DOC_DSCR("Says to wallet if locked transfers should be included or not (false is strongly recomennded)") DOC_EXMP(false)     DOC_END
       END_KV_SERIALIZE_MAP()
@@ -1128,12 +1138,12 @@ namespace tools::wallet_public
       crypto::public_key asset_id = currency::native_coin_asset_id;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(mixin)              DOC_DSCR("Number of outputs from the blockchain to mix with when sending a transaction to improve privacy.") DOC_EXMP(15) DOC_END
+        KV_SERIALIZE(mixin)              DOC_DSCR("Number of outputs from the blockchain to mix with when sending a transaction to improve privacy. Auditable wallets use no decoys. For other wallets, zero requests a direct spend where permitted; a non-zero value for legacy bare inputs is raised to the network minimum used by decoy selection v4, and Zarcanum inputs use the mandatory network minimum.") DOC_EXMP(15) DOC_END
         KV_SERIALIZE(address)            DOC_DSCR("Public address for sending or receiving native coins.") DOC_EXMP("ZxBvJDuQjMG9R2j4WnYUhBYNrwZPwuyXrC7FHdVmWqaESgowDvgfWtiXeNGu8Px9B24pkmjsA39fzSSiEQG1ekB225ZnrMTBp") DOC_END
         KV_SERIALIZE(amount)             DOC_DSCR("Threshold amount of native coins to sweep.") DOC_EXMP(1000000000000) DOC_END
         KV_SERIALIZE(payment_id_hex)     DOC_DSCR("[deprecated] Legacy tx-wide hex-encoded payment_id, that normally used for user database by exchanges") DOC_EXMP_AUTO("")     DOC_END
         KV_SERIALIZE(fee)                DOC_DSCR("Transaction fee required for processing the transaction.") DOC_EXMP(10000000000) DOC_END
-        KV_SERIALIZE(max_inputs)         DOC_DSCR("[optional] Maximum number of inputs in sweeping transaction. Default is the maximum possible.") DOC_EXMP(5) DOC_END
+        KV_SERIALIZE(max_inputs)         DOC_DSCR("[optional] Maximum number of inputs in sweeping transaction. Default is the maximum possible. Asset sweeps require at least two inputs: one native fee input and one asset input.") DOC_EXMP(5) DOC_END
         KV_SERIALIZE(min_outputs)        DOC_DSCR("[optional] Minimum number of outputs in sweeping transaction. Default is the minimum possible.") DOC_EXMP(3) DOC_END
         KV_SERIALIZE_POD_AS_HEX_STRING(asset_id) DOC_DSCR("[optional] Asset ID to filter outputs. Native coin if not specified.") DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
       END_KV_SERIALIZE_MAP()
@@ -1675,7 +1685,7 @@ namespace tools::wallet_public
       std::string hex_raw_proposal;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(hex_raw_proposal) DOC_DSCR("Hex-encoded proposal raw data(encrypted with common shared key). Includes half-created transaction template and some extra information that would be needed counterparty to finialize and sign transaction") DOC_EXMP("97d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc97d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc97d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc97d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc97d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc97d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc") DOC_END
+        KV_SERIALIZE(hex_raw_proposal) DOC_DSCR("Hex-encoded proposal raw data(encrypted with common shared key). Includes half-created transaction template and some extra information that would be needed counterparty to finalize and sign transaction") DOC_EXMP("97d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc97d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc97d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc97d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc97d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc97d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc") DOC_END
       END_KV_SERIALIZE_MAP()
     };
   };
@@ -1690,7 +1700,7 @@ namespace tools::wallet_public
       std::string hex_raw_proposal;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(hex_raw_proposal) DOC_DSCR("Hex-encoded proposal raw data(encrypted with common shared key). Includes half-created transaction template and some extra information that would be needed counterparty to finialize and sign transaction") DOC_EXMP("97d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc97d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc97d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc97d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc97d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc97d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc") DOC_END
+        KV_SERIALIZE(hex_raw_proposal) DOC_DSCR("Hex-encoded proposal raw data(encrypted with common shared key). Includes half-created transaction template and some extra information that would be needed counterparty to finalize and sign transaction") DOC_EXMP("97d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc97d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc97d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc97d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc97d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc97d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc") DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
@@ -1715,7 +1725,7 @@ namespace tools::wallet_public
       std::string hex_raw_proposal;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(hex_raw_proposal) DOC_DSCR("Hex-encoded proposal raw data(encrypted with common shared key). Includes half-created transaction template and some extra information that would be needed counterparty to finialize and sign transaction") DOC_EXMP("97d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc97d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc97d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc97d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc97d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc97d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc") DOC_END
+        KV_SERIALIZE(hex_raw_proposal) DOC_DSCR("Hex-encoded proposal raw data(encrypted with common shared key). Includes half-created transaction template and some extra information that would be needed counterparty to finalize and sign transaction") DOC_EXMP("97d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc97d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc97d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc97d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc97d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc97d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc") DOC_END
       END_KV_SERIALIZE_MAP()
     };
 

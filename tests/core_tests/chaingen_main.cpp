@@ -1133,16 +1133,21 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY_HF(gen_alias_too_many_regs_in_block_template, "3"); // disabled in HF4 due to tx outputs count limitation
     GENERATE_AND_PLAY_HF(gen_alias_update_for_free, "3-*");
     GENERATE_AND_PLAY_HF(gen_alias_in_coinbase, "3-*");
+    GENERATE_AND_PLAY_HF(gen_alias_default_alias, "3-*");
+    GENERATE_AND_PLAY_HF(gen_alias_default_alias_last_alias_reorg, "3-*");
+    GENERATE_AND_PLAY_HF(gen_alias_default_alias_info_update, "3-*");
 
     GENERATE_AND_PLAY(gen_wallet_basic_transfer);
     GENERATE_AND_PLAY(gen_wallet_refreshing_on_chain_switch);
     GENERATE_AND_PLAY(gen_wallet_refreshing_on_chain_switch_2);
     GENERATE_AND_PLAY(gen_wallet_unconfirmed_tx_from_tx_pool);
+    GENERATE_AND_PLAY(gen_wallet_unconfirmed_dup_on_pool_reorg);
     GENERATE_AND_PLAY_HF(gen_wallet_save_load_and_balance, "*");
     GENERATE_AND_PLAY_HF(gen_wallet_mine_pos_block, "3-*");
     GENERATE_AND_PLAY_HF(gbt_pool_invalid_txs_asset_overemit, "4-*");
     GENERATE_AND_PLAY(gen_wallet_unconfirmed_outdated_tx);
     GENERATE_AND_PLAY(gen_wallet_unlock_by_block_and_by_time);
+    GENERATE_AND_PLAY(wallet_unlock_time_tx_spend_detection);
     GENERATE_AND_PLAY(gen_wallet_payment_id);
     GENERATE_AND_PLAY(gen_wallet_oversized_payment_id);
     GENERATE_AND_PLAY(gen_wallet_transfers_and_outdated_unconfirmed_txs);
@@ -1188,6 +1193,8 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY_HF(wallet_rpc_gateway_reorg_spend, "6-*");
     GENERATE_AND_PLAY_HF(wallet_rpc_gateway_reorg_receive, "6-*");
     GENERATE_AND_PLAY_HF(wallet_rpc_gateway_owner_change_altchain, "6-*");
+    GENERATE_AND_PLAY_HF(wallet_rpc_gateway_limits, "6-*");
+    GENERATE_AND_PLAY_HF(wallet_rpc_gateway_decrypt_op, "6-*");
     GENERATE_AND_PLAY_HF(wallet_rpc_and_tx_unlock_time, "5-*");
     GENERATE_AND_PLAY_HF(wallet_rpc_sweep_below, "4-*");
     GENERATE_AND_PLAY_HF(wallet_rpc_sweep_below_wo_native, "4-*");
@@ -1252,6 +1259,8 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY(mix_attr_tests);
     GENERATE_AND_PLAY(mix_in_spent_outs);
     GENERATE_AND_PLAY(random_outs_and_burnt_coins);
+    GENERATE_AND_PLAY(decoy_set_oob_on_multisig_out);
+    GENERATE_AND_PLAY(decoy_set_on_zero_output_tx);
 
     // Block verification tests
     GENERATE_AND_PLAY_HF(gen_block_big_major_version, "0,3");
@@ -1371,6 +1380,7 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY_HF(hardfork_4_wallet_transfer_with_mandatory_mixins, "3-*");
     GENERATE_AND_PLAY(hardfork_4_wallet_sweep_bare_outs);
     GENERATE_AND_PLAY_HF(hardfork_4_pop_tx_from_global_index, "4-*");
+    GENERATE_AND_PLAY(hardfork_4_pos_decoy_transition);
 
     // HF5
     GENERATE_AND_PLAY_HF(hard_fork_5_tx_version, "5-*");
@@ -1383,12 +1393,14 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY_HF(hard_fork_6_and_self_directed_tx_with_payment_id, "6-*");
     GENERATE_AND_PLAY(hard_fork_6_coinbase_size_rules);
     GENERATE_AND_PLAY_HF(hard_fork_6_gw_incompatible_with_mode_separate, "6-*");
+    GENERATE_AND_PLAY(hard_fork_6_asset_descriptor_limits);
 
     // GW address alt-chain tests
     GENERATE_AND_PLAY(gw_addr_altchain_spend_in_both_chains);
     GENERATE_AND_PLAY(gw_addr_altchain_created_in_fork);
     GENERATE_AND_PLAY(gw_addr_altchain_no_cross_chain_usage);
     GENERATE_AND_PLAY(gw_addr_altchain_owner_change);
+    GENERATE_AND_PLAY(gw_addr_register_output_rollback);
 
     GENERATE_AND_PLAY_HF(isolate_auditable_and_proof, "2-*");
     
@@ -1406,6 +1418,7 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY_HF(zarcanum_in_alt_chain_2, "4-*");
     GENERATE_AND_PLAY(assets_and_explicit_native_coins_in_outs);
     GENERATE_AND_PLAY(zarcanum_block_with_txs);
+    GENERATE_AND_PLAY_HF(block_template_and_invalid_tx_proofs, "5-*");
     GENERATE_AND_PLAY(asset_depoyment_and_few_zc_utxos);
     GENERATE_AND_PLAY_HF(assets_and_pos_mining, "4-*");
     GENERATE_AND_PLAY_HF(asset_emission_and_unconfirmed_balance, "4-*");

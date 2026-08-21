@@ -61,6 +61,7 @@ using namespace currency;
 #define BLOCKCHAIN_STORAGE_CONTAINER_SOLO_OPTIONS            "solo"
 #define BLOCKCHAIN_STORAGE_CONTAINER_ALIASES                 "aliases"
 #define BLOCKCHAIN_STORAGE_CONTAINER_ADDR_TO_ALIAS           "addr_to_alias"
+#define BLOCKCHAIN_STORAGE_CONTAINER_ADDR_TO_DEFAULT_ALIAS   "addr_to_default_alias"
 #define BLOCKCHAIN_STORAGE_CONTAINER_TX_FEE_MEDIAN           "median_fee2"
 #define BLOCKCHAIN_STORAGE_CONTAINER_GINDEX_INCS             "gindex_increments"
 #define BLOCKCHAIN_STORAGE_CONTAINER_ASSETS                  "assets"
@@ -96,6 +97,7 @@ blockchain_storage::blockchain_storage(tx_memory_pool& tx_pool) :m_db(nullptr, m
                                                                  m_db_aliases(m_db),
                                                                  m_db_assets(m_db),
                                                                  m_db_addr_to_alias(m_db),
+                                                                 m_db_addr_to_default_alias(m_db),
                                                                  m_db_gateway_addresses(m_db),
                                                                  m_db_gateway_transactions(m_db), 
                                                                  m_read_lock(m_rw_lock),
@@ -122,7 +124,6 @@ blockchain_storage::blockchain_storage(tx_memory_pool& tx_pool) :m_db(nullptr, m
                                                                  m_cached_next_pos_difficulty(0), 
                                                                  m_blockchain_launch_timestamp(0),
                                                                  m_non_pruning_mode_enabled(false)
-
 
 {
   m_services_mgr.set_core_runtime_config(m_core_runtime_config);
@@ -231,6 +232,7 @@ void blockchain_storage::set_db_l2_cache_size(uint64_t ceched_elements) const
   m_db_gateway_addresses.set_cache_size(ceched_elements);
   m_db_gateway_transactions.set_cache_size(ceched_elements);
   m_db_addr_to_alias.set_cache_size(ceched_elements);
+  m_db_addr_to_default_alias.set_cache_size(ceched_elements);
 }
 //------------------------------------------------------------------
 std::string blockchain_storage::get_db_l2_cache_state_str() const
@@ -249,6 +251,7 @@ std::string blockchain_storage::get_db_l2_cache_state_str() const
   PRINT_CACHE_STATE(m_db_gateway_addresses);
   PRINT_CACHE_STATE(m_db_gateway_transactions);
   PRINT_CACHE_STATE(m_db_addr_to_alias);
+  PRINT_CACHE_STATE(m_db_addr_to_default_alias);
   return ss.str();
 }
 //------------------------------------------------------------------
@@ -357,6 +360,10 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
     CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
     res = m_db_gateway_transactions.init(BLOCKCHAIN_STORAGE_CONTAINER_GATEWAY_TRANSACTIONS);
     CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
+    res = m_db_addr_to_default_alias.init(BLOCKCHAIN_STORAGE_CONTAINER_ADDR_TO_DEFAULT_ALIAS);
+    CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
+    
+    
 
     if (command_line::has_arg(vm, arg_db_cache_l2))
     {
@@ -534,7 +541,6 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
         }
         LOG_PRINT_MAGENTA("migration of m_db_per_block_gindex_incs completed successfully", LOG_LEVEL_0);
       }
-
 #ifndef TESTNET
       // MAINNET ONLY
       if (m_db_most_recent_hardfork_id == 0)
@@ -573,10 +579,20 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
           truncate_blockchain(height_right_before_hardfork_activation + 1);
         }
       }
+
 #endif
-
-    } // if (m_db_blocks.size() != 0)
-
+      } // if (m_db_blocks.size() != 0)
+    
+      
+    if(!need_reinit && m_db_storage_minor_compatibility_version <= 2)
+    {
+      // need to scan aliases and migrate to m_db_addr_to_default_alias container
+      auto db_tx_ptr = m_db.begin_transaction_obj();
+      bool r         = migrate_default_aliases_container();
+      CHECK_AND_ASSERT_MES(r, false, "Failed to migrate default aliases container");
+      db_tx_ptr->commit_transaction();
+    }
+ 
     if (need_reinit)
     {
       LOG_PRINT_L1("DB at " << db_folder_path << " is about to be deleted and re-created...");
@@ -590,6 +606,7 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
       m_db_aliases.deinit();
       m_db_assets.deinit();
       m_db_addr_to_alias.deinit();
+      m_db_addr_to_default_alias.deinit();
       m_db_per_block_gindex_incs.deinit();
       m_db_gateway_addresses.deinit();
       m_db_gateway_transactions.deinit();
@@ -897,6 +914,7 @@ bool blockchain_storage::clear()
     m_db_aliases.clear();
     m_db_assets.clear();
     m_db_addr_to_alias.clear();
+    m_db_addr_to_default_alias.clear();
     m_db_per_block_gindex_incs.clear();
     m_pos_targetdata_cache.clear();
     m_pow_targetdata_cache.clear();
@@ -1060,13 +1078,16 @@ bool blockchain_storage::purge_transaction_from_blockchain(const crypto::hash& t
 
   fee = get_tx_fee(tx_res_ptr->tx);
   purge_transaction_keyimages_from_blockchain(tx, true);
-  
-  bool r = unprocess_blockchain_tx_extra(tx, tx_res_ptr->m_keeper_block_height, tx_id);
-  CHECK_AND_ASSERT_MES(r, false, "failed to unprocess_blockchain_tx_extra for tx " << tx_id);
- 
-  r = unprocess_blockchain_tx_attachments(tx, get_current_blockchain_size(), 0/*TODO: add valid timestamp here in future if need*/);
+
+  bool res_pop_gi = pop_transaction_from_global_index(tx, tx_id);
+  CHECK_AND_ASSERT_MES_NO_RET(res_pop_gi, "serious internal error: pop_transaction_from_global_index() failed for tx " << tx_id);
+
+  bool r = unprocess_blockchain_tx_attachments(tx, get_current_blockchain_size(), 0/*TODO: add valid timestamp here in future if need*/);
 
   unprocess_tx_gateway_history(tx_id, tx_);
+  
+  r = unprocess_blockchain_tx_extra(tx, tx_res_ptr->m_keeper_block_height, tx_id);
+  CHECK_AND_ASSERT_MES(r, false, "failed to unprocess_blockchain_tx_extra for tx " << tx_id);
 
   bool added_to_the_pool = false;
   if(!is_coinbase(tx))
@@ -1075,8 +1096,6 @@ bool blockchain_storage::purge_transaction_from_blockchain(const crypto::hash& t
     added_to_the_pool = m_tx_pool.add_tx(tx, tvc, true, true);
   }
 
-  bool res_pop_gi = pop_transaction_from_global_index(tx, tx_id);
-  CHECK_AND_ASSERT_MES_NO_RET(res_pop_gi, "serious internal error: pop_transaction_from_global_index() failed for tx " << tx_id);
   bool res_erase = m_db_transactions.erase_validate(tx_id);
   CHECK_AND_ASSERT_MES_NO_RET(res_erase, "serious internal error: m_transactions.erase_validate() failed for tx " << tx_id);
 
@@ -2003,7 +2022,7 @@ void blockchain_storage::reset_db_cache() const
   m_db_gateway_addresses.clear_cache();
   m_db_gateway_transactions.clear_cache();
   m_db_addr_to_alias.clear_cache();
-
+  m_db_addr_to_default_alias.clear_cache();
 }
 //------------------------------------------------------------------
 void blockchain_storage::clear_altblocks()
@@ -2999,27 +3018,33 @@ bool blockchain_storage::build_random_out_entry(uint64_t amount, size_t g_index,
   auto tx_ptr = m_db_transactions.find(out_ptr->tx_id);
   CHECK_AND_ASSERT_MES(tx_ptr, false, "internal error: transaction " << out_ptr->tx_id << " was not found in transaction DB, amount: " << print_money_brief(amount) <<
     ", g_index: " << g_index);
-  CHECK_AND_ASSERT_MES(tx_ptr->tx.vout.size() > out_ptr->out_no, false, "internal error: in global outs index, transaction out index="
-    << out_ptr->out_no << " is greater than transaction outputs = " << tx_ptr->tx.vout.size() << ", for tx id = " << out_ptr->tx_id);
+
+  return build_random_out_entry_from_tx_entry(*tx_ptr, out_ptr->out_no, amount, g_index, mix_count, use_only_forced_to_mix, height_upper_limit, oen);
+}
+//------------------------------------------------------------------
+bool blockchain_storage::build_random_out_entry_from_tx_entry(const transaction_chain_entry& tx_entry, uint64_t out_no, uint64_t amount, uint64_t g_index, uint64_t mix_count, bool use_only_forced_to_mix, uint64_t height_upper_limit, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry& oen) const
+{
+  const transaction& tx = tx_entry.tx;
+  CHECK_AND_ASSERT_MES(tx.vout.size() > out_no, false, "internal error: in global outs index, transaction out index="
+    << out_no << " is greater than transaction outputs = " << tx.vout.size() << ", for tx id = " << get_transaction_hash(tx));
 
   //CHECK_AND_ASSERT_MES(amount != 0 || height_upper_limit != 0, false, "height_upper_limit must be nonzero for hidden amounts (amount = 0)");
 
-  if (height_upper_limit != 0 && tx_ptr->m_keeper_block_height > height_upper_limit)
+  if (height_upper_limit != 0 && tx_entry.m_keeper_block_height > height_upper_limit)
     return false;
 
-  const transaction& tx = tx_ptr->tx;
-  CHECK_AND_ASSERT_MES(tx_ptr->m_spent_flags.size() == tx.vout.size(), false, "internal error: spent_flag.size()=" << tx_ptr->m_spent_flags.size() << ", tx.vout.size()=" << tx.vout.size());
-  
+  CHECK_AND_ASSERT_MES(tx_entry.m_spent_flags.size() == tx.vout.size(), false, "internal error: spent_flag.size()=" << tx_entry.m_spent_flags.size() << ", tx.vout.size()=" << tx.vout.size());
+
   //do not use outputs that obviously spent for mixins
-  if (tx_ptr->m_spent_flags[out_ptr->out_no])
+  if (tx_entry.m_spent_flags[out_no])
     return false;
 
   //check if transaction is unlocked
-  if (!is_tx_spendtime_unlocked(get_tx_unlock_time(tx, out_ptr->out_no)))
+  if (!is_tx_spendtime_unlocked(get_tx_unlock_time(tx, out_no)))
     return false;
 
-  const tx_out_v& out_v = tx.vout[out_ptr->out_no];
-  
+  const tx_out_v& out_v = tx.vout[out_no];
+
   // do not use burned coins
   if (is_out_burned(out_v))
     return false;
@@ -3055,10 +3080,10 @@ bool blockchain_storage::build_random_out_entry(uint64_t amount, size_t g_index,
     oen.amount_commitment   = toz.amount_commitment;
     oen.concealing_point    = toz.concealing_point;
     oen.blinded_asset_id    = toz.blinded_asset_id;   // TODO @#@# bad design, too much manual coping, consider redesign -- sowle
-    if (is_coinbase(tx_ptr->tx))
+    if (is_coinbase(tx))
     {
       oen.flags |= RANDOM_OUTPUTS_FOR_AMOUNTS_FLAGS_COINBASE;
-      if (is_pos_coinbase(tx_ptr->tx))
+      if (is_pos_coinbase(tx))
       {
         oen.flags |= RANDOM_OUTPUTS_FOR_AMOUNTS_FLAGS_POS_COINBASE;
       }
@@ -3279,13 +3304,20 @@ bool blockchain_storage::get_random_outs_for_amounts4(const COMMAND_RPC_GET_RAND
     return false;
   }
 
+  TIME_MEASURE_START_MS(total_time_ms);
+
   const uint64_t top_block_height = get_current_blockchain_size() - CURRENCY_MINED_MONEY_UNLOCK_WINDOW;
   const uint64_t height_limit = (req.height_upper_limit && req.height_upper_limit <= top_block_height) ? req.height_upper_limit : top_block_height;
+  const uint64_t hf4_active_after_height = m_core_runtime_config.hard_forks.get_height_the_hardfork_active_after(ZANO_HARDFORK_04_ZARCANUM);
   res.blocks_batches.clear();
   res.blocks_batches.reserve(req.batches.size());
 
+  uint64_t total_heights_requested = 0, total_blocks_found = 0, total_blocks_loaded = 0, total_collects = 0, total_seeds_skipped_pre_hf4 = 0, total_passes = 0;
+
   for(size_t i = 0; i < req.batches.size(); ++i)
   {
+    const bool zc_outs_only = (req.batches[i].input_amount == 0);
+
     std::unordered_set<uint64_t> seen_heights;
     std::unordered_set<uint64_t> picked_heights;
     seen_heights.reserve(req.batches[i].heights.size());
@@ -3297,12 +3329,19 @@ bool blockchain_storage::get_random_outs_for_amounts4(const COMMAND_RPC_GET_RAND
 
     auto search_pass = [&](const std::string& strategy)
     {
+      ++total_passes;
       seen_heights.clear();
       for (uint64_t seed_height_original : req.batches[i].heights)
       {
         uint64_t seed_height = seed_height_original;
         if (seed_height > height_limit)
           seed_height = height_limit;
+
+        if (zc_outs_only && seed_height + MAX_SEARCH_DELTA_HEIGHT <= hf4_active_after_height)
+        {
+          ++total_seeds_skipped_pre_hf4;
+          continue;
+        }
 
         uint64_t delta = 0;
         int step_direction = +1;
@@ -3329,14 +3368,21 @@ bool blockchain_storage::get_random_outs_for_amounts4(const COMMAND_RPC_GET_RAND
             }
           }
 
-          if (inside_range)
+          // pre-HF4 filter
+          if (inside_range && zc_outs_only && candidate_height <= hf4_active_after_height)
+            inside_range = false;
+
+          if (inside_range && candidate_height < m_db_blocks.size())
           {
             if (!picked_heights.count(candidate_height) && seen_heights.insert(candidate_height).second)
             {
-              if (is_block_fit_for_strategy(candidate_height, strategy))
+              auto bei_ptr = m_db_blocks[candidate_height];
+              ++total_blocks_loaded;
+              if (is_block_fit_for_strategy(bei_ptr->bl, strategy))
               {
                 std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry> oe;
-                collect_all_outs_in_block(req.batches[i].input_amount, candidate_height, oe);
+                collect_all_outs_in_block(req.batches[i].input_amount, *bei_ptr, oe);
+                ++total_collects;
                 picked_heights.insert(candidate_height);
 
                 if(!oe.empty())
@@ -3385,7 +3431,16 @@ bool blockchain_storage::get_random_outs_for_amounts4(const COMMAND_RPC_GET_RAND
     {
       search_pass(LOOK_UP_STRATEGY_ANY);
     }
+
+    total_heights_requested += requested_heights_count;
+    total_blocks_found += out_blocks.size();
   }
+
+  TIME_MEASURE_FINISH_MS(total_time_ms);
+  LOG_PRINT_L1("[GET_RANDOM_OUTS4]: " << req.batches.size() << " batches, heights requested: " << total_heights_requested
+    << ", blocks found: " << total_blocks_found << ", blocks loaded: " << total_blocks_loaded
+    << ", collects: " << total_collects << ", seeds skipped as pre-HF4: " << total_seeds_skipped_pre_hf4
+    << ", passes: " << total_passes << ", timing: " << total_time_ms << " ms");
   return true;
 }
 //------------------------------------------------------------------
@@ -3772,6 +3827,7 @@ void blockchain_storage::print_db_cache_perfeormance_data() const
     DB_CONTAINER_PERF_DATA_ENTRY(m_db_gateway_addresses) << ENDL
     DB_CONTAINER_PERF_DATA_ENTRY(m_db_gateway_transactions) << ENDL
     DB_CONTAINER_PERF_DATA_ENTRY(m_db_addr_to_alias) << ENDL
+    DB_CONTAINER_PERF_DATA_ENTRY(m_db_addr_to_default_alias) << ENDL
     //DB_CONTAINER_PERF_DATA_ENTRY(m_db_per_block_gindex_incs) << ENDL
     //DB_CONTAINER_PERF_DATA_ENTRY(m_tx_fee_median) << ENDL
   );
@@ -4333,7 +4389,7 @@ bool blockchain_storage::unprocess_blockchain_tx_extra(const transaction& tx, co
   CHECK_AND_ASSERT_MES(r, false, "failed to validate transaction extra on unprocess_blockchain_tx_extra");
   if(ei.m_alias.m_alias.size())
   {
-    r = pop_alias_info(ei.m_alias);
+    r = pop_alias_info(ei.m_alias, tx_id);
     CHECK_AND_ASSERT_MES(r, false, "failed to pop_alias_info");
   }
 
@@ -4435,61 +4491,297 @@ uint64_t blockchain_storage::get_assets_count() const
 //------------------------------------------------------------------
 std::string blockchain_storage::get_alias_by_address(const account_public_address& addr)const
 {
+  CRITICAL_REGION_LOCAL(m_read_lock);
   auto alias_ptr = m_db_addr_to_alias.find(addr);
-  if (alias_ptr && alias_ptr->size())
-  {
-    return *(alias_ptr->begin());
-  }
-  
-  return "";
+  if(!alias_ptr || !alias_ptr->size())
+    return "";
+
+  auto default_alias_ptr = m_db_addr_to_default_alias.find(addr);
+  if(default_alias_ptr && default_alias_ptr->size() && alias_ptr->count(default_alias_ptr->back().alias))
+    return default_alias_ptr->back().alias;
+
+  return *(alias_ptr->begin());
 }
 //------------------------------------------------------------------
-std::set<std::string> blockchain_storage::get_aliases_by_address(const account_public_address& addr)const
+std::set<std::string> blockchain_storage::get_aliases_by_address(const account_public_address& addr, std::string& default_alias)const
 {
+  CRITICAL_REGION_LOCAL(m_read_lock);
+  auto default_alias_ptr = m_db_addr_to_default_alias.find(addr);
+  if(default_alias_ptr && default_alias_ptr->size())
+  {
+    default_alias = default_alias_ptr->back().alias;
+  }
+
   auto alias_ptr = m_db_addr_to_alias.find(addr);
   if (alias_ptr && alias_ptr->size())
   {
+    // precaution: if default alias is not in the list of aliases for this address, then we will return empty set
+    if(default_alias_ptr && default_alias_ptr->size() && !alias_ptr->count(default_alias_ptr->back().alias))
+      default_alias = *(alias_ptr->begin());
+    
     return *(alias_ptr);
   }
 
+  default_alias.clear();
   return std::set<std::string>();
 }
 //------------------------------------------------------------------
-bool blockchain_storage::pop_alias_info(const extra_alias_entry& ai)
+bool blockchain_storage::migrate_default_aliases_container()
+{
+  CRITICAL_REGION_LOCAL(m_read_lock);
+  size_t updated_count = 0;
+  size_t total_addresses_count = 0;
+  size_t total_aliases_count = 0;
+  LOG_PRINT_L0("Migrating default aliases container started...");
+  m_db_addr_to_alias.enumerate_items([&](uint64_t i, const account_public_address& addr, const std::set<std::string>& aliases)
+        {
+          if(aliases.size())
+          {
+            auto default_alias_ptr = m_db_addr_to_default_alias.find(addr);
+            if(!default_alias_ptr || !default_alias_ptr->size() || !aliases.count(default_alias_ptr->back().alias))
+            {
+              // no default alias or default alias is not in the list of aliases for this address
+              // set the first alias as the default one
+              default_alias_entry new_default_alias_entry = { *aliases.begin(), null_hash };
+              m_db_addr_to_default_alias.set(addr, std::list<default_alias_entry>({ new_default_alias_entry }));
+              updated_count++;
+            }
+          }
+          total_aliases_count += aliases.size();
+          total_addresses_count++;        
+          return true;  // continue
+        });
+
+  LOG_PRINT_L0("Migrating default aliases container finished! Updated " << updated_count << " out of " << total_addresses_count << " addresses, total aliases count = " << total_aliases_count << ".");
+  return true;
+}
+//------------------------------------------------------------------
+void blockchain_storage::pop_default_alias(const account_public_address& addr, const crypto::hash& tx_id)
+{
+  CRITICAL_REGION_LOCAL(m_read_lock);
+
+  std::list<default_alias_entry> list_local;
+  auto def_alias_ptr = m_db_addr_to_default_alias.find(addr);
+  if(def_alias_ptr)
+  {
+    list_local = *def_alias_ptr;
+  }
+  else
+  {
+    LOG_PRINT_RED("unexpected(missing entry) pop of default alias for address " << get_account_address_as_str(addr) << ", tx: " << tx_id, LOG_LEVEL_0);
+    return;
+  }
+
+  if(!list_local.size())
+  {
+    LOG_PRINT_RED("unexpected(empty list) pop of default alias for address " << get_account_address_as_str(addr) << ", tx: " << tx_id, LOG_LEVEL_0);
+    return;
+  }
+
+  if (list_local.back().tx_id != tx_id)
+  {
+    LOG_PRINT_RED("unexpected(tx id missmatch) pop of default alias for address " << get_account_address_as_str(addr) << ", tx: " << tx_id, LOG_LEVEL_0);
+    return;
+  }
+  list_local.pop_back();
+
+  m_db_addr_to_default_alias.set(addr, list_local);
+}
+//------------------------------------------------------------------
+void blockchain_storage::push_default_alias(const account_public_address& addr, const std::string& default_alias, const crypto::hash& tx_id)
+{
+  CRITICAL_REGION_LOCAL(m_read_lock);
+
+  std::list<default_alias_entry> list_local;
+  auto def_alias_ptr = m_db_addr_to_default_alias.find(addr);
+  if(def_alias_ptr)
+  {
+    list_local = *def_alias_ptr;
+  }
+
+  list_local.push_back(default_alias_entry { default_alias, tx_id});
+  m_db_addr_to_default_alias.set(addr, list_local);
+}
+//------------------------------------------------------------------
+void blockchain_storage::remove_alias_from_address(const account_public_address& addr, const std::string& alias, const aliases_container::t_value_type& local_alias_history, bool is_during_put_process, const crypto::hash& tx_id)
+{
+  CRITICAL_REGION_LOCAL(m_read_lock);
+
+  address_to_aliases_container::t_value_type addr_to_alias_local;
+  // update adr-to-alias db
+  auto addr_to_alias_ptr_ = m_db_addr_to_alias.find(addr);
+
+  if(addr_to_alias_ptr_)
+  {
+    addr_to_alias_local = *addr_to_alias_ptr_;
+    auto it_in_set  = addr_to_alias_local.find(alias);
+    if(it_in_set == addr_to_alias_local.end())
+    {
+      LOG_ERROR("it_in_set == addr_to_alias_local.end()");
+    }
+    else
+    {
+      addr_to_alias_local.erase(it_in_set);
+    }
+
+    if(!addr_to_alias_local.size())
+      m_db_addr_to_alias.erase(addr);
+    else
+      m_db_addr_to_alias.set(addr, addr_to_alias_local);
+  }
+  else
+  {
+    LOG_ERROR("Wrong m_addr_to_alias state: address not found " << get_account_address_as_str(addr));
+
+    std::stringstream ss;
+    ss << "History for alias " << alias << ":" << ENDL;
+    size_t i = 0;
+    for(auto el : local_alias_history)
+    {
+      ss << std::setw(2) << i++ << " "
+         << get_account_address_as_str(el.m_address) << " "
+         << (el.m_sign.empty() ? " no sig " : " SIGNED ") << " "
+         << el.m_text_comment << ENDL;
+    }
+
+    LOG_PRINT_L0(ss.str());
+  }
+
+  //phase 2: default alias: check if it was default alias for this address
+  // 
+  auto default_alias_ptr = m_db_addr_to_default_alias.find(addr);
+  if(default_alias_ptr && default_alias_ptr->size())
+  {
+    //it is default alias
+    // 
+    //if we are in put situation, then we need to push default alias from prev items, that are still owned by this address
+    //otherwise we should simply pop default alias
+    if (is_during_put_process)
+    {
+      if (default_alias_ptr->back().alias == alias)
+      {
+        auto default_alias_stack_local = *default_alias_ptr;
+
+        std::string replacement;
+        for(auto it = ++default_alias_stack_local.rbegin(); it != default_alias_stack_local.rend(); it++)
+        {
+          if(addr_to_alias_local.count(it->alias))
+          {
+            replacement = it->alias;
+            break;
+          }
+        }
+        if(replacement.empty() && !addr_to_alias_local.empty())
+          replacement = *addr_to_alias_local.begin();
+
+        default_alias_stack_local.push_back(default_alias_entry { replacement, tx_id });
+        m_db_addr_to_default_alias.set(addr, default_alias_stack_local);
+      }
+    }
+    else
+    {
+      if(default_alias_ptr->back().tx_id == tx_id)
+        pop_default_alias(addr, tx_id);
+    }
+  }
+}
+//------------------------------------------------------------------
+void blockchain_storage::add_alias_to_address(const account_public_address& addr, const std::string& alias, bool is_during_put_process, const crypto::hash& tx_id)
+{
+  CRITICAL_REGION_LOCAL(m_read_lock);
+  // update addr-to-alias db entry
+  address_to_aliases_container::t_value_type addr_to_alias_local = AUTO_VAL_INIT(addr_to_alias_local);
+  auto addr_to_alias_ptr_                                        = m_db_addr_to_alias.get(addr);
+  if(addr_to_alias_ptr_)
+    addr_to_alias_local = *addr_to_alias_ptr_;
+
+  bool was_empty = addr_to_alias_local.empty();
+
+  addr_to_alias_local.insert(alias);
+  m_db_addr_to_alias.set(addr, addr_to_alias_local);
+
+  // check if we need to set default alias for this address
+  if (!is_during_put_process)
+  {
+    //we returning back alias to address, let's check if it was a default before
+    auto default_alias_ptr = m_db_addr_to_default_alias.find(addr);
+    if (default_alias_ptr && default_alias_ptr->size() && default_alias_ptr->back().tx_id == tx_id)
+    {
+      //it was default before and we have to pop it back
+      pop_default_alias(addr, tx_id);
+    }
+  }
+  else
+  {
+    if(was_empty)
+      push_default_alias(addr, alias, tx_id);
+  }
+}
+//------------------------------------------------------------------
+
+/*
+
+  Table of default alias handling in case of alias history pop (owner change or info update) 
+  and push (new owner or info update)
+           |---------------------------------------------------------------------------------------------- 
+           |    New alias,     |             Owner change            | Set default alias | Action        |
+           |       addr        |     old addr     |    new addr      | (self-directed    |               |
+           | have any aliases? |is default alias? |have any aliases? | update operation) |               |
+           |  YES    |   NO    |   YES  |  NO     |   YES   |  NO    |                   |               |
+           |-------------------+--------+---------+---------+--------+-------------------+---------------+
+ situation |  0_0Y   |  0_0N   |  1_1Y  |  1_1N   |  1_2Y   |  1_2N  |        1_3        |               |
+ code      |         |         |        |         |         |        |                   |               |
+           |-------------------+--------+---------+---------+--------+-------------------+---------------+
+           |         |         |set back|         |         |push new|                   |               |                    
+           |         |push new | a prev |         |         |default |    push new       |  PUSH ALIAS   |
+           |         | default | default|         |         | alias  |  default alias    |               |
+           |         |  alias  |  alias |         |         |        |                   |               |
+           |         |         |   via  |         |         |        |                   |               |
+           |         |         |  push  |         |         |        |                   |               |
+           |         |         |(the one|         |         |        |                   |               |
+           |         |         | still  |         |         |        |                   |               |
+           |         |         | owned) |         |         |        |                   |               |
+           |-------------------+--------+---------+---------+--------+-------------------+---------------+               
+           |         |         |        |         |         |        |                   |               |
+           |         |   pop   | pop    |         |         | pop    |   pop default     |  POP ALIAS    |
+           |         | default | default|         |         | default|     alias         |               |               
+           |         |  alias  | alias  |         |         | alias  |                   |               |               
+           |         |         |        |         |         |        |                   |               |               
+           |         |         |        |         |         |        |                   |               |
+           |         |         |        |         |         |        |                   |               |
+           |-------------------+--------+---------+---------+--------+-------------------+---------------+
+
+0_0*, 1_1*, 1_2* - situations are handled in remove_alias_from_address/add_alias_to_address functions, 
+1_3 - handled in put_alias_info/pop_alias_info functions
+
+
+*/
+
+bool blockchain_storage::pop_alias_info(const extra_alias_entry& ai, const crypto::hash& tx_id)
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
 
   CHECK_AND_ASSERT_MES(ai.m_alias.size(), false, "empty name in pop_alias_info");
   auto alias_history_ptr = m_db_aliases.find(ai.m_alias);
   CHECK_AND_ASSERT_MES(alias_history_ptr && alias_history_ptr->size(), false, "empty name list in pop_alias_info");
-  
-  auto addr_to_alias_ptr = m_db_addr_to_alias.find(alias_history_ptr->back().m_address);
-  if (addr_to_alias_ptr)
+  aliases_container::t_value_type local_alias_hist = *alias_history_ptr;
+
+    // check if it was just an info update or actual owner change
+  bool owner_change = true;
+  if(local_alias_hist.size() > 1 && local_alias_hist.back().m_address == std::prev(local_alias_hist.end(), 2)->m_address)
   {
-    //update db
-    address_to_aliases_container::t_value_type local_v = *addr_to_alias_ptr;
-
-    auto it_in_set = local_v.find(ai.m_alias);
-    CHECK_AND_ASSERT_MES(it_in_set != local_v.end(), false, "it_in_set != it->second.end() validation failed");
-
-    local_v.erase(it_in_set);
-    if (!local_v.size())
+    owner_change = false;
+    // we consider it as set default operation only if description didn't change, otherwise it is just an info update
+    if(local_alias_hist.back().m_text_comment == std::prev(local_alias_hist.end(), 2)->m_text_comment && local_alias_hist.back().m_view_key == std::prev(local_alias_hist.end(), 2)->m_view_key)
     {
-      //delete the whole record from db
-      m_db_addr_to_alias.erase(alias_history_ptr->back().m_address);
-    }
-    else
-    {
-      //update db
-      m_db_addr_to_alias.set(alias_history_ptr->back().m_address, local_v);
+      pop_default_alias(local_alias_hist.back().m_address, tx_id);
     }
   }
   else
   {
-    LOG_ERROR("In m_addr_to_alias not found " << get_account_address_as_str(alias_history_ptr->back().m_address));
+    remove_alias_from_address(alias_history_ptr->back().m_address, ai.m_alias, *alias_history_ptr, false, tx_id);
   }
-
-  aliases_container::t_value_type local_alias_hist = *alias_history_ptr;
+  
   local_alias_hist.pop_back();
   if(local_alias_hist.size())
     m_db_aliases.set(ai.m_alias, local_alias_hist);
@@ -4498,23 +4790,17 @@ bool blockchain_storage::pop_alias_info(const extra_alias_entry& ai)
 
   if (local_alias_hist.size())
   {
-    address_to_aliases_container::t_value_type local_copy = AUTO_VAL_INIT(local_copy);
-    auto set_ptr = m_db_addr_to_alias.get(local_alias_hist.back().m_address);
-    if (set_ptr)
-      local_copy = *set_ptr;
-
-    local_copy.insert(ai.m_alias);
-    m_db_addr_to_alias.set(local_alias_hist.back().m_address, local_copy);
+    add_alias_to_address(local_alias_hist.back().m_address, ai.m_alias, false, tx_id);
   }
 
   LOG_PRINT_MAGENTA("[ALIAS_UNREGISTERED]: " << ai.m_alias << ": " << get_account_address_as_str(ai.m_address) << " -> " << (!local_alias_hist.empty() ? get_account_address_as_str(local_alias_hist.back().m_address) : "(available)"), LOG_LEVEL_1);
   return true;
 }
+
 //------------------------------------------------------------------
-bool blockchain_storage::put_alias_info(const transaction & tx, extra_alias_entry & ai)
+bool blockchain_storage::put_alias_info(const transaction& tx, extra_alias_entry& ai, const crypto::hash& tx_id)
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
-
   CHECK_AND_ASSERT_MES(ai.m_alias.size(), false, "empty name in put_alias_info");
   aliases_container::t_value_type local_alias_history = AUTO_VAL_INIT(local_alias_history);
   auto alias_history_ptr_ = m_db_aliases.get(ai.m_alias);
@@ -4527,15 +4813,10 @@ bool blockchain_storage::put_alias_info(const transaction & tx, extra_alias_entr
     //update alias entry in db
     local_alias_history.push_back(ai);
     m_db_aliases.set(ai.m_alias, local_alias_history);
-
-    //update addr-to-alias db entry
-    address_to_aliases_container::t_value_type addr_to_alias_local = AUTO_VAL_INIT(addr_to_alias_local);
-    auto addr_to_alias_ptr_ = m_db_addr_to_alias.get(local_alias_history.back().m_address);
-    if (addr_to_alias_ptr_)
-      addr_to_alias_local = *addr_to_alias_ptr_;
-
-    addr_to_alias_local.insert(ai.m_alias);
-    m_db_addr_to_alias.set(local_alias_history.back().m_address, addr_to_alias_local);
+    
+    //SITUATION CODE 0_0;
+    // update addr-to-alias db entry
+    add_alias_to_address(local_alias_history.back().m_address, ai.m_alias, true, tx_id);
 
     //@@ remove get_tx_fee_median();
     LOG_PRINT_MAGENTA("[ALIAS_REGISTERED]: " << ai.m_alias << ": " << get_account_address_as_str(ai.m_address) << ", fee median: " << get_tx_fee_median(), LOG_LEVEL_1);
@@ -4557,57 +4838,32 @@ bool blockchain_storage::put_alias_info(const transaction & tx, extra_alias_entr
       << "signature:                  " << epee::string_tools::pod_to_hex(ai.m_sign) << ENDL 
       << "local_alias_history.size(): " << local_alias_history.size());
 
-    //update adr-to-alias db
-    auto addr_to_alias_ptr_ = m_db_addr_to_alias.find(local_alias_history.back().m_address);
-    if (addr_to_alias_ptr_)
+    bool owner_change = true;
+    if(local_alias_history.back().m_address == ai.m_address)
     {
-      address_to_aliases_container::t_value_type addr_to_alias_local = *addr_to_alias_ptr_;
-      auto it_in_set = addr_to_alias_local.find(ai.m_alias);
-      if (it_in_set == addr_to_alias_local.end())
+      // making this alias default
+      owner_change = false;
+      // SITUATION CODE 1_3;
+      // we consider it as set default operation only if description didn't change, otherwise it is just an info update
+      if(local_alias_history.back().m_text_comment == ai.m_text_comment && local_alias_history.back().m_view_key == ai.m_view_key)
       {
-        LOG_ERROR("it_in_set == addr_to_alias_local.end()");
+        push_default_alias(ai.m_address, ai.m_alias, tx_id);
       }
-      else
-      {
-        addr_to_alias_local.erase(it_in_set);
-      }
-
-      if (!addr_to_alias_local.size())
-        m_db_addr_to_alias.erase(local_alias_history.back().m_address);
-      else
-        m_db_addr_to_alias.set(local_alias_history.back().m_address, addr_to_alias_local);
     }
     else
     {
-      LOG_ERROR("Wrong m_addr_to_alias state: address not found " << get_account_address_as_str(local_alias_history.back().m_address));
+      // SITUATION CODE 1_1? and 1_2? will be handled in remove_alias_from_address/add_alias_to_address functions
+      //work with aliases set
+      
+      // update addr-to-alias db
+      remove_alias_from_address(local_alias_history.back().m_address, ai.m_alias, local_alias_history, true, tx_id);
 
-      std::stringstream ss;
-      ss << "History for alias " << ai.m_alias << ":" << ENDL;
-      size_t i = 0;
-      for (auto el : local_alias_history)
-      {
-        ss << std::setw(2) << i++ << " "
-          << get_account_address_as_str(el.m_address) << " "
-          << (el.m_sign.empty() ? " no sig " : " SIGNED ") << " "
-          << el.m_text_comment << ENDL;
-      }
-
-      LOG_PRINT_L0(ss.str());
-
+     // update addr-to-alias db
+      add_alias_to_address(ai.m_address, ai.m_alias, true, tx_id);
     }
-
     //update alias db
     local_alias_history.push_back(ai);
     m_db_aliases.set(ai.m_alias, local_alias_history);
-
-    //update addr_to_alias db
-    address_to_aliases_container::t_value_type addr_to_alias_local2 = AUTO_VAL_INIT(addr_to_alias_local2);
-    auto addr_to_alias_ptr_2 = m_db_addr_to_alias.get(local_alias_history.back().m_address);
-    if (addr_to_alias_ptr_2)
-      addr_to_alias_local2 = *addr_to_alias_ptr_2;
-    
-    addr_to_alias_local2.insert(ai.m_alias);
-    m_db_addr_to_alias.set(local_alias_history.back().m_address, addr_to_alias_local2);
 
     LOG_PRINT_MAGENTA("[ALIAS_UPDATED]: " << ai.m_alias << ": from: " << old_address << " to " << get_account_address_as_str(ai.m_address), LOG_LEVEL_1);
     rise_core_event(CORE_EVENT_UPDATE_ALIAS, alias_info_to_rpc_update_alias_info(ai, old_address));
@@ -4809,7 +5065,9 @@ bool blockchain_storage::validate_asset_operation_hf4(asset_op_verification_cont
 bool blockchain_storage::validate_asset_operation_hf5(asset_op_verification_context& avc) const
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
-  CHECK_AND_ASSERT_MES(is_hardfork_active_for_height(ZANO_HARDFORK_05, avc.height), false, "validate_asset_operation was called before HF5");
+  bool hf5_active = is_hardfork_active_for_height(ZANO_HARDFORK_05, avc.height);
+  bool hf6_active = is_hardfork_active_for_height(ZANO_HARDFORK_06, avc.height);
+  CHECK_AND_ASSERT_MES(hf5_active, false, "validate_asset_operation was called before HF5");
 
   CHECK_AND_ASSERT_MES(get_or_calculate_asset_id(avc.ado, &avc.asset_id_pt, &avc.asset_id), false, "get_or_calculate_asset_id failed");
   avc.asset_op_history = m_db_assets.find(avc.asset_id);
@@ -4824,7 +5082,7 @@ bool blockchain_storage::validate_asset_operation_hf5(asset_op_verification_cont
     CHECK_AND_ASSERT_MES(ado.opt_descriptor.has_value(), false, "opt_descriptor is missing while registering asset " << avc.asset_id);
     avc.amount_to_validate = ado.opt_descriptor.get().current_supply;
     // HF5 specific
-    CHECK_AND_ASSERT_MES(validate_ado_initial(ado.opt_descriptor.get()), false, "validate_ado_initial failed!");
+    CHECK_AND_ASSERT_MES(validate_ado_initial(ado.opt_descriptor.get(), hf6_active), false, "validate_ado_initial failed!");
     CHECK_AND_ASSERT_MES(ado.opt_amount.has_value() && avc.amount_to_validate == ado.opt_amount.get(), false, "opt_amount is missing or incorrect");
   }
   else
@@ -4847,7 +5105,7 @@ bool blockchain_storage::validate_asset_operation_hf5(asset_op_verification_cont
       CHECK_AND_ASSERT_MES(ado.opt_descriptor.has_value(), false, "opt_descriptor is missing (update)");
       //check that total current_supply haven't changed
       CHECK_AND_ASSERT_MES(ado.opt_descriptor.get().current_supply == last_adb.current_supply, false, "update operation attempted to change emission, failed");
-      CHECK_AND_ASSERT_MES(validate_ado_update_allowed(ado.opt_descriptor.get(), last_adb), false, "update operation modifies asset descriptor in a prohibited manner");
+      CHECK_AND_ASSERT_MES(validate_ado_update_allowed(ado.opt_descriptor.get(), last_adb, hf6_active), false, "update operation modifies asset descriptor in a prohibited manner");
       need_to_validate_ao_amount_commitment = false;
     }
     else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT)
@@ -4901,7 +5159,7 @@ bool blockchain_storage::validate_asset_operation(asset_op_verification_context&
 {
   if (is_hardfork_active_for_height(ZANO_HARDFORK_05, height))
   {
-    return validate_asset_operation_hf5(avc);
+    return validate_asset_operation_hf5(avc); // HF5, HF6
   }
   else
   {
@@ -5094,7 +5352,7 @@ bool blockchain_storage::process_blockchain_tx_extra(const transaction& tx, cons
     r = prevalidate_alias_info(tx, ei.m_alias);
     CHECK_AND_ASSERT_MES(r, false, "failed to prevalidate_alias_info");
 
-    r = put_alias_info(tx, ei.m_alias);
+    r = put_alias_info(tx, ei.m_alias, tx_id);
     CHECK_AND_ASSERT_MES(r, false, "failed to put_alias_info");
   }
   if (ei.m_asset_operation.operation_type != ASSET_DESCRIPTOR_OPERATION_UNDEFINED)
@@ -5346,21 +5604,25 @@ bool blockchain_storage::change_gateway_balance(const crypto::hash& tx_id, const
 
   if (increase)
   {
-    CHECK_AND_ASSERT_MES(balance_entry.amount <= std::numeric_limits<uint64_t>::max() - amount, false, "Uint64 overflow, gateway address " << gw_addr_str << ", tx: " << tx_id << ", asset_id: " << asset_id);
+    CHECK_AND_ASSERT_MES(balance_entry.amount <= std::numeric_limits<uint64_t>::max() - amount, false, "Uint64 overflow, gateway address " << gw_addr_str << ", tx: " << tx_id << ", asset_id: " << asset_id << ", balance: " << balance_entry.amount << ", amount: " << amount);
     balance_entry.amount += amount;
   }
   else
   {
     // decrease
-    CHECK_AND_ASSERT_MES(balance_entry.amount >= amount, false, "Balance underflow, gateway address " << gw_addr_str << ", tx: " << tx_id << ", asset_id: " << asset_id);
+    CHECK_AND_ASSERT_MES(balance_entry.amount >= amount, false, "Balance underflow, gateway address " << gw_addr_str << ", tx: " << tx_id << ", asset_id: " << asset_id << ", balance: " << balance_entry.amount << ", amount: " << amount);
     balance_entry.amount -= amount;
   }
 
-  //update db
-  m_db_gateway_addresses.set(gw_addr, gw_addr_entry);
+  // update db (but only if there's smth to change)
+  if (balance_before != balance_entry.amount)
+  {
+    m_db_gateway_addresses.set(gw_addr, gw_addr_entry);
 
-  // for debugging
-  LOG_PRINT_L0("gateway address " << gw_addr_str << ", balance changed: " << balance_before << " -> " << balance_entry.amount << " (" << (increase ? "+" : "-") << amount << "), asset_id: " << asset_id);
+    // for debugging
+    LOG_PRINT_L0("gateway address " << gw_addr_str << ", balance changed: " << balance_before << " -> " << balance_entry.amount << " (" << (increase ? "+" : "-") << amount << "), asset_id: " << asset_id);
+  }
+
   return true;
 }
 
@@ -5502,21 +5764,34 @@ bool blockchain_storage::gateway_get_address_history(const currency::gateway_add
 
   std::vector<crypto::hash> tx_ids;
   m_db_gateway_transactions.get_subitems(addr_id, req.offset, count, tx_ids);
-  crypto::secret_key decrypt_key = {};
-  if (req.gateway_view_secret_key)
-    decrypt_key = *req.gateway_view_secret_key;
-
+  // the view secret key is OPTIONAL, if provided, decrypt server-side, if omitted, the  daemon does NOT decrypt
+  const bool has_key = req.gateway_view_secret_key.has_value() && !(*req.gateway_view_secret_key == currency::null_skey);
 
   for (const auto& tx_id : tx_ids)
   {
     tools::wallet_public::wallet_transfer_info wti = {};
     auto tx_ptr = m_db_transactions.get(tx_id);
     CHECK_AND_ASSERT_MES(tx_ptr, false, "gateway_get_address_history: internal error, tx id " << tx_id << " not found in m_db_transactions");
-    bool r = gateway_prepare_wti(addr_id, tx_id, decrypt_key, wti, *tx_ptr);
-    if(r)
+
+    if (has_key)
+    {
+      bool r = gateway_prepare_wti(addr_id, tx_id, *req.gateway_view_secret_key, wti, *tx_ptr);
+    if (r)
       res.transactions.push_back(wti);
+    }
+    else
+    {
+      bool decrypt_as_income = false;
+      bool found = false;
+      bool r = gateway_prepare_wti_public(addr_id, tx_id, wti, *tx_ptr, decrypt_as_income, found);
+      if (r)
+      {
+        res.raw_txs.push_back(epee::string_tools::buff_to_hex_nodelimer(t_serializable_object_to_blob(wti.tx)));
+        res.transactions.push_back(wti);
+      }
+    }
   }
-  
+
   return true;
 }
 
@@ -6447,7 +6722,7 @@ bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, 
 
   CHECK_AND_ASSERT_MES(scan_contex.zc_outs.size() == zc_in.key_offsets.size(), false, "incorrect number of referenced outputs found: " << scan_contex.zc_outs.size() << ", while " << zc_in.key_offsets.size() << " is expected.");
   CHECK_AND_ASSERT_MES(in_index < tx.signatures.size(), false, "tx.signatures.size (" << tx.signatures.size() << ") is less than or equal to in_index (" << in_index << ")");
-  // TODO: consider additional checks here
+  CHECK_AND_ASSERT_MES(tx.signatures[in_index].type() == typeid(ZC_sig), false, "unexpected tx.signatures[" << in_index << "].type() != typeid(ZC_sig): " << tx.signatures[in_index].type().name());
 
   // build a ring of references
   vector<crypto::CLSAG_GGX_input_ref_t> ring;
@@ -6465,12 +6740,10 @@ bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, 
 
   const ZC_sig& sig = boost::get<ZC_sig>(tx.signatures[in_index]);
 
-  //TIME_MEASURE_START_PD(tx_input_check_clsag_ggx);
-
+  TRY_ENTRY()
   bool r = crypto::verify_CLSAG_GGX(tx_hash_for_signature, ring, sig.pseudo_out_amount_commitment, sig.pseudo_out_blinded_asset_id, zc_in.k_image, sig.clsags_ggx);
   CHECK_AND_ASSERT_MES(r, false, "verify_CLSAG_GGX failed");
-
-  //TIME_MEASURE_FINISH_PD(tx_input_check_clsag_ggx);
+  CATCH_ENTRY("check_tx_input(ZC) -> verify_CLSAG_GGX", false);
 
   return true;
 }
@@ -6556,14 +6829,15 @@ std::vector<uint64_t> blockchain_storage::get_last_n_blocks_timestamps(size_t n)
 uint64_t blockchain_storage::get_last_n_blocks_timestamps_median(size_t n) const
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
-  auto it = m_timestamps_median_cache.find(n);
-  if (it != m_timestamps_median_cache.end())
-    return it->second;
+
+  uint64_t cached_median = 0;
+  if (m_timestamps_median_cache.visit(n, [&cached_median](const auto& kv){ cached_median = kv.second; }))
+    return cached_median;
 
   std::vector<uint64_t> timestamps = get_last_n_blocks_timestamps(n);
   uint64_t median_res = epee::misc_utils::median(timestamps);
   if (timestamps.size() == n)
-    m_timestamps_median_cache[n] = median_res;
+    m_timestamps_median_cache.emplace(n, median_res);
   return median_res;
 }
 //------------------------------------------------------------------
@@ -7145,12 +7419,23 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
     CHECK_AND_ASSERT_MES(tx.vin.size() <= CURRENCY_TX_MAX_ALLOWED_INPUTS, false, "transaction has too many inputs = " << tx.vin.size());
     CHECK_AND_ASSERT_MES(tx.vout.size() <= CURRENCY_TX_MAX_ALLOWED_OUTS,  false, "transaction has too many outputs = " << tx.vout.size());
 
+    bool has_gw_outs = std::any_of(tx.vout.begin(), tx.vout.end(), [](const tx_out_v& o) { return o.type() == typeid(tx_out_gateway); });
+
     if (mode_separate)
     {
       bool has_gw_ins  = std::any_of(tx.vin.begin(),  tx.vin.end(),  [](const txin_v& o)   { return o.type() == typeid(txin_gateway); });
-      bool has_gw_outs = std::any_of(tx.vout.begin(), tx.vout.end(), [](const tx_out_v& o) { return o.type() == typeid(tx_out_gateway); });
       CHECK_AND_ASSERT_MES(!has_gw_ins && !has_gw_outs, false, "TX_FLAG_SIGNATURE_MODE_SEPARATE is incompatible with gw ins/outs");
     }
+
+    if (has_gw_outs)
+    {
+      bool has_legacy_pid = has_tx_wide_payment_id(tx);
+      CHECK_AND_ASSERT_MES(!has_legacy_pid, false, "legacy tx-wide payment ID is incompatible with gateway outputs");
+    }
+
+    gateway_address_descriptor_operation gado{};
+    if (get_type_in_variant_container<gateway_address_descriptor_operation>(tx.extra, gado))
+      CHECK_AND_ASSERT_MES(validate_gateway_descriptor_operation_limits(gado), false, "transaction has invalid gateway descriptor");
   }
 
 
@@ -7528,82 +7813,6 @@ bool get_tx_from_cache(const crypto::hash& tx_id, transactions_map& tx_cache, tr
   return true;
 }
 //------------------------------------------------------------------
-bool blockchain_storage::collect_rangeproofs_data_from_tx(const transaction& tx, const crypto::hash& tx_id, std::vector<zc_outs_range_proofs_with_commitments>& agregated_proofs)
-{
-  if (tx.version <= TRANSACTION_VERSION_PRE_HF4)
-    return true;
-
-  size_t confidential_outs_count = 0;
-  for(auto& out_v : tx.vout)
-  {
-    VARIANT_SWITCH_BEGIN(out_v)
-      VARIANT_CASE_CONST(tx_out_zarcanum, out_zc)
-        ++confidential_outs_count;
-    //  VARIANT_CASE_CONST(tx_out_confidential_gateway, out_cgw)
-    //  ++confidential_outs_count;
-      VARIANT_CASE_CONST(tx_out_gateway, out_gw)
-        // nothing
-      VARIANT_CASE_OTHER()
-        LOG_ERROR("unexpected output type: " << out_v.type().name());
-        return false;
-    VARIANT_SWITCH_END()
-  }
-
-
-  size_t range_proofs_count = 0;
-  size_t out_index_offset = 0; //Consolidated Transactions have multiple zc_outs_range_proof entries
-  for (const auto& a : tx.proofs)
-  {
-    if (a.type() == typeid(zc_outs_range_proof))
-    {
-      const zc_outs_range_proof& zcrp = boost::get<zc_outs_range_proof>(a);
-
-      // validate aggregation proof, collect commitments from confidential outputs
-      std::vector<const crypto::public_key*> amount_commitment_ptrs_1div8, blinded_asset_id_ptrs_1div8;
-      for(size_t j = out_index_offset; j < tx.vout.size(); ++j)
-      {
-        VARIANT_SWITCH_BEGIN(tx.vout[j])
-          VARIANT_CASE_CONST(tx_out_zarcanum, out_zc) // other types are checked at the beggining
-            amount_commitment_ptrs_1div8.push_back(&out_zc.amount_commitment);
-            blinded_asset_id_ptrs_1div8.push_back(&out_zc.blinded_asset_id);
-        VARIANT_SWITCH_END()
-      }
-      uint8_t err = 0;
-      bool r = crypto::verify_vector_UG_aggregation_proof(tx_id, amount_commitment_ptrs_1div8, blinded_asset_id_ptrs_1div8, zcrp.aggregation_proof, &err);
-      CHECK_AND_ASSERT_MES(r, false, "verify_vector_UG_aggregation_proof failed with err code " << (int)err);
-
-
-      agregated_proofs.emplace_back(zcrp);
-
-      // convert amount commitments for aggregation from public_key to point_t form
-      // TODO: consider refactoring this ugly code
-      for (size_t i = 0; i != zcrp.aggregation_proof.amount_commitments_for_rp_aggregation.size(); i++)
-        agregated_proofs.back().amount_commitments.emplace_back(zcrp.aggregation_proof.amount_commitments_for_rp_aggregation[i]);
-
-      out_index_offset += zcrp.aggregation_proof.amount_commitments_for_rp_aggregation.size();
-      range_proofs_count++;
-    }
-  }
-
-
-  if (tx.hardfork_id >= ZANO_HARDFORK_06)
-  {
-    CHECK_AND_ASSERT_MES((confidential_outs_count == 0) == (range_proofs_count == 0), false, "transaction " << tx_id << " has inconsistent confidential outputs count (" << confidential_outs_count << ") and RPs count (" << range_proofs_count << ")");
-    CHECK_AND_ASSERT_MES(out_index_offset == confidential_outs_count, false, "range proof elements count doesn't match with confidential outputs count: " << out_index_offset << " != " << confidential_outs_count);
-    CHECK_AND_ASSERT_MES(confidential_outs_count == 0 || range_proofs_count == 1 || (get_tx_flags(tx) & TX_FLAG_SIGNATURE_MODE_SEPARATE), false, "transaction " << tx_id 
-      << " has confidential outputs, doesn't have TX_FLAG_SIGNATURE_MODE_SEPARATE, but has range_proofs_count = " << range_proofs_count);
-  }
-  else
-  {
-    CHECK_AND_ASSERT_MES(out_index_offset == confidential_outs_count, false, "range proof elements count doesn't match with confidential outputs count: " << out_index_offset << " != " << confidential_outs_count);
-    CHECK_AND_ASSERT_MES(range_proofs_count > 0, false, "transaction " << get_transaction_hash(tx) << " doesn't have range proofs");
-    CHECK_AND_ASSERT_MES(range_proofs_count == 1 || (get_tx_flags(tx) & TX_FLAG_SIGNATURE_MODE_SEPARATE), false, "transaction " << get_transaction_hash(tx) 
-      << " doesn't have TX_FLAG_SIGNATURE_MODE_SEPARATE but has range_proofs_count = " << range_proofs_count);
-  }
-
-  return true;
-}
-
 bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypto::hash& id, block_verification_context& bvc)
 {
   TIME_MEASURE_START_PD_MS(block_processing_time_0_ms);
@@ -7792,6 +8001,8 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
         bvc.m_verification_failed = true; 
         };
 
+      TRY_ENTRY()
+
       CHECK_AND_ASSERT_MES_CUSTOM(collect_rangeproofs_data_from_tx(tx, tx_id, range_proofs_agregated), false, cleanup(),
         "block " << id << ", tx " << tx_id << ": collect_rangeproofs_data_from_tx failed");
 
@@ -7800,6 +8011,9 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
 
       CHECK_AND_ASSERT_MES_CUSTOM(verify_asset_surjection_proof(tx, tx_id), false, cleanup(),
         "block " << id << ", tx " << tx_id << ": verify_asset_surjection_proof failed");
+
+      CATCH_ENTRY_RETHROW_BAD_ALLOC()
+      CATCH_ENTRY_CUSTOM_LOG_OP(LOG_PRINT_RED_L0, LOCATION_SS, cleanup(), false);
     }
 
     TIME_MEASURE_START_PD(tx_add_one_tx_time);
@@ -8289,7 +8503,7 @@ bool blockchain_storage::prevalidate_block(const block& bl)
   if (bl.minor_version > CURRENT_BLOCK_MINOR_VERSION)
   {
     //this means that binary block is compatible, but semantics got changed due to hardfork, daemon should be updated
-    LOG_PRINT_MAGENTA("Block's MINOR_VERSION is: " << bl.minor_version 
+    LOG_PRINT_MAGENTA("Block's MINOR_VERSION is: " << (int)bl.minor_version 
       << ", while current build supports not bigger then " <<  CURRENT_BLOCK_MINOR_VERSION 
       << ", please make sure you using latest version.", LOG_LEVEL_0
     );
@@ -8989,8 +9203,10 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
       CHECK_AND_ASSERT_MES(input_index < input_tx.signatures.size(), false, "input_index = " << input_index << ", isn't less than input_tx.signatures.size() = " << input_tx.signatures.size());
       CHECK_AND_ASSERT_MES(input_tx.signatures[input_index].type() == typeid(ZC_sig), false, "input_tx.signatures[" << input_index << "] has wrong type: " << input_tx.signatures[input_index].type().name());
       const ZC_sig& sig = boost::get<ZC_sig>(input_tx.signatures[input_index]);
+      TRY_ENTRY()
       bool r = crypto::verify_CLSAG_GGX(tx_hash_for_signature, zc_input_ring, sig.pseudo_out_amount_commitment, sig.pseudo_out_blinded_asset_id, input_key_image, sig.clsags_ggx);
       CHECK_AND_ASSERT_MES(r, false, "verify_CLSAG_GGX failed");
+      CATCH_ENTRY("validate_alt_block_input -> verify_CLSAG_GGX", false);
     }
   VARIANT_CASE_OTHER()
     LOG_ERROR("unexpected input type: " << input_v.type().name());
@@ -9317,7 +9533,8 @@ bool blockchain_storage::validate_alt_block_txs(const block& b, const crypto::ha
     }
     const transaction& tx = it == abei.onboard_transactions.end() ? *tx_ptr : it->second;
 
-    CHECK_AND_ASSERT_MES(tx.signatures.size() == tx.vin.size(), false, "invalid tx: signatures.size() == " <<  tx.signatures.size() << ", tx.vin.size() == " << tx.vin.size());
+    CHECK_AND_ASSERT_MES(tx.signatures.size() == tx.vin.size(), false, "invalid alt block tx " << tx_id << ": signatures.size() == " <<  tx.signatures.size() << ", tx.vin.size() == " << tx.vin.size());
+    CHECK_AND_ASSERT_MES(validate_tx_semantic(tx, get_object_blobsize(tx), tx_id), false, "invalid alt block tx " << tx_id << ": semantic validation failed");
 
     fees.push_back(get_tx_fee(tx));
 
@@ -9364,12 +9581,17 @@ bool blockchain_storage::validate_alt_block_txs(const block& b, const crypto::ha
 //------------------------------------------------------------------
 bool blockchain_storage::is_block_fit_for_strategy(uint64_t h, const std::string& strategy) const
 {
-  block blk;
-  if (!get_block_by_height(h, blk))
+  CRITICAL_REGION_LOCAL(m_read_lock);
+  if (h >= m_db_blocks.size())
   {
     return false;
   }
 
+  return is_block_fit_for_strategy(m_db_blocks[h]->bl, strategy);
+}
+//------------------------------------------------------------------
+bool blockchain_storage::is_block_fit_for_strategy(const block& blk, const std::string& strategy) const
+{
   if (strategy == LOOK_UP_STRATEGY_REGULAR_TX)
   {
     return !blk.tx_hashes.empty();
@@ -9397,33 +9619,65 @@ bool blockchain_storage::collect_all_outs_in_block(uint64_t input_amount, uint64
     return false;
   }
 
-  auto bei_ptr = m_db_blocks[height];
+  return collect_all_outs_in_block(input_amount, *m_db_blocks[height], outs);
+}
+//------------------------------------------------------------------
+bool blockchain_storage::collect_all_outs_in_block(uint64_t input_amount, const block_extended_info& bei, std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry>& outs) const
+{
+  CRITICAL_REGION_LOCAL(m_read_lock);
+
+  const uint64_t height = bei.height;
   const uint64_t mix_count = this->get_core_runtime_config().hf4_minimum_mixins;
 
-  auto process_tx = [&](const crypto::hash& txid, const transaction& tx) -> bool
+  auto process_tx = [&](const crypto::hash& txid, const transaction_chain_entry& tx_entry) -> bool
   {
-    std::vector<uint64_t> gidx;
-    CHECK_AND_ASSERT_MES(this->get_tx_outputs_gindexs(txid, gidx), false, "failed to get_tx_outputs_gindexs() for tx_id " << txid);
+    const transaction& tx = tx_entry.tx;
+
+    if (tx.vout.empty())
+    {
+      LOG_PRINT_L2("collect_all_outs_in_block: skipping tx " << txid << " height " << height << " - it has no outputs (alias-like tx), nothing to collect for decoys");
+      return true;
+    }
+
+    const std::vector<uint64_t>& gidx = tx_entry.m_global_output_indexes;
+    if (gidx.empty())
+    {
+      LOG_PRINT_L2("collect_all_outs_in_block: skipping tx " << txid << " height " << height << " - empty global output index, nothing to collect for decoys");
+      return true;
+    }
+
     CHECK_AND_ASSERT_MES(gidx.size() == tx.vout.size(), false, "gidx size (" << gidx.size() << ") != tx vout size (" << tx.vout.size() << ") for tx_id " << txid);
 
     for (size_t i = 0; i < tx.vout.size(); ++i)
     {
       uint64_t amount = 0;
 
+      bool out_is_decoy_eligible = false;
       VARIANT_SWITCH_BEGIN(tx.vout[i]);
       VARIANT_CASE_CONST(tx_out_bare, o)
       {
-        amount = o.amount;
+        if (o.target.type() == typeid(txout_to_key))
+        {
+          amount = o.amount;
+          out_is_decoy_eligible = true;
+        }
       }
       VARIANT_CASE_CONST(tx_out_zarcanum, dummy_zc)
       {
         amount = 0;
+        out_is_decoy_eligible = true;
       }
       VARIANT_SWITCH_END();
 
+      // skip for multisig gateway and other, cuz they have no out in m_global_output_indexes
+      if (!out_is_decoy_eligible)
+        continue;
+
+      if (amount != input_amount)
+        continue;
+
       COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry oen{};
-      if (this->build_random_out_entry(amount, gidx[i], mix_count, /*use_only_forced_to_mix=*/false, /*height_upper_limit=*/0, oen) &&
-        amount == input_amount) // for pre-zc inputs
+      if (this->build_random_out_entry_from_tx_entry(tx_entry, i, amount, gidx[i], mix_count, /*use_only_forced_to_mix=*/false, /*height_upper_limit=*/0, oen))
       {
         outs.emplace_back(oen);
       }
@@ -9432,13 +9686,21 @@ bool blockchain_storage::collect_all_outs_in_block(uint64_t input_amount, uint64
   };
   // miner tx
   {
-    const crypto::hash miner_txid = get_transaction_hash(bei_ptr->bl.miner_tx);
-    if (!process_tx(miner_txid, bei_ptr->bl.miner_tx))
-      return false;
+    const crypto::hash miner_txid = get_transaction_hash(bei.bl.miner_tx);
+    auto tx_ptr = m_db_transactions.find(miner_txid);
+    if (tx_ptr)
+    {
+      if (!process_tx(miner_txid, *tx_ptr))
+        return false;
+    }
+    else
+    {
+      LOG_PRINT_L2("collect_all_outs_in_block: skipping miner tx " << miner_txid << " height " << height << " - not found in transaction DB");
+    }
   }
 
   // regular txs
-  for (const crypto::hash& txid : bei_ptr->bl.tx_hashes)
+  for (const crypto::hash& txid : bei.bl.tx_hashes)
   {
     auto tx_ptr = m_db_transactions.find(txid);
     if (!tx_ptr)
@@ -9446,7 +9708,7 @@ bool blockchain_storage::collect_all_outs_in_block(uint64_t input_amount, uint64
       continue; // cant find - skipping
     }
 
-    if (!process_tx(txid, tx_ptr->tx))
+    if (!process_tx(txid, *tx_ptr))
       return false;
   }
 

@@ -55,6 +55,8 @@ const command_line::arg_descriptor<bool> arg_disable_logs_init("disable-logs-ini
 const command_line::arg_descriptor<std::string> arg_qt_dev_tools  ( "qt-dev-tools", "Enable main web page inspection with Chromium DevTools, <vertical|horizontal>[,scale], e.g. \"horizontal,1.3\"", "");
 const command_line::arg_descriptor<bool> arg_disable_price_fetch("gui-disable-price-fetch", "Disable price fetching in UI(for privacy matter)");
 const command_line::arg_descriptor<bool> arg_allow_weak_password("allow-weak-password", "Allow setting a wallet password that doesn't meet the password policy");
+const command_line::arg_descriptor<bool> arg_unsecure_disable_extension_id_check("unsecure-disable-extension-id-check", "Disable official extension ID check for HTTP requests");
+
 
 const command_line::arg_descriptor<std::string> arg_xcode_stub("-NSDocumentRevisionsDebugMode", "Substitute for xcode bug");
 const command_line::arg_descriptor<std::string> arg_sandbox_disable("no-sandbox", "Substitute for ubuntu/linux rendering problem");
@@ -88,6 +90,8 @@ wallets_manager::wallets_manager():m_pview(&m_view_stub),
   m_offers_service.set_disabled(true);
   m_pproxy_diganostic_info = m_rpc_proxy->get_proxy_diagnostic_info();
 #endif
+
+
 	//m_ccore.get_blockchain_storage().get_attachment_services_manager().add_service(&m_offers_service);
 }
 
@@ -200,6 +204,7 @@ bool wallets_manager::init_command_line(int argc, char* argv[], std::string& fai
   command_line::add_arg(desc_cmd_sett, arg_qt_dev_tools);
   command_line::add_arg(desc_cmd_sett, arg_disable_price_fetch);
   command_line::add_arg(desc_cmd_only, arg_allow_weak_password);
+  command_line::add_arg(desc_cmd_sett, arg_unsecure_disable_extension_id_check);
   
   command_line::add_arg(desc_cmd_sett, command_line::arg_enable_tx_socks5_relay_proxy);
   command_line::add_arg(desc_cmd_sett, command_line::arg_tx_relay_url);
@@ -211,6 +216,7 @@ bool wallets_manager::init_command_line(int argc, char* argv[], std::string& fai
 #ifndef MOBILE_WALLET_BUILD
   currency::core::init_options(desc_cmd_sett);
   currency::core_rpc_server::init_options(desc_cmd_sett);
+  //tools::wallet_rpc_server::init_options(desc_cmd_sett);
   nodetool::node_server<currency::t_currency_protocol_handler<currency::core> >::init_options(desc_cmd_sett);
 #ifdef CPU_MINING_ENABLED
   currency::miner::init_options(desc_cmd_sett);
@@ -272,7 +278,6 @@ bool wallets_manager::init_command_line(int argc, char* argv[], std::string& fai
 
   m_qt_logs_enbaled = command_line::get_arg(m_vm, arg_enable_qt_logs);
   m_qt_dev_tools = command_line::get_arg(m_vm, arg_qt_dev_tools);
-
   return true;
   CATCH_ENTRY2(false);
 }
@@ -329,6 +334,11 @@ bool wallets_manager::init(view::i_view* pview_handler)
   {
     m_ui_opt.disable_price_fetch = true;
   }
+  if(command_line::has_arg(m_vm, arg_unsecure_disable_extension_id_check) && command_line::get_arg(m_vm, arg_unsecure_disable_extension_id_check))
+  {
+    m_wallet_rpc_server.get_origin_verifier().set_enabled(false);
+  }
+
   //if (command_line::has_arg(m_vm, command_line::arg_allow_legacy_payment_id_size))
   //{
   //  m_allow_legacy_payment_id_size = true;
@@ -592,6 +602,7 @@ bool wallets_manager::init_local_daemon()
   m_pview->update_daemon_status(dsi);
   res = m_ccore.init(m_vm);
   CHECK_AND_ASSERT_AND_SET_GUI(res,  "Failed to initialize core");
+  m_ccore.get_blockchain_storage().measure_db_performance();
   LOG_PRINT_L0("Core initialized OK");
 
   //check if offers module synchronized with blockchaine storage
@@ -632,9 +643,9 @@ bool wallets_manager::init_local_daemon()
   m_pview->update_daemon_status(dsi);
   res = m_rpc_server.init(m_vm);
   CHECK_AND_ASSERT_AND_SET_GUI(res, "Failed to initialize core rpc server.");
-  LOG_PRINT_GREEN("Core rpc server initialized OK on port: " << m_rpc_server.get_binded_port(), LOG_LEVEL_0);
+  LOG_PRINT_GREEN("Core rpc server initialized OK on port: " << m_rpc_server.get_bound_port(), LOG_LEVEL_0);
 
-  m_ui_opt.rpc_port = m_rpc_server.get_binded_port();
+  m_ui_opt.rpc_port = m_rpc_server.get_bound_port();
 
 
   //chain calls to rpc server
@@ -1708,6 +1719,12 @@ std::string wallets_manager::transfer(uint64_t wallet_id, const view::transfer_p
     api_return_code_result
     );
   
+  if (api_return_code_result == API_RETURN_CODE_OK && !tr_res.tx_details.has_value())
+    return API_RETURN_CODE_INTERNAL_ERROR + std::string(" tx_details is absent, while return code is OK");
+
+  if (tr_res.tx_details.has_value())
+      res_tx = tr_res.tx_details->tx;
+
   return api_return_code_result;
 }
 
@@ -1721,11 +1738,21 @@ bool wallets_manager::get_is_remote_daemon_connected()
 std::string wallets_manager::get_connectivity_status()
 {
   view::general_connectivity_info gci{};
-  gci.is_online = get_is_remote_daemon_connected();
-  gci.last_daemon_is_disconnected = m_pproxy_diganostic_info->last_daemon_is_disconnected;
+  if (m_pproxy_diganostic_info->incompatible_server)
+  {
+    gci.is_online = false;
+    gci.last_daemon_is_disconnected = true;
+    gci.incompatible_server = true;
+  }
+  else
+  {
+    gci.is_online                   = get_is_remote_daemon_connected();
+    gci.last_daemon_is_disconnected = m_pproxy_diganostic_info->last_daemon_is_disconnected;
+    gci.last_proxy_communicate_timestamp = m_rpc_proxy->get_last_success_interract_time();
+    gci.incompatible_server = false;
+  }
   gci.is_server_busy = m_pproxy_diganostic_info->is_busy;
   gci.is_remote_node_mode = m_remote_node_mode;
-  gci.last_proxy_communicate_timestamp = m_rpc_proxy->get_last_success_interract_time();
   return epee::serialization::store_t_to_json(gci);
 }
 
@@ -2289,7 +2316,11 @@ void wallets_manager::wallet_vs_options::worker_func()
 
   while (!major_stop)
   {
+    // as not every path in the loop is guaranteed to sleep if it's at the end, we need to put sleep here to avoid busy loop
+    boost::this_thread::sleep_for(boost::chrono::milliseconds(100));
     stop_for_refresh = false;
+    if(major_stop)
+      break;
     try
     {
       if (m_pproxy_diagnostig_info->last_daemon_is_disconnected.load())
@@ -2306,14 +2337,14 @@ void wallets_manager::wallet_vs_options::worker_func()
       //sync zone
       if (*plast_daemon_network_state == currency::COMMAND_RPC_GET_INFO::daemon_network_state_online)
       {
-        if (*plast_daemon_height != last_wallet_synch_height)
+        if (*plast_daemon_height > last_wallet_synch_height)
         {
           wsi.is_mining = do_mining;
           bool show_progress = true;
-          if (last_wallet_synch_height && *plast_daemon_height - last_wallet_synch_height < 3)
+          if(last_wallet_synch_height && *plast_daemon_height >= last_wallet_synch_height && *plast_daemon_height - last_wallet_synch_height < 3)
             show_progress = false;
 
-          if(*plast_daemon_height - last_wallet_synch_height > 10)
+          if(*plast_daemon_height >= last_wallet_synch_height && *plast_daemon_height - last_wallet_synch_height > 10)
           {
             CRITICAL_REGION_LOCAL(long_refresh_in_progress_lock);
             long_refresh_in_progress = true;
@@ -2327,20 +2358,28 @@ void wallets_manager::wallet_vs_options::worker_func()
             pview->update_wallet_status(wsi);
           }
           w->get()->refresh(stop_for_refresh);
+          if(major_stop)
+            break;
+          last_wallet_synch_height = w->get()->get_blockchain_current_size();
+          if((stop_for_refresh && !major_stop) || (*plast_daemon_height >= last_wallet_synch_height && *plast_daemon_height - last_wallet_synch_height > 3))
+          {            
+            // something wrong with the refresh, let's wait a bit and try again
+            for(size_t i = 0; i < 50 && !major_stop; ++i) boost::this_thread::sleep_for(boost::chrono::milliseconds(100));
+
+            continue;
+          }
+
           long_refresh_in_progress = false;
           w->get()->resend_unconfirmed();
-          {
-            auto w_ptr = *w; // get locked exclusive access to the wallet first (it's more likely that wallet is locked for a long time than 'offers')
-            auto offers_list_proxy = *offers; // than get locked exclusive access to offers
-            offers_list_proxy->clear();
-            (*w_ptr)->get_actual_offers(*offers_list_proxy);
-          }
 
           wallet_state = wsi.wallet_state = view::wallet_status_info::wallet_state_ready;
           prepare_wallet_status_info(*this, wsi);
           pview->update_wallet_status(wsi);
-          //do refresh
-          last_wallet_synch_height = static_cast<uint64_t>(*plast_daemon_height);
+          //do refresh          
+        }
+        else
+        {
+          long_refresh_in_progress = false;
         }
 
         scan_pool_interval.do_call([&](){
@@ -2359,7 +2398,7 @@ void wallets_manager::wallet_vs_options::worker_func()
         });
       }
 
-      if (major_stop || stop_for_refresh)
+      if (major_stop)
         break;
       //******************************************************************************************
       //mining zone
@@ -2407,7 +2446,6 @@ void wallets_manager::wallet_vs_options::worker_func()
       pview->update_wallet_status(wsi);
       continue;
     }
-    boost::this_thread::sleep_for(boost::chrono::milliseconds(100));
   }
   LOG_PRINT_GREEN("[WALLET_HANDLER] Wallet thread thread stopped", LOG_LEVEL_0);
 }

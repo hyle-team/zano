@@ -336,6 +336,12 @@ namespace currency
     CHECK_CORE_READY();
     CHECK_RPC_LIMITS(req.block_ids.size(), RPC_LIMIT_COMMAND_RPC_GET_BLOCKS_DIRECT_BLOCK_IDS);
 
+    if (req.block_ids.empty())
+    {
+      res.status = API_RETURN_CODE_GENESIS_MISMATCH;
+      return true;
+    }
+
     if (req.block_ids.back() != m_core.get_blockchain_storage().get_block_id_by_height(0))
     {
       //genesis mismatch, return specific
@@ -375,6 +381,16 @@ namespace currency
     CHECK_CORE_READY();
     CHECK_RPC_LIMITS(req.block_ids.size(), RPC_LIMIT_COMMAND_RPC_GET_BLOCKS_DIRECT_BLOCK_IDS);
     LOG_PRINT_L2("[on_get_blocks]: Prevalidating....");
+
+    res.current_height   = m_core.get_blockchain_storage().get_current_blockchain_size();
+    res.current_hardfork = m_core.get_blockchain_storage().get_core_runtime_config().hard_forks.get_the_most_recent_hardfork_id_for_height(res.current_height);
+
+    if (req.block_ids.empty())
+    {
+      res.status = API_RETURN_CODE_GENESIS_MISMATCH;
+      return true;
+    }
+
     if (req.block_ids.back() != m_core.get_blockchain_storage().get_block_id_by_height(0))
     {
       //genesis mismatch, return specific
@@ -395,7 +411,6 @@ namespace currency
       res.status = API_RETURN_CODE_FAIL;
       return false;
     }
-    res.current_hardfork = m_core.get_blockchain_storage().get_core_runtime_config().hard_forks.get_the_most_recent_hardfork_id_for_height(res.current_height);
 
     LOG_PRINT_L2("[on_get_blocks]: Enumerating over blocks ....");
     for (auto& b : bs)
@@ -473,21 +488,6 @@ namespace currency
     return true;
   }
 
-    //------------------------------------------------------------------------------------------------------------------------------
-  bool core_rpc_server::on_get_random_outs1(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::request& req, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::response& res, connection_context& cntx)
-  {
-    CHECK_CORE_READY();
-    CHECK_RPC_LIMITS(req.amounts.size(), RPC_LIMIT_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS);
-    res.status = API_RETURN_CODE_FAIL;
-
-    if(!m_core.get_random_outs_for_amounts(req, res))
-    {
-      return true;
-    }
-
-    res.status = API_RETURN_CODE_OK;
-    return true;
-  }
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_get_random_outs3(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::request& req, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::response& res, connection_context& cntx)
   {
@@ -902,6 +902,10 @@ namespace currency
 
     res.tx_blob = t_serializable_object_to_blob(ftx.tx);
     res.tx_id = get_transaction_hash(ftx.tx);
+    res.tx_secret_key = ftx.one_time_key;
+    for(const auto& de : ftp.prepared_destinations)
+      if (de.addr.size() == 1)
+        res.outputs_addresses.push_back(currency::get_account_address_as_str(de.addr.back()));
 
     crypto::hash tx_hash_for_input_sig = currency::prepare_prefix_hash_for_sign(ftx.tx, 0, res.tx_id);
     if (tx_hash_for_input_sig == currency::null_hash)
@@ -1224,13 +1228,6 @@ namespace currency
   {
     CHECK_RPC_LIMITS(req.count, RPC_LIMIT_COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY);
 
-    if (req.gateway_view_secret_key == currency::null_skey)
-    {
-      res.status = API_RETURN_CODE_BAD_ARG;
-      res.status_error = "gateway_view_secret_key is required, must be a non-null secret";
-      return true;
-    }
-
     currency::gateway_address_id_type addr_id = {};
     address_v v_addr = {};
     payment_id_t dummy_payment_id = {};
@@ -1516,6 +1513,9 @@ namespace currency
           auto& decoded_out = res.decoded_outputs.emplace_back();
           decoded_out.out_index = out_idx;
           decoded_out.address = req.outputs_addresses[addr_idx];
+          decoded_out.amount = gwo.amount;
+          if (!crypto::pub_key_mul8(gwo.asset_id, decoded_out.asset_id))
+            decoded_out.asset_id = currency::null_pkey;
           return currency::decode_output_data(gwo, derivation, out_idx, decoded_out.payment_id);
         VARIANT_CASE_OTHER()
           unknown_output_type = true;
@@ -1851,6 +1851,7 @@ namespace currency
     {
       error_resp.code = CORE_RPC_ERROR_CODE_TOO_BIG_HEIGHT;
       error_resp.message = std::string("To big height: ") + std::to_string(h) + ", current blockchain size = " +  std::to_string(m_core.get_current_blockchain_size());
+      return false;
     }
     res = string_tools::pod_to_hex(m_core.get_block_id_by_height(h));
     return true;
@@ -2068,7 +2069,28 @@ namespace currency
     size_t sim_count = 0;
     account_base acc;
     acc.generate();
-    while (simulation_result_str == API_RETURN_CODE_SIMULATION_FAILED)
+    
+    //as range_proofs are calculated for the whole block due to performance optimization and in case of failure it's not possible to say 
+    // which particular tx broke whole thing, we have to check range proos separately for each transactions before we go into the loop.
+    std::list<std::pair<crypto::hash, transaction>> txs;
+    bool r = m_core.get_tx_pool().get_all_transactions_list(txs);
+    CHECK_AND_ASSERT_MES_NO_RET(r, "get_all_transactions_list() failed");
+    size_t tx_count_in_pool = txs.size();
+    for(const auto& tx_pair : txs)
+    {
+      const auto& tx = tx_pair.second;
+      if(!currency::check_single_tx_range_proofs(tx, tx_pair.first))
+      {
+        LOG_PRINT_MAGENTA("Transaction " << tx_pair.first << " has invalid range proof, will be blacklisted", LOG_LEVEL_0);
+        m_core.get_tx_pool().add_transaction_to_black_list(tx);
+      }
+    }
+
+    // simulation suposed to blacklist failing transactions, so we will try to call getblocktemplate 
+    // in simulation mode until it will return something else than "simulation failed" or until we will 
+    // reach the number of transactions in the pool + 1 (to avoid infinite loop)
+
+    while(simulation_result_str == API_RETURN_CODE_SIMULATION_FAILED && sim_count < tx_count_in_pool+1)
     {
       //calling getblocktemplate in simulation mode
       currency::COMMAND_RPC_GETBLOCKTEMPLATE::request tmpl_req_sim = AUTO_VAL_INIT(tmpl_req_sim);
@@ -2516,7 +2538,7 @@ namespace currency
     COMMAND_RPC_GET_ALIAS_DETAILS::request req2 = AUTO_VAL_INIT(req2);
     COMMAND_RPC_GET_ALIAS_DETAILS::response res2 = AUTO_VAL_INIT(res2);
 
-    std::set<std::string> aliases = m_core.get_blockchain_storage().get_aliases_by_address(addr);
+    std::set<std::string> aliases = m_core.get_blockchain_storage().get_aliases_by_address(addr, res.default_alias);
 
     if (!aliases.size())
     {

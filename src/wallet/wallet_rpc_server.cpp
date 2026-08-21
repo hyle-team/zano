@@ -243,7 +243,7 @@ namespace tools
 
     if (do_server_init && m_jwt_secret.empty() && !m_deaf && !command_line::has_arg(vm, arg_unsecure_no_auth))
     {
-      LOG_PRINT_RED("Running wallet RPC server without --jwt-secret is INSECURE: every endpoint would be reachable without authentication." << ENDL
+      LOG_PRINT_YELLOW("Running wallet RPC server without --jwt-secret is INSECURE: every endpoint would be reachable without authentication." << ENDL
         << "Use --jwt-secret <secret> to enable JWT auth, --deaf to disable all handlers, or --unsecure-no-auth to acknowledge the risk.", LOG_LEVEL_0);
       return false;
     }
@@ -255,6 +255,12 @@ namespace tools
   //------------------------------------------------------------------------------------------------------------------------------
   bool wallet_rpc_server::auth_http_request(const epee::net_utils::http::http_request_info& query_info, epee::net_utils::http::http_response_info& response, connection_context& conn_context)
   {
+    //verify extension id first
+    if(!m_origin_verifier.is_valid_request(query_info))
+    {
+      return false;
+    }
+
 
     auto it = std::find_if(query_info.m_header_info.m_etc_fields.begin(), query_info.m_header_info.m_etc_fields.end(), [](const auto& element)
                            { return !epee::string_tools::compare_no_case(element.first, ZANO_ACCESS_TOKEN); });
@@ -728,20 +734,6 @@ namespace tools
       extra.push_back(comment);
     }
 
-    if (req.push_payer)
-    {
-      er.code = WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT;
-      er.message = "push_payer=true is not supported anymore";
-      return false;
-    }
-
-    /*if (!req.hide_receiver)
-    {
-      er.code = WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT;
-      er.message = "hide_receiver=false is not supported anymore";
-      return false;
-    }*/
-
     currency::finalized_tx result{};
     std::string unsigned_tx_blob_str;
     ctp.fee = req.fee;
@@ -834,12 +826,18 @@ namespace tools
         if (payment.m_unlock_time > payment.m_block_height + WALLET_DEFAULT_TX_SPENDABLE_AGE)
           continue;
       }
-      wallet_public::payment_details rpc_payment;
+      wallet_public::payment_details rpc_payment{};
       rpc_payment.payment_id   = req.payment_id;
       rpc_payment.tx_hash      = epee::string_tools::pod_to_hex(payment.m_tx_hash);
       rpc_payment.amount       = payment.m_amount;
       rpc_payment.block_height = payment.m_block_height;
       rpc_payment.unlock_time  = payment.m_unlock_time;
+      for (auto& st : payment.subtransfers)
+      {
+        auto& pst = rpc_payment.payment_subtransfers.emplace_back();
+        pst.amount = st.amount;
+        pst.asset_id = st.asset_id;
+      }
       res.payments.push_back(rpc_payment);
     }
     WALLET_RPC_CATCH_TRY_ENTRY();
@@ -851,13 +849,13 @@ namespace tools
     WALLET_RPC_BEGIN_TRY_ENTRY();
     res.payments.clear();
 
-    for (auto & payment_id_str : req.payment_ids)
+    for (auto& payment_id_hex_str : req.payment_ids)
     {
       currency::payment_id_t payment_id;
-      if (!currency::parse_payment_id_from_hex_str(payment_id_str, payment_id))
+      if (!currency::parse_payment_id_from_hex_str(payment_id_hex_str, payment_id))
       {
         er.code = WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID;
-        er.message = std::string("invalid payment id given: \'") + payment_id_str + "\', hex-encoded string was expected";
+        er.message = std::string("invalid payment id given: \'") + payment_id_hex_str + "\', hex-encoded string was expected";
         return false;
       }
 
@@ -874,12 +872,18 @@ namespace tools
             continue;
         }
 
-        wallet_public::payment_details rpc_payment;
-        rpc_payment.payment_id = payment_id_str;
-        rpc_payment.tx_hash = epee::string_tools::pod_to_hex(payment.m_tx_hash);
-        rpc_payment.amount = payment.m_amount;
-        rpc_payment.block_height = payment.m_block_height;
-        rpc_payment.unlock_time = payment.m_unlock_time;
+        wallet_public::payment_details rpc_payment{};
+        rpc_payment.payment_id    = payment_id_hex_str;
+        rpc_payment.tx_hash       = epee::string_tools::pod_to_hex(payment.m_tx_hash);
+        rpc_payment.amount        = payment.m_amount;
+        rpc_payment.block_height  = payment.m_block_height;
+        rpc_payment.unlock_time   = payment.m_unlock_time;
+        for (auto& st : payment.subtransfers)
+        {
+          auto& pst = rpc_payment.payment_subtransfers.emplace_back();
+          pst.amount = st.amount;
+          pst.asset_id = st.asset_id;
+        }
         res.payments.push_back(std::move(rpc_payment));
       }
     }
@@ -1532,7 +1536,7 @@ namespace tools
     //make local req so we can modify it (if needed)
     wallet_public::COMMAND_ASSETS_DEPLOY::request req = req_;
 
-    if (!currency::validate_asset_ticker_and_full_name(req.asset_descriptor))
+    if (!currency::validate_asset_ticker_full_name_and_meta_info(req.asset_descriptor))
     {
       er.code = WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT;
       er.message = "asset ticker or full_name is invalid";
@@ -1799,7 +1803,12 @@ namespace tools
   bool wallet_rpc_server::on_decrypt_data(const wallet_public::COMMAND_DECRYPT_DATA::request& req, wallet_public::COMMAND_DECRYPT_DATA::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
     WALLET_RPC_BEGIN_TRY_ENTRY();
-    w.get_wallet()->decrypt_buffer(req.buff, res.res_buff);
+    if (!w.get_wallet()->decrypt_buffer(req.buff, res.res_buff))
+    {
+      er.code = WALLET_RPC_ERROR_CODE_GENERIC_ERROR;
+      er.message = "decryption failed, bad input data given";
+      return false;
+    }
     return true;
     WALLET_RPC_CATCH_TRY_ENTRY();
   }

@@ -481,6 +481,7 @@ bool test_generator::build_wallets(const blockchain_vector& blockchain,
         const uint64_t zc_hard_cap = m_blockchain.size() - CURRENCY_HF4_MANDATORY_MIN_COINAGE;
         zc_cap = std::min<uint64_t>(hul_exclusive, zc_hard_cap);
       }
+      const uint64_t mix_count = m_core_runtime_config.hf4_minimum_mixins;
 
       auto block_fits = [&](uint64_t h) -> bool
       {
@@ -493,7 +494,7 @@ bool test_generator::build_wallets(const blockchain_vector& blockchain,
         return false;
       };
 
-      auto gather_from_tx = [&](uint64_t h, const currency::transaction& tx, const crypto::hash& txid, bool is_coinbase,
+      auto gather_from_tx = [&](uint64_t input_amount, uint64_t h, const currency::transaction& tx, const crypto::hash& txid, bool is_coinbase,
         bool is_pos_block_flag, std::vector<currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry>& outs_vec)
       {
         const auto& gidx = get_tx_gindex_from_map(txid, m_txs_outs);
@@ -509,6 +510,8 @@ bool test_generator::build_wallets(const blockchain_vector& blockchain,
             continue;
           if (mix_attr == CURRENCY_TO_KEY_OUT_FORCED_NO_MIX)
             continue;
+          if (mix_attr != CURRENCY_TO_KEY_OUT_RELAXED && mix_attr > mix_count)
+            continue;
 
           currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry oe{};
           bool ok = false;
@@ -516,14 +519,14 @@ bool test_generator::build_wallets(const blockchain_vector& blockchain,
           VARIANT_SWITCH_BEGIN(out_v)
             VARIANT_CASE_CONST(currency::tx_out_zarcanum, zc)
             {
-              if (!zc_allowed || h > zc_cap)
+              if (input_amount != 0 || !zc_allowed || h > zc_cap)
                 break;
               oe = currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry(gidx[i], zc.stealth_address, zc.amount_commitment, zc.concealing_point, zc.blinded_asset_id);
               ok = true;
             }
             VARIANT_CASE_CONST(currency::tx_out_bare, br)
             {
-              if (h > hul_exclusive)
+              if (input_amount == 0 || br.amount != input_amount || h > hul_exclusive)
                 break;
 
               if (br.target.type() == typeid(currency::txout_to_key))
@@ -551,7 +554,7 @@ bool test_generator::build_wallets(const blockchain_vector& blockchain,
       };
 
       // collect block at height h and add to out_blocks if outs are present
-      auto collect_from_height = [&](uint64_t h, std::unordered_set<uint64_t>& seen_set,
+      auto collect_from_height = [&](uint64_t input_amount, uint64_t h, std::unordered_set<uint64_t>& seen_set,
         std::vector<currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::outputs_in_block>& out_blocks) -> size_t
       {
         if (h == 0 && hul_exclusive == 0)
@@ -568,10 +571,10 @@ bool test_generator::build_wallets(const blockchain_vector& blockchain,
         const bool is_pos = is_pos_block(bl);
 
         std::vector<currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry> outs;
-        gather_from_tx(h, bl.miner_tx, get_transaction_hash(bl.miner_tx), /*is_coinbase=*/true, is_pos, outs);
+        gather_from_tx(input_amount, h, bl.miner_tx, get_transaction_hash(bl.miner_tx), /*is_coinbase=*/true, is_pos, outs);
         const size_t tx_cnt = std::min(bl.tx_hashes.size(), bi.m_transactions.size());
         for (size_t i = 0; i < tx_cnt; ++i)
-          gather_from_tx(h, bi.m_transactions[i], bl.tx_hashes[i], /*is_coinbase=*/false, is_pos, outs);
+          gather_from_tx(input_amount, h, bi.m_transactions[i], bl.tx_hashes[i], /*is_coinbase=*/false, is_pos, outs);
 
         if (!outs.empty())
         {
@@ -586,6 +589,7 @@ bool test_generator::build_wallets(const blockchain_vector& blockchain,
 
       for (size_t bi = 0; bi < req.batches.size(); ++bi)
       {
+        const uint64_t input_amount = req.batches[bi].input_amount;
         rsp.blocks_batches.emplace_back();
         auto& out_blocks = rsp.blocks_batches.back().blocks;
         out_blocks.reserve(req.batches[bi].heights.size());
@@ -597,7 +601,7 @@ bool test_generator::build_wallets(const blockchain_vector& blockchain,
         for (uint64_t seed_h : req.batches[bi].heights)
         {
           uint64_t h = seed_h > hul_exclusive ? hul_exclusive : seed_h;
-          collect_from_height(h, seen, out_blocks);
+          collect_from_height(input_amount, h, seen, out_blocks);
         }
 
         auto sum_outs = [&]() -> uint64_t {
@@ -633,7 +637,7 @@ bool test_generator::build_wallets(const blockchain_vector& blockchain,
             // go from the closest to a to b (or vice versa; determinism is important)
             for (uint64_t h = a + 1; h < b && total < target; ++h)
             {
-              size_t added = collect_from_height(h, seen, out_blocks);
+              size_t added = collect_from_height(input_amount, h, seen, out_blocks);
               if (added)
                 total += added;
             }
@@ -648,7 +652,7 @@ bool test_generator::build_wallets(const blockchain_vector& blockchain,
           {
             if (seen.count(h))
               continue;
-            size_t added = collect_from_height(h, seen, out_blocks);
+            size_t added = collect_from_height(input_amount, h, seen, out_blocks);
             if (added)
               total += added;
             if (h == 1)
@@ -661,74 +665,6 @@ bool test_generator::build_wallets(const blockchain_vector& blockchain,
       return true;
     }
 
-    bool call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS(const currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::request& rqt, currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::response& rsp) override
-    {
-      for (uint64_t amount : rqt.amounts)
-      {
-        uint64_t height_upper_limit_local = rqt.height_upper_limit;
-        if (amount == 0)
-        {
-          //for hardfork 4 we need to have at least 10 confirmations on hard rule level
-          //rqt.height_upper_limit > - 10
-          if (m_blockchain.size() < CURRENCY_HF4_MANDATORY_MIN_COINAGE)
-            return false;
-          if (height_upper_limit_local > m_blockchain.size() - CURRENCY_HF4_MANDATORY_MIN_COINAGE)
-            height_upper_limit_local = m_blockchain.size() - CURRENCY_HF4_MANDATORY_MIN_COINAGE;
-        }
-        rsp.outs.resize(rsp.outs.size() + 1);
-        auto& rsp_entry = rsp.outs.back();
-        rsp_entry.amount = amount;
-        auto it = m_outputs_index.find(amount);
-        if (it == m_outputs_index.end())
-          continue;
-
-        std::vector<size_t> random_mapping(it->second.size());
-        for(size_t i = 0; i < random_mapping.size(); ++i)
-          random_mapping[i] = i;
-        std::shuffle(random_mapping.begin(), random_mapping.end(), crypto::uniform_random_bit_generator());
-
-        for (size_t gindex : random_mapping)
-        {
-          const out_index_info& oii = it->second[gindex];
-          if (height_upper_limit_local != 0 && oii.block_height > height_upper_limit_local)
-            continue;
-          const transaction& tx = oii.in_block_tx_index == 0 ? m_blockchain[oii.block_height]->b.miner_tx : m_blockchain[oii.block_height]->m_transactions[oii.in_block_tx_index - 1];
-          auto& out_v = tx.vout[oii.in_tx_out_index];
-          uint8_t mix_attr = 0;
-          if (!get_mix_attr_from_tx_out_v(out_v, mix_attr))
-            continue;
-          if (mix_attr == CURRENCY_TO_KEY_OUT_FORCED_NO_MIX)
-            continue;
-          if (rqt.use_forced_mix_outs && mix_attr == CURRENCY_TO_KEY_OUT_RELAXED)
-            continue;
-          if (mix_attr != CURRENCY_TO_KEY_OUT_RELAXED && mix_attr > rqt.decoys_count)
-            continue;
-
-          if (amount == 0 && out_v.type() == typeid(tx_out_zarcanum))
-          {
-            const tx_out_zarcanum& out_zc = boost::get<tx_out_zarcanum>(out_v);
-            rsp_entry.outs.emplace_back(gindex, out_zc.stealth_address, out_zc.amount_commitment, out_zc.concealing_point, out_zc.blinded_asset_id);
-          }
-          else if (amount != 0 && out_v.type() == typeid(tx_out_bare))
-          {
-            txout_target_v out_tv = boost::get<tx_out_bare>(out_v).target;
-            if (out_tv.type() != typeid(txout_to_key))
-              continue;
-            rsp_entry.outs.emplace_back(gindex, boost::get<txout_to_key>(out_tv).key);
-          }
-          if (rsp_entry.outs.size() >= rqt.decoys_count)
-            break;
-        }
-        if (rsp_entry.outs.size() < rqt.decoys_count)
-        {
-          rsp.status = API_RETURN_CODE_NOT_ENOUGH_OUTPUTS_FOR_MIXING;
-          return true;
-        }
-      }
-
-      rsp.status = API_RETURN_CODE_OK;
-      return true;
-    }
   }; // struct stub_core_proxy
 
   std::shared_ptr<tools::i_core_proxy> tmp_proxy(new stub_core_proxy(blockchain, txs_outs, oi, cc));

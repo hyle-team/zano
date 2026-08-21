@@ -193,9 +193,14 @@ class boosted_tcp_server
     return m_config;
   }
 
-  int get_binded_port()
+  int get_bound_port() const
   {
     return m_port;
+  }
+
+  std::string get_address() const
+  {
+    return m_address;
   }
 
   boost::asio::io_service& get_io_service()

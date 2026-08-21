@@ -123,6 +123,7 @@ namespace currency
     bool get_all_transactions_details(std::list<tx_rpc_extended_info>& txs)const;
     bool get_all_transactions_brief_details(std::list<tx_rpc_brief_info>& txs)const;
     bool get_all_transactions_list(std::list<std::string>& txs)const;
+    bool get_all_transactions_list(std::list<std::pair<crypto::hash, transaction>>& txs) const;
     bool get_transactions_details(const std::list<std::string>& ids, std::list<tx_rpc_extended_info>& txs)const;
     bool get_transactions_brief_details(const std::list<std::string>& ids, std::list<tx_rpc_brief_info>& txs)const;
 
@@ -156,7 +157,6 @@ namespace currency
     bool remove_alias_info(const transaction& tx);
     bool check_tx_fee(const transaction &tx, uint64_t amount_fee) const;
     std::string get_blacklisted_txs_string() const;
-    bool check_gateway_address(const transaction& tx) const;
 
     bool is_valid_contract_finalization_tx(const transaction &tx)const;
     void store_db_solo_options_values();

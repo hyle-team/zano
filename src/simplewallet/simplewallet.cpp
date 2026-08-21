@@ -121,7 +121,7 @@ namespace
 {
   const command_line::arg_descriptor<std::string>   arg_wallet_file  ("wallet-file", "Use wallet <arg>", "");
   const command_line::arg_descriptor<std::string>   arg_generate_new_wallet  ("generate-new-wallet", "Generate new wallet and save it to <arg> or <address>.wallet by default", "");
-  const command_line::arg_descriptor<bool>          arg_derive_custom_seed("derive_custom_seed", "Derive seed phrase from custom 24-words secret(advanced option, do it on your own risk)", "");
+  const command_line::arg_descriptor<bool>          arg_derive_custom_seed("derive-custom-seed", "Derive seed phrase from custom 24-words secret(advanced option, do it on your own risk)", "");
   const command_line::arg_descriptor<std::string>   arg_generate_new_auditable_wallet  ("generate-new-auditable-wallet", "Generate new auditable wallet and store it to <arg>", "");
   const command_line::arg_descriptor<std::string>   arg_daemon_address  ("daemon-address", "Use daemon instance at <host>:<port>", "");
   const command_line::arg_descriptor<std::string>   arg_daemon_host  ("daemon-host", "Use daemon instance at host <arg> instead of localhost", "");
@@ -178,9 +178,8 @@ namespace
   public:
     message_writer(epee::log_space::console_colors color = epee::log_space::console_color_default, bool bright = false,
       std::string&& prefix = std::string(), int log_level = LOG_LEVEL_2)
-      : m_flush(true)
+      : m_bright(bright)
       , m_color(color)
-      , m_bright(bright)
       , m_log_level(log_level)
     {
       m_oss << prefix;
@@ -196,7 +195,6 @@ namespace
 #endif
       , m_color(std::move(rhs.m_color))
       , m_log_level(std::move(rhs.m_log_level))
-      , m_bright(false)
     {
       rhs.m_flush = false;
     }
@@ -222,11 +220,18 @@ namespace
       {
         m_flush = false;
 
-        LOG_PRINT(m_oss.str(), m_log_level)
-        epee::log_space::set_console_color(m_color, m_bright);
-        std::cout << m_oss.str();
-        epee::log_space::reset_console_color();
-        std::cout << std::endl;
+        if (m_print_to_log)
+        {
+          LOG_PRINT(m_oss.str(), m_log_level)
+        }
+
+        if (m_print_to_stdout)
+        {
+          epee::log_space::set_console_color(m_color, m_bright);
+          std::cout << m_oss.str();
+          epee::log_space::reset_console_color();
+          std::cout << std::endl;
+        }
       }
 
       NESTED_CATCH_ENTRY(__func__);
@@ -237,11 +242,13 @@ namespace
     message_writer& operator=(message_writer& rhs);
     message_writer& operator=(message_writer&& rhs);
 
-  private:
-    bool m_flush;
+  protected:
+    bool m_flush = true;
+    bool m_bright = false;
+    bool m_print_to_log = true;
+    bool m_print_to_stdout = true;
     std::stringstream m_oss;
     epee::log_space::console_colors m_color;
-    bool m_bright;
     int m_log_level;
   };
 
@@ -254,7 +261,25 @@ namespace
   {
     return message_writer(epee::log_space::console_color_red, true, "Error: ", LOG_LEVEL_0);
   }
-}
+
+  class message_writer_no_log : public message_writer
+  {
+  public:
+    message_writer_no_log(epee::log_space::console_colors color = epee::log_space::console_color_default, bool bright = false,
+      std::string&& prefix = std::string())
+      : message_writer(color, bright, std::move(prefix), LOG_LEVEL_0)
+    {
+      m_print_to_log = false;
+      m_print_to_stdout = true;
+    }
+  };
+
+  message_writer_no_log success_msg_writer_no_log(bool color = false)
+  {
+    return message_writer_no_log(color ? epee::log_space::console_color_green : epee::log_space::console_color_default, false, std::string());
+  }
+
+} // namespace
 
 void display_vote_info(tools::wallet2& w)
 {
@@ -1694,10 +1719,17 @@ bool simple_wallet::show_payments(const std::vector<std::string> &args)
     "  height\t       amount        \tunlock time";
 
   bool payments_found = false;
-  for(std::string arg : args)
+  for (const std::string& arg : args)
   {
+    currency::payment_id_t payment_id;
+    if (!currency::parse_payment_id_from_hex_str(arg, payment_id))
+    {
+      fail_msg_writer() << "invalid payment id given: '" << arg << "', hex-encoded string was expected";
+      continue;
+    }
+
     std::list<tools::payment_details> payments;
-    m_wallet->get_payments(arg, payments);
+    m_wallet->get_payments(payment_id, payments);
     if (payments.empty())
     {
       success_msg_writer() << "No payments with id " << arg;
@@ -2338,7 +2370,7 @@ bool simple_wallet::get_tx_key(const std::vector<std::string> &args_)
   std::vector<crypto::secret_key> amount_keys;
   if (m_wallet->get_tx_key(txid, tx_key))
   {
-    success_msg_writer() << "tx one-time secret key: " << epee::string_tools::pod_to_hex(tx_key);
+    success_msg_writer_no_log() << "tx one-time secret key: " << epee::string_tools::pod_to_hex(tx_key);
     return true;
   }
   else
@@ -2367,7 +2399,7 @@ bool simple_wallet::check_all_tx_keys(const std::vector<std::string> &args_)
       crypto::secret_key tx_secret_key{};
       if (m_wallet->get_tx_key(wti.tx_hash, tx_secret_key))
       {
-        message_writer(epee::log_space::console_color_green, true, "", LOG_LEVEL_0) << "tx " << wti.tx_hash << " @ " << wti.height << " : " << tx_secret_key;
+        message_writer_no_log(epee::log_space::console_color_green, true, "") << "tx " << wti.tx_hash << " @ " << wti.height << " : " << tx_secret_key;
         ++txs_with_known_key;
       }
       else
@@ -2397,7 +2429,7 @@ bool simple_wallet::check_all_tx_keys(const std::vector<std::string> &args_)
     success_msg_writer() << "\nwallet's tx secret keys:";
     m_wallet->enumerate_tx_keys([&](const crypto::hash& tx_id, const crypto::secret_key& tx_key) -> bool
       {
-        success_msg_writer() << "tx " << tx_id << " -> " << tx_key << (tx_seen_in_history.count(tx_id) == 0 ? "  tx is not in transfer history" : "");
+        success_msg_writer_no_log() << "tx " << tx_id << " -> " << tx_key << (tx_seen_in_history.count(tx_id) == 0 ? "  tx is not in transfer history" : "");
         return true;
       });
   }
@@ -2625,7 +2657,7 @@ bool simple_wallet::deploy_new_asset(const std::vector<std::string> &args)
     return true;
   }
 
-  if (!validate_asset_ticker_and_full_name(adb))
+  if (!validate_asset_ticker_full_name_and_meta_info(adb))
   {
     fail_msg_writer() << "ticker or full_name are invalid (perhaps they contain invalid symbols)";
     return true;
@@ -3521,7 +3553,7 @@ int custom_seed_builder()
   }
   const std::string new_seed = acc.get_seed_phrase(passphrase, processed_binary_from_seed);
   
-  success_msg_writer() << "Here is your seed"  << pass_protected_or_not << "\n " << new_seed;
+  success_msg_writer_no_log() << "Here is your seed"  << pass_protected_or_not << "\n " << new_seed;
   return EXIT_SUCCESS;
 }
 
@@ -3626,13 +3658,13 @@ int seed_doctor()
           if (acc.get_public_address_str() == address)
           {
             success_msg_writer(true) << "!!!SUCCESS!!!";
-            success_msg_writer() << "Seed recovered, please write down recovered seed and use it to restore the wallet:\n" << result;
+            success_msg_writer_no_log() << "Seed recovered, please write down recovered seed and use it to restore the wallet:\n" << result;
             return true;
           }
         }
         else
         {
-          success_msg_writer() << "Potential seed candidate:\n" << result << "\nAddress: " << acc.get_public_address_str();
+          success_msg_writer_no_log() << "Potential seed candidate:\n" << result << "\nAddress: " << acc.get_public_address_str();
           candidates_count++;
         }
       }
@@ -3660,13 +3692,13 @@ int seed_doctor()
         if (acc.get_public_address_str() == address)
         {
           success_msg_writer(true) << "!!!SUCCESS!!!";
-          success_msg_writer() << "Seed recovered, please write down recovered seed and use it to restore the wallet:\n" << result;
+          success_msg_writer_no_log() << "Seed recovered, please write down recovered seed and use it to restore the wallet:\n" << result;
           return true;
         }
       }
       else
       {
-        success_msg_writer() << "Potential seed candidate:\n" << result << "\nAddress: " << acc.get_public_address_str();
+        success_msg_writer_no_log() << "Potential seed candidate:\n" << result << "\nAddress: " << acc.get_public_address_str();
         candidates_count++;
       }
     }
@@ -3701,7 +3733,7 @@ int seed_doctor()
       std::string result = boost::algorithm::join(words, " ");
       account_base acc;
       acc.restore_from_seed_phrase(result, passphrase);
-      success_msg_writer() << "Potential seed candidate:\n" << result << "\nAddress: " << acc.get_public_address_str();
+      success_msg_writer_no_log() << "Potential seed candidate:\n" << result << "\nAddress: " << acc.get_public_address_str();
       return EXIT_FAILURE;
     }
     success_msg_writer() << "Brute forcing all each word";
@@ -4064,7 +4096,11 @@ int main(int argc, char* argv[])
 
     tools::wallet_rpc_server wrpc(wallet_ptr);
     bool r = wrpc.init(vm);
-    CHECK_AND_ASSERT_MES(r, EXIT_FAILURE, "Failed to initialize wallet rpc server");
+    if (!r)
+    {
+      LOG_PRINT_L0("Wallet RPC server was not started");
+      return EXIT_FAILURE;
+    }
 
     tools::signal_handler::install([&wrpc/*, &wal*/ /* TODO(unassigned): use? */] {
       wrpc.send_stop_signal();
