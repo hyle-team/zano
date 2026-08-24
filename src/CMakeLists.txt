@@ -270,6 +270,9 @@ if(BUILD_GUI)
   endif()
   if(MSVC)
     target_link_libraries(Zano shlwapi.lib)
+    # Qt6 pushes the merged Zano.pdb past its default max size; raise the PDB page
+    # size for this target only (keeps full, shippable debug symbols). -- sowle
+    target_link_options(Zano PRIVATE /PDBPAGESIZE:16384)
   endif()
 
   set_property(TARGET Zano PROPERTY FOLDER "prog")
