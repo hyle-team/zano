@@ -166,22 +166,61 @@ jobs:
 
       - name: Build Boost (static libraries, shared CRT)
         if: steps.deps-cache.outputs.cache-hit != 'true'
+        timeout-minutes: 120
         run: |
           New-Item -ItemType Directory -Path $env:DEPS_DIR -Force | Out-Null
           $boostVersionUnderscore = $env:BOOST_VERSION.Replace('.', '_')
           $archive = Join-Path $env:RUNNER_TEMP "boost_$boostVersionUnderscore.tar.bz2"
           $sourceDir = Join-Path $env:RUNNER_TEMP "boost_$boostVersionUnderscore"
           $prefix = Join-Path $env:DEPS_DIR 'boost'
-          $url = "https://archives.boost.io/release/$env:BOOST_VERSION/source/boost_$boostVersionUnderscore.tar.bz2"
 
-          & curl.exe --fail --location --retry 3 --output $archive $url
-          if ($LASTEXITCODE -ne 0) {
-            throw "Boost download failed"
+          # archives.boost.io occasionally stalls on GitHub-hosted Windows
+          # runners. Bound every transfer and fall back to Boost's SourceForge
+          # project mirror; the pinned digest must match either way.
+          $urls = @(
+            "https://sourceforge.net/projects/boost/files/boost/$env:BOOST_VERSION/boost_$boostVersionUnderscore.tar.bz2/download",
+            "https://archives.boost.io/release/$env:BOOST_VERSION/source/boost_$boostVersionUnderscore.tar.bz2"
+          )
+          $downloadedFrom = $null
+          foreach ($url in $urls) {
+            if (Test-Path -LiteralPath $archive) {
+              Remove-Item -LiteralPath $archive -Force
+            }
+
+            Write-Host "Downloading Boost $env:BOOST_VERSION from $url"
+            & curl.exe `
+              --fail `
+              --location `
+              --show-error `
+              --retry 2 `
+              --retry-all-errors `
+              --retry-delay 5 `
+              --retry-max-time 900 `
+              --connect-timeout 30 `
+              --max-time 600 `
+              --speed-limit 65536 `
+              --speed-time 120 `
+              --output $archive `
+              $url
+            $curlExitCode = $LASTEXITCODE
+            if ($curlExitCode -ne 0) {
+              Write-Warning "Boost download failed from $url with curl exit code $curlExitCode"
+              continue
+            }
+
+            $actualHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $archive).Hash.ToLowerInvariant()
+            if ($actualHash -ne ($env:BOOST_SHA256).ToLowerInvariant()) {
+              Write-Warning "Boost SHA-256 mismatch from ${url}: $actualHash"
+              continue
+            }
+
+            $downloadedFrom = $url
+            break
           }
-          $actualHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $archive).Hash.ToLowerInvariant()
-          if ($actualHash -ne ($env:BOOST_SHA256).ToLowerInvariant()) {
-            throw "Boost SHA-256 mismatch: $actualHash"
+          if (-not $downloadedFrom) {
+            throw "Boost download failed from every configured source"
           }
+          Write-Host "Verified Boost archive from $downloadedFrom"
 
           & tar.exe -xjf $archive -C $env:RUNNER_TEMP
           if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $sourceDir)) {
