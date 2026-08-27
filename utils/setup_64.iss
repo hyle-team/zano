@@ -24,6 +24,14 @@ DefaultGroupName={#MyAppName}
 OutputBaseFilename=setup
 Compression=lzma
 SolidCompression=yes
+#ifdef CodeSigningEnabled
+SignTool=ZanoCi
+SignedUninstaller=yes
+SignToolRetryCount=3
+SignToolRetryDelay=5000
+#else
+SignedUninstaller=no
+#endif
 ChangesAssociations=yes
 ArchitecturesInstallIn64BitMode=x64
 WizardImageFile=../resources/installer_bg_164x313.bmp
