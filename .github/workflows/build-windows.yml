@@ -13,7 +13,7 @@ permissions:
 
 env:
   BOOST_VERSION: 1.84.0
-  BOOST_SHA256: cc4b893acf645c9d4b698e9a0f08ca8846aa5d6c68275c14c3e7949c24109454
+  BOOST_SHA256: 81a4d10075731966477276c47324ecd9cac02da49899d36c48eba66e40014f25
   OPENSSL_VERSION: 3.5.8
   OPENSSL_SHA256: a8f84a39918ec6415ce765d9b429d313ba97b8143169c172e734b9514464f5b2
   NASM_VERSION: 2.16.3
@@ -170,16 +170,16 @@ jobs:
         run: |
           New-Item -ItemType Directory -Path $env:DEPS_DIR -Force | Out-Null
           $boostVersionUnderscore = $env:BOOST_VERSION.Replace('.', '_')
-          $archive = Join-Path $env:RUNNER_TEMP "boost_$boostVersionUnderscore.tar.bz2"
+          $archive = Join-Path $env:RUNNER_TEMP "boost_$boostVersionUnderscore.7z"
           $sourceDir = Join-Path $env:RUNNER_TEMP "boost_$boostVersionUnderscore"
           $prefix = Join-Path $env:DEPS_DIR 'boost'
 
-          # archives.boost.io occasionally stalls on GitHub-hosted Windows
-          # runners. Bound every transfer and fall back to Boost's SourceForge
-          # project mirror; the pinned digest must match either way.
+          # Use Boost's Windows-friendly 7z release instead of the tar.bz2
+          # package: extracting the latter with Windows tar can take hours.
+          # The pinned digest must match regardless of the selected mirror.
           $urls = @(
-            "https://sourceforge.net/projects/boost/files/boost/$env:BOOST_VERSION/boost_$boostVersionUnderscore.tar.bz2/download",
-            "https://archives.boost.io/release/$env:BOOST_VERSION/source/boost_$boostVersionUnderscore.tar.bz2"
+            "https://sourceforge.net/projects/boost/files/boost/$env:BOOST_VERSION/boost_$boostVersionUnderscore.7z/download",
+            "https://archives.boost.io/release/$env:BOOST_VERSION/source/boost_$boostVersionUnderscore.7z"
           )
           $downloadedFrom = $null
           foreach ($url in $urls) {
@@ -222,8 +222,20 @@ jobs:
           }
           Write-Host "Verified Boost archive from $downloadedFrom"
 
-          & tar.exe -xjf $archive -C $env:RUNNER_TEMP
-          if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $sourceDir)) {
+          $sevenZipCommand = Get-Command '7z.exe' -ErrorAction SilentlyContinue
+          $sevenZip = if ($sevenZipCommand) {
+            $sevenZipCommand.Source
+          }
+          else {
+            Join-Path $env:ProgramFiles '7-Zip\7z.exe'
+          }
+          if (-not (Test-Path -LiteralPath $sevenZip -PathType Leaf)) {
+            throw "7z.exe was not found"
+          }
+
+          Write-Host "Extracting Boost with $sevenZip (progress is reported below)"
+          & $sevenZip x $archive "-o$env:RUNNER_TEMP" -y -mmt=on -bb1 -bsp1
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $sourceDir -PathType Container)) {
             throw "Boost extraction failed"
           }
 
