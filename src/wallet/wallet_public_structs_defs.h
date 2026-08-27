@@ -2330,7 +2330,7 @@ namespace tools::wallet_public
 
   struct COMMAND_GATEWAY_REGISTER_ADDRESS
   {
-    DOC_COMMAND("Register gateway address to be used in further transfers.")
+    DOC_COMMAND("Register gateway address to be used in further transfers. WARNING: Registering a GW address requires a **one-time registration fee of 100 native ZANO**. This fee is the network fee of the registration transaction and is **permanently burned**, and is therefore **non-refundable**.")
     struct request
     {
       crypto::public_key                      view_pub_key = {};     //Zano specific generic Schnorr signature public key
