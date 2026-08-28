@@ -158,17 +158,17 @@ namespace tools
 
       STACKFRAME64 frame;
       memset(&frame, 0, sizeof frame);
-#ifndef _M_ARM64
+#ifdef _M_ARM64
+      frame.AddrPC.Offset = context.Pc;
+      frame.AddrStack.Offset = context.Sp;
+      frame.AddrFrame.Offset = context.Fp;
+#else
       frame.AddrPC.Offset = context.Rip;
-#endif 
-      frame.AddrPC.Mode = AddrModeFlat;
-#ifndef _M_ARM64
       frame.AddrStack.Offset = context.Rsp;
-#endif
-      frame.AddrStack.Mode = AddrModeFlat;
-#ifndef _M_ARM64
       frame.AddrFrame.Offset = context.Rbp;
 #endif
+      frame.AddrPC.Mode = AddrModeFlat;
+      frame.AddrStack.Mode = AddrModeFlat;
       frame.AddrFrame.Mode = AddrModeFlat;
   
       IMAGEHLP_LINE64 line = { 0 };

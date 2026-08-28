@@ -22,9 +22,28 @@ env:
 
 jobs:
   build:
-    name: Windows x64${{ inputs.testnet == true && ' (testnet)' || '' }}
+    name: Windows ${{ matrix.arch }}${{ matrix.gui && ' (full)' || ' (CLI)' }}${{ inputs.testnet == true && ' (testnet)' || '' }}
     runs-on: windows-2022
     timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            cmake_arch: x64
+            vcvars: vcvars64.bat
+            vs_component: Microsoft.VisualStudio.Component.VC.Tools.x86.x64
+            openssl_target: VC-WIN64A
+            boost_arch: x86
+            gui: true
+          # Qt 6.8.3 has no prebuilt Windows ARM64 Qt WebEngine package.
+          - arch: arm64
+            cmake_arch: ARM64
+            vcvars: vcvarsamd64_arm64.bat
+            vs_component: Microsoft.VisualStudio.Component.VC.Tools.ARM64
+            openssl_target: VC-WIN64-ARM
+            boost_arch: arm
+            gui: false
     # Put the WINDOWS_SIGN_* secrets in this environment and configure required
     # reviewers plus protected release refs before enabling production signing.
     environment: windows-code-signing
@@ -45,7 +64,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Set up MSVC 2022 x64 environment
+      - name: Set up MSVC 2022 ${{ matrix.arch }} environment
         run: |
           $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
           if (-not (Test-Path -LiteralPath $vswhere)) {
@@ -53,22 +72,22 @@ jobs:
           }
 
           $vsPath = & $vswhere -latest -products * `
-            -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+            -requires '${{ matrix.vs_component }}' `
             -property installationPath |
             Select-Object -First 1
           if ([string]::IsNullOrWhiteSpace($vsPath)) {
-            throw "Visual Studio with the x64 C++ toolchain was not found"
+            throw "Visual Studio with the ${{ matrix.arch }} C++ toolchain was not found"
           }
           $vsPath = $vsPath.Trim()
 
-          $vcvars = Join-Path $vsPath 'VC\Auxiliary\Build\vcvars64.bat'
+          $vcvars = Join-Path $vsPath 'VC\Auxiliary\Build\${{ matrix.vcvars }}'
           if (-not (Test-Path -LiteralPath $vcvars)) {
-            throw "vcvars64.bat was not found at $vcvars"
+            throw "${{ matrix.vcvars }} was not found at $vcvars"
           }
 
           $environment = & $env:COMSPEC /d /s /c "`"$vcvars`" >nul && set"
           if ($LASTEXITCODE -ne 0) {
-            throw "vcvars64.bat failed with exit code $LASTEXITCODE"
+            throw "${{ matrix.vcvars }} failed with exit code $LASTEXITCODE"
           }
 
           foreach ($line in $environment) {
@@ -84,7 +103,7 @@ jobs:
           }
 
           "VS_PATH=$vsPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          Write-Host "Using Visual Studio at $vsPath"
+          Write-Host "Using Visual Studio at $vsPath for ${{ matrix.arch }}"
 
       - name: Cache Boost and OpenSSL
         id: deps-cache
@@ -93,10 +112,10 @@ jobs:
           path: |
             ${{ env.DEPS_DIR }}\boost
             ${{ env.DEPS_DIR }}\openssl
-          key: deps-windows-2022-x64-msvc143-md-boost${{ env.BOOST_VERSION }}-openssl${{ env.OPENSSL_VERSION }}-nasm${{ env.NASM_VERSION }}-v1
+          key: deps-windows-2022-${{ matrix.arch }}-msvc143-md-boost${{ env.BOOST_VERSION }}-openssl${{ env.OPENSSL_VERSION }}-nasm${{ env.NASM_VERSION }}-v1
 
       - name: Install NASM
-        if: steps.deps-cache.outputs.cache-hit != 'true'
+        if: steps.deps-cache.outputs.cache-hit != 'true' && matrix.arch == 'x64'
         run: |
           choco install nasm --version=$env:NASM_VERSION --allow-downgrade --yes --no-progress
           if ($LASTEXITCODE -ne 0) {
@@ -140,7 +159,7 @@ jobs:
           $prefixForConfigure = $prefix.Replace('\', '/')
           Push-Location $sourceDir
           try {
-            & perl.exe Configure VC-WIN64A no-shared no-tests no-makedepend `
+            & perl.exe Configure ${{ matrix.openssl_target }} no-shared no-tests no-makedepend `
               "--prefix=$prefixForConfigure" `
               "--openssldir=$prefixForConfigure/ssl" `
               '--libdir=lib'
@@ -233,15 +252,19 @@ jobs:
             throw "7z.exe was not found"
           }
 
-          Write-Host "Extracting Boost with $sevenZip (progress is reported below)"
-          & $sevenZip x $archive "-o$env:RUNNER_TEMP" -y -mmt=on -bb1 -bsp1
+          $extractStartedAt = Get-Date
+          Write-Host "Extracting Boost with $sevenZip"
+          & $sevenZip x $archive "-o$env:RUNNER_TEMP" -y -mmt=on -bb0 -bso0 -bsp0 -bse2
           if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $sourceDir -PathType Container)) {
-            throw "Boost extraction failed"
+            throw "Boost extraction failed with 7-Zip exit code $LASTEXITCODE"
           }
+          $elapsedSeconds = [int]((Get-Date) - $extractStartedAt).TotalSeconds
+          Write-Host "Boost extraction completed in $elapsedSeconds seconds"
 
           Push-Location $sourceDir
           try {
-            & cmd.exe /d /c bootstrap.bat
+            $hostVcvars = Join-Path $env:VS_PATH 'VC\Auxiliary\Build\vcvars64.bat'
+            & $env:COMSPEC /d /s /c "`"$hostVcvars`" >nul && bootstrap.bat"
             if ($LASTEXITCODE -ne 0) {
               throw "Boost bootstrap failed"
             }
@@ -260,7 +283,8 @@ jobs:
               --with-program_options `
               --with-log `
               address-model=64 `
-              architecture=x86 `
+              architecture=${{ matrix.boost_arch }} `
+              target-os=windows `
               toolset=msvc-14.3 `
               link=static `
               runtime-link=shared `
@@ -280,11 +304,13 @@ jobs:
           }
 
       - name: Set up Python for Qt installer
+        if: matrix.gui
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: '3.13.3'
 
       - name: Install Qt 6.8 (MSVC 2022, WebEngine)
+        if: matrix.gui
         uses: jurplel/install-qt-action/action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4
         with:
           version: ${{ env.QT_VERSION }}
@@ -294,35 +320,51 @@ jobs:
           aqtversion: '==3.3.0'
           py7zrversion: '==1.0.0'
 
-      - name: Configure (CMake, Release x64)
+      - name: Configure (CMake, Release ${{ matrix.arch }})
         run: |
           $testnet = if ('${{ inputs.testnet }}' -eq 'true') { 'TRUE' } else { 'FALSE' }
-          & cmake.exe -S . -B $env:BUILD_DIR `
-            -G 'Visual Studio 17 2022' `
-            -A x64 `
-            -T 'v143,host=x64' `
-            "-DTESTNET=$testnet" `
-            -DBUILD_GUI=TRUE `
-            -DBUILD_TESTS=FALSE `
-            -DUSE_PCH=FALSE `
-            -DSTATIC=FALSE `
-            -DOPENSSL_USE_STATIC_LIBS=TRUE `
-            -DOPENSSL_MSVC_STATIC_RT=FALSE `
-            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 `
-            "-DCMAKE_PREFIX_PATH=$env:QT_ROOT_DIR" `
-            "-DBOOST_ROOT=$env:DEPS_DIR\boost" `
-            "-DBOOST_LIBRARYDIR=$env:DEPS_DIR\boost\lib" `
+          $buildGui = if ('${{ matrix.gui }}' -eq 'true') { 'TRUE' } else { 'FALSE' }
+          $cmakeArguments = @(
+            '-S', '.',
+            '-B', $env:BUILD_DIR,
+            '-G', 'Visual Studio 17 2022',
+            '-A', '${{ matrix.cmake_arch }}',
+            '-T', 'v143,host=x64',
+            "-DTESTNET=$testnet",
+            "-DBUILD_GUI=$buildGui",
+            '-DBUILD_TESTS=FALSE',
+            '-DUSE_PCH=FALSE',
+            '-DSTATIC=FALSE',
+            '-DOPENSSL_USE_STATIC_LIBS=TRUE',
+            '-DOPENSSL_MSVC_STATIC_RT=FALSE',
+            '-DCMAKE_POLICY_VERSION_MINIMUM=3.5',
+            "-DBOOST_ROOT=$env:DEPS_DIR\boost",
+            "-DBOOST_LIBRARYDIR=$env:DEPS_DIR\boost\lib",
             "-DOPENSSL_ROOT_DIR=$env:DEPS_DIR\openssl"
+          )
+          if ($buildGui -eq 'TRUE') {
+            $cmakeArguments += "-DCMAKE_PREFIX_PATH=$env:QT_ROOT_DIR"
+          }
+
+          & cmake.exe @cmakeArguments
           if ($LASTEXITCODE -ne 0) {
             throw "CMake configure failed"
           }
 
       - name: Build Zano applications
         run: |
-          & cmake.exe --build $env:BUILD_DIR `
-            --config Release `
-            --parallel 2 `
-            --target Zano daemon simplewallet connectivity_tool gateway_rpc_proxy
+          $targets = @('daemon', 'simplewallet', 'connectivity_tool', 'gateway_rpc_proxy')
+          if ('${{ matrix.gui }}' -eq 'true') {
+            $targets = @('Zano') + $targets
+          }
+          $buildArguments = @(
+            '--build', $env:BUILD_DIR,
+            '--config', 'Release',
+            '--parallel', '2',
+            '--target'
+          ) + $targets
+
+          & cmake.exe @buildArguments
           if ($LASTEXITCODE -ne 0) {
             throw "CMake build failed"
           }
@@ -331,22 +373,29 @@ jobs:
         run: |
           $releaseDir = Join-Path $env:BUILD_DIR 'src\Release'
           $expectedFiles = @(
-            'Zano.exe',
             'zanod.exe',
             'simplewallet.exe',
             'connectivity_tool.exe',
             'gateway_rpc_proxy.exe',
-            'Zano.pdb',
             'zanod.pdb',
             'simplewallet.pdb',
             'connectivity_tool.pdb',
             'gateway_rpc_proxy.pdb'
           )
+          if ('${{ matrix.gui }}' -eq 'true') {
+            $expectedFiles += @('Zano.exe', 'Zano.pdb')
+          }
           foreach ($name in $expectedFiles) {
             $path = Join-Path $releaseDir $name
             if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
               throw "Expected output was not produced: $path"
             }
+          }
+
+          $headers = (& dumpbin.exe /headers (Join-Path $releaseDir 'zanod.exe')) -join "`n"
+          $expectedMachine = if ('${{ matrix.arch }}' -eq 'arm64') { 'AA64 machine \(ARM64\)' } else { '8664 machine \(x64\)' }
+          if ($LASTEXITCODE -ne 0 -or $headers -notmatch $expectedMachine) {
+            throw "zanod.exe is not a ${{ matrix.arch }} PE binary"
           }
 
       - name: Derive package version
@@ -378,10 +427,11 @@ jobs:
 
           "APP_VERSION=$appVersion" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "PACKAGE_VERSION=$packageVersion" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          "CLI_BASENAME=zano-windows-x64-cli$networkSuffix-$packageVersion" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          "GUI_BASENAME=zano-windows-x64-gui$networkSuffix-$packageVersion" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          "INSTALLER_BASENAME=zano-windows-x64-gui$networkSuffix-$packageVersion-installer" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          "SYMBOLS_BASENAME=zano-windows-x64-symbols$networkSuffix-$packageVersion" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          $arch = '${{ matrix.arch }}'
+          "CLI_BASENAME=zano-windows-$arch-cli$networkSuffix-$packageVersion" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "GUI_BASENAME=zano-windows-$arch-gui$networkSuffix-$packageVersion" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "INSTALLER_BASENAME=zano-windows-$arch-gui$networkSuffix-$packageVersion-installer" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "SYMBOLS_BASENAME=zano-windows-$arch-symbols$networkSuffix-$packageVersion" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "NETWORK_NAME=$(if ($networkSuffix) { 'testnet' } else { 'mainnet' })" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Check Authenticode signing secrets
@@ -403,7 +453,8 @@ jobs:
           if ($hasCertificate) {
             'sign=true' | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
             'SIGNING_STATUS=authenticode' | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-            Write-Host '::notice title=Authenticode signing::ENABLED - project binaries and the Inno Setup installer/uninstaller will be signed'
+            $scope = if ('${{ matrix.gui }}' -eq 'true') { 'project binaries and the Inno Setup installer/uninstaller' } else { 'project binaries' }
+            Write-Host "::notice title=Authenticode signing::ENABLED - $scope will be signed"
           }
           else {
             'sign=false' | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
@@ -492,13 +543,16 @@ jobs:
         if: steps.signcheck.outputs.sign == 'true'
         run: |
           $releaseDir = Join-Path $env:BUILD_DIR 'src\Release'
-          $files = @(
-            'Zano.exe',
+          $fileNames = @(
             'zanod.exe',
             'simplewallet.exe',
             'connectivity_tool.exe',
             'gateway_rpc_proxy.exe'
-          ) | ForEach-Object { Join-Path $releaseDir $_ }
+          )
+          if ('${{ matrix.gui }}' -eq 'true') {
+            $fileNames += 'Zano.exe'
+          }
+          $files = $fileNames | ForEach-Object { Join-Path $releaseDir $_ }
 
           foreach ($file in $files) {
             & $env:SIGNTOOL_EXE sign `
@@ -521,6 +575,7 @@ jobs:
           }
 
       - name: Assemble CLI, GUI, and symbols packages
+        if: matrix.gui
         run: |
           New-Item -ItemType Directory -Path $env:DIST_DIR -Force | Out-Null
           $stageRoot = Join-Path $env:RUNNER_TEMP "zano-stage-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
@@ -589,15 +644,9 @@ jobs:
             throw "The staged GUI package is missing html\index.html"
           }
 
-          $redistSearchRoot = if (-not [string]::IsNullOrWhiteSpace($env:VCToolsRedistDir) -and
-              (Test-Path -LiteralPath $env:VCToolsRedistDir)) {
-            $env:VCToolsRedistDir
-          }
-          else {
-            Join-Path $env:VS_PATH 'VC\Redist\MSVC'
-          }
+          $redistSearchRoot = Join-Path $env:VS_PATH 'VC\Redist\MSVC'
           $redist = Get-ChildItem -LiteralPath $redistSearchRoot -Filter 'vc_redist.x64.exe' -File -Recurse |
-            Sort-Object { [version]$_.Directory.Name } -Descending |
+            Sort-Object { [version]::new($_.VersionInfo.FileMajorPart, $_.VersionInfo.FileMinorPart, $_.VersionInfo.FileBuildPart, $_.VersionInfo.FilePrivatePart) } -Descending |
             Select-Object -First 1
           if (-not $redist) {
             throw "vc_redist.x64.exe was not found below $redistSearchRoot"
@@ -777,7 +826,115 @@ jobs:
           Signing: $env:SIGNING_STATUS
           "@ | Set-Content -LiteralPath (Join-Path $symbolsRoot 'BUILD-INFO.txt') -Encoding utf8
 
+      - name: Assemble ARM64 CLI and symbols packages
+        if: matrix.gui == false
+        run: |
+          New-Item -ItemType Directory -Path $env:DIST_DIR -Force | Out-Null
+          $stageRoot = Join-Path $env:RUNNER_TEMP "zano-stage-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
+          New-Item -ItemType Directory -Path $stageRoot -Force | Out-Null
+          "STAGE_ROOT=$stageRoot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+          $releaseDir = Join-Path $env:BUILD_DIR 'src\Release'
+          $cliRoot = Join-Path $stageRoot $env:CLI_BASENAME
+          $symbolsRoot = Join-Path $stageRoot $env:SYMBOLS_BASENAME
+          New-Item -ItemType Directory -Path $cliRoot, $symbolsRoot -Force | Out-Null
+
+          $cliFiles = @(
+            'zanod.exe',
+            'simplewallet.exe',
+            'connectivity_tool.exe',
+            'gateway_rpc_proxy.exe'
+          )
+          foreach ($name in $cliFiles) {
+            Copy-Item -LiteralPath (Join-Path $releaseDir $name) -Destination $cliRoot -Force
+          }
+
+          $redistSearchRoot = if (-not [string]::IsNullOrWhiteSpace($env:VCToolsRedistDir) -and
+              (Test-Path -LiteralPath $env:VCToolsRedistDir)) {
+            $env:VCToolsRedistDir
+          }
+          else {
+            Join-Path $env:VS_PATH 'VC\Redist\MSVC'
+          }
+          # Microsoft's x64 redistributable also carries the ARM64 runtime.
+          $redistName = 'vc_redist.x64.exe'
+          $redist = Get-ChildItem -LiteralPath $redistSearchRoot -Filter $redistName -File -Recurse |
+            Sort-Object { [version]::new($_.VersionInfo.FileMajorPart, $_.VersionInfo.FileMinorPart, $_.VersionInfo.FileBuildPart, $_.VersionInfo.FilePrivatePart) } -Descending |
+            Select-Object -First 1
+          if (-not $redist) {
+            throw "$redistName was not found below $redistSearchRoot"
+          }
+          $redistSignature = Get-AuthenticodeSignature -LiteralPath $redist.FullName
+          if ($redistSignature.Status -ne 'Valid' -or
+              $redistSignature.SignerCertificate.Subject -notmatch 'Microsoft Corporation') {
+            throw "$redistName does not have the expected valid Microsoft signature"
+          }
+          Copy-Item -LiteralPath $redist.FullName -Destination $cliRoot -Force
+
+          $licenseRoot = Join-Path $cliRoot 'licenses'
+          New-Item -ItemType Directory -Path $licenseRoot -Force | Out-Null
+          Copy-Item -LiteralPath 'LICENSE' -Destination (Join-Path $cliRoot 'LICENSE.txt') -Force
+          Copy-Item -LiteralPath 'LICENSE' -Destination (Join-Path $licenseRoot 'Zano.txt') -Force
+          Copy-Item -LiteralPath (Join-Path $env:DEPS_DIR 'boost\LICENSE_1_0.txt') `
+            -Destination (Join-Path $licenseRoot 'Boost-1.0.txt') -Force
+          Copy-Item -LiteralPath (Join-Path $env:DEPS_DIR 'openssl\LICENSE.txt') `
+            -Destination (Join-Path $licenseRoot 'OpenSSL.txt') -Force
+
+          $sourceLicenseRoot = Join-Path $licenseRoot 'source-tree'
+          foreach ($scanRoot in @('contrib', 'src\gui\qt-daemon\layout')) {
+            Get-ChildItem -LiteralPath $scanRoot -File -Recurse |
+              Where-Object { $_.Name -match '^(LICENSE|COPYING)(\..*)?$' } |
+              ForEach-Object {
+                $relativePath = [IO.Path]::GetRelativePath($env:GITHUB_WORKSPACE, $_.FullName)
+                $destination = Join-Path $sourceLicenseRoot $relativePath
+                New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null
+                Copy-Item -LiteralPath $_.FullName -Destination $destination -Force
+              }
+          }
+
+          @"
+          Zano Windows ARM64 CLI package
+          Network: $env:NETWORK_NAME
+          Version: $env:PACKAGE_VERSION
+          Signing: $env:SIGNING_STATUS
+
+          Programs:
+            zanod.exe                    full-node daemon
+            simplewallet.exe             CLI wallet and wallet RPC mode
+            connectivity_tool.exe        connectivity diagnostics
+            gateway_rpc_proxy.exe        gateway RPC proxy
+
+          This build uses the Microsoft Visual C++ dynamic runtime. Run
+          $redistName if the required runtime is not already installed.
+          License texts are under licenses\.
+          "@ | Set-Content -LiteralPath (Join-Path $cliRoot 'README-WINDOWS.txt') -Encoding utf8
+
+          @"
+          This distribution contains Zano and third-party components.
+
+          License texts shipped by the project, Boost, and OpenSSL are collected
+          under licenses\. The source-tree subdirectory preserves notices from
+          bundled dependencies.
+          "@ | Set-Content -LiteralPath (Join-Path $cliRoot 'THIRD-PARTY-NOTICES.txt') -Encoding utf8
+
+          foreach ($name in @('zanod.pdb', 'simplewallet.pdb', 'connectivity_tool.pdb', 'gateway_rpc_proxy.pdb')) {
+            Copy-Item -LiteralPath (Join-Path $releaseDir $name) -Destination $symbolsRoot -Force
+          }
+          @"
+          Source commit: $env:GITHUB_SHA
+          Source ref: $env:GITHUB_REF
+          Configuration: Release
+          Platform: Windows ARM64
+          Toolchain: Visual Studio 2022 / MSVC v143 (x64 to ARM64)
+          Boost: $env:BOOST_VERSION (static libraries, shared CRT)
+          OpenSSL: $env:OPENSSL_VERSION (static libraries, shared CRT)
+          Qt: not included (CLI-only package)
+          Network: $env:NETWORK_NAME
+          Signing: $env:SIGNING_STATUS
+          "@ | Set-Content -LiteralPath (Join-Path $symbolsRoot 'BUILD-INFO.txt') -Encoding utf8
+
       - name: Build and optionally sign Inno Setup installer
+        if: matrix.gui
         env:
           SIGN_ENABLED: ${{ steps.signcheck.outputs.sign }}
         run: |
@@ -856,9 +1013,11 @@ jobs:
           Compress-Archive -LiteralPath $cliRoot `
             -DestinationPath (Join-Path $env:DIST_DIR "$env:CLI_BASENAME.zip") `
             -CompressionLevel Optimal
-          Compress-Archive -LiteralPath $guiRoot `
-            -DestinationPath (Join-Path $env:DIST_DIR "$env:GUI_BASENAME.zip") `
-            -CompressionLevel Optimal
+          if ('${{ matrix.gui }}' -eq 'true') {
+            Compress-Archive -LiteralPath $guiRoot `
+              -DestinationPath (Join-Path $env:DIST_DIR "$env:GUI_BASENAME.zip") `
+              -CompressionLevel Optimal
+          }
           Compress-Archive -LiteralPath $symbolsRoot `
             -DestinationPath (Join-Path $env:DIST_DIR "$env:SYMBOLS_BASENAME.zip") `
             -CompressionLevel Optimal
@@ -879,35 +1038,37 @@ jobs:
       - name: Upload CLI package
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: zano-windows-x64-cli${{ inputs.testnet == true && '-testnet' || '' }}
-          path: dist-windows/zano-windows-x64-cli*.zip
+          name: zano-windows-${{ matrix.arch }}-cli${{ inputs.testnet == true && '-testnet' || '' }}
+          path: dist-windows/zano-windows-${{ matrix.arch }}-cli*.zip
           if-no-files-found: error
 
       - name: Upload GUI package
+        if: matrix.gui
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: zano-windows-x64-gui${{ inputs.testnet == true && '-testnet' || '' }}
-          path: dist-windows/zano-windows-x64-gui*.zip
+          name: zano-windows-${{ matrix.arch }}-gui${{ inputs.testnet == true && '-testnet' || '' }}
+          path: dist-windows/zano-windows-${{ matrix.arch }}-gui*.zip
           if-no-files-found: error
 
       - name: Upload installer
+        if: matrix.gui
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: zano-windows-x64-installer${{ inputs.testnet == true && '-testnet' || '' }}
-          path: dist-windows/zano-windows-x64-gui*-installer.exe
+          name: zano-windows-${{ matrix.arch }}-installer${{ inputs.testnet == true && '-testnet' || '' }}
+          path: dist-windows/zano-windows-${{ matrix.arch }}-gui*-installer.exe
           if-no-files-found: error
 
       - name: Upload debug symbols
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: zano-windows-x64-symbols${{ inputs.testnet == true && '-testnet' || '' }}
-          path: dist-windows/zano-windows-x64-symbols*.zip
+          name: zano-windows-${{ matrix.arch }}-symbols${{ inputs.testnet == true && '-testnet' || '' }}
+          path: dist-windows/zano-windows-${{ matrix.arch }}-symbols*.zip
           if-no-files-found: error
 
       - name: Upload SHA-256 manifest
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: zano-windows-x64-checksums${{ inputs.testnet == true && '-testnet' || '' }}
+          name: zano-windows-${{ matrix.arch }}-checksums${{ inputs.testnet == true && '-testnet' || '' }}
           path: dist-windows/SHA256SUMS.txt
           if-no-files-found: error
 
