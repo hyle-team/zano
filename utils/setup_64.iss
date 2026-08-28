@@ -66,8 +66,8 @@ Root: HKCR; Subkey: "Zano\shell\open\command"; ValueType: string; ValueName: "";
 
 [Files]
 
-Source: "{#BinariesPath}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs ignoreversion overwritereadonly replacesameversion
-Source: "..\src\gui\qt-daemon\layout\html\*"; DestDir: "{app}\html"; Flags: ignoreversion recursesubdirs ignoreversion overwritereadonly replacesameversion
+Source: "{#BinariesPath}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs overwritereadonly
+Source: "..\src\gui\qt-daemon\layout\html\*"; DestDir: "{app}\html"; Flags: ignoreversion recursesubdirs overwritereadonly
 Source: "{#BinariesPath}\vc_redist.x64.exe"; DestDir: {tmp}; Flags: deleteafterinstall
 Source: "../resources/installer_bg_*.bmp"; Excludes: "*313.bmp"; Flags: dontcopy
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
