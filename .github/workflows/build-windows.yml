@@ -321,53 +321,23 @@ jobs:
           py7zrversion: '==1.0.0'
 
       - name: Configure (CMake, Release ${{ matrix.arch }})
-        run: |
-          $testnet = if ('${{ inputs.testnet }}' -eq 'true') { 'TRUE' } else { 'FALSE' }
-          $buildGui = if ('${{ matrix.gui }}' -eq 'true') { 'TRUE' } else { 'FALSE' }
-          $cmakeArguments = @(
-            '-S', '.',
-            '-B', $env:BUILD_DIR,
-            '-G', 'Visual Studio 17 2022',
-            '-A', '${{ matrix.cmake_arch }}',
-            '-T', 'v143,host=x64',
-            "-DTESTNET=$testnet",
-            "-DBUILD_GUI=$buildGui",
-            '-DBUILD_TESTS=FALSE',
-            '-DUSE_PCH=FALSE',
-            '-DSTATIC=FALSE',
-            '-DOPENSSL_USE_STATIC_LIBS=TRUE',
-            '-DOPENSSL_MSVC_STATIC_RT=FALSE',
-            '-DCMAKE_POLICY_VERSION_MINIMUM=3.5',
-            "-DBOOST_ROOT=$env:DEPS_DIR\boost",
-            "-DBOOST_LIBRARYDIR=$env:DEPS_DIR\boost\lib",
-            "-DOPENSSL_ROOT_DIR=$env:DEPS_DIR\openssl"
-          )
-          if ($buildGui -eq 'TRUE') {
-            $cmakeArguments += "-DCMAKE_PREFIX_PATH=$env:QT_ROOT_DIR"
-          }
-
-          & cmake.exe @cmakeArguments
-          if ($LASTEXITCODE -ne 0) {
-            throw "CMake configure failed"
-          }
+        shell: cmd
+        env:
+          ZANO_SOURCE_DIR: ${{ github.workspace }}
+          ZANO_BUILD_DIR: ${{ env.BUILD_DIR }}
+          ZANO_DEPS_DIR: ${{ env.DEPS_DIR }}
+          ZANO_CMAKE_ARCH: ${{ matrix.cmake_arch }}
+          ZANO_BUILD_GUI: ${{ matrix.gui }}
+          ZANO_TESTNET: ${{ inputs.testnet }}
+        run: call utils\build_script_windows.bat --ci-configure
 
       - name: Build Zano applications
-        run: |
-          $targets = @('daemon', 'simplewallet', 'connectivity_tool', 'gateway_rpc_proxy')
-          if ('${{ matrix.gui }}' -eq 'true') {
-            $targets = @('Zano') + $targets
-          }
-          $buildArguments = @(
-            '--build', $env:BUILD_DIR,
-            '--config', 'Release',
-            '--parallel', '2',
-            '--target'
-          ) + $targets
-
-          & cmake.exe @buildArguments
-          if ($LASTEXITCODE -ne 0) {
-            throw "CMake build failed"
-          }
+        shell: cmd
+        env:
+          ZANO_BUILD_DIR: ${{ env.BUILD_DIR }}
+          ZANO_BUILD_GUI: ${{ matrix.gui }}
+          ZANO_BUILD_PARALLEL: '2'
+        run: call utils\build_script_windows.bat --ci-build
 
       - name: Verify expected build outputs
         run: |
