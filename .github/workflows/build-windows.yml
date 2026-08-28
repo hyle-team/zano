@@ -1,0 +1,1056 @@
+name: Windows build
+
+on:
+  workflow_dispatch:
+    inputs:
+      testnet:
+        description: 'Build testnet binaries (-DTESTNET=TRUE)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  BOOST_VERSION: 1.84.0
+  BOOST_SHA256: 81a4d10075731966477276c47324ecd9cac02da49899d36c48eba66e40014f25
+  OPENSSL_VERSION: 3.5.8
+  OPENSSL_SHA256: a8f84a39918ec6415ce765d9b429d313ba97b8143169c172e734b9514464f5b2
+  NASM_VERSION: 2.16.3
+  QT_VERSION: 6.8.3
+  WINDOWS_SIGN_TIMESTAMP_URL: ${{ vars.WINDOWS_SIGN_TIMESTAMP_URL || 'http://timestamp.digicert.com' }}
+
+jobs:
+  build:
+    name: Windows ${{ matrix.arch }}${{ matrix.gui && ' (full)' || ' (CLI)' }}${{ inputs.testnet == true && ' (testnet)' || '' }}
+    runs-on: windows-2022
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            cmake_arch: x64
+            vcvars: vcvars64.bat
+            vs_component: Microsoft.VisualStudio.Component.VC.Tools.x86.x64
+            openssl_target: VC-WIN64A
+            boost_arch: x86
+            gui: true
+          # Qt 6.8.3 has no prebuilt Windows ARM64 Qt WebEngine package.
+          - arch: arm64
+            cmake_arch: ARM64
+            vcvars: vcvarsamd64_arm64.bat
+            vs_component: Microsoft.VisualStudio.Component.VC.Tools.ARM64
+            openssl_target: VC-WIN64-ARM
+            boost_arch: arm
+            gui: false
+    # Put the WINDOWS_SIGN_* secrets in this environment and configure required
+    # reviewers plus protected release refs before enabling production signing.
+    environment: windows-code-signing
+    env:
+      DEPS_DIR: ${{ github.workspace }}\_deps
+      BUILD_DIR: ${{ github.workspace }}\build-windows
+      DIST_DIR: ${{ github.workspace }}\dist-windows
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - name: Checkout (with submodules)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          submodules: recursive
+          # Full history is used by src/version.cmake and libmdbx.
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up MSVC 2022 ${{ matrix.arch }} environment
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          if (-not (Test-Path -LiteralPath $vswhere)) {
+            throw "vswhere.exe was not found"
+          }
+
+          $vsPath = & $vswhere -latest -products * `
+            -requires '${{ matrix.vs_component }}' `
+            -property installationPath |
+            Select-Object -First 1
+          if ([string]::IsNullOrWhiteSpace($vsPath)) {
+            throw "Visual Studio with the ${{ matrix.arch }} C++ toolchain was not found"
+          }
+          $vsPath = $vsPath.Trim()
+
+          $vcvars = Join-Path $vsPath 'VC\Auxiliary\Build\${{ matrix.vcvars }}'
+          if (-not (Test-Path -LiteralPath $vcvars)) {
+            throw "${{ matrix.vcvars }} was not found at $vcvars"
+          }
+
+          $environment = & $env:COMSPEC /d /s /c "`"$vcvars`" >nul && set"
+          if ($LASTEXITCODE -ne 0) {
+            throw "${{ matrix.vcvars }} failed with exit code $LASTEXITCODE"
+          }
+
+          foreach ($line in $environment) {
+            if ($line -notmatch '^([^=]+)=(.*)$') {
+              continue
+            }
+            $name = $matches[1]
+            $value = $matches[2]
+            if ($name -match '^(GITHUB_|RUNNER_|ACTIONS_)' -or $name -eq 'CI') {
+              continue
+            }
+            "$name=$value" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          }
+
+          "VS_PATH=$vsPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Host "Using Visual Studio at $vsPath for ${{ matrix.arch }}"
+
+      - name: Cache Boost and OpenSSL
+        id: deps-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: |
+            ${{ env.DEPS_DIR }}\boost
+            ${{ env.DEPS_DIR }}\openssl
+          key: deps-windows-2022-${{ matrix.arch }}-msvc143-md-boost${{ env.BOOST_VERSION }}-openssl${{ env.OPENSSL_VERSION }}-nasm${{ env.NASM_VERSION }}-v1
+
+      - name: Install NASM
+        if: steps.deps-cache.outputs.cache-hit != 'true' && matrix.arch == 'x64'
+        run: |
+          choco install nasm --version=$env:NASM_VERSION --allow-downgrade --yes --no-progress
+          if ($LASTEXITCODE -ne 0) {
+            throw "Chocolatey failed to install NASM $env:NASM_VERSION"
+          }
+
+          $nasmPath = Join-Path $env:ProgramFiles 'NASM\nasm.exe'
+          if (-not (Test-Path -LiteralPath $nasmPath -PathType Leaf)) {
+            throw "nasm.exe was not found after installation"
+          }
+          $nasmVersion = (& $nasmPath -v) -join ' '
+          if ($LASTEXITCODE -ne 0 -or $nasmVersion -notmatch '\b2\.16\.03\b') {
+            throw "Expected NASM 2.16.03, got: $nasmVersion"
+          }
+          Split-Path -Parent $nasmPath |
+            Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Build OpenSSL (static library, shared CRT)
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        run: |
+          New-Item -ItemType Directory -Path $env:DEPS_DIR -Force | Out-Null
+          $archive = Join-Path $env:RUNNER_TEMP "openssl-$env:OPENSSL_VERSION.tar.gz"
+          $sourceDir = Join-Path $env:RUNNER_TEMP "openssl-$env:OPENSSL_VERSION"
+          $prefix = Join-Path $env:DEPS_DIR 'openssl'
+          $url = "https://github.com/openssl/openssl/releases/download/openssl-$env:OPENSSL_VERSION/openssl-$env:OPENSSL_VERSION.tar.gz"
+
+          & curl.exe --fail --location --retry 3 --output $archive $url
+          if ($LASTEXITCODE -ne 0) {
+            throw "OpenSSL download failed"
+          }
+          $actualHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $archive).Hash.ToLowerInvariant()
+          if ($actualHash -ne ($env:OPENSSL_SHA256).ToLowerInvariant()) {
+            throw "OpenSSL SHA-256 mismatch: $actualHash"
+          }
+
+          & tar.exe -xzf $archive -C $env:RUNNER_TEMP
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $sourceDir)) {
+            throw "OpenSSL extraction failed"
+          }
+
+          $prefixForConfigure = $prefix.Replace('\', '/')
+          Push-Location $sourceDir
+          try {
+            & perl.exe Configure ${{ matrix.openssl_target }} no-shared no-tests no-makedepend `
+              "--prefix=$prefixForConfigure" `
+              "--openssldir=$prefixForConfigure/ssl" `
+              '--libdir=lib'
+            if ($LASTEXITCODE -ne 0) {
+              throw "OpenSSL Configure failed"
+            }
+
+            & nmake.exe
+            if ($LASTEXITCODE -ne 0) {
+              throw "OpenSSL build failed"
+            }
+
+            & nmake.exe install_sw
+            if ($LASTEXITCODE -ne 0) {
+              throw "OpenSSL install failed"
+            }
+
+            Copy-Item -LiteralPath 'LICENSE.txt' -Destination (Join-Path $prefix 'LICENSE.txt') -Force
+          }
+          finally {
+            Pop-Location
+          }
+
+      - name: Build Boost (static libraries, shared CRT)
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        timeout-minutes: 120
+        run: |
+          New-Item -ItemType Directory -Path $env:DEPS_DIR -Force | Out-Null
+          $boostVersionUnderscore = $env:BOOST_VERSION.Replace('.', '_')
+          $archive = Join-Path $env:RUNNER_TEMP "boost_$boostVersionUnderscore.7z"
+          $sourceDir = Join-Path $env:RUNNER_TEMP "boost_$boostVersionUnderscore"
+          $prefix = Join-Path $env:DEPS_DIR 'boost'
+
+          # Use Boost's Windows-friendly 7z release instead of the tar.bz2
+          # package: extracting the latter with Windows tar can take hours.
+          # The pinned digest must match regardless of the selected mirror.
+          $urls = @(
+            "https://sourceforge.net/projects/boost/files/boost/$env:BOOST_VERSION/boost_$boostVersionUnderscore.7z/download",
+            "https://archives.boost.io/release/$env:BOOST_VERSION/source/boost_$boostVersionUnderscore.7z"
+          )
+          $downloadedFrom = $null
+          foreach ($url in $urls) {
+            if (Test-Path -LiteralPath $archive) {
+              Remove-Item -LiteralPath $archive -Force
+            }
+
+            Write-Host "Downloading Boost $env:BOOST_VERSION from $url"
+            & curl.exe `
+              --fail `
+              --location `
+              --show-error `
+              --retry 2 `
+              --retry-all-errors `
+              --retry-delay 5 `
+              --retry-max-time 900 `
+              --connect-timeout 30 `
+              --max-time 600 `
+              --speed-limit 65536 `
+              --speed-time 120 `
+              --output $archive `
+              $url
+            $curlExitCode = $LASTEXITCODE
+            if ($curlExitCode -ne 0) {
+              Write-Warning "Boost download failed from $url with curl exit code $curlExitCode"
+              continue
+            }
+
+            $actualHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $archive).Hash.ToLowerInvariant()
+            if ($actualHash -ne ($env:BOOST_SHA256).ToLowerInvariant()) {
+              Write-Warning "Boost SHA-256 mismatch from ${url}: $actualHash"
+              continue
+            }
+
+            $downloadedFrom = $url
+            break
+          }
+          if (-not $downloadedFrom) {
+            throw "Boost download failed from every configured source"
+          }
+          Write-Host "Verified Boost archive from $downloadedFrom"
+
+          $sevenZipCommand = Get-Command '7z.exe' -ErrorAction SilentlyContinue
+          $sevenZip = if ($sevenZipCommand) {
+            $sevenZipCommand.Source
+          }
+          else {
+            Join-Path $env:ProgramFiles '7-Zip\7z.exe'
+          }
+          if (-not (Test-Path -LiteralPath $sevenZip -PathType Leaf)) {
+            throw "7z.exe was not found"
+          }
+
+          $extractStartedAt = Get-Date
+          Write-Host "Extracting Boost with $sevenZip"
+          & $sevenZip x $archive "-o$env:RUNNER_TEMP" -y -mmt=on -bb0 -bso0 -bsp0 -bse2
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $sourceDir -PathType Container)) {
+            throw "Boost extraction failed with 7-Zip exit code $LASTEXITCODE"
+          }
+          $elapsedSeconds = [int]((Get-Date) - $extractStartedAt).TotalSeconds
+          Write-Host "Boost extraction completed in $elapsedSeconds seconds"
+
+          Push-Location $sourceDir
+          try {
+            $hostVcvars = Join-Path $env:VS_PATH 'VC\Auxiliary\Build\vcvars64.bat'
+            & $env:COMSPEC /d /s /c "`"$hostVcvars`" >nul && bootstrap.bat"
+            if ($LASTEXITCODE -ne 0) {
+              throw "Boost bootstrap failed"
+            }
+
+            & .\b2.exe -j2 `
+              --with-system `
+              --with-filesystem `
+              --with-locale `
+              --with-thread `
+              --with-timer `
+              --with-date_time `
+              --with-chrono `
+              --with-regex `
+              --with-serialization `
+              --with-atomic `
+              --with-program_options `
+              --with-log `
+              address-model=64 `
+              architecture=${{ matrix.boost_arch }} `
+              target-os=windows `
+              toolset=msvc-14.3 `
+              link=static `
+              runtime-link=shared `
+              threading=multi `
+              variant=release `
+              boost.locale.icu=off `
+              "--prefix=$prefix" `
+              install
+            if ($LASTEXITCODE -ne 0) {
+              throw "Boost build failed"
+            }
+
+            Copy-Item -LiteralPath 'LICENSE_1_0.txt' -Destination (Join-Path $prefix 'LICENSE_1_0.txt') -Force
+          }
+          finally {
+            Pop-Location
+          }
+
+      - name: Set up Python for Qt installer
+        if: matrix.gui
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.13.3'
+
+      - name: Install Qt 6.8 (MSVC 2022, WebEngine)
+        if: matrix.gui
+        uses: jurplel/install-qt-action/action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          arch: win64_msvc2022_64
+          modules: 'qtwebengine qtwebchannel qtpositioning'
+          cache: true
+          aqtversion: '==3.3.0'
+          py7zrversion: '==1.0.0'
+
+      - name: Configure (CMake, Release ${{ matrix.arch }})
+        run: |
+          $testnet = if ('${{ inputs.testnet }}' -eq 'true') { 'TRUE' } else { 'FALSE' }
+          $buildGui = if ('${{ matrix.gui }}' -eq 'true') { 'TRUE' } else { 'FALSE' }
+          $cmakeArguments = @(
+            '-S', '.',
+            '-B', $env:BUILD_DIR,
+            '-G', 'Visual Studio 17 2022',
+            '-A', '${{ matrix.cmake_arch }}',
+            '-T', 'v143,host=x64',
+            "-DTESTNET=$testnet",
+            "-DBUILD_GUI=$buildGui",
+            '-DBUILD_TESTS=FALSE',
+            '-DUSE_PCH=FALSE',
+            '-DSTATIC=FALSE',
+            '-DOPENSSL_USE_STATIC_LIBS=TRUE',
+            '-DOPENSSL_MSVC_STATIC_RT=FALSE',
+            '-DCMAKE_POLICY_VERSION_MINIMUM=3.5',
+            "-DBOOST_ROOT=$env:DEPS_DIR\boost",
+            "-DBOOST_LIBRARYDIR=$env:DEPS_DIR\boost\lib",
+            "-DOPENSSL_ROOT_DIR=$env:DEPS_DIR\openssl"
+          )
+          if ($buildGui -eq 'TRUE') {
+            $cmakeArguments += "-DCMAKE_PREFIX_PATH=$env:QT_ROOT_DIR"
+          }
+
+          & cmake.exe @cmakeArguments
+          if ($LASTEXITCODE -ne 0) {
+            throw "CMake configure failed"
+          }
+
+      - name: Build Zano applications
+        run: |
+          $targets = @('daemon', 'simplewallet', 'connectivity_tool', 'gateway_rpc_proxy')
+          if ('${{ matrix.gui }}' -eq 'true') {
+            $targets = @('Zano') + $targets
+          }
+          $buildArguments = @(
+            '--build', $env:BUILD_DIR,
+            '--config', 'Release',
+            '--parallel', '2',
+            '--target'
+          ) + $targets
+
+          & cmake.exe @buildArguments
+          if ($LASTEXITCODE -ne 0) {
+            throw "CMake build failed"
+          }
+
+      - name: Verify expected build outputs
+        run: |
+          $releaseDir = Join-Path $env:BUILD_DIR 'src\Release'
+          $expectedFiles = @(
+            'zanod.exe',
+            'simplewallet.exe',
+            'connectivity_tool.exe',
+            'gateway_rpc_proxy.exe',
+            'zanod.pdb',
+            'simplewallet.pdb',
+            'connectivity_tool.pdb',
+            'gateway_rpc_proxy.pdb'
+          )
+          if ('${{ matrix.gui }}' -eq 'true') {
+            $expectedFiles += @('Zano.exe', 'Zano.pdb')
+          }
+          foreach ($name in $expectedFiles) {
+            $path = Join-Path $releaseDir $name
+            if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+              throw "Expected output was not produced: $path"
+            }
+          }
+
+          $headers = (& dumpbin.exe /headers (Join-Path $releaseDir 'zanod.exe')) -join "`n"
+          $expectedMachine = if ('${{ matrix.arch }}' -eq 'arm64') { 'AA64 machine \(ARM64\)' } else { '8664 machine \(x64\)' }
+          if ($LASTEXITCODE -ne 0 -or $headers -notmatch $expectedMachine) {
+            throw "zanod.exe is not a ${{ matrix.arch }} PE binary"
+          }
+
+      - name: Derive package version
+        run: |
+          $versionHeader = Get-Content -LiteralPath 'src\version.h.in' -Raw
+          function Get-QuotedDefine([string] $name) {
+            $match = [regex]::Match($versionHeader, "(?m)^#define\s+$name\s+`"([^`"]+)`"")
+            if (-not $match.Success) {
+              throw "Could not read $name from src/version.h.in"
+            }
+            return $match.Groups[1].Value
+          }
+
+          $major = Get-QuotedDefine 'PROJECT_MAJOR_VERSION'
+          $minor = Get-QuotedDefine 'PROJECT_MINOR_VERSION'
+          $revision = Get-QuotedDefine 'PROJECT_REVISION'
+          $buildMatch = [regex]::Match($versionHeader, '(?m)^#define\s+PROJECT_VERSION_BUILD_NO\s+(\d+)')
+          if (-not $buildMatch.Success) {
+            throw "Could not read PROJECT_VERSION_BUILD_NO from src/version.h.in"
+          }
+
+          $appVersion = "$major.$minor.$revision.$($buildMatch.Groups[1].Value)"
+          $commit = (& git.exe rev-parse --short=7 HEAD).Trim()
+          if ($LASTEXITCODE -ne 0 -or -not $commit) {
+            throw "Could not derive the Git commit"
+          }
+          $packageVersion = "$appVersion-$commit"
+          $networkSuffix = if ('${{ inputs.testnet }}' -eq 'true') { '-testnet' } else { '' }
+
+          "APP_VERSION=$appVersion" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "PACKAGE_VERSION=$packageVersion" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          $arch = '${{ matrix.arch }}'
+          "CLI_BASENAME=zano-windows-$arch-cli$networkSuffix-$packageVersion" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "GUI_BASENAME=zano-windows-$arch-gui$networkSuffix-$packageVersion" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "INSTALLER_BASENAME=zano-windows-$arch-gui$networkSuffix-$packageVersion-installer" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "NETWORK_NAME=$(if ($networkSuffix) { 'testnet' } else { 'mainnet' })" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Check Authenticode signing secrets
+        id: signcheck
+        # This backend is for an exportable PFX. A hardware/cloud-HSM
+        # certificate should replace the centralized import/sign steps below
+        # with the issuing provider's action once that provider is known.
+        env:
+          CERT_PFX_B64: ${{ secrets.WINDOWS_SIGN_CERT_PFX }}
+          CERT_PASSWORD: ${{ secrets.WINDOWS_SIGN_CERT_PASSWORD }}
+        run: |
+          $hasCertificate = -not [string]::IsNullOrWhiteSpace($env:CERT_PFX_B64)
+          $hasPassword = -not [string]::IsNullOrWhiteSpace($env:CERT_PASSWORD)
+
+          if ($hasCertificate -xor $hasPassword) {
+            throw "WINDOWS_SIGN_CERT_PFX and WINDOWS_SIGN_CERT_PASSWORD must either both be set or both be absent"
+          }
+
+          if ($hasCertificate) {
+            'sign=true' | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+            'SIGNING_STATUS=authenticode' | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+            $scope = if ('${{ matrix.gui }}' -eq 'true') { 'project binaries and the Inno Setup installer/uninstaller' } else { 'project binaries' }
+            Write-Host "::notice title=Authenticode signing::ENABLED - $scope will be signed"
+          }
+          else {
+            'sign=false' | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+            'SIGNING_STATUS=unsigned' | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+            Write-Host '::notice title=Authenticode signing::SKIPPED - signing secrets are absent; producing unsigned artifacts'
+          }
+
+      - name: Import Authenticode certificate
+        if: steps.signcheck.outputs.sign == 'true'
+        env:
+          CERT_PFX_B64: ${{ secrets.WINDOWS_SIGN_CERT_PFX }}
+          CERT_PASSWORD: ${{ secrets.WINDOWS_SIGN_CERT_PASSWORD }}
+          EXPECTED_SUBJECT: ${{ vars.WINDOWS_SIGN_EXPECTED_SUBJECT }}
+        run: |
+          $pfxPath = Join-Path $env:RUNNER_TEMP 'zano-signing.pfx'
+          try {
+            $pfxBytes = [Convert]::FromBase64String($env:CERT_PFX_B64)
+            [IO.File]::WriteAllBytes($pfxPath, $pfxBytes)
+            $securePassword = ConvertTo-SecureString $env:CERT_PASSWORD -AsPlainText -Force
+            $existingThumbprints = @(Get-ChildItem 'Cert:\CurrentUser\My' | ForEach-Object { $_.Thumbprint })
+            $imported = @(Import-PfxCertificate `
+              -FilePath $pfxPath `
+              -CertStoreLocation 'Cert:\CurrentUser\My' `
+              -Password $securePassword)
+
+            $newThumbprints = @($imported |
+              ForEach-Object { $_.Thumbprint } |
+              Where-Object { $_ -and $_ -notin $existingThumbprints } |
+              Select-Object -Unique)
+            "IMPORTED_CERT_THUMBPRINTS=$($newThumbprints -join ',')" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+            $codeSigningOid = '1.3.6.1.5.5.7.3.3'
+            $codeSigningCertificates = @($imported |
+              Where-Object {
+                $_.HasPrivateKey -and
+                (@($_.EnhancedKeyUsageList | ForEach-Object { $_.ObjectId.Value }) -contains $codeSigningOid)
+              })
+            if (-not $codeSigningCertificates) {
+              throw "The PFX does not contain a code-signing certificate with a private key"
+            }
+
+            if (-not [string]::IsNullOrWhiteSpace($env:EXPECTED_SUBJECT)) {
+              $codeSigningCertificates = @($codeSigningCertificates |
+                Where-Object {
+                  $_.Subject.IndexOf($env:EXPECTED_SUBJECT, [StringComparison]::OrdinalIgnoreCase) -ge 0
+                })
+              if (-not $codeSigningCertificates) {
+                throw "No code-signing certificate matches WINDOWS_SIGN_EXPECTED_SUBJECT"
+              }
+            }
+
+            $now = Get-Date
+            $certificate = $codeSigningCertificates |
+              Where-Object { $_.NotBefore -le $now -and $_.NotAfter -gt $now } |
+              Sort-Object NotAfter -Descending |
+              Select-Object -First 1
+            if (-not $certificate) {
+              throw "The PFX does not contain a currently valid code-signing certificate"
+            }
+
+            # Export the selected leaf for the later signing steps.
+            "SIGN_CERT_THUMBPRINT=$($certificate.Thumbprint)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+            $signTool = Get-ChildItem `
+              -Path "${env:ProgramFiles(x86)}\Windows Kits\10\bin" `
+              -Filter 'signtool.exe' `
+              -File `
+              -Recurse |
+              Where-Object { $_.FullName -match '\\x64\\signtool\.exe$' } |
+              Sort-Object { [version]$_.Directory.Parent.Name } -Descending |
+              Select-Object -First 1
+            if (-not $signTool) {
+              throw "The x64 Windows SDK signtool.exe was not found"
+            }
+
+            "SIGNTOOL_EXE=$($signTool.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+            Write-Host "Using code-signing certificate: $($certificate.Subject)"
+          }
+          finally {
+            if (Test-Path -LiteralPath $pfxPath) {
+              Remove-Item -LiteralPath $pfxPath -Force
+            }
+          }
+
+      - name: Sign and verify project executables
+        if: steps.signcheck.outputs.sign == 'true'
+        run: |
+          $releaseDir = Join-Path $env:BUILD_DIR 'src\Release'
+          $fileNames = @(
+            'zanod.exe',
+            'simplewallet.exe',
+            'connectivity_tool.exe',
+            'gateway_rpc_proxy.exe'
+          )
+          if ('${{ matrix.gui }}' -eq 'true') {
+            $fileNames += 'Zano.exe'
+          }
+          $files = $fileNames | ForEach-Object { Join-Path $releaseDir $_ }
+
+          foreach ($file in $files) {
+            & $env:SIGNTOOL_EXE sign `
+              /sha1 $env:SIGN_CERT_THUMBPRINT `
+              /s My `
+              /fd SHA256 `
+              /tr $env:WINDOWS_SIGN_TIMESTAMP_URL `
+              /td SHA256 `
+              /d Zano `
+              /du https://zano.org `
+              $file
+            if ($LASTEXITCODE -ne 0) {
+              throw "Signing failed for $file"
+            }
+
+            & $env:SIGNTOOL_EXE verify /pa /all /v /tw $file
+            if ($LASTEXITCODE -ne 0) {
+              throw "Signature verification failed for $file"
+            }
+          }
+
+      - name: Assemble CLI and GUI packages
+        if: matrix.gui
+        run: |
+          New-Item -ItemType Directory -Path $env:DIST_DIR -Force | Out-Null
+          $stageRoot = Join-Path $env:RUNNER_TEMP "zano-stage-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
+          New-Item -ItemType Directory -Path $stageRoot -Force | Out-Null
+          "STAGE_ROOT=$stageRoot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+          $releaseDir = Join-Path $env:BUILD_DIR 'src\Release'
+          $cliRoot = Join-Path $stageRoot $env:CLI_BASENAME
+          $guiRoot = Join-Path $stageRoot $env:GUI_BASENAME
+          New-Item -ItemType Directory -Path $cliRoot, $guiRoot -Force | Out-Null
+
+          function Copy-CommonLicenses([string] $packageRoot) {
+            Copy-Item -LiteralPath 'LICENSE' -Destination (Join-Path $packageRoot 'LICENSE.txt') -Force
+            $licenseRoot = Join-Path $packageRoot 'licenses'
+            New-Item -ItemType Directory -Path $licenseRoot -Force | Out-Null
+            Copy-Item -LiteralPath 'LICENSE' -Destination (Join-Path $licenseRoot 'Zano.txt') -Force
+            Copy-Item -LiteralPath (Join-Path $env:DEPS_DIR 'boost\LICENSE_1_0.txt') `
+              -Destination (Join-Path $licenseRoot 'Boost-1.0.txt') -Force
+            Copy-Item -LiteralPath (Join-Path $env:DEPS_DIR 'openssl\LICENSE.txt') `
+              -Destination (Join-Path $licenseRoot 'OpenSSL.txt') -Force
+
+            $sourceLicenseRoot = Join-Path $licenseRoot 'source-tree'
+            $scanRoots = @('contrib', 'src\gui\qt-daemon\layout')
+            foreach ($scanRoot in $scanRoots) {
+              Get-ChildItem -LiteralPath $scanRoot -File -Recurse |
+                Where-Object { $_.Name -match '^(LICENSE|COPYING)(\..*)?$' } |
+                ForEach-Object {
+                  $relativePath = [IO.Path]::GetRelativePath($env:GITHUB_WORKSPACE, $_.FullName)
+                  $destination = Join-Path $sourceLicenseRoot $relativePath
+                  New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null
+                  Copy-Item -LiteralPath $_.FullName -Destination $destination -Force
+                }
+            }
+          }
+
+          $cliFiles = @(
+            'zanod.exe',
+            'zanod.pdb',
+            'simplewallet.exe',
+            'simplewallet.pdb',
+            'connectivity_tool.exe',
+            'connectivity_tool.pdb',
+            'gateway_rpc_proxy.exe',
+            'gateway_rpc_proxy.pdb'
+          )
+          foreach ($name in $cliFiles) {
+            Copy-Item -LiteralPath (Join-Path $releaseDir $name) -Destination $cliRoot -Force
+          }
+
+          $guiFiles = @(
+            'Zano.exe',
+            'Zano.pdb',
+            'zanod.exe',
+            'zanod.pdb',
+            'simplewallet.exe',
+            'simplewallet.pdb'
+          )
+          foreach ($name in $guiFiles) {
+            Copy-Item -LiteralPath (Join-Path $releaseDir $name) -Destination $guiRoot -Force
+          }
+
+          # Match the macOS application bundle: the GUI loads its web frontend
+          # from a sibling html directory at runtime. Keep build-only inputs out
+          # of the portable package.
+          $htmlSource = (Resolve-Path -LiteralPath 'src\gui\qt-daemon\layout\html').Path
+          $htmlDestination = Join-Path $guiRoot 'html'
+          & robocopy.exe $htmlSource $htmlDestination /E `
+            /XD (Join-Path $htmlSource 'less') `
+            /XF package.json gulpfile.js `
+            /NFL /NDL /NJH /NJS /NP
+          $robocopyExitCode = $LASTEXITCODE
+          if ($robocopyExitCode -ge 8) {
+            throw "Copying the GUI html runtime failed with robocopy exit code $robocopyExitCode"
+          }
+          if (-not (Test-Path -LiteralPath (Join-Path $htmlDestination 'index.html') -PathType Leaf)) {
+            throw "The staged GUI package is missing html\index.html"
+          }
+
+          $redistSearchRoot = Join-Path $env:VS_PATH 'VC\Redist\MSVC'
+          $redist = Get-ChildItem -LiteralPath $redistSearchRoot -Filter 'vc_redist.x64.exe' -File -Recurse |
+            Sort-Object { [version]::new($_.VersionInfo.FileMajorPart, $_.VersionInfo.FileMinorPart, $_.VersionInfo.FileBuildPart, $_.VersionInfo.FilePrivatePart) } -Descending |
+            Select-Object -First 1
+          if (-not $redist) {
+            throw "vc_redist.x64.exe was not found below $redistSearchRoot"
+          }
+          $redistSignature = Get-AuthenticodeSignature -LiteralPath $redist.FullName
+          if ($redistSignature.Status -ne 'Valid' -or
+              $redistSignature.SignerCertificate.Subject -notmatch 'Microsoft Corporation') {
+            throw "vc_redist.x64.exe does not have the expected valid Microsoft signature"
+          }
+          Copy-Item -LiteralPath $redist.FullName -Destination $cliRoot -Force
+          Copy-Item -LiteralPath $redist.FullName -Destination $guiRoot -Force
+
+          $windeployqt = Join-Path $env:QT_ROOT_DIR 'bin\windeployqt.exe'
+          if (-not (Test-Path -LiteralPath $windeployqt)) {
+            throw "windeployqt.exe was not found at $windeployqt"
+          }
+          & $windeployqt `
+            --release `
+            --no-compiler-runtime `
+            --dir $guiRoot `
+            (Join-Path $guiRoot 'Zano.exe')
+          if ($LASTEXITCODE -ne 0) {
+            throw "windeployqt failed"
+          }
+
+          $requiredQtFiles = @(
+            'QtWebEngineProcess.exe',
+            'platforms\qwindows.dll',
+            'tls\qschannelbackend.dll',
+            'resources\icudtl.dat'
+          )
+          foreach ($relativePath in $requiredQtFiles) {
+            $path = Join-Path $guiRoot $relativePath
+            if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+              throw "windeployqt did not produce required runtime file: $path"
+            }
+          }
+          $webEngineLocales = Get-ChildItem -LiteralPath $guiRoot -Filter 'qtwebengine_locales' -Directory -Recurse |
+            Select-Object -First 1
+          if (-not $webEngineLocales) {
+            throw "windeployqt did not produce the Qt WebEngine locales directory"
+          }
+
+          Copy-CommonLicenses $cliRoot
+          Copy-CommonLicenses $guiRoot
+
+          $qtLicenseDestination = Join-Path $guiRoot 'licenses\Qt'
+          New-Item -ItemType Directory -Path $qtLicenseDestination -Force | Out-Null
+
+          # A curated release bundle can be added here once the final
+          # commercial/open-source Qt distribution terms are known.
+          $curatedQtLicenseRoot = 'utils\windows_licenses\qt'
+          $hasCuratedQtBundle = Test-Path -LiteralPath $curatedQtLicenseRoot -PathType Container
+          if ($hasCuratedQtBundle) {
+            $curatedQtLicenseDestination = Join-Path $qtLicenseDestination 'release-approved'
+            New-Item -ItemType Directory -Path $curatedQtLicenseDestination -Force | Out-Null
+            Copy-Item -Path (Join-Path $curatedQtLicenseRoot '*') `
+              -Destination $curatedQtLicenseDestination `
+              -Recurse -Force
+          }
+
+          # Binary kits installed by aqt do not guarantee a single LICENSES
+          # location. Preserve every license directory/file that the kit does
+          # provide, without pretending the first match is a complete bundle.
+          $qtLicenseDirectories = @(Get-ChildItem -LiteralPath $env:QT_ROOT_DIR `
+            -Filter 'LICENSES' -Directory -Recurse)
+          foreach ($directory in $qtLicenseDirectories) {
+            $relativePath = [IO.Path]::GetRelativePath($env:QT_ROOT_DIR, $directory.FullName)
+            $destination = Join-Path $qtLicenseDestination (Join-Path 'kit' $relativePath)
+            New-Item -ItemType Directory -Path $destination -Force | Out-Null
+            Copy-Item -Path (Join-Path $directory.FullName '*') -Destination $destination -Recurse -Force
+          }
+
+          $qtStandaloneLicenses = @(Get-ChildItem -LiteralPath $env:QT_ROOT_DIR -File -Recurse |
+            Where-Object { $_.Name -match '^(LICENSE|COPYING|licenseInfo)(\..*)?$' })
+          foreach ($file in $qtStandaloneLicenses) {
+            $relativePath = [IO.Path]::GetRelativePath($env:QT_ROOT_DIR, $file.FullName)
+            $destination = Join-Path $qtLicenseDestination (Join-Path 'kit-files' $relativePath)
+            New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null
+            Copy-Item -LiteralPath $file.FullName -Destination $destination -Force
+          }
+
+          if (-not $hasCuratedQtBundle) {
+            Write-Host '::warning title=Qt release licensing::No curated utils/windows_licenses/qt bundle is present; review Qt/WebEngine obligations before publishing'
+          }
+          @"
+          Qt / Qt WebEngine release licensing checkpoint
+
+          Files under kit\ and kit-files\ were copied from the exact Qt $env:QT_VERSION
+          binary kit used for this build. They are included when available, but
+          are not assumed to be a complete Chromium/Qt WebEngine notice bundle.
+
+          Before public release, legal/release owners must review the applicable
+          Qt commercial or open-source agreement and WebEngine third-party
+          notices. Put the approved distributable bundle in
+          utils\windows_licenses\qt so CI copies it to release-approved\.
+
+          Reference inventories for Qt 6.8:
+          https://doc.qt.io/qt-6.8/licenses-used-in-qt.html
+          https://doc.qt.io/qt-6.8/qtwebengine-licensing.html
+          "@ | Set-Content -LiteralPath (Join-Path $qtLicenseDestination 'README-RELEASE-LICENSING.txt') -Encoding utf8
+
+          @"
+          Zano Windows x64 CLI package
+          Network: $env:NETWORK_NAME
+          Version: $env:PACKAGE_VERSION
+          Signing: $env:SIGNING_STATUS
+
+          Programs:
+            zanod.exe                    full-node daemon
+            simplewallet.exe             CLI wallet and wallet RPC mode
+            connectivity_tool.exe        connectivity diagnostics
+            gateway_rpc_proxy.exe        gateway RPC proxy
+
+          This build uses the Microsoft Visual C++ dynamic runtime. Run
+          vc_redist.x64.exe if the required runtime is not already installed.
+          License texts are under licenses\.
+          "@ | Set-Content -LiteralPath (Join-Path $cliRoot 'README-WINDOWS.txt') -Encoding utf8
+
+          @"
+          Zano Windows x64 GUI package
+          Network: $env:NETWORK_NAME
+          Version: $env:PACKAGE_VERSION
+          Signing: $env:SIGNING_STATUS
+
+          Programs:
+            Zano.exe                     desktop GUI wallet
+            zanod.exe                    full-node daemon
+            simplewallet.exe             CLI wallet and wallet RPC mode
+
+          Qt 6 and Qt WebEngine runtime files are deployed beside Zano.exe.
+          This build uses the Microsoft Visual C++ dynamic runtime. Run
+          vc_redist.x64.exe if the required runtime is not already installed.
+          License texts are under licenses\.
+          "@ | Set-Content -LiteralPath (Join-Path $guiRoot 'README-WINDOWS.txt') -Encoding utf8
+
+          @"
+          This distribution contains Zano and third-party components.
+
+          License texts shipped by the project, Boost, and OpenSSL are collected
+          under licenses\. The source-tree subdirectory preserves notices from
+          bundled dependencies.
+          "@ | Set-Content -LiteralPath (Join-Path $cliRoot 'THIRD-PARTY-NOTICES.txt') -Encoding utf8
+
+          @"
+          This distribution contains Zano and third-party components.
+
+          The corresponding license texts shipped by the project, Boost, OpenSSL,
+          and those available in the Qt binary kit are collected under licenses\.
+          The source-tree subdirectory preserves notices from bundled dependencies.
+
+          Qt WebEngine contains Chromium-derived third-party software. See
+          licenses\Qt\README-RELEASE-LICENSING.txt: a release-approved bundle
+          is still required unless one is present under release-approved\.
+          "@ | Set-Content -LiteralPath (Join-Path $guiRoot 'THIRD-PARTY-NOTICES.txt') -Encoding utf8
+
+          $buildInfo = @"
+          Source commit: $env:GITHUB_SHA
+          Source ref: $env:GITHUB_REF
+          Configuration: Release
+          Platform: Windows x64
+          Toolchain: Visual Studio 2022 / MSVC v143
+          Boost: $env:BOOST_VERSION (static libraries, shared CRT)
+          OpenSSL: $env:OPENSSL_VERSION (static libraries, shared CRT)
+          Qt: $env:QT_VERSION (MSVC 2022 x64)
+          Network: $env:NETWORK_NAME
+          Signing: $env:SIGNING_STATUS
+          "@
+          $buildInfo | Set-Content -LiteralPath (Join-Path $cliRoot 'BUILD-INFO.txt') -Encoding utf8
+          $buildInfo | Set-Content -LiteralPath (Join-Path $guiRoot 'BUILD-INFO.txt') -Encoding utf8
+
+      - name: Assemble ARM64 CLI package
+        if: matrix.gui == false
+        run: |
+          New-Item -ItemType Directory -Path $env:DIST_DIR -Force | Out-Null
+          $stageRoot = Join-Path $env:RUNNER_TEMP "zano-stage-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
+          New-Item -ItemType Directory -Path $stageRoot -Force | Out-Null
+          "STAGE_ROOT=$stageRoot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+          $releaseDir = Join-Path $env:BUILD_DIR 'src\Release'
+          $cliRoot = Join-Path $stageRoot $env:CLI_BASENAME
+          New-Item -ItemType Directory -Path $cliRoot -Force | Out-Null
+
+          $cliFiles = @(
+            'zanod.exe',
+            'zanod.pdb',
+            'simplewallet.exe',
+            'simplewallet.pdb',
+            'connectivity_tool.exe',
+            'connectivity_tool.pdb',
+            'gateway_rpc_proxy.exe',
+            'gateway_rpc_proxy.pdb'
+          )
+          foreach ($name in $cliFiles) {
+            Copy-Item -LiteralPath (Join-Path $releaseDir $name) -Destination $cliRoot -Force
+          }
+
+          $redistSearchRoot = if (-not [string]::IsNullOrWhiteSpace($env:VCToolsRedistDir) -and
+              (Test-Path -LiteralPath $env:VCToolsRedistDir)) {
+            $env:VCToolsRedistDir
+          }
+          else {
+            Join-Path $env:VS_PATH 'VC\Redist\MSVC'
+          }
+          # Microsoft's x64 redistributable also carries the ARM64 runtime.
+          $redistName = 'vc_redist.x64.exe'
+          $redist = Get-ChildItem -LiteralPath $redistSearchRoot -Filter $redistName -File -Recurse |
+            Sort-Object { [version]::new($_.VersionInfo.FileMajorPart, $_.VersionInfo.FileMinorPart, $_.VersionInfo.FileBuildPart, $_.VersionInfo.FilePrivatePart) } -Descending |
+            Select-Object -First 1
+          if (-not $redist) {
+            throw "$redistName was not found below $redistSearchRoot"
+          }
+          $redistSignature = Get-AuthenticodeSignature -LiteralPath $redist.FullName
+          if ($redistSignature.Status -ne 'Valid' -or
+              $redistSignature.SignerCertificate.Subject -notmatch 'Microsoft Corporation') {
+            throw "$redistName does not have the expected valid Microsoft signature"
+          }
+          Copy-Item -LiteralPath $redist.FullName -Destination $cliRoot -Force
+
+          $licenseRoot = Join-Path $cliRoot 'licenses'
+          New-Item -ItemType Directory -Path $licenseRoot -Force | Out-Null
+          Copy-Item -LiteralPath 'LICENSE' -Destination (Join-Path $cliRoot 'LICENSE.txt') -Force
+          Copy-Item -LiteralPath 'LICENSE' -Destination (Join-Path $licenseRoot 'Zano.txt') -Force
+          Copy-Item -LiteralPath (Join-Path $env:DEPS_DIR 'boost\LICENSE_1_0.txt') `
+            -Destination (Join-Path $licenseRoot 'Boost-1.0.txt') -Force
+          Copy-Item -LiteralPath (Join-Path $env:DEPS_DIR 'openssl\LICENSE.txt') `
+            -Destination (Join-Path $licenseRoot 'OpenSSL.txt') -Force
+
+          $sourceLicenseRoot = Join-Path $licenseRoot 'source-tree'
+          foreach ($scanRoot in @('contrib', 'src\gui\qt-daemon\layout')) {
+            Get-ChildItem -LiteralPath $scanRoot -File -Recurse |
+              Where-Object { $_.Name -match '^(LICENSE|COPYING)(\..*)?$' } |
+              ForEach-Object {
+                $relativePath = [IO.Path]::GetRelativePath($env:GITHUB_WORKSPACE, $_.FullName)
+                $destination = Join-Path $sourceLicenseRoot $relativePath
+                New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null
+                Copy-Item -LiteralPath $_.FullName -Destination $destination -Force
+              }
+          }
+
+          @"
+          Zano Windows ARM64 CLI package
+          Network: $env:NETWORK_NAME
+          Version: $env:PACKAGE_VERSION
+          Signing: $env:SIGNING_STATUS
+
+          Programs:
+            zanod.exe                    full-node daemon
+            simplewallet.exe             CLI wallet and wallet RPC mode
+            connectivity_tool.exe        connectivity diagnostics
+            gateway_rpc_proxy.exe        gateway RPC proxy
+
+          This build uses the Microsoft Visual C++ dynamic runtime. Run
+          $redistName if the required runtime is not already installed.
+          License texts are under licenses\.
+          "@ | Set-Content -LiteralPath (Join-Path $cliRoot 'README-WINDOWS.txt') -Encoding utf8
+
+          @"
+          This distribution contains Zano and third-party components.
+
+          License texts shipped by the project, Boost, and OpenSSL are collected
+          under licenses\. The source-tree subdirectory preserves notices from
+          bundled dependencies.
+          "@ | Set-Content -LiteralPath (Join-Path $cliRoot 'THIRD-PARTY-NOTICES.txt') -Encoding utf8
+
+          @"
+          Source commit: $env:GITHUB_SHA
+          Source ref: $env:GITHUB_REF
+          Configuration: Release
+          Platform: Windows ARM64
+          Toolchain: Visual Studio 2022 / MSVC v143 (x64 to ARM64)
+          Boost: $env:BOOST_VERSION (static libraries, shared CRT)
+          OpenSSL: $env:OPENSSL_VERSION (static libraries, shared CRT)
+          Qt: not included (CLI-only package)
+          Network: $env:NETWORK_NAME
+          Signing: $env:SIGNING_STATUS
+          "@ | Set-Content -LiteralPath (Join-Path $cliRoot 'BUILD-INFO.txt') -Encoding utf8
+
+      - name: Build and optionally sign Inno Setup installer
+        if: matrix.gui
+        env:
+          SIGN_ENABLED: ${{ steps.signcheck.outputs.sign }}
+        run: |
+          $guiRoot = Join-Path $env:STAGE_ROOT $env:GUI_BASENAME
+          $isccCandidates = @(
+            "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
+            "$env:ProgramFiles\Inno Setup 6\ISCC.exe"
+          )
+          $iscc = $isccCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+          if (-not $iscc) {
+            throw "Inno Setup 6 compiler was not found"
+          }
+
+          $isccArguments = @(
+            "/DBinariesPath=$guiRoot",
+            "/DMyAppVersion=$env:APP_VERSION",
+            "/O$env:DIST_DIR",
+            "/F$env:INSTALLER_BASENAME"
+          )
+
+          if ($env:SIGN_ENABLED -eq 'true') {
+            $signer = Join-Path $env:RUNNER_TEMP 'zano-inno-signer.ps1'
+            @'
+          param(
+            [Parameter(Mandatory = $true)]
+            [string] $FilePath
+          )
+
+          $ErrorActionPreference = 'Stop'
+          & $env:SIGNTOOL_EXE sign `
+            /sha1 $env:SIGN_CERT_THUMBPRINT `
+            /s My `
+            /fd SHA256 `
+            /tr $env:WINDOWS_SIGN_TIMESTAMP_URL `
+            /td SHA256 `
+            /d Zano `
+            /du https://zano.org `
+            $FilePath
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+          & $env:SIGNTOOL_EXE verify /pa /all /v /tw $FilePath
+          exit $LASTEXITCODE
+          '@ | Set-Content -LiteralPath $signer -Encoding utf8
+
+            # Inno expands $f to an already quoted file name; $q is only needed
+            # around the helper script path.
+            $signCommand = 'powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $q{0}$q -FilePath $f' -f $signer
+            $isccArguments += '/DCodeSigningEnabled'
+            $isccArguments += "/SZanoCi=$signCommand"
+          }
+
+          & $iscc @isccArguments 'utils\setup_64.iss'
+          if ($LASTEXITCODE -ne 0) {
+            throw "Inno Setup compilation failed"
+          }
+
+          $installer = Join-Path $env:DIST_DIR "$env:INSTALLER_BASENAME.exe"
+          if (-not (Test-Path -LiteralPath $installer -PathType Leaf)) {
+            throw "Expected installer was not produced: $installer"
+          }
+          if ($env:SIGN_ENABLED -eq 'true') {
+            & $env:SIGNTOOL_EXE verify /pa /all /v /tw $installer
+            if ($LASTEXITCODE -ne 0) {
+              throw "Installer signature verification failed"
+            }
+          }
+
+      - name: Create ZIP archives
+        run: |
+          $cliRoot = Join-Path $env:STAGE_ROOT $env:CLI_BASENAME
+          $guiRoot = Join-Path $env:STAGE_ROOT $env:GUI_BASENAME
+
+          Compress-Archive -LiteralPath $cliRoot `
+            -DestinationPath (Join-Path $env:DIST_DIR "$env:CLI_BASENAME.zip") `
+            -CompressionLevel Optimal
+          if ('${{ matrix.gui }}' -eq 'true') {
+            Compress-Archive -LiteralPath $guiRoot `
+              -DestinationPath (Join-Path $env:DIST_DIR "$env:GUI_BASENAME.zip") `
+              -CompressionLevel Optimal
+          }
+          Get-ChildItem -LiteralPath $env:DIST_DIR -File | Format-Table Name, Length
+
+      - name: Upload CLI package
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: zano-windows-${{ matrix.arch }}-cli${{ inputs.testnet == true && '-testnet' || '' }}
+          path: dist-windows/zano-windows-${{ matrix.arch }}-cli*.zip
+          if-no-files-found: error
+
+      - name: Upload GUI package
+        if: matrix.gui
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: zano-windows-${{ matrix.arch }}-gui${{ inputs.testnet == true && '-testnet' || '' }}
+          path: dist-windows/zano-windows-${{ matrix.arch }}-gui*.zip
+          if-no-files-found: error
+
+      - name: Upload installer
+        if: matrix.gui
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: zano-windows-${{ matrix.arch }}-installer${{ inputs.testnet == true && '-testnet' || '' }}
+          path: dist-windows/zano-windows-${{ matrix.arch }}-gui*-installer.exe
+          if-no-files-found: error
+
+      - name: Remove imported signing certificate
+        if: always() && steps.signcheck.outputs.sign == 'true'
+        run: |
+          $thumbprints = @($env:IMPORTED_CERT_THUMBPRINTS -split ',' |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+          foreach ($thumbprint in $thumbprints) {
+            $certificatePath = "Cert:\CurrentUser\My\$thumbprint"
+            if (Test-Path -LiteralPath $certificatePath) {
+              Remove-Item -LiteralPath $certificatePath -Force
+            }
+          }

@@ -483,7 +483,7 @@ std::string get_nix_version_display_string()
     std::string config_folder;
 #ifdef WIN32
     // Windows
-#ifdef _M_X64
+#if defined(_M_X64) || defined(_M_ARM64)
     config_folder = get_special_folder_path_utf8(CSIDL_APPDATA, true) + "/" + CURRENCY_NAME_SHORT;
 #else 
     config_folder = get_special_folder_path_utf8(CSIDL_APPDATA, true) + "/" + CURRENCY_NAME_SHORT + "-x86";
