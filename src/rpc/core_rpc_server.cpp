@@ -8,6 +8,7 @@
 using namespace epee;
 
 #include "core_rpc_server.h"
+#include "gateway_rpc_validation.h"
 #include "common/command_line.h"
 #include "currency_core/currency_format_utils.h"
 #include "currency_core/account.h"
@@ -18,6 +19,7 @@ using namespace epee;
 #include "core_rpc_server_error_codes.h"
 #include "wallet/core_fast_rpc_proxy.h"
 #include "wallet/fill_destination_helper.h"
+#include "currency_core/currency_format_utils_transactions.h"
 
 #define CHECK_RPC_LIMITS(var, limit)    if(var > limit)  {res.status = API_RETURN_CODE_ARG_OUT_OF_LIMITS; return true;}
 
@@ -48,6 +50,7 @@ namespace currency
     const command_line::arg_descriptor<std::string> arg_rpc_bind_port       ("rpc-bind-port",       "", std::to_string(RPC_DEFAULT_PORT));
     const command_line::arg_descriptor<bool> arg_rpc_ignore_offline_status  ("rpc-ignore-offline",  "Let rpc calls despite online/offline status");
     const command_line::arg_descriptor<bool> arg_rpc_enable_admin_api       ("rpc-enable-admin-api", "Enable API commands that can alter pool or daemon state (reset pool, remove txs, etc.)");
+
   }
   //-----------------------------------------------------------------------------------
   void core_rpc_server::init_options(boost::program_options::options_description& desc)
@@ -407,7 +410,7 @@ namespace currency
     LOG_PRINT_L2("[on_get_blocks]: find_blockchain_supplement ....");
     blockchain_storage::blocks_direct_container bs;
     if (!m_core.get_blockchain_storage().find_blockchain_supplement(req.block_ids, bs, res.current_height, res.start_height, COMMAND_RPC_GET_BLOCKS_FAST_MAX_COUNT, req.minimum_height))
-    {
+    { 
       res.status = API_RETURN_CODE_FAIL;
       return false;
     }
@@ -756,12 +759,37 @@ namespace currency
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_gateway_create_transfer(const COMMAND_RPC_GATEWAY_CREATE_TRANSFER::request& req, COMMAND_RPC_GATEWAY_CREATE_TRANSFER::response& res, connection_context& cntx)
   {
+    CHECK_CORE_READY();
+
     //TODO: Some of the code presented here might need to be moved to separate library/module as it touch privacy-sensitive operations
 
     if (req.gateway_view_secret_key == currency::null_skey)
     {
       res.status = API_RETURN_CODE_BAD_ARG;
       res.status_error = "gateway_view_secret_key is required, must be a non-null secret";
+      return true;
+    }
+
+    crypto::public_key gateway_view_public_key = null_pkey;
+    if (!crypto::secret_key_to_public_key(req.gateway_view_secret_key, gateway_view_public_key) || gateway_view_public_key != req.origin_gateway_id)
+    {
+      res.status = API_RETURN_CODE_BAD_ARG;
+      res.status_error = "gateway_view_secret_key does not match origin_gateway_id";
+      return true;
+    }
+
+    const uint64_t minimum_fee = m_core.get_blockchain_storage().get_core_runtime_config().tx_pool_min_fee;
+    if (req.fee < minimum_fee)
+    {
+      res.status = API_RETURN_CODE_BAD_ARG;
+      res.status_error = "Transaction fee is below the current minimum";
+      return true;
+    }
+
+    if (req.destinations.empty() || req.destinations.size() > CURRENCY_TX_MAX_ALLOWED_OUTS)
+    {
+      res.status = API_RETURN_CODE_BAD_ARG;
+      res.status_error = "Destinations count is outside the allowed range";
       return true;
     }
 
@@ -785,10 +813,29 @@ namespace currency
     std::unordered_map<crypto::public_key, uint64_t> total_coins_needed; //asset_id -> amount
     for(const auto& dest : req.destinations)
     {
-      total_coins_needed[dest.asset_id] += dest.amount;
+      const crypto::public_key asset_id = dest.asset_id == null_pkey ? currency::native_coin_asset_id : dest.asset_id;
+      if (!crypto::check_key(asset_id))
+      {
+        res.status = API_RETURN_CODE_BAD_ARG;
+        res.status_error = "Destination contains an invalid asset id";
+        return true;
+      }
+      uint64_t& total_amount = total_coins_needed[asset_id];
+      if (!assign_add_with_overflow_check(dest.amount, total_amount))
+      {
+        res.status = API_RETURN_CODE_BAD_ARG;
+        res.status_error = "Destination amount overflow";
+        return true;
+      }
     }
 
-    total_coins_needed[currency::native_coin_asset_id] += req.fee;
+    uint64_t& native_coins_needed = total_coins_needed[currency::native_coin_asset_id];
+    if (!assign_add_with_overflow_check(req.fee, native_coins_needed))
+    {
+      res.status = API_RETURN_CODE_BAD_ARG;
+      res.status_error = "Destination amounts and fee overflow";
+      return true;
+    }
 
 
     for (const auto& [asset_id, amount] : total_coins_needed)
@@ -807,6 +854,12 @@ namespace currency
     {
       res.status = API_RETURN_CODE_NOT_FOUND;
       res.status_error = std::string("Gateway address ") + epee::string_tools::pod_to_hex(req.origin_gateway_id) + " not found";
+      return true;
+    }
+    if (addr_data_ptr->info_history.empty())
+    {
+      res.status = API_RETURN_CODE_INTERNAL_ERROR;
+      res.status_error = "Gateway address has no owner history";
       return true;
     }
     for ( const auto& [asset_id, amount] : total_coins_needed)
@@ -900,8 +953,18 @@ namespace currency
       return true;
     }
 
-    res.tx_blob = t_serializable_object_to_blob(ftx.tx);
-    res.tx_id = get_transaction_hash(ftx.tx);
+    blobdata tx_blob = t_serializable_object_to_blob(ftx.tx);
+    const crypto::hash tx_id = get_transaction_hash(ftx.tx);
+    std::string validation_error;
+    if (!gateway_rpc_validation::prevalidate_transaction(ftx.tx, tx_blob, tx_id, m_core.get_blockchain_storage(), validation_error))
+    {
+      res.status = API_RETURN_CODE_BAD_ARG;
+      res.status_error = validation_error;
+      return true;
+    }
+
+    res.tx_blob = std::move(tx_blob);
+    res.tx_id = tx_id;
     res.tx_secret_key = ftx.one_time_key;
     for(const auto& de : ftp.prepared_destinations)
       if (de.addr.size() == 1)
@@ -922,6 +985,15 @@ namespace currency
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_gateway_sign_transfer(const COMMAND_RPC_GATEWAY_SIGN_TRANSFER::request& req, COMMAND_RPC_GATEWAY_SIGN_TRANSFER::response& res, connection_context& cntx)
   {
+    CHECK_CORE_READY();
+
+    if (req.tx_blob.size() >= CURRENCY_MAX_TRANSACTION_BLOB_SIZE)
+    {
+      res.status = API_RETURN_CODE_BAD_ARG;
+      res.status_error = "Transaction blob is too large";
+      return true;
+    }
+
     transaction tx = {};
 
     bool r = t_unserializable_object_from_blob(tx, req.tx_blob);
@@ -967,6 +1039,16 @@ namespace currency
       return true;
     }
 
+    if (count_type_in_variant_container<gateway_address_descriptor_operation>(tx.extra) != 0 ||
+        count_type_in_variant_container<asset_descriptor_operation>(tx.extra) != 0 ||
+        count_type_in_variant_container<extra_alias_entry>(tx.extra) != 0 ||
+        count_type_in_variant_container<gateway_address_ownership_proof>(tx.proofs) != 0)
+    {
+      res.status = API_RETURN_CODE_BAD_ARG;
+      res.status_error = "gateway_sign_transfer accepts regular gateway transfers only";
+      return true;
+    }
+
     for(auto& sig : tx.signatures)
     {
       if (sig.type() == typeid(gateway_sig))
@@ -984,13 +1066,33 @@ namespace currency
       }
     }
 
-    res.signed_tx_blob = t_serializable_object_to_blob(tx);
+    gateway_address_id_type gateway_id = null_pkey;
+    gateway_owner_key_v owner_key;
+    std::string validation_error;
+    if (!gateway_rpc_validation::validate_input_signatures(tx, tx_id, m_core.get_blockchain_storage(), gateway_id, owner_key, validation_error))
+    {
+      res.status = API_RETURN_CODE_BAD_ARG;
+      res.status_error = validation_error;
+      return true;
+    }
+
+    blobdata signed_tx_blob = t_serializable_object_to_blob(tx);
+    if (!gateway_rpc_validation::prevalidate_signed_transaction(tx, signed_tx_blob, tx_id, m_core.get_blockchain_storage(), validation_error))
+    {
+      res.status = API_RETURN_CODE_BAD_ARG;
+      res.status_error = validation_error;
+      return true;
+    }
+
+    res.signed_tx_blob = std::move(signed_tx_blob);
     res.status = API_RETURN_CODE_OK;
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_gateway_create_owner_change(const COMMAND_RPC_GATEWAY_CREATE_OWNER_CHANGE::request& req, COMMAND_RPC_GATEWAY_CREATE_OWNER_CHANGE::response& res, connection_context& cntx)
   {
+    CHECK_CORE_READY();
+
     if (m_core.get_blockchain_storage().is_pre_hardfork_tx_freeze_period_active())
     {
       LOG_PRINT_L0("[on_gateway_create_owner_change]: pre hardfork freeze period is in effect.");
@@ -1021,8 +1123,21 @@ namespace currency
       res.status_error = std::string("Gateway address ") + epee::string_tools::pod_to_hex(req.address_id) + " not found";
       return true;
     }
+    if (addr_data_ptr->info_history.empty())
+    {
+      res.status = API_RETURN_CODE_INTERNAL_ERROR;
+      res.status_error = "Gateway address has no owner history";
+      return true;
+    }
 
     uint64_t fee = req.fee ? req.fee : TX_DEFAULT_FEE;
+
+    if (fee < m_core.get_blockchain_storage().get_core_runtime_config().tx_pool_min_fee)
+    {
+      res.status = API_RETURN_CODE_BAD_ARG;
+      res.status_error = "Transaction fee is below the current minimum";
+      return true;
+    }
 
     auto it = addr_data_ptr->balances.find(currency::native_coin_asset_id);
     if (it == addr_data_ptr->balances.end() || it->second.amount < fee)
@@ -1042,6 +1157,13 @@ namespace currency
       gao_upd.descriptor.owner_key = req.new_descriptor_info.opt_owner_eddsa_pub_key.value();
     else if (req.new_descriptor_info.opt_owner_ecdsa_pub_key)
       gao_upd.descriptor.owner_key = req.new_descriptor_info.opt_owner_ecdsa_pub_key.value();
+
+    if (!validate_gateway_descriptor_base_limits(gao_upd.descriptor))
+    {
+      res.status = API_RETURN_CODE_BAD_ARG;
+      res.status_error = "New gateway descriptor does not satisfy the current limits";
+      return true;
+    }
 
     gateway_address_descriptor_operation gwdo{};
     gwdo.operation = gao_upd;
@@ -1073,8 +1195,18 @@ namespace currency
       return true;
     }
 
-    res.tx_blob = t_serializable_object_to_blob(ftx.tx);
-    res.tx_id = get_transaction_hash(ftx.tx);
+    blobdata tx_blob = t_serializable_object_to_blob(ftx.tx);
+    const crypto::hash tx_id = get_transaction_hash(ftx.tx);
+    std::string validation_error;
+    if (!gateway_rpc_validation::prevalidate_transaction(ftx.tx, tx_blob, tx_id, m_core.get_blockchain_storage(), validation_error))
+    {
+      res.status = API_RETURN_CODE_BAD_ARG;
+      res.status_error = validation_error;
+      return true;
+    }
+
+    res.tx_blob = std::move(tx_blob);
+    res.tx_id = tx_id;
     res.tx_secret_key = ftx.one_time_key;
 
     crypto::hash tx_hash_for_input_sig = currency::prepare_prefix_hash_for_sign(ftx.tx, 0, res.tx_id);
@@ -1093,6 +1225,30 @@ namespace currency
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_gateway_submit_owner_change(const COMMAND_RPC_GATEWAY_SUBMIT_OWNER_CHANGE::request& req, COMMAND_RPC_GATEWAY_SUBMIT_OWNER_CHANGE::response& res, connection_context& cntx)
   {
+    CHECK_CORE_READY();
+
+    if (!m_ignore_offline_status && !m_p2p.get_payload_object().get_synchronized_connections_count())
+    {
+      res.status = API_RETURN_CODE_DISCONNECTED;
+      res.status_error = "Daemon is not connected to the network";
+      return true;
+    }
+
+    if (m_core.get_blockchain_storage().is_pre_hardfork_tx_freeze_period_active())
+    {
+      res.status = API_RETURN_CODE_TX_FREEZE_PERIOD;
+      res.status_error = "Pre hardfork freeze period is in effect, sending transactions is not allowed till the next hardfork.";
+      LOG_PRINT_L0("on_gateway_submit_owner_change: pre hardfork freeze period is in effect.");
+      return true;
+    }
+
+    if (req.tx_blob.size() >= CURRENCY_MAX_TRANSACTION_BLOB_SIZE)
+    {
+      res.status = API_RETURN_CODE_BAD_ARG;
+      res.status_error = "Transaction blob is too large";
+      return true;
+    }
+
     transaction tx = {};
 
     bool r = t_unserializable_object_from_blob(tx, req.tx_blob);
@@ -1163,6 +1319,48 @@ namespace currency
       return true;
     }
 
+    size_t ownership_sig_count = 0;
+    if (req.opt_ownership_ecdsa_signature)
+      ownership_sig_count++;
+    if (req.opt_ownership_custom_schnorr_signature)
+      ownership_sig_count++;
+    if (req.opt_ownership_eddsa_signature)
+      ownership_sig_count++;
+
+    if (ownership_sig_count != 1)
+    {
+      LOG_ERROR("Expected exactly one ownership signature in on_gateway_submit_owner_change, got: " << ownership_sig_count);
+      res.status = API_RETURN_CODE_BAD_ARG;
+      res.status_error = "Expected exactly one ownership signature";
+      return true;
+    }
+
+    if (tx.vin.size() != 1 || tx.vin.front().type() != typeid(txin_gateway) || boost::get<txin_gateway>(tx.vin.front()).asset_id != native_coin_asset_id_1div8)
+    {
+      res.status = API_RETURN_CODE_BAD_ARG;
+      res.status_error = "Owner change transaction must contain exactly one native-coin gateway input";
+      return true;
+    }
+
+    if (count_type_in_variant_container<gateway_address_descriptor_operation>(tx.extra) != 1 ||
+        count_type_in_variant_container<asset_descriptor_operation>(tx.extra) != 0 ||
+        count_type_in_variant_container<extra_alias_entry>(tx.extra) != 0 ||
+        count_type_in_variant_container<gateway_address_ownership_proof>(tx.proofs) != 0)
+    {
+      res.status = API_RETURN_CODE_BAD_ARG;
+      res.status_error = "Transaction does not contain exactly one unsigned gateway owner change";
+      return true;
+    }
+
+    gateway_address_descriptor_operation descriptor_operation{};
+    if (!get_type_in_variant_container(tx.extra, descriptor_operation) ||
+        descriptor_operation.operation.type() != typeid(gateway_address_descriptor_operation_update))
+    {
+      res.status = API_RETURN_CODE_BAD_ARG;
+      res.status_error = "Transaction does not contain a gateway owner update";
+      return true;
+    }
+
     // apply gateway input signatures (for fee)
     for (auto& sig : tx.signatures)
     {
@@ -1180,12 +1378,51 @@ namespace currency
       }
     }
 
+    gateway_address_id_type gateway_id = null_pkey;
+    gateway_owner_key_v current_owner_key;
+    std::string validation_error;
+    if (!gateway_rpc_validation::validate_input_signatures(tx, tx_id, m_core.get_blockchain_storage(), gateway_id, current_owner_key, validation_error))
+    {
+      res.status = API_RETURN_CODE_BAD_ARG;
+      res.status_error = validation_error;
+      return true;
+    }
+
+    const gateway_address_descriptor_operation_update& owner_update = boost::get<gateway_address_descriptor_operation_update>(descriptor_operation.operation);
+    if (!validate_gateway_descriptor_base_limits(owner_update.descriptor))
+    {
+      res.status = API_RETURN_CODE_BAD_ARG;
+      res.status_error = "New gateway descriptor does not satisfy the current limits";
+      return true;
+    }
+    if (owner_update.address_id != gateway_id)
+    {
+      res.status = API_RETURN_CODE_BAD_ARG;
+      res.status_error = "Gateway owner update address does not match the transaction input";
+      return true;
+    }
+
+    const crypto::hash ownership_hash = crypto::hash_helper_t::h(CRYPTO_HDS_GW_CHANGE_OWNER_SIGNATURE, tx_id);
+    if (!gateway_rpc_validation::verify_owner_signature(ownership_hash, current_owner_key, ownership_sig))
+    {
+      res.status = API_RETURN_CODE_BAD_ARG;
+      res.status_error = "Gateway ownership signature is not valid for the current owner key";
+      return true;
+    }
+
     // add ownership proof to tx.proofs
     gateway_address_ownership_proof gaoop{};
     gaoop.sign = ownership_sig;
     tx.proofs.push_back(gaoop);
 
     blobdata signed_tx_blob = t_serializable_object_to_blob(tx);
+
+    if (!gateway_rpc_validation::prevalidate_signed_transaction(tx, signed_tx_blob, tx_id, m_core.get_blockchain_storage(), validation_error))
+    {
+      res.status = API_RETURN_CODE_BAD_ARG;
+      res.status_error = validation_error;
+      return true;
+    }
 
     // broadcast tx
     tx_verification_context tvc = AUTO_VAL_INIT(tvc);
@@ -1203,15 +1440,12 @@ namespace currency
       res.status_error = "Signed transaction verification failed";
       return true;
     }
-    
-    /*
-    * We don't want to return "already exists" error, some exchanges/custody might specifically want to relay tx again.
     if (!tvc.m_should_be_relayed && !tvc.m_already_existed)
     {
-      res.status = API_RETURN_CODE_ALREADY_EXISTS;
+      res.status = API_RETURN_CODE_FAIL;
+      res.status_error = "Signed transaction was not accepted for relay";
       return true;
     }
-    */
 
     NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::request ntx_req;
     ntx_req.txs.push_back(signed_tx_blob);
