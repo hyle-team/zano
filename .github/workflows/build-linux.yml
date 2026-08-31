@@ -1,0 +1,545 @@
+name: Linux build
+
+on:
+  workflow_dispatch:
+    inputs:
+      testnet:
+        description: 'Build testnet binaries (-DTESTNET=TRUE)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  BOOST_VERSION: 1.84.0
+  BOOST_SHA256: cc4b893acf645c9d4b698e9a0f08ca8846aa5d6c68275c14c3e7949c24109454
+  OPENSSL_VERSION: 3.5.8
+  OPENSSL_SHA256: a8f84a39918ec6415ce765d9b429d313ba97b8143169c172e734b9514464f5b2
+  QT_VERSION: 6.8.3
+  LINUXDEPLOY_VERSION: 1-alpha-20251107-1
+  LINUXDEPLOY_QT_VERSION: 1-alpha-20250213-1
+
+jobs:
+  build:
+    name: Linux ${{ matrix.arch }} (full)${{ inputs.testnet == true && ' (testnet)' || '' }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: ubuntu-22.04
+            cmake_arch: x86-64
+            boost_arch: x86
+            openssl_target: linux-x86_64
+            qt_host: linux
+            qt_arch: linux_gcc_64
+            appimage_arch: x86_64
+            elf_machine: Advanced Micro Devices X86-64
+            baseline: Ubuntu 22.04 / glibc 2.35
+            linuxdeploy_sha256: c20cd71e3a4e3b80c3483cef793cda3f4e990aca14014d23c544ca3ce1270b4d
+            linuxdeploy_qt_sha256: 15106be885c1c48a021198e7e1e9a48ce9d02a86dd0a1848f00bdbf3c1c92724
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            cmake_arch: default
+            boost_arch: arm
+            openssl_target: linux-aarch64
+            qt_host: linux_arm64
+            qt_arch: linux_gcc_arm64
+            appimage_arch: aarch64
+            elf_machine: AArch64
+            baseline: Ubuntu 24.04 / glibc 2.39
+            linuxdeploy_sha256: 620095110d693282b8ebeb244a95b5e911cf8f65f76c88b4b47d16ae6346fcff
+            linuxdeploy_qt_sha256: bf1c24aff6d749b5cf423afad6f15abd4440f81dec1aab95706b25f6667cdcf1
+    env:
+      DEPS_DIR: ${{ github.workspace }}/_deps-linux
+      BUILD_DIR: ${{ github.workspace }}/build-linux
+      DIST_DIR: ${{ github.workspace }}/dist-linux
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout (with submodules)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          submodules: recursive
+          # src/version.cmake and libmdbx derive versions from Git history.
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install Linux build prerequisites
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            bzip2 \
+            ca-certificates \
+            curl \
+            desktop-file-utils \
+            file \
+            libbz2-dev \
+            libgl1-mesa-dev \
+            libicu-dev \
+            libnss3 \
+            libxkbcommon-x11-0 \
+            libxcb-cursor0 \
+            patchelf \
+            perl \
+            pkg-config \
+            rsync \
+            zlib1g-dev
+
+      # restore/save are separate so successfully built dependencies enter the cache immediately even if a later Zano or packaging step fails
+      - name: Restore Boost and OpenSSL cache
+        id: deps-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ${{ env.DEPS_DIR }}
+          key: deps-${{ matrix.runner }}-${{ matrix.arch }}-boost${{ env.BOOST_VERSION }}-openssl${{ env.OPENSSL_VERSION }}-linux-v1
+
+      - name: Build Boost and OpenSSL (static)
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          jobs=$(nproc)
+          if (( jobs > 4 )); then jobs=4; fi
+
+          rm -rf "$DEPS_DIR"
+          mkdir -p "$DEPS_DIR/src"
+          cd "$DEPS_DIR/src"
+
+          openssl_archive="openssl-${OPENSSL_VERSION}.tar.gz"
+          curl --fail --location --retry 3 --output "$openssl_archive" \
+            "https://github.com/openssl/openssl/releases/download/openssl-${OPENSSL_VERSION}/${openssl_archive}"
+          echo "${OPENSSL_SHA256}  ${openssl_archive}" | sha256sum --check --strict
+          tar -xzf "$openssl_archive"
+          pushd "openssl-${OPENSSL_VERSION}"
+          ./Configure "${{ matrix.openssl_target }}" no-shared no-tests \
+            --prefix="$DEPS_DIR/openssl" \
+            --openssldir="$DEPS_DIR/openssl" \
+            --libdir=lib
+          make -s -j"$jobs"
+          make -s install_sw
+          install -m 0644 LICENSE.txt "$DEPS_DIR/openssl/LICENSE.txt"
+          popd
+
+          boost_underscore=${BOOST_VERSION//./_}
+          boost_archive="boost_${boost_underscore}.tar.bz2"
+          curl --fail --location --retry 3 --output "$boost_archive" \
+            "https://archives.boost.io/release/${BOOST_VERSION}/source/${boost_archive}"
+          echo "${BOOST_SHA256}  ${boost_archive}" | sha256sum --check --strict
+          tar -xjf "$boost_archive"
+          pushd "boost_${boost_underscore}"
+          ./bootstrap.sh \
+            --prefix="$DEPS_DIR/boost" \
+            --with-libraries=system,filesystem,thread,date_time,chrono,regex,serialization,atomic,program_options,locale,timer,log
+          ./b2 -j"$jobs" -d1 \
+            architecture="${{ matrix.boost_arch }}" \
+            address-model=64 \
+            link=static \
+            runtime-link=shared \
+            threading=multi \
+            variant=release \
+            install
+          install -m 0644 LICENSE_1_0.txt "$DEPS_DIR/boost/LICENSE_1_0.txt"
+          popd
+
+          rm -rf "$DEPS_DIR/src"
+          test -f "$DEPS_DIR/boost/lib/libboost_system.a"
+          test -f "$DEPS_DIR/openssl/lib/libcrypto.a"
+
+      - name: Verify Boost and OpenSSL installation
+        run: |
+          set -euo pipefail
+          test -f "$DEPS_DIR/boost/lib/libboost_system.a"
+          test -f "$DEPS_DIR/boost/LICENSE_1_0.txt"
+          test -f "$DEPS_DIR/openssl/lib/libcrypto.a"
+          test -f "$DEPS_DIR/openssl/LICENSE.txt"
+
+      - name: Save Boost and OpenSSL cache
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ${{ env.DEPS_DIR }}
+          key: ${{ steps.deps-cache.outputs.cache-primary-key }}
+
+      - name: Set up Python for Qt installer
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.13.3'
+
+      - name: Install Qt 6.8 (WebEngine)
+        uses: jurplel/install-qt-action/action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          host: ${{ matrix.qt_host }}
+          target: desktop
+          arch: ${{ matrix.qt_arch }}
+          modules: 'qtwebengine qtwebchannel qtpositioning'
+          cache: true
+          cache-key-prefix: qt-${{ matrix.runner }}-${{ matrix.qt_arch }}
+          aqtversion: '==3.3.0'
+          py7zrversion: '==1.0.0'
+
+      - name: Configure (CMake, Release ${{ matrix.arch }})
+        run: |
+          set -euo pipefail
+          testnet=FALSE
+          if [[ "${{ inputs.testnet }}" == true ]]; then testnet=TRUE; fi
+
+          cmake -S . -B "$BUILD_DIR" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+            -DTESTNET="$testnet" \
+            -DBUILD_GUI=TRUE \
+            -DBUILD_TESTS=FALSE \
+            -DUSE_PCH=FALSE \
+            -DSTATIC=TRUE \
+            -DARCH="${{ matrix.cmake_arch }}" \
+            -DBOOST_ROOT="$DEPS_DIR/boost" \
+            -DBOOST_LIBRARYDIR="$DEPS_DIR/boost/lib" \
+            -DOPENSSL_ROOT_DIR="$DEPS_DIR/openssl" \
+            -DOPENSSL_USE_STATIC_LIBS=TRUE \
+            -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR"
+
+      - name: Build Zano applications
+        run: |
+          set -euo pipefail
+          # Keep the high-memory Qt WebEngine link serial, as in the legacy
+          # Linux release script; the CLI targets can safely use two jobs.
+          cmake --build "$BUILD_DIR" --parallel 2 \
+            --target daemon simplewallet connectivity_tool gateway_rpc_proxy
+          cmake --build "$BUILD_DIR" --parallel 1 --target Zano
+
+      - name: Verify ELF outputs and run CLI smoke checks
+        run: |
+          set -euo pipefail
+          binaries=(Zano zanod simplewallet connectivity_tool gateway_rpc_proxy)
+          for binary in "${binaries[@]}"; do
+            path="$BUILD_DIR/src/$binary"
+            test -x "$path"
+            file "$path"
+            readelf -h "$path" | grep -F "Machine:" | grep -F "${{ matrix.elf_machine }}"
+            if ldd "$path" | grep -F 'not found'; then
+              echo "::error::$binary has unresolved shared-library dependencies"
+              exit 1
+            fi
+          done
+
+          "$BUILD_DIR/src/zanod" --version
+          "$BUILD_DIR/src/simplewallet" --version
+          "$BUILD_DIR/src/connectivity_tool" --version
+          "$BUILD_DIR/src/gateway_rpc_proxy" --version
+
+      - name: Derive package version
+        run: |
+          set -euo pipefail
+
+          quoted_define() {
+            local name=$1
+            sed -nE "s/^#define[[:space:]]+${name}[[:space:]]+\"([^\"]+)\".*/\\1/p" src/version.h.in
+          }
+
+          major=$(quoted_define PROJECT_MAJOR_VERSION)
+          minor=$(quoted_define PROJECT_MINOR_VERSION)
+          revision=$(quoted_define PROJECT_REVISION)
+          build_no=$(sed -nE 's/^#define[[:space:]]+PROJECT_VERSION_BUILD_NO[[:space:]]+([0-9]+).*/\1/p' src/version.h.in)
+          commit=$(git rev-parse --short=7 HEAD)
+          if [[ -z "$major" || -z "$minor" || -z "$revision" || -z "$build_no" || -z "$commit" ]]; then
+            echo '::error::Could not derive the package version'
+            exit 1
+          fi
+
+          package_version="${major}.${minor}.${revision}.${build_no}-${commit}"
+          network_suffix=''
+          network_name=mainnet
+          if [[ "${{ inputs.testnet }}" == true ]]; then
+            network_suffix=-testnet
+            network_name=testnet
+          fi
+
+          {
+            echo "PACKAGE_VERSION=$package_version"
+            echo "NETWORK_NAME=$network_name"
+            echo "CLI_BASENAME=zano-linux-${{ matrix.arch }}-cli${network_suffix}-${package_version}"
+            echo "GUI_BASENAME=zano-linux-${{ matrix.arch }}-gui${network_suffix}-${package_version}"
+          } >> "$GITHUB_ENV"
+
+      - name: Assemble CLI package
+        run: |
+          set -euo pipefail
+          mkdir -p "$DIST_DIR"
+          stage_root="$RUNNER_TEMP/zano-stage-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${{ matrix.arch }}"
+          cli_root="$stage_root/$CLI_BASENAME"
+          mkdir -p "$cli_root/licenses/source-tree"
+          echo "STAGE_ROOT=$stage_root" >> "$GITHUB_ENV"
+
+          for binary in zanod simplewallet connectivity_tool gateway_rpc_proxy; do
+            install -m 0755 "$BUILD_DIR/src/$binary" "$cli_root/$binary"
+          done
+
+          install -m 0644 LICENSE "$cli_root/LICENSE.txt"
+          install -m 0644 LICENSE "$cli_root/licenses/Zano.txt"
+          install -m 0644 "$DEPS_DIR/boost/LICENSE_1_0.txt" "$cli_root/licenses/Boost-1.0.txt"
+          install -m 0644 "$DEPS_DIR/openssl/LICENSE.txt" "$cli_root/licenses/OpenSSL.txt"
+
+          while IFS= read -r -d '' notice; do
+            destination="$cli_root/licenses/source-tree/$notice"
+            mkdir -p "$(dirname "$destination")"
+            cp "$notice" "$destination"
+          done < <(find contrib src/gui/qt-daemon/layout -type f \
+            \( -iname 'LICENSE' -o -iname 'LICENSE.*' -o -iname 'COPYING' -o -iname 'COPYING.*' \) -print0)
+
+          cat > "$cli_root/README-LINUX.txt" <<EOF
+          Zano Linux ${{ matrix.arch }} CLI package
+          Network: $NETWORK_NAME
+          Version: $PACKAGE_VERSION
+          Runtime baseline: ${{ matrix.baseline }}
+
+          Programs:
+            zanod                 full-node daemon
+            simplewallet          CLI wallet and wallet RPC mode
+            connectivity_tool     connectivity diagnostics
+            gateway_rpc_proxy     gateway RPC proxy
+
+          Boost, OpenSSL, libgcc, and libstdc++ are linked statically. glibc and
+          core Linux libraries remain system dependencies. License texts are
+          under licenses/.
+          EOF
+
+          cat > "$cli_root/THIRD-PARTY-NOTICES.txt" <<'EOF'
+          This distribution contains Zano and third-party components.
+
+          License texts shipped by Zano, Boost, OpenSSL, and bundled source-tree
+          dependencies are collected under licenses/.
+          EOF
+
+          cat > "$cli_root/BUILD-INFO.txt" <<EOF
+          Source commit: $GITHUB_SHA
+          Source ref: $GITHUB_REF
+          Configuration: Release
+          Platform: Linux ${{ matrix.arch }}
+          Runner/runtime baseline: ${{ matrix.baseline }}
+          Boost: $BOOST_VERSION (static)
+          OpenSSL: $OPENSSL_VERSION (static)
+          Qt: not required by this CLI archive
+          Network: $NETWORK_NAME
+          Debug symbols: embedded in the ELF binaries
+          Signing: none (GitHub records an artifact digest on upload)
+          EOF
+
+          tar -cjf "$DIST_DIR/$CLI_BASENAME.tar.bz2" -C "$stage_root" "$CLI_BASENAME"
+
+      - name: Download and verify AppImage packaging tools
+        env:
+          TOOLS_DIR: ${{ runner.temp }}/zano-appimage-tools
+        run: |
+          set -euo pipefail
+          mkdir -p "$TOOLS_DIR"
+          linuxdeploy="$TOOLS_DIR/linuxdeploy-${{ matrix.appimage_arch }}.AppImage"
+          qt_plugin="$TOOLS_DIR/linuxdeploy-plugin-qt-${{ matrix.appimage_arch }}.AppImage"
+
+          curl --fail --location --retry 3 --output "$linuxdeploy" \
+            "https://github.com/linuxdeploy/linuxdeploy/releases/download/${LINUXDEPLOY_VERSION}/linuxdeploy-${{ matrix.appimage_arch }}.AppImage"
+          echo "${{ matrix.linuxdeploy_sha256 }}  $linuxdeploy" | sha256sum --check --strict
+
+          curl --fail --location --retry 3 --output "$qt_plugin" \
+            "https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/${LINUXDEPLOY_QT_VERSION}/linuxdeploy-plugin-qt-${{ matrix.appimage_arch }}.AppImage"
+          echo "${{ matrix.linuxdeploy_qt_sha256 }}  $qt_plugin" | sha256sum --check --strict
+          chmod 0755 "$linuxdeploy" "$qt_plugin"
+
+      - name: Assemble Qt 6 GUI AppImage
+        env:
+          TOOLS_DIR: ${{ runner.temp }}/zano-appimage-tools
+        run: |
+          set -euo pipefail
+          appdir="$RUNNER_TEMP/$GUI_BASENAME.AppDir"
+          rm -rf "$appdir"
+          mkdir -p \
+            "$appdir/usr/bin" \
+            "$appdir/usr/share/applications" \
+            "$appdir/usr/share/icons/hicolor/scalable/apps" \
+            "$appdir/usr/share/icons/hicolor/256x256/apps" \
+            "$appdir/usr/share/doc/zano"
+
+          for binary in Zano zanod simplewallet connectivity_tool gateway_rpc_proxy; do
+            install -m 0755 "$BUILD_DIR/src/$binary" "$appdir/usr/bin/$binary"
+          done
+          rsync -a \
+            --exclude less \
+            --exclude package.json \
+            --exclude gulpfile.js \
+            src/gui/qt-daemon/layout/html/ "$appdir/usr/bin/html/"
+          test -f "$appdir/usr/bin/html/index.html"
+
+          install -m 0644 utils/Zano.desktop "$appdir/usr/share/applications/Zano.desktop"
+          sed -i 's/^Terminal=.*/Terminal=false/' "$appdir/usr/share/applications/Zano.desktop"
+          printf '%s\n' 'Exec=Zano %u' 'StartupWMClass=Zano' >> "$appdir/usr/share/applications/Zano.desktop"
+          install -m 0644 resources/app_icon.svg "$appdir/usr/share/icons/hicolor/scalable/apps/Zano.svg"
+          install -m 0644 resources/app_icon_256.png "$appdir/usr/share/icons/hicolor/256x256/apps/Zano.png"
+
+          cp -a "$STAGE_ROOT/$CLI_BASENAME/licenses" "$appdir/usr/share/doc/zano/licenses"
+          install -m 0644 LICENSE "$appdir/usr/share/doc/zano/LICENSE.txt"
+          install -m 0644 "$STAGE_ROOT/$CLI_BASENAME/BUILD-INFO.txt" "$appdir/usr/share/doc/zano/BUILD-INFO.txt"
+          install -m 0644 "$STAGE_ROOT/$CLI_BASENAME/THIRD-PARTY-NOTICES.txt" \
+            "$appdir/usr/share/doc/zano/THIRD-PARTY-NOTICES.txt"
+
+          qt_license_root="$appdir/usr/share/doc/zano/licenses/Qt"
+          mkdir -p "$qt_license_root/kit" "$qt_license_root/kit-files"
+          while IFS= read -r -d '' directory; do
+            relative=${directory#"$QT_ROOT_DIR"/}
+            destination="$qt_license_root/kit/$relative"
+            mkdir -p "$destination"
+            cp -a "$directory"/. "$destination"/
+          done < <(find "$QT_ROOT_DIR" -type d -name LICENSES -print0)
+
+          while IFS= read -r -d '' notice; do
+            relative=${notice#"$QT_ROOT_DIR"/}
+            destination="$qt_license_root/kit-files/$relative"
+            mkdir -p "$(dirname "$destination")"
+            cp "$notice" "$destination"
+          done < <(find "$QT_ROOT_DIR" -type f \
+            \( -iname 'LICENSE' -o -iname 'LICENSE.*' -o -iname 'COPYING' -o -iname 'COPYING.*' -o -iname 'licenseInfo.*' \) -print0)
+
+          if [[ -d utils/linux_licenses/qt ]]; then
+            mkdir -p "$qt_license_root/release-approved"
+            cp -a utils/linux_licenses/qt/. "$qt_license_root/release-approved"/
+          else
+            echo '::warning title=Qt release licensing::No curated utils/linux_licenses/qt bundle is present; review Qt/WebEngine obligations before publishing'
+          fi
+
+          cat > "$qt_license_root/README-RELEASE-LICENSING.txt" <<EOF
+          Qt / Qt WebEngine release licensing checkpoint
+
+          Files under kit/ and kit-files/ were copied from the Qt $QT_VERSION
+          binary kit used for this build. They are retained when available, but
+          are not assumed to be a complete Chromium/Qt WebEngine notice bundle.
+
+          Before public release, review the applicable Qt commercial or
+          open-source agreement and WebEngine third-party notices. An approved
+          distributable notice bundle can be committed under
+          utils/linux_licenses/qt and will then appear under release-approved/.
+
+          References:
+          https://doc.qt.io/qt-6.8/licenses-used-in-qt.html
+          https://doc.qt.io/qt-6.8/qtwebengine-licensing.html
+          EOF
+
+          cat > "$appdir/usr/share/doc/zano/THIRD-PARTY-NOTICES.txt" <<'EOF'
+          This distribution contains Zano and third-party components.
+
+          License texts shipped by Zano, Boost, OpenSSL, the Qt binary kit, and
+          bundled source-tree dependencies are collected under licenses/. Qt
+          WebEngine contains Chromium-derived third-party software; see
+          licenses/Qt/README-RELEASE-LICENSING.txt before publishing.
+          EOF
+
+          cat > "$appdir/usr/share/doc/zano/BUILD-INFO.txt" <<EOF
+          Source commit: $GITHUB_SHA
+          Source ref: $GITHUB_REF
+          Configuration: Release
+          Platform: Linux ${{ matrix.arch }}
+          Runner/runtime baseline: ${{ matrix.baseline }}
+          Boost: $BOOST_VERSION (static)
+          OpenSSL: $OPENSSL_VERSION (static)
+          Qt: $QT_VERSION / ${{ matrix.qt_arch }}
+          Network: $NETWORK_NAME
+          Debug symbols: embedded in the ELF binaries
+          Signing: none (GitHub records an artifact digest on upload)
+          EOF
+
+          cat > "$appdir/usr/share/doc/zano/README-LINUX.txt" <<EOF
+          Zano Linux ${{ matrix.arch }} GUI AppImage
+          Network: $NETWORK_NAME
+          Version: $PACKAGE_VERSION
+          Runtime baseline: ${{ matrix.baseline }}
+
+          The AppImage contains the Zano Qt 6/WebEngine desktop wallet plus
+          zanod, simplewallet, connectivity_tool, and gateway_rpc_proxy.
+          Select a CLI program with --exec=<name>; pass its arguments with
+          --exec-args='<arguments>'. License texts are under usr/share/doc/zano/.
+          EOF
+
+          linuxdeploy="$TOOLS_DIR/linuxdeploy-${{ matrix.appimage_arch }}.AppImage"
+          export APPIMAGE_EXTRACT_AND_RUN=1
+          export ARCH="${{ matrix.appimage_arch }}"
+          export NO_STRIP=1
+          export OUTPUT="$DIST_DIR/$GUI_BASENAME.AppImage"
+          export QMAKE="$QT_ROOT_DIR/bin/qmake"
+          export PATH="$QT_ROOT_DIR/bin:$PATH"
+          export LD_LIBRARY_PATH="$QT_ROOT_DIR/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+
+          "$linuxdeploy" \
+            --appdir "$appdir" \
+            --executable "$appdir/usr/bin/Zano" \
+            --executable "$appdir/usr/bin/zanod" \
+            --executable "$appdir/usr/bin/simplewallet" \
+            --executable "$appdir/usr/bin/connectivity_tool" \
+            --executable "$appdir/usr/bin/gateway_rpc_proxy" \
+            --desktop-file "$appdir/usr/share/applications/Zano.desktop" \
+            --icon-file "$appdir/usr/share/icons/hicolor/256x256/apps/Zano.png" \
+            --custom-apprun utils/Zano_appimage_wrapper.sh \
+            --plugin qt \
+            --output appimage
+
+          test -x "$OUTPUT"
+          file "$OUTPUT"
+          readelf -h "$OUTPUT" | grep -F "Machine:" | grep -F "${{ matrix.elf_machine }}"
+          test -x "$appdir/AppRun"
+          webengine_process=$(find "$appdir" -type f -name QtWebEngineProcess -print -quit)
+          test -n "$webengine_process"
+          test -x "$webengine_process"
+          readelf -h "$webengine_process" | grep -F "Machine:" | grep -F "${{ matrix.elf_machine }}"
+          find "$appdir" -type f -name icudtl.dat -print -quit | grep -q .
+          find "$appdir" -type d -name qtwebengine_locales -print -quit | grep -q .
+
+          xcb_plugin=$(find "$appdir" -type f -name libqxcb.so -path '*/platforms/*' -print -quit)
+          test -n "$xcb_plugin"
+          readelf -h "$xcb_plugin" | grep -F "Machine:" | grep -F "${{ matrix.elf_machine }}"
+
+          unset LD_LIBRARY_PATH
+          for runtime_file in "$webengine_process" "$xcb_plugin"; do
+            if ldd "$runtime_file" | grep -F 'not found'; then
+              echo "::error::$runtime_file has unresolved shared-library dependencies"
+              exit 1
+            fi
+          done
+          for binary in Zano zanod simplewallet connectivity_tool gateway_rpc_proxy; do
+            if ldd "$appdir/usr/bin/$binary" | grep -F 'not found'; then
+              echo "::error::Deployed $binary has unresolved shared-library dependencies"
+              exit 1
+            fi
+          done
+
+      - name: Write workflow summary
+        run: |
+          {
+            echo "### Linux ${{ matrix.arch }} build"
+            echo
+            echo "- Network: $NETWORK_NAME"
+            echo "- Runtime baseline: ${{ matrix.baseline }}"
+            echo "- CLI: \`$CLI_BASENAME.tar.bz2\`"
+            echo "- GUI: \`$GUI_BASENAME.AppImage\`"
+            echo "- Linux platform signing: not configured"
+            echo "- Release checksums: GitHub shows an artifact digest; no separate checksum artifact is produced"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload CLI package
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: zano-linux-${{ matrix.arch }}-cli${{ inputs.testnet == true && '-testnet' || '' }}
+          path: dist-linux/zano-linux-${{ matrix.arch }}-cli*.tar.bz2
+          if-no-files-found: error
+          compression-level: 0
+
+      - name: Upload GUI AppImage
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: zano-linux-${{ matrix.arch }}-gui${{ inputs.testnet == true && '-testnet' || '' }}
+          path: dist-linux/zano-linux-${{ matrix.arch }}-gui*.AppImage
+          if-no-files-found: error
+          compression-level: 0
