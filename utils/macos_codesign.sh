@@ -170,6 +170,25 @@ cmd_sign_app() {
   xattr -cr "$app"
   find "$app" -name '.DS_Store' -type f -delete
 
+  # codesign treats Contents/MacOS as a code directory. Anything in there that
+  # is not a Mach-O binary becomes an unsigned "subcomponent" and fails
+  # --strict verification (and notarization after it). Catch it up front, and
+  # name the offender, instead of failing at the end with codesign's opaque
+  # "code object is not signed at all / In subcomponent: ..." message.
+  local stray=""
+  local item
+  for item in "$app"/Contents/MacOS/*; do
+    [ -e "$item" ] || continue
+    if [ -d "$item" ]; then
+      stray="${stray}"$'\n'"  $(basename "$item")/ (directory; resources belong in Contents/Resources)"
+    elif ! file -b "$item" | grep -q 'Mach-O'; then
+      stray="${stray}"$'\n'"  $(basename "$item") (not a Mach-O executable)"
+    fi
+  done
+  if [ -n "$stray" ]; then
+    die "non-code entries in $app/Contents/MacOS will fail signature verification:${stray}"
+  fi
+
   # 1. The Qt WebEngine helper, with the entitlements Qt ships for it.
   local helper helper_entitlements
   helper="$(find "$app/Contents" -type d -name 'QtWebEngineProcess.app' -print 2>/dev/null | head -1 || true)"
@@ -186,7 +205,6 @@ cmd_sign_app() {
 
   # 2. Loose Mach-O libraries, deepest path first. Reverse lexicographic order
   #    puts a child path ahead of its parent, which is all "inside-out" needs.
-  local item
   find "$app/Contents" \( -name '*.dylib' -o -name '*.so' \) -type f \
     | sort -r \
     | while IFS= read -r item; do
