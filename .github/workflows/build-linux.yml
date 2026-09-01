@@ -99,7 +99,7 @@ jobs:
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ${{ env.DEPS_DIR }}
-          key: deps-${{ matrix.runner }}-${{ matrix.arch }}-boost${{ env.BOOST_VERSION }}-openssl${{ env.OPENSSL_VERSION }}-linux-v1
+          key: deps-${{ matrix.runner }}-${{ matrix.arch }}-boost${{ env.BOOST_VERSION }}-openssl${{ env.OPENSSL_VERSION }}-linux-rtstatic-v2
 
       - name: Build Boost and OpenSSL (static)
         if: steps.deps-cache.outputs.cache-hit != 'true'
@@ -137,11 +137,12 @@ jobs:
           ./bootstrap.sh \
             --prefix="$DEPS_DIR/boost" \
             --with-libraries=system,filesystem,thread,date_time,chrono,regex,serialization,atomic,program_options,locale,timer,log
+          # Zano's STATIC=TRUE configuration sets Boost_USE_STATIC_RUNTIME=ON.
           ./b2 -j"$jobs" -d1 \
             architecture="${{ matrix.boost_arch }}" \
             address-model=64 \
             link=static \
-            runtime-link=shared \
+            runtime-link=static \
             threading=multi \
             variant=release \
             install
@@ -157,6 +158,8 @@ jobs:
           set -euo pipefail
           test -f "$DEPS_DIR/boost/lib/libboost_system.a"
           test -f "$DEPS_DIR/boost/LICENSE_1_0.txt"
+          grep -R --include='libboost_system-variant-*.cmake' -F '# runtime-link=static' \
+            "$DEPS_DIR/boost/lib/cmake/boost_system-${BOOST_VERSION}"
           test -f "$DEPS_DIR/openssl/lib/libcrypto.a"
           test -f "$DEPS_DIR/openssl/LICENSE.txt"
 
