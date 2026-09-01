@@ -82,8 +82,10 @@ jobs:
             desktop-file-utils \
             file \
             libbz2-dev \
+            libevent-dev \
             libgl1-mesa-dev \
             libicu-dev \
+            libminizip-dev \
             libnss3 \
             libxkbcommon-x11-0 \
             libxcb-cursor0 \
@@ -182,7 +184,7 @@ jobs:
           host: ${{ matrix.qt_host }}
           target: desktop
           arch: ${{ matrix.qt_arch }}
-          modules: 'qtwebengine qtwebchannel qtpositioning'
+          modules: 'qtwebengine qtwebchannel qtpositioning qtserialport'
           cache: true
           cache-key-prefix: qt-${{ matrix.runner }}-${{ matrix.qt_arch }}
           aqtversion: '==3.3.0'
@@ -391,6 +393,13 @@ jobs:
           install -m 0644 "$STAGE_ROOT/$CLI_BASENAME/THIRD-PARTY-NOTICES.txt" \
             "$appdir/usr/share/doc/zano/THIRD-PARTY-NOTICES.txt"
 
+          linux_runtime_license_root="$appdir/usr/share/doc/zano/licenses/Linux-runtime"
+          mkdir -p "$linux_runtime_license_root"
+          install -m 0644 /usr/share/doc/libevent-dev/copyright \
+            "$linux_runtime_license_root/libevent.txt"
+          install -m 0644 /usr/share/doc/libminizip-dev/copyright \
+            "$linux_runtime_license_root/minizip.txt"
+
           qt_license_root="$appdir/usr/share/doc/zano/licenses/Qt"
           mkdir -p "$qt_license_root/kit" "$qt_license_root/kit-files"
           while IFS= read -r -d '' directory; do
@@ -435,9 +444,10 @@ jobs:
           cat > "$appdir/usr/share/doc/zano/THIRD-PARTY-NOTICES.txt" <<'EOF'
           This distribution contains Zano and third-party components.
 
-          License texts shipped by Zano, Boost, OpenSSL, the Qt binary kit, and
-          bundled source-tree dependencies are collected under licenses/. Qt
-          WebEngine contains Chromium-derived third-party software; see
+          License texts shipped by Zano, Boost, OpenSSL, the Qt binary kit,
+          bundled Linux runtime libraries, and source-tree dependencies are
+          collected under licenses/. Qt WebEngine contains Chromium-derived
+          third-party software; see
           licenses/Qt/README-RELEASE-LICENSING.txt before publishing.
           EOF
 
@@ -450,6 +460,7 @@ jobs:
           Boost: $BOOST_VERSION (static)
           OpenSSL: $OPENSSL_VERSION (static)
           Qt: $QT_VERSION / ${{ matrix.qt_arch }}
+          Linux runtime libraries: Qt WebEngine dependencies bundled by linuxdeploy
           Network: $NETWORK_NAME
           Debug symbols: embedded in the ELF binaries
           Signing: none (GitHub records an artifact digest on upload)
@@ -476,6 +487,11 @@ jobs:
           export PATH="$QT_ROOT_DIR/bin:$PATH"
           export LD_LIBRARY_PATH="$QT_ROOT_DIR/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 
+          mapfile -t qt_runtime_sonames < <(
+            ldd "$BUILD_DIR/src/Zano" |
+              awk '$1 ~ /^libevent-2[.]1[.]so[.]/ || $1 ~ /^libminizip[.]so[.]/ { print $1 }'
+          )
+
           "$linuxdeploy" \
             --appdir "$appdir" \
             --executable "$appdir/usr/bin/Zano" \
@@ -499,12 +515,25 @@ jobs:
           readelf -h "$webengine_process" | grep -F "Machine:" | grep -F "${{ matrix.elf_machine }}"
           find "$appdir" -type f -name icudtl.dat -print -quit | grep -q .
           find "$appdir" -type d -name qtwebengine_locales -print -quit | grep -q .
+          for soname in "${qt_runtime_sonames[@]}"; do
+            if ! find "$appdir/usr/lib" -name "${soname}*" -print -quit | grep -q .; then
+              echo "::error::$soname was not bundled in the AppDir"
+              exit 1
+            fi
+          done
 
           xcb_plugin=$(find "$appdir" -type f -name libqxcb.so -path '*/platforms/*' -print -quit)
           test -n "$xcb_plugin"
           readelf -h "$xcb_plugin" | grep -F "Machine:" | grep -F "${{ matrix.elf_machine }}"
 
           unset LD_LIBRARY_PATH
+          deployed_zano_ldd=$(ldd "$appdir/usr/bin/Zano")
+          for soname in "${qt_runtime_sonames[@]}"; do
+            if ! printf '%s\n' "$deployed_zano_ldd" | grep -F "$soname => $appdir/" >/dev/null; then
+              echo "::error::$soname was not resolved from inside the AppDir"
+              exit 1
+            fi
+          done
           for runtime_file in "$webengine_process" "$xcb_plugin"; do
             if ldd "$runtime_file" | grep -F 'not found'; then
               echo "::error::$runtime_file has unresolved shared-library dependencies"
