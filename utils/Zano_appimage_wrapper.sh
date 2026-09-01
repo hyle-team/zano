@@ -1,6 +1,15 @@
 #!/bin/bash
 script_dir=$( dirname "$(readlink -f "$0")" )
 
+# linuxdeploy plugins publish runtime environment hooks here, a custom AppRun
+# must source them; older Zano AppImages do not have this directory, so the conditional keeps their existing behaviour
+if [ -d "${script_dir}/apprun-hooks" ]; then
+  for hook in "${script_dir}"/apprun-hooks/*.sh; do
+    [ -f "$hook" ] || continue
+    . "$hook"
+  done
+fi
+
 parse_manual_binary_arguments()
 {
   local input="$1"
