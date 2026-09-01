@@ -1,0 +1,806 @@
+name: macOS build
+
+on:
+  workflow_dispatch:
+    inputs:
+      testnet:
+        description: 'Build testnet binaries (-D TESTNET=TRUE)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  BOOST_VERSION: 1.84.0
+  BOOST_SHA256: cc4b893acf645c9d4b698e9a0f08ca8846aa5d6c68275c14c3e7949c24109454
+  OPENSSL_VERSION: 3.5.7
+  OPENSSL_SHA256: a8c0d28a529ca480f9f36cf5792e2cd21984552a3c8e4aa11a24aa31aeac98e8
+
+jobs:
+  build-cli:
+    name: macOS CLI ${{ matrix.arch }}${{ inputs.testnet == true && ' (testnet)' || '' }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: macos-15-intel
+            cmake_arch: x86_64
+            osx_min: '10.15'
+            openssl_target: darwin64-x86_64-cc
+          - arch: arm64
+            runner: macos-15
+            cmake_arch: arm64
+            osx_min: '11.0'
+            openssl_target: darwin64-arm64-cc
+    env:
+      DEPS_DIR: ${{ github.workspace }}/_deps
+    steps:
+      - name: Checkout (with submodules)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          submodules: recursive
+          # full history: src/version.cmake and libmdbx count revisions via git
+          fetch-depth: 0
+
+      - name: Cache Boost & OpenSSL
+        id: deps-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ${{ env.DEPS_DIR }}
+          key: deps-${{ matrix.runner }}-${{ matrix.arch }}-boost${{ env.BOOST_VERSION }}-openssl${{ env.OPENSSL_VERSION }}-min${{ matrix.osx_min }}-v1
+
+      - name: Build OpenSSL (static)
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p "$DEPS_DIR" && cd "$DEPS_DIR"
+          curl -fL -o "openssl-${OPENSSL_VERSION}.tar.gz" \
+            "https://github.com/openssl/openssl/releases/download/openssl-${OPENSSL_VERSION}/openssl-${OPENSSL_VERSION}.tar.gz"
+          echo "${OPENSSL_SHA256}  openssl-${OPENSSL_VERSION}.tar.gz" | shasum -a 256 -c
+          tar xzf "openssl-${OPENSSL_VERSION}.tar.gz"
+          cd "openssl-${OPENSSL_VERSION}"
+          ./Configure ${{ matrix.openssl_target }} no-shared no-tests \
+            --prefix="$DEPS_DIR/openssl" --openssldir="$DEPS_DIR/openssl" --libdir=lib \
+            -mmacosx-version-min=${{ matrix.osx_min }}
+          make -j"$(sysctl -n hw.ncpu)"
+          make install_sw
+          cd "$DEPS_DIR" && rm -rf "openssl-${OPENSSL_VERSION}" "openssl-${OPENSSL_VERSION}.tar.gz"
+
+      - name: Build Boost (static)
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        run: |
+          boost_und=$(echo "$BOOST_VERSION" | tr . _)
+          mkdir -p "$DEPS_DIR" && cd "$DEPS_DIR"
+          curl -fL -O "https://archives.boost.io/release/${BOOST_VERSION}/source/boost_${boost_und}.tar.bz2"
+          echo "${BOOST_SHA256}  boost_${boost_und}.tar.bz2" | shasum -a 256 -c
+          tar xjf "boost_${boost_und}.tar.bz2"
+          cd "boost_${boost_und}"
+          ./bootstrap.sh --with-libraries=system,filesystem,thread,date_time,chrono,regex,serialization,atomic,program_options,locale,timer,log
+          # static libs; boost.locale uses iconv, linked via -liconv
+          ./b2 -j"$(sysctl -n hw.ncpu)" \
+            link=static runtime-link=shared threading=multi variant=release \
+            boost.locale.icu=off \
+            cxxflags="-mmacosx-version-min=${{ matrix.osx_min }}" \
+            linkflags="-mmacosx-version-min=${{ matrix.osx_min }}" \
+            install --prefix="$DEPS_DIR/boost"
+          cd "$DEPS_DIR" && rm -rf "boost_${boost_und}" "boost_${boost_und}.tar.bz2"
+
+      - name: Configure (CMake)
+        run: |
+          testnet_def=""
+          if [ "${{ inputs.testnet }}" = "true" ]; then testnet_def="-D TESTNET=TRUE"; fi
+          mkdir -p build && cd build
+          # CMAKE_POLICY_VERSION_MINIMUM=3.5: CMake 4.x vs old vendored subprojects
+          # -liconv: required by statically linked boost_locale
+          cmake $testnet_def \
+            -D CMAKE_BUILD_TYPE=Release \
+            -D CMAKE_OSX_ARCHITECTURES=${{ matrix.cmake_arch }} \
+            -D CMAKE_OSX_DEPLOYMENT_TARGET=${{ matrix.osx_min }} \
+            -D CMAKE_POLICY_VERSION_MINIMUM=3.5 \
+            -D CMAKE_EXE_LINKER_FLAGS="-liconv" \
+            -D BOOST_ROOT="$DEPS_DIR/boost" \
+            -D OPENSSL_ROOT_DIR="$DEPS_DIR/openssl" \
+            ..
+
+      - name: Build (zanod, simplewallet, connectivity_tool)
+        run: cd build && make -j"$(sysctl -n hw.ncpu)" daemon simplewallet connectivity_tool
+
+      # Signing and notarization are all-or-nothing: a Developer ID signature
+      # without a notarization ticket is still blocked by Gatekeeper, so a
+      # half-configured repository is treated as an error rather than silently
+      # producing an artifact that looks signed but cannot be opened.
+      - name: Check code signing configuration
+        id: signcheck
+        env:
+          CERT_P12: ${{ secrets.MACOS_SIGN_CERT_P12 }}
+          CERT_PASSWORD: ${{ secrets.MACOS_SIGN_CERT_PASSWORD }}
+          NOTARY_KEY: ${{ secrets.MACOS_NOTARY_API_KEY_P8 }}
+          NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_API_KEY_ID }}
+          NOTARY_ISSUER: ${{ secrets.MACOS_NOTARY_API_ISSUER_ID }}
+        run: |
+          present=0
+          for value in "$CERT_P12" "$CERT_PASSWORD" "$NOTARY_KEY" "$NOTARY_KEY_ID" "$NOTARY_ISSUER"; do
+            if [ -n "$value" ]; then present=$((present + 1)); fi
+          done
+
+          if [ "$present" -eq 5 ]; then
+            echo "sign=true" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Code signing::ENABLED - binaries will be signed and notarized"
+          elif [ "$present" -eq 0 ]; then
+            echo "sign=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Code signing::SKIPPED - no signing secrets set, producing UNSIGNED binaries"
+          else
+            echo "::error title=Code signing::Incomplete configuration - $present of 5 secrets are set. Required: MACOS_SIGN_CERT_P12, MACOS_SIGN_CERT_PASSWORD, MACOS_NOTARY_API_KEY_P8, MACOS_NOTARY_API_KEY_ID, MACOS_NOTARY_API_ISSUER_ID"
+            exit 1
+          fi
+
+      - name: Set up signing keychain
+        if: steps.signcheck.outputs.sign == 'true'
+        env:
+          MACOS_SIGN_CERT_P12: ${{ secrets.MACOS_SIGN_CERT_P12 }}
+          MACOS_SIGN_CERT_PASSWORD: ${{ secrets.MACOS_SIGN_CERT_PASSWORD }}
+          MACOS_SIGN_IDENTITY: ${{ vars.MACOS_SIGN_IDENTITY }}
+          MACOS_TEAM_ID: ${{ vars.MACOS_TEAM_ID }}
+        run: bash utils/macos_codesign.sh keychain
+
+      - name: Sign binaries (Developer ID)
+        if: steps.signcheck.outputs.sign == 'true'
+        run: |
+          bash utils/macos_codesign.sh sign-binaries \
+            build/src/zanod build/src/simplewallet build/src/connectivity_tool
+
+      - name: Smoke test
+        run: |
+          cd build/src
+          file zanod simplewallet connectivity_tool
+          lipo -archs zanod
+          ./zanod --version
+          ./simplewallet --version
+          ./connectivity_tool --version
+
+      - name: Package
+        env:
+          SIGNED: ${{ steps.signcheck.outputs.sign }}
+        run: |
+          cd build/src
+          version_str=$(./zanod --version | awk '/^Zano/ { print $2; exit }')
+          suffix=""
+          if [ "${{ inputs.testnet }}" = "true" ]; then suffix="-testnet"; fi
+          # Make an unsigned build obvious from the file name alone, so a run
+          # with missing secrets cannot be mistaken for a shippable one.
+          if [ "$SIGNED" != "true" ]; then suffix="${suffix}-unsigned"; fi
+          pkg="zano-macos-${{ matrix.arch }}-cli${suffix}-${version_str}"
+          mkdir "$pkg"
+          cp zanod simplewallet connectivity_tool "$pkg/"
+          tar -cjf "$pkg.tar.bz2" "$pkg"
+          echo "CLI_PKG=$pkg" >> "$GITHUB_ENV"
+
+      - name: Notarize binaries
+        if: steps.signcheck.outputs.sign == 'true'
+        env:
+          MACOS_NOTARY_API_KEY_P8: ${{ secrets.MACOS_NOTARY_API_KEY_P8 }}
+          MACOS_NOTARY_API_KEY_ID: ${{ secrets.MACOS_NOTARY_API_KEY_ID }}
+          MACOS_NOTARY_API_ISSUER_ID: ${{ secrets.MACOS_NOTARY_API_ISSUER_ID }}
+        run: |
+          # notarytool takes only .dmg, .pkg or .zip - never a tarball - so the
+          # binaries go up as a zip built with ditto (which preserves the
+          # signatures). The shipped artifact stays the .tar.bz2; notarization
+          # registers the binaries themselves with Apple, and a bare Mach-O
+          # cannot hold a stapled ticket anyway, so Gatekeeper resolves these
+          # through its online check.
+          cd build/src
+          ditto -c -k --keepParent "$CLI_PKG" "$RUNNER_TEMP/$CLI_PKG.zip"
+          bash "$GITHUB_WORKSPACE/utils/macos_codesign.sh" notarize "$RUNNER_TEMP/$CLI_PKG.zip"
+          rm -f "$RUNNER_TEMP/$CLI_PKG.zip"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: zano-macos-${{ matrix.arch }}-cli${{ inputs.testnet == true && '-testnet' || '' }}
+          # file name contains [commit] brackets, so use a wildcard
+          path: build/src/zano-macos-*.tar.bz2
+          if-no-files-found: error
+
+      - name: Remove signing material
+        if: always() && steps.signcheck.outputs.sign == 'true'
+        run: bash utils/macos_codesign.sh cleanup
+
+  make-universal:
+    name: macOS Universal CLI (lipo)
+    needs: build-cli
+    runs-on: macos-15
+    # notarytool --wait blocks on Apple's queue; 15 minutes is not enough.
+    timeout-minutes: 90
+    steps:
+      # This job signs, so it needs utils/macos_codesign.sh on disk. It does not
+      # build anything, so a blob-less, single-commit checkout is plenty.
+      - name: Checkout (signing scripts only)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          submodules: false
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Download both artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          pattern: zano-macos-*-cli*
+          merge-multiple: true
+          path: artifacts
+
+      - name: Glue with lipo
+        run: |
+          shopt -s nullglob
+          x64_tar=(artifacts/zano-macos-x64-cli*.tar.bz2)
+          arm_tar=(artifacts/zano-macos-arm64-cli*.tar.bz2)
+          mkdir x64 arm64
+          tar -xjf "${x64_tar[0]}" --strip-components=1 -C x64
+          tar -xjf "${arm_tar[0]}" --strip-components=1 -C arm64
+          base=$(basename "${x64_tar[0]}" .tar.bz2)
+          pkg="zano-macos-universal-${base#zano-macos-x64-}"
+          mkdir "$pkg"
+          for b in zanod simplewallet connectivity_tool; do
+            lipo -create -output "$pkg/$b" "x64/$b" "arm64/$b"
+            lipo -archs "$pkg/$b"
+          done
+          echo "PKG=$pkg" >> "$GITHUB_ENV"
+
+      - name: Check code signing configuration
+        id: signcheck
+        env:
+          CERT_P12: ${{ secrets.MACOS_SIGN_CERT_P12 }}
+          CERT_PASSWORD: ${{ secrets.MACOS_SIGN_CERT_PASSWORD }}
+          NOTARY_KEY: ${{ secrets.MACOS_NOTARY_API_KEY_P8 }}
+          NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_API_KEY_ID }}
+          NOTARY_ISSUER: ${{ secrets.MACOS_NOTARY_API_ISSUER_ID }}
+        run: |
+          present=0
+          for value in "$CERT_P12" "$CERT_PASSWORD" "$NOTARY_KEY" "$NOTARY_KEY_ID" "$NOTARY_ISSUER"; do
+            if [ -n "$value" ]; then present=$((present + 1)); fi
+          done
+
+          if [ "$present" -eq 5 ]; then
+            echo "sign=true" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Code signing::ENABLED - universal binaries will be re-signed and notarized"
+          elif [ "$present" -eq 0 ]; then
+            echo "sign=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Code signing::SKIPPED - no signing secrets set, universal binaries stay UNSIGNED"
+          else
+            echo "::error title=Code signing::Incomplete configuration - $present of 5 secrets are set. Required: MACOS_SIGN_CERT_P12, MACOS_SIGN_CERT_PASSWORD, MACOS_NOTARY_API_KEY_P8, MACOS_NOTARY_API_KEY_ID, MACOS_NOTARY_API_ISSUER_ID"
+            exit 1
+          fi
+
+      - name: Set up signing keychain
+        if: steps.signcheck.outputs.sign == 'true'
+        env:
+          MACOS_SIGN_CERT_P12: ${{ secrets.MACOS_SIGN_CERT_P12 }}
+          MACOS_SIGN_CERT_PASSWORD: ${{ secrets.MACOS_SIGN_CERT_PASSWORD }}
+          MACOS_SIGN_IDENTITY: ${{ vars.MACOS_SIGN_IDENTITY }}
+          MACOS_TEAM_ID: ${{ vars.MACOS_TEAM_ID }}
+        run: bash utils/macos_codesign.sh keychain
+
+      - name: Sign universal binaries (Developer ID)
+        if: steps.signcheck.outputs.sign == 'true'
+        # lipo discards the thin binaries' signatures, so the fat ones must be
+        # signed again here - the per-arch signatures from build-cli do not survive.
+        run: |
+          bash utils/macos_codesign.sh sign-binaries \
+            "$PKG/zanod" "$PKG/simplewallet" "$PKG/connectivity_tool"
+
+      - name: Package universal
+        run: |
+          "./$PKG/zanod" --version
+          tar -cjf "$PKG.tar.bz2" "$PKG"
+
+      - name: Notarize universal binaries
+        if: steps.signcheck.outputs.sign == 'true'
+        env:
+          MACOS_NOTARY_API_KEY_P8: ${{ secrets.MACOS_NOTARY_API_KEY_P8 }}
+          MACOS_NOTARY_API_KEY_ID: ${{ secrets.MACOS_NOTARY_API_KEY_ID }}
+          MACOS_NOTARY_API_ISSUER_ID: ${{ secrets.MACOS_NOTARY_API_ISSUER_ID }}
+        run: |
+          ditto -c -k --keepParent "$PKG" "$RUNNER_TEMP/$PKG.zip"
+          bash utils/macos_codesign.sh notarize "$RUNNER_TEMP/$PKG.zip"
+          rm -f "$RUNNER_TEMP/$PKG.zip"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: zano-macos-universal-cli${{ inputs.testnet == true && '-testnet' || '' }}
+          path: zano-macos-universal-*.tar.bz2
+          if-no-files-found: error
+
+      - name: Remove signing material
+        if: always() && steps.signcheck.outputs.sign == 'true'
+        run: bash utils/macos_codesign.sh cleanup
+
+  # Release-style GUI build (Zano.app packed into a dmg)
+  build-gui-x64:
+    name: macOS GUI x64 (Qt 6.8)${{ inputs.testnet == true && ' (testnet)' || '' }}
+    runs-on: macos-15-intel
+    timeout-minutes: 240
+    env:
+      DEPS_DIR: ${{ github.workspace }}/_deps
+      OSX_MIN: '10.15'
+    steps:
+      - name: Checkout (with submodules)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      # same key as the CLI x64 job -> shares its Boost/OpenSSL cache
+      - name: Cache Boost & OpenSSL
+        id: deps-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ${{ env.DEPS_DIR }}
+          key: deps-macos-15-intel-x64-boost${{ env.BOOST_VERSION }}-openssl${{ env.OPENSSL_VERSION }}-min10.15-v1
+
+      - name: Build OpenSSL (static)
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p "$DEPS_DIR" && cd "$DEPS_DIR"
+          curl -fL -o "openssl-${OPENSSL_VERSION}.tar.gz" \
+            "https://github.com/openssl/openssl/releases/download/openssl-${OPENSSL_VERSION}/openssl-${OPENSSL_VERSION}.tar.gz"
+          echo "${OPENSSL_SHA256}  openssl-${OPENSSL_VERSION}.tar.gz" | shasum -a 256 -c
+          tar xzf "openssl-${OPENSSL_VERSION}.tar.gz"
+          cd "openssl-${OPENSSL_VERSION}"
+          ./Configure darwin64-x86_64-cc no-shared no-tests \
+            --prefix="$DEPS_DIR/openssl" --openssldir="$DEPS_DIR/openssl" --libdir=lib \
+            -mmacosx-version-min=$OSX_MIN
+          make -j"$(sysctl -n hw.ncpu)"
+          make install_sw
+          cd "$DEPS_DIR" && rm -rf "openssl-${OPENSSL_VERSION}" "openssl-${OPENSSL_VERSION}.tar.gz"
+
+      - name: Build Boost (static)
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        run: |
+          boost_und=$(echo "$BOOST_VERSION" | tr . _)
+          mkdir -p "$DEPS_DIR" && cd "$DEPS_DIR"
+          curl -fL -O "https://archives.boost.io/release/${BOOST_VERSION}/source/boost_${boost_und}.tar.bz2"
+          echo "${BOOST_SHA256}  boost_${boost_und}.tar.bz2" | shasum -a 256 -c
+          tar xjf "boost_${boost_und}.tar.bz2"
+          cd "boost_${boost_und}"
+          ./bootstrap.sh --with-libraries=system,filesystem,thread,date_time,chrono,regex,serialization,atomic,program_options,locale,timer,log
+          ./b2 -j"$(sysctl -n hw.ncpu)" \
+            link=static runtime-link=shared threading=multi variant=release \
+            boost.locale.icu=off \
+            cxxflags="-mmacosx-version-min=$OSX_MIN" \
+            linkflags="-mmacosx-version-min=$OSX_MIN" \
+            install --prefix="$DEPS_DIR/boost"
+          cd "$DEPS_DIR" && rm -rf "boost_${boost_und}" "boost_${boost_und}.tar.bz2"
+
+      - name: Set up Python for Qt installer
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.13.3'
+
+      - name: Install Qt 6.8 (with WebEngine)
+        uses: jurplel/install-qt-action/action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4
+        with:
+          version: '6.8.3'
+          arch: clang_64
+          modules: 'qtwebengine qtwebchannel qtpositioning'
+          cache: true
+          aqtversion: '==3.3.0'
+          py7zrversion: '==1.0.0'
+
+      - name: Configure (CMake, BUILD_GUI)
+        run: |
+          testnet_def=""
+          if [ "${{ inputs.testnet }}" = "true" ]; then testnet_def="-D TESTNET=TRUE"; fi
+          mkdir -p build && cd build
+          # deployment target 12.0: minimum supported by Qt 6.8
+          cmake $testnet_def \
+            -D CMAKE_BUILD_TYPE=Release \
+            -D BUILD_GUI=TRUE \
+            -D CMAKE_PREFIX_PATH="$QT_ROOT_DIR" \
+            -D CMAKE_OSX_ARCHITECTURES=x86_64 \
+            -D CMAKE_OSX_DEPLOYMENT_TARGET=12.0 \
+            -D CMAKE_POLICY_VERSION_MINIMUM=3.5 \
+            -D CMAKE_EXE_LINKER_FLAGS="-liconv" \
+            -D BOOST_ROOT="$DEPS_DIR/boost" \
+            -D OPENSSL_ROOT_DIR="$DEPS_DIR/openssl" \
+            ..
+
+      - name: Build (Zano.app, zanod, simplewallet)
+        run: cd build && make -j"$(sysctl -n hw.ncpu)" Zano daemon simplewallet
+
+      - name: Assemble Zano.app
+        run: |
+          cd build/src
+          # align the binary name with the bundle (no-op if already 'Zano')
+          mv Zano.app/Contents/MacOS/zano Zano.app/Contents/MacOS/Zano || true
+          cp zanod simplewallet Zano.app/Contents/MacOS/
+          "$QT_ROOT_DIR/bin/macdeployqt" Zano.app
+          # ship html layout as in the official package
+          rsync -a ../../src/gui/qt-daemon/layout/html Zano.app/Contents/MacOS --exclude less --exclude package.json --exclude gulpfile.js
+          cp ../../src/gui/qt-daemon/app.icns Zano.app/Contents/Resources/
+
+          # Info.plist.in ships both version keys empty, and the notary service
+          # rejects a bundle whose CFBundleVersion is blank. Fill them from the
+          # version the daemon reports so the bundle always matches the build.
+          version_str=$(./zanod --version | awk '/^Zano/ { print $2; exit }')
+          if [ -z "$version_str" ]; then
+            echo "::error::could not derive a version from 'zanod --version'"
+            exit 1
+          fi
+          # Keep the leading dotted-numeric run and drop the rest, so the
+          # "[commit]" suffix goes away: 2.2.1.506[ff4f0d7] -> 2.2.1.506
+          numeric_version=$(printf '%s' "$version_str" | sed -e 's/^[^0-9]*//' -e 's/[^0-9.].*//' -e 's/\.*$//')
+          if [ -z "$numeric_version" ]; then
+            echo "::error::could not derive a numeric bundle version from '$version_str'"
+            exit 1
+          fi
+          short_version=$(printf '%s' "$numeric_version" | awk -F. '{ printf "%d.%d.%d", $1, $2, $3 }')
+          plist=Zano.app/Contents/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $numeric_version" "$plist" \
+            || /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $numeric_version" "$plist"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $short_version" "$plist" \
+            || /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string $short_version" "$plist"
+          echo "bundle id      : $(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$plist")"
+          echo "bundle version : $numeric_version (short $short_version)"
+          echo "ZANO_VERSION=$version_str" >> "$GITHUB_ENV"
+
+          echo "--- architecture check ---"
+          lipo -archs Zano.app/Contents/MacOS/Zano
+
+      # Signing and notarization are all-or-nothing: a Developer ID signature
+      # without a notarization ticket is still blocked by Gatekeeper, so a
+      # half-configured repository is treated as an error rather than silently
+      # producing an artifact that looks signed but cannot be opened.
+      - name: Check code signing configuration
+        id: signcheck
+        env:
+          CERT_P12: ${{ secrets.MACOS_SIGN_CERT_P12 }}
+          CERT_PASSWORD: ${{ secrets.MACOS_SIGN_CERT_PASSWORD }}
+          NOTARY_KEY: ${{ secrets.MACOS_NOTARY_API_KEY_P8 }}
+          NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_API_KEY_ID }}
+          NOTARY_ISSUER: ${{ secrets.MACOS_NOTARY_API_ISSUER_ID }}
+        run: |
+          present=0
+          for value in "$CERT_P12" "$CERT_PASSWORD" "$NOTARY_KEY" "$NOTARY_KEY_ID" "$NOTARY_ISSUER"; do
+            if [ -n "$value" ]; then present=$((present + 1)); fi
+          done
+
+          if [ "$present" -eq 5 ]; then
+            echo "sign=true" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Code signing::ENABLED - Zano.app and the dmg will be signed, notarized and stapled"
+          elif [ "$present" -eq 0 ]; then
+            echo "sign=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Code signing::SKIPPED - no signing secrets set, Zano.app gets an ad-hoc signature and the dmg is marked unsigned"
+          else
+            echo "::error title=Code signing::Incomplete configuration - $present of 5 secrets are set. Required: MACOS_SIGN_CERT_P12, MACOS_SIGN_CERT_PASSWORD, MACOS_NOTARY_API_KEY_P8, MACOS_NOTARY_API_KEY_ID, MACOS_NOTARY_API_ISSUER_ID"
+            exit 1
+          fi
+
+      - name: Set up signing keychain
+        if: steps.signcheck.outputs.sign == 'true'
+        env:
+          MACOS_SIGN_CERT_P12: ${{ secrets.MACOS_SIGN_CERT_P12 }}
+          MACOS_SIGN_CERT_PASSWORD: ${{ secrets.MACOS_SIGN_CERT_PASSWORD }}
+          MACOS_SIGN_IDENTITY: ${{ vars.MACOS_SIGN_IDENTITY }}
+          MACOS_TEAM_ID: ${{ vars.MACOS_TEAM_ID }}
+        run: bash utils/macos_codesign.sh keychain
+
+      - name: Sign Zano.app (Developer ID)
+        if: steps.signcheck.outputs.sign == 'true'
+        # Signs inside-out. Not `codesign --deep`: Apple deprecates it for
+        # signing, and it stamps the outer bundle's entitlements onto every
+        # nested binary - which breaks QtWebEngineProcess, and with it the
+        # entire UI, because that helper ships entitlements of its own.
+        run: bash utils/macos_codesign.sh sign-app build/src/Zano.app utils/macos_entitlements.plist
+
+      - name: Sign Zano.app (ad-hoc)
+        if: steps.signcheck.outputs.sign != 'true'
+        run: |
+          codesign --force --deep --sign - build/src/Zano.app
+          codesign --verify --deep build/src/Zano.app
+
+      - name: Notarize and staple Zano.app
+        if: steps.signcheck.outputs.sign == 'true'
+        env:
+          MACOS_NOTARY_API_KEY_P8: ${{ secrets.MACOS_NOTARY_API_KEY_P8 }}
+          MACOS_NOTARY_API_KEY_ID: ${{ secrets.MACOS_NOTARY_API_KEY_ID }}
+          MACOS_NOTARY_API_ISSUER_ID: ${{ secrets.MACOS_NOTARY_API_ISSUER_ID }}
+        # The ticket is stapled into the bundle itself, not just the disk image,
+        # so the app still launches once the user has dragged it out of the dmg
+        # and is offline.
+        run: bash utils/macos_codesign.sh notarize-app build/src/Zano.app
+
+      - name: Package dmg
+        env:
+          SIGNED: ${{ steps.signcheck.outputs.sign }}
+        run: |
+          cd build/src
+          suffix=""
+          if [ "${{ inputs.testnet }}" = "true" ]; then suffix="-testnet"; fi
+          # Make an unsigned build obvious from the file name alone, so a run
+          # with missing secrets cannot be mistaken for a shippable one.
+          if [ "$SIGNED" != "true" ]; then suffix="${suffix}-unsigned"; fi
+          mkdir package_folder
+          mv Zano.app package_folder/
+          ln -s /Applications package_folder/Applications
+          dmg="zano-macos-x64-gui${suffix}-${ZANO_VERSION}.dmg"
+          hdiutil create -volname "Zano" -srcfolder package_folder -ov -format UDZO "$dmg"
+          ls -lh "$dmg"
+          echo "ZANO_DMG=build/src/$dmg" >> "$GITHUB_ENV"
+
+      - name: Sign, notarize and staple the dmg
+        if: steps.signcheck.outputs.sign == 'true'
+        env:
+          MACOS_NOTARY_API_KEY_P8: ${{ secrets.MACOS_NOTARY_API_KEY_P8 }}
+          MACOS_NOTARY_API_KEY_ID: ${{ secrets.MACOS_NOTARY_API_KEY_ID }}
+          MACOS_NOTARY_API_ISSUER_ID: ${{ secrets.MACOS_NOTARY_API_ISSUER_ID }}
+        # The dmg is what the user actually downloads, so it carries the
+        # quarantine bit and is what Gatekeeper judges at mount time. UDZO is a
+        # UDIF image, which is one of the three containers notarytool accepts.
+        run: |
+          bash utils/macos_codesign.sh sign-dmg "$ZANO_DMG"
+          bash utils/macos_codesign.sh notarize "$ZANO_DMG"
+
+      - name: Verify the distributable artifacts
+        if: steps.signcheck.outputs.sign == 'true'
+        # Fails the build unless the dmg is signed, notarized, stapled and
+        # accepted by Gatekeeper - a silently unnotarized build is otherwise
+        # indistinguishable from a good one until a user tries to open it.
+        run: bash utils/macos_codesign.sh verify-dmg "$ZANO_DMG"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: zano-macos-x64-gui${{ inputs.testnet == true && '-testnet' || '' }}
+          path: build/src/zano-macos-x64-gui*.dmg
+          if-no-files-found: error
+
+      - name: Remove signing material
+        if: always() && steps.signcheck.outputs.sign == 'true'
+        run: bash utils/macos_codesign.sh cleanup
+
+  # Native Apple Silicon GUI (Qt 6.8, macOS 12+)
+  build-gui-arm64:
+    name: macOS GUI arm64 (Qt 6.8)${{ inputs.testnet == true && ' (testnet)' || '' }}
+    runs-on: macos-15
+    timeout-minutes: 240
+    env:
+      DEPS_DIR: ${{ github.workspace }}/_deps
+      OSX_MIN: '11.0' # for the cached deps (same key as the CLI arm64 job)
+    steps:
+      - name: Checkout (with submodules)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      # same key as the CLI arm64 job -> shares its Boost/OpenSSL cache
+      - name: Cache Boost & OpenSSL
+        id: deps-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ${{ env.DEPS_DIR }}
+          key: deps-macos-15-arm64-boost${{ env.BOOST_VERSION }}-openssl${{ env.OPENSSL_VERSION }}-min11.0-v1
+
+      - name: Build OpenSSL (static)
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p "$DEPS_DIR" && cd "$DEPS_DIR"
+          curl -fL -o "openssl-${OPENSSL_VERSION}.tar.gz" \
+            "https://github.com/openssl/openssl/releases/download/openssl-${OPENSSL_VERSION}/openssl-${OPENSSL_VERSION}.tar.gz"
+          echo "${OPENSSL_SHA256}  openssl-${OPENSSL_VERSION}.tar.gz" | shasum -a 256 -c
+          tar xzf "openssl-${OPENSSL_VERSION}.tar.gz"
+          cd "openssl-${OPENSSL_VERSION}"
+          ./Configure darwin64-arm64-cc no-shared no-tests \
+            --prefix="$DEPS_DIR/openssl" --openssldir="$DEPS_DIR/openssl" --libdir=lib \
+            -mmacosx-version-min=$OSX_MIN
+          make -j"$(sysctl -n hw.ncpu)"
+          make install_sw
+          cd "$DEPS_DIR" && rm -rf "openssl-${OPENSSL_VERSION}" "openssl-${OPENSSL_VERSION}.tar.gz"
+
+      - name: Build Boost (static)
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        run: |
+          boost_und=$(echo "$BOOST_VERSION" | tr . _)
+          mkdir -p "$DEPS_DIR" && cd "$DEPS_DIR"
+          curl -fL -O "https://archives.boost.io/release/${BOOST_VERSION}/source/boost_${boost_und}.tar.bz2"
+          echo "${BOOST_SHA256}  boost_${boost_und}.tar.bz2" | shasum -a 256 -c
+          tar xjf "boost_${boost_und}.tar.bz2"
+          cd "boost_${boost_und}"
+          ./bootstrap.sh --with-libraries=system,filesystem,thread,date_time,chrono,regex,serialization,atomic,program_options,locale,timer,log
+          ./b2 -j"$(sysctl -n hw.ncpu)" \
+            link=static runtime-link=shared threading=multi variant=release \
+            boost.locale.icu=off \
+            cxxflags="-mmacosx-version-min=$OSX_MIN" \
+            linkflags="-mmacosx-version-min=$OSX_MIN" \
+            install --prefix="$DEPS_DIR/boost"
+          cd "$DEPS_DIR" && rm -rf "boost_${boost_und}" "boost_${boost_und}.tar.bz2"
+
+      - name: Set up Python for Qt installer
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.13.3'
+
+      - name: Install Qt 6.8 (with WebEngine)
+        uses: jurplel/install-qt-action/action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4
+        with:
+          version: '6.8.3'
+          arch: clang_64
+          modules: 'qtwebengine qtwebchannel qtpositioning'
+          cache: true
+          aqtversion: '==3.3.0'
+          py7zrversion: '==1.0.0'
+
+      - name: Configure (CMake, BUILD_GUI, Qt 6)
+        run: |
+          testnet_def=""
+          if [ "${{ inputs.testnet }}" = "true" ]; then testnet_def="-D TESTNET=TRUE"; fi
+          mkdir -p build && cd build
+          # deployment target 12.0: minimum supported by Qt 6.8
+          cmake $testnet_def \
+            -D CMAKE_BUILD_TYPE=Release \
+            -D BUILD_GUI=TRUE \
+            -D CMAKE_PREFIX_PATH="$QT_ROOT_DIR" \
+            -D CMAKE_OSX_ARCHITECTURES=arm64 \
+            -D CMAKE_OSX_DEPLOYMENT_TARGET=12.0 \
+            -D CMAKE_POLICY_VERSION_MINIMUM=3.5 \
+            -D CMAKE_EXE_LINKER_FLAGS="-liconv" \
+            -D BOOST_ROOT="$DEPS_DIR/boost" \
+            -D OPENSSL_ROOT_DIR="$DEPS_DIR/openssl" \
+            ..
+
+      - name: Build (Zano.app, zanod, simplewallet)
+        run: cd build && make -j"$(sysctl -n hw.ncpu)" Zano daemon simplewallet
+
+      - name: Assemble Zano.app
+        run: |
+          cd build/src
+          # align the binary name with the bundle (no-op if already 'Zano')
+          mv Zano.app/Contents/MacOS/zano Zano.app/Contents/MacOS/Zano || true
+          cp zanod simplewallet Zano.app/Contents/MacOS/
+          "$QT_ROOT_DIR/bin/macdeployqt" Zano.app
+          # ship html layout as in the official package
+          rsync -a ../../src/gui/qt-daemon/layout/html Zano.app/Contents/MacOS --exclude less --exclude package.json --exclude gulpfile.js
+          cp ../../src/gui/qt-daemon/app.icns Zano.app/Contents/Resources/
+
+          # Info.plist.in ships both version keys empty, and the notary service
+          # rejects a bundle whose CFBundleVersion is blank. Fill them from the
+          # version the daemon reports so the bundle always matches the build.
+          version_str=$(./zanod --version | awk '/^Zano/ { print $2; exit }')
+          if [ -z "$version_str" ]; then
+            echo "::error::could not derive a version from 'zanod --version'"
+            exit 1
+          fi
+          # Keep the leading dotted-numeric run and drop the rest, so the
+          # "[commit]" suffix goes away: 2.2.1.506[ff4f0d7] -> 2.2.1.506
+          numeric_version=$(printf '%s' "$version_str" | sed -e 's/^[^0-9]*//' -e 's/[^0-9.].*//' -e 's/\.*$//')
+          if [ -z "$numeric_version" ]; then
+            echo "::error::could not derive a numeric bundle version from '$version_str'"
+            exit 1
+          fi
+          short_version=$(printf '%s' "$numeric_version" | awk -F. '{ printf "%d.%d.%d", $1, $2, $3 }')
+          plist=Zano.app/Contents/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $numeric_version" "$plist" \
+            || /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $numeric_version" "$plist"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $short_version" "$plist" \
+            || /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string $short_version" "$plist"
+          echo "bundle id      : $(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$plist")"
+          echo "bundle version : $numeric_version (short $short_version)"
+          echo "ZANO_VERSION=$version_str" >> "$GITHUB_ENV"
+
+          echo "--- architecture check ---"
+          lipo -archs Zano.app/Contents/MacOS/Zano
+
+      # Signing and notarization are all-or-nothing: a Developer ID signature
+      # without a notarization ticket is still blocked by Gatekeeper, so a
+      # half-configured repository is treated as an error rather than silently
+      # producing an artifact that looks signed but cannot be opened.
+      - name: Check code signing configuration
+        id: signcheck
+        env:
+          CERT_P12: ${{ secrets.MACOS_SIGN_CERT_P12 }}
+          CERT_PASSWORD: ${{ secrets.MACOS_SIGN_CERT_PASSWORD }}
+          NOTARY_KEY: ${{ secrets.MACOS_NOTARY_API_KEY_P8 }}
+          NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_API_KEY_ID }}
+          NOTARY_ISSUER: ${{ secrets.MACOS_NOTARY_API_ISSUER_ID }}
+        run: |
+          present=0
+          for value in "$CERT_P12" "$CERT_PASSWORD" "$NOTARY_KEY" "$NOTARY_KEY_ID" "$NOTARY_ISSUER"; do
+            if [ -n "$value" ]; then present=$((present + 1)); fi
+          done
+
+          if [ "$present" -eq 5 ]; then
+            echo "sign=true" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Code signing::ENABLED - Zano.app and the dmg will be signed, notarized and stapled"
+          elif [ "$present" -eq 0 ]; then
+            echo "sign=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Code signing::SKIPPED - no signing secrets set, Zano.app gets an ad-hoc signature and the dmg is marked unsigned"
+          else
+            echo "::error title=Code signing::Incomplete configuration - $present of 5 secrets are set. Required: MACOS_SIGN_CERT_P12, MACOS_SIGN_CERT_PASSWORD, MACOS_NOTARY_API_KEY_P8, MACOS_NOTARY_API_KEY_ID, MACOS_NOTARY_API_ISSUER_ID"
+            exit 1
+          fi
+
+      - name: Set up signing keychain
+        if: steps.signcheck.outputs.sign == 'true'
+        env:
+          MACOS_SIGN_CERT_P12: ${{ secrets.MACOS_SIGN_CERT_P12 }}
+          MACOS_SIGN_CERT_PASSWORD: ${{ secrets.MACOS_SIGN_CERT_PASSWORD }}
+          MACOS_SIGN_IDENTITY: ${{ vars.MACOS_SIGN_IDENTITY }}
+          MACOS_TEAM_ID: ${{ vars.MACOS_TEAM_ID }}
+        run: bash utils/macos_codesign.sh keychain
+
+      - name: Sign Zano.app (Developer ID)
+        if: steps.signcheck.outputs.sign == 'true'
+        # Signs inside-out. Not `codesign --deep`: Apple deprecates it for
+        # signing, and it stamps the outer bundle's entitlements onto every
+        # nested binary - which breaks QtWebEngineProcess, and with it the
+        # entire UI, because that helper ships entitlements of its own.
+        run: bash utils/macos_codesign.sh sign-app build/src/Zano.app utils/macos_entitlements.plist
+
+      - name: Sign Zano.app (ad-hoc)
+        if: steps.signcheck.outputs.sign != 'true'
+        run: |
+          codesign --force --deep --sign - build/src/Zano.app
+          codesign --verify --deep build/src/Zano.app
+
+      - name: Notarize and staple Zano.app
+        if: steps.signcheck.outputs.sign == 'true'
+        env:
+          MACOS_NOTARY_API_KEY_P8: ${{ secrets.MACOS_NOTARY_API_KEY_P8 }}
+          MACOS_NOTARY_API_KEY_ID: ${{ secrets.MACOS_NOTARY_API_KEY_ID }}
+          MACOS_NOTARY_API_ISSUER_ID: ${{ secrets.MACOS_NOTARY_API_ISSUER_ID }}
+        # The ticket is stapled into the bundle itself, not just the disk image,
+        # so the app still launches once the user has dragged it out of the dmg
+        # and is offline.
+        run: bash utils/macos_codesign.sh notarize-app build/src/Zano.app
+
+      - name: Package dmg
+        env:
+          SIGNED: ${{ steps.signcheck.outputs.sign }}
+        run: |
+          cd build/src
+          suffix=""
+          if [ "${{ inputs.testnet }}" = "true" ]; then suffix="-testnet"; fi
+          # Make an unsigned build obvious from the file name alone, so a run
+          # with missing secrets cannot be mistaken for a shippable one.
+          if [ "$SIGNED" != "true" ]; then suffix="${suffix}-unsigned"; fi
+          mkdir package_folder
+          mv Zano.app package_folder/
+          ln -s /Applications package_folder/Applications
+          dmg="zano-macos-arm64-gui${suffix}-${ZANO_VERSION}.dmg"
+          hdiutil create -volname "Zano" -srcfolder package_folder -ov -format UDZO "$dmg"
+          ls -lh "$dmg"
+          echo "ZANO_DMG=build/src/$dmg" >> "$GITHUB_ENV"
+
+      - name: Sign, notarize and staple the dmg
+        if: steps.signcheck.outputs.sign == 'true'
+        env:
+          MACOS_NOTARY_API_KEY_P8: ${{ secrets.MACOS_NOTARY_API_KEY_P8 }}
+          MACOS_NOTARY_API_KEY_ID: ${{ secrets.MACOS_NOTARY_API_KEY_ID }}
+          MACOS_NOTARY_API_ISSUER_ID: ${{ secrets.MACOS_NOTARY_API_ISSUER_ID }}
+        # The dmg is what the user actually downloads, so it carries the
+        # quarantine bit and is what Gatekeeper judges at mount time. UDZO is a
+        # UDIF image, which is one of the three containers notarytool accepts.
+        run: |
+          bash utils/macos_codesign.sh sign-dmg "$ZANO_DMG"
+          bash utils/macos_codesign.sh notarize "$ZANO_DMG"
+
+      - name: Verify the distributable artifacts
+        if: steps.signcheck.outputs.sign == 'true'
+        # Fails the build unless the dmg is signed, notarized, stapled and
+        # accepted by Gatekeeper - a silently unnotarized build is otherwise
+        # indistinguishable from a good one until a user tries to open it.
+        run: bash utils/macos_codesign.sh verify-dmg "$ZANO_DMG"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: zano-macos-arm64-gui${{ inputs.testnet == true && '-testnet' || '' }}
+          path: build/src/zano-macos-arm64-gui*.dmg
+          if-no-files-found: error
+
+      - name: Remove signing material
+        if: always() && steps.signcheck.outputs.sign == 'true'
+        run: bash utils/macos_codesign.sh cleanup
