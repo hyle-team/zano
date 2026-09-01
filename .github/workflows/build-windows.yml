@@ -1,0 +1,1412 @@
+name: Windows build
+
+on:
+  workflow_dispatch:
+    inputs:
+      testnet:
+        description: 'Build testnet binaries (-DTESTNET=TRUE)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  BOOST_VERSION: 1.84.0
+  BOOST_SHA256: 81a4d10075731966477276c47324ecd9cac02da49899d36c48eba66e40014f25
+  OPENSSL_VERSION: 3.5.8
+  OPENSSL_SHA256: a8f84a39918ec6415ce765d9b429d313ba97b8143169c172e734b9514464f5b2
+  NASM_VERSION: 2.16.3
+  QT_VERSION: 6.8.3
+  # RFC 3161 timestamping authority. The certificate is issued by Sectigo, so
+  # its TSA is the default here; jsign also accepts a comma-separated fallback
+  # list in this variable.
+  WINDOWS_SIGN_TIMESTAMP_URL: ${{ vars.WINDOWS_SIGN_TIMESTAMP_URL || 'http://timestamp.sectigo.com' }}
+  # Authenticode signing runs through Jsign against a Google Cloud HSM key; the
+  # private key never leaves KMS. net.jsign:jsign is the standalone CLI jar,
+  # pinned by version and SHA-256 (7.5 is the current release, 2026-07-16).
+  JSIGN_VERSION: '7.5'
+  JSIGN_SHA256: 602A51C3545A6DC4FB99BD2EA7152B26D1345916D0C93DDFBD5936CB735AF91C
+  # Pinned properties of the issued Sectigo OV certificate. Every one of these
+  # is re-checked on the runner before anything is signed, and the build fails
+  # if any of them does not match.
+  SIGN_EXPECTED_SUBJECT_CN: Ravaga Apps Studio FZCO
+  SIGN_EXPECTED_ISSUER_CN: Sectigo Public Code Signing CA R36
+  SIGN_EXPECTED_CERT_SERIAL: 6EAE1F699D349C392DA7E752F77409B1
+  SIGN_EXPECTED_CERT_SHA256: 1509C6B2DA15EA1093D886BB350722E102028204652AADBBD1F7ABCCFA2FFEF2
+  # SubjectPublicKeyInfo digest of the leaf; must equal the public key that
+  # Cloud KMS reports for the configured key version.
+  SIGN_EXPECTED_SPKI_SHA256: C4AAA4A96183581A7C62AB4E1EED26AC9C3FECE7616F9BD30E18BD7722DEBE62
+  SIGN_EXPECTED_KMS_ALGORITHM: RSA_SIGN_PKCS1_3072_SHA256
+
+jobs:
+  build:
+    name: Windows ${{ matrix.arch }}${{ matrix.gui && ' (full)' || ' (CLI)' }}${{ inputs.testnet == true && ' (testnet)' || '' }}
+    runs-on: windows-2022
+    permissions:
+      contents: read
+      # Mints the short-lived OIDC token that Google Cloud Workload Identity
+      # Federation exchanges for KMS access. There is deliberately no service
+      # account and no GOOGLE_CREDENTIALS secret in this setup.
+      id-token: write
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            cmake_arch: x64
+            vcvars: vcvars64.bat
+            vs_component: Microsoft.VisualStudio.Component.VC.Tools.x86.x64
+            openssl_target: VC-WIN64A
+            boost_arch: x86
+            gui: true
+          # Qt 6.8.3 has no prebuilt Windows ARM64 Qt WebEngine package.
+          - arch: arm64
+            cmake_arch: ARM64
+            vcvars: vcvarsamd64_arm64.bat
+            vs_component: Microsoft.VisualStudio.Component.VC.Tools.ARM64
+            openssl_target: VC-WIN64-ARM
+            boost_arch: arm
+            gui: false
+    # Holds the GCP_* signing identifiers (they may also be repository
+    # variables) and is where required reviewers belong. Google Cloud only
+    # admits refs/heads/master and refs/tags/* from hyle-team/zano, so protect
+    # those refs here as well.
+    environment: windows-code-signing
+    env:
+      DEPS_DIR: ${{ github.workspace }}\_deps
+      BUILD_DIR: ${{ github.workspace }}\build-windows
+      DIST_DIR: ${{ github.workspace }}\dist-windows
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - name: Checkout (with submodules)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          submodules: recursive
+          # Full history is used by src/version.cmake and libmdbx.
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up MSVC 2022 ${{ matrix.arch }} environment
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          if (-not (Test-Path -LiteralPath $vswhere)) {
+            throw "vswhere.exe was not found"
+          }
+
+          $vsPath = & $vswhere -latest -products * `
+            -requires '${{ matrix.vs_component }}' `
+            -property installationPath |
+            Select-Object -First 1
+          if ([string]::IsNullOrWhiteSpace($vsPath)) {
+            throw "Visual Studio with the ${{ matrix.arch }} C++ toolchain was not found"
+          }
+          $vsPath = $vsPath.Trim()
+
+          $vcvars = Join-Path $vsPath 'VC\Auxiliary\Build\${{ matrix.vcvars }}'
+          if (-not (Test-Path -LiteralPath $vcvars)) {
+            throw "${{ matrix.vcvars }} was not found at $vcvars"
+          }
+
+          $environment = & $env:COMSPEC /d /s /c "`"$vcvars`" >nul && set"
+          if ($LASTEXITCODE -ne 0) {
+            throw "${{ matrix.vcvars }} failed with exit code $LASTEXITCODE"
+          }
+
+          foreach ($line in $environment) {
+            if ($line -notmatch '^([^=]+)=(.*)$') {
+              continue
+            }
+            $name = $matches[1]
+            $value = $matches[2]
+            if ($name -match '^(GITHUB_|RUNNER_|ACTIONS_)' -or $name -eq 'CI') {
+              continue
+            }
+            "$name=$value" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          }
+
+          "VS_PATH=$vsPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Host "Using Visual Studio at $vsPath for ${{ matrix.arch }}"
+
+      - name: Cache Boost and OpenSSL
+        id: deps-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: |
+            ${{ env.DEPS_DIR }}\boost
+            ${{ env.DEPS_DIR }}\openssl
+          key: deps-windows-2022-${{ matrix.arch }}-msvc143-md-boost${{ env.BOOST_VERSION }}-openssl${{ env.OPENSSL_VERSION }}-nasm${{ env.NASM_VERSION }}-v1
+
+      - name: Install NASM
+        if: steps.deps-cache.outputs.cache-hit != 'true' && matrix.arch == 'x64'
+        run: |
+          choco install nasm --version=$env:NASM_VERSION --allow-downgrade --yes --no-progress
+          if ($LASTEXITCODE -ne 0) {
+            throw "Chocolatey failed to install NASM $env:NASM_VERSION"
+          }
+
+          $nasmPath = Join-Path $env:ProgramFiles 'NASM\nasm.exe'
+          if (-not (Test-Path -LiteralPath $nasmPath -PathType Leaf)) {
+            throw "nasm.exe was not found after installation"
+          }
+          $nasmVersion = (& $nasmPath -v) -join ' '
+          if ($LASTEXITCODE -ne 0 -or $nasmVersion -notmatch '\b2\.16\.03\b') {
+            throw "Expected NASM 2.16.03, got: $nasmVersion"
+          }
+          Split-Path -Parent $nasmPath |
+            Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Build OpenSSL (static library, shared CRT)
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        run: |
+          New-Item -ItemType Directory -Path $env:DEPS_DIR -Force | Out-Null
+          $archive = Join-Path $env:RUNNER_TEMP "openssl-$env:OPENSSL_VERSION.tar.gz"
+          $sourceDir = Join-Path $env:RUNNER_TEMP "openssl-$env:OPENSSL_VERSION"
+          $prefix = Join-Path $env:DEPS_DIR 'openssl'
+          $url = "https://github.com/openssl/openssl/releases/download/openssl-$env:OPENSSL_VERSION/openssl-$env:OPENSSL_VERSION.tar.gz"
+
+          & curl.exe --fail --location --retry 3 --output $archive $url
+          if ($LASTEXITCODE -ne 0) {
+            throw "OpenSSL download failed"
+          }
+          $actualHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $archive).Hash.ToLowerInvariant()
+          if ($actualHash -ne ($env:OPENSSL_SHA256).ToLowerInvariant()) {
+            throw "OpenSSL SHA-256 mismatch: $actualHash"
+          }
+
+          & tar.exe -xzf $archive -C $env:RUNNER_TEMP
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $sourceDir)) {
+            throw "OpenSSL extraction failed"
+          }
+
+          $prefixForConfigure = $prefix.Replace('\', '/')
+          Push-Location $sourceDir
+          try {
+            & perl.exe Configure ${{ matrix.openssl_target }} no-shared no-tests no-makedepend `
+              "--prefix=$prefixForConfigure" `
+              "--openssldir=$prefixForConfigure/ssl" `
+              '--libdir=lib'
+            if ($LASTEXITCODE -ne 0) {
+              throw "OpenSSL Configure failed"
+            }
+
+            & nmake.exe
+            if ($LASTEXITCODE -ne 0) {
+              throw "OpenSSL build failed"
+            }
+
+            & nmake.exe install_sw
+            if ($LASTEXITCODE -ne 0) {
+              throw "OpenSSL install failed"
+            }
+
+            Copy-Item -LiteralPath 'LICENSE.txt' -Destination (Join-Path $prefix 'LICENSE.txt') -Force
+          }
+          finally {
+            Pop-Location
+          }
+
+      - name: Build Boost (static libraries, shared CRT)
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        timeout-minutes: 120
+        run: |
+          New-Item -ItemType Directory -Path $env:DEPS_DIR -Force | Out-Null
+          $boostVersionUnderscore = $env:BOOST_VERSION.Replace('.', '_')
+          $archive = Join-Path $env:RUNNER_TEMP "boost_$boostVersionUnderscore.7z"
+          $sourceDir = Join-Path $env:RUNNER_TEMP "boost_$boostVersionUnderscore"
+          $prefix = Join-Path $env:DEPS_DIR 'boost'
+
+          # Use Boost's Windows-friendly 7z release instead of the tar.bz2
+          # package: extracting the latter with Windows tar can take hours.
+          # The pinned digest must match regardless of the selected mirror.
+          $urls = @(
+            "https://sourceforge.net/projects/boost/files/boost/$env:BOOST_VERSION/boost_$boostVersionUnderscore.7z/download",
+            "https://archives.boost.io/release/$env:BOOST_VERSION/source/boost_$boostVersionUnderscore.7z"
+          )
+          $downloadedFrom = $null
+          foreach ($url in $urls) {
+            if (Test-Path -LiteralPath $archive) {
+              Remove-Item -LiteralPath $archive -Force
+            }
+
+            Write-Host "Downloading Boost $env:BOOST_VERSION from $url"
+            & curl.exe `
+              --fail `
+              --location `
+              --show-error `
+              --retry 2 `
+              --retry-all-errors `
+              --retry-delay 5 `
+              --retry-max-time 900 `
+              --connect-timeout 30 `
+              --max-time 600 `
+              --speed-limit 65536 `
+              --speed-time 120 `
+              --output $archive `
+              $url
+            $curlExitCode = $LASTEXITCODE
+            if ($curlExitCode -ne 0) {
+              Write-Warning "Boost download failed from $url with curl exit code $curlExitCode"
+              continue
+            }
+
+            $actualHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $archive).Hash.ToLowerInvariant()
+            if ($actualHash -ne ($env:BOOST_SHA256).ToLowerInvariant()) {
+              Write-Warning "Boost SHA-256 mismatch from ${url}: $actualHash"
+              continue
+            }
+
+            $downloadedFrom = $url
+            break
+          }
+          if (-not $downloadedFrom) {
+            throw "Boost download failed from every configured source"
+          }
+          Write-Host "Verified Boost archive from $downloadedFrom"
+
+          $sevenZipCommand = Get-Command '7z.exe' -ErrorAction SilentlyContinue
+          $sevenZip = if ($sevenZipCommand) {
+            $sevenZipCommand.Source
+          }
+          else {
+            Join-Path $env:ProgramFiles '7-Zip\7z.exe'
+          }
+          if (-not (Test-Path -LiteralPath $sevenZip -PathType Leaf)) {
+            throw "7z.exe was not found"
+          }
+
+          $extractStartedAt = Get-Date
+          Write-Host "Extracting Boost with $sevenZip"
+          & $sevenZip x $archive "-o$env:RUNNER_TEMP" -y -mmt=on -bb0 -bso0 -bsp0 -bse2
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $sourceDir -PathType Container)) {
+            throw "Boost extraction failed with 7-Zip exit code $LASTEXITCODE"
+          }
+          $elapsedSeconds = [int]((Get-Date) - $extractStartedAt).TotalSeconds
+          Write-Host "Boost extraction completed in $elapsedSeconds seconds"
+
+          Push-Location $sourceDir
+          try {
+            $hostVcvars = Join-Path $env:VS_PATH 'VC\Auxiliary\Build\vcvars64.bat'
+            & $env:COMSPEC /d /s /c "`"$hostVcvars`" >nul && bootstrap.bat"
+            if ($LASTEXITCODE -ne 0) {
+              throw "Boost bootstrap failed"
+            }
+
+            & .\b2.exe -j2 `
+              --with-system `
+              --with-filesystem `
+              --with-locale `
+              --with-thread `
+              --with-timer `
+              --with-date_time `
+              --with-chrono `
+              --with-regex `
+              --with-serialization `
+              --with-atomic `
+              --with-program_options `
+              --with-log `
+              address-model=64 `
+              architecture=${{ matrix.boost_arch }} `
+              target-os=windows `
+              toolset=msvc-14.3 `
+              link=static `
+              runtime-link=shared `
+              threading=multi `
+              variant=release `
+              boost.locale.icu=off `
+              "--prefix=$prefix" `
+              install
+            if ($LASTEXITCODE -ne 0) {
+              throw "Boost build failed"
+            }
+
+            Copy-Item -LiteralPath 'LICENSE_1_0.txt' -Destination (Join-Path $prefix 'LICENSE_1_0.txt') -Force
+          }
+          finally {
+            Pop-Location
+          }
+
+      - name: Set up Python for Qt installer
+        if: matrix.gui
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.13.3'
+
+      - name: Install Qt 6.8 (MSVC 2022, WebEngine)
+        if: matrix.gui
+        uses: jurplel/install-qt-action/action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          arch: win64_msvc2022_64
+          modules: 'qtwebengine qtwebchannel qtpositioning'
+          cache: true
+          aqtversion: '==3.3.0'
+          py7zrversion: '==1.0.0'
+
+      - name: Configure (CMake, Release ${{ matrix.arch }})
+        run: |
+          $testnet = if ('${{ inputs.testnet }}' -eq 'true') { 'TRUE' } else { 'FALSE' }
+          $buildGui = if ('${{ matrix.gui }}' -eq 'true') { 'TRUE' } else { 'FALSE' }
+          $cmakeArguments = @(
+            '-S', '.',
+            '-B', $env:BUILD_DIR,
+            '-G', 'Visual Studio 17 2022',
+            '-A', '${{ matrix.cmake_arch }}',
+            '-T', 'v143,host=x64',
+            "-DTESTNET=$testnet",
+            "-DBUILD_GUI=$buildGui",
+            '-DBUILD_TESTS=FALSE',
+            '-DUSE_PCH=FALSE',
+            '-DSTATIC=FALSE',
+            '-DOPENSSL_USE_STATIC_LIBS=TRUE',
+            '-DOPENSSL_MSVC_STATIC_RT=FALSE',
+            '-DCMAKE_POLICY_VERSION_MINIMUM=3.5',
+            "-DBOOST_ROOT=$env:DEPS_DIR\boost",
+            "-DBOOST_LIBRARYDIR=$env:DEPS_DIR\boost\lib",
+            "-DOPENSSL_ROOT_DIR=$env:DEPS_DIR\openssl"
+          )
+          if ($buildGui -eq 'TRUE') {
+            $cmakeArguments += "-DCMAKE_PREFIX_PATH=$env:QT_ROOT_DIR"
+          }
+
+          & cmake.exe @cmakeArguments
+          if ($LASTEXITCODE -ne 0) {
+            throw "CMake configure failed"
+          }
+
+      - name: Build Zano applications
+        run: |
+          $targets = @('daemon', 'simplewallet', 'connectivity_tool', 'gateway_rpc_proxy')
+          if ('${{ matrix.gui }}' -eq 'true') {
+            $targets = @('Zano') + $targets
+          }
+          $buildArguments = @(
+            '--build', $env:BUILD_DIR,
+            '--config', 'Release',
+            '--parallel', '2',
+            '--target'
+          ) + $targets
+
+          & cmake.exe @buildArguments
+          if ($LASTEXITCODE -ne 0) {
+            throw "CMake build failed"
+          }
+
+      - name: Verify expected build outputs
+        run: |
+          $releaseDir = Join-Path $env:BUILD_DIR 'src\Release'
+          $expectedFiles = @(
+            'zanod.exe',
+            'simplewallet.exe',
+            'connectivity_tool.exe',
+            'gateway_rpc_proxy.exe',
+            'zanod.pdb',
+            'simplewallet.pdb',
+            'connectivity_tool.pdb',
+            'gateway_rpc_proxy.pdb'
+          )
+          if ('${{ matrix.gui }}' -eq 'true') {
+            $expectedFiles += @('Zano.exe', 'Zano.pdb')
+          }
+          foreach ($name in $expectedFiles) {
+            $path = Join-Path $releaseDir $name
+            if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+              throw "Expected output was not produced: $path"
+            }
+          }
+
+          $headers = (& dumpbin.exe /headers (Join-Path $releaseDir 'zanod.exe')) -join "`n"
+          $expectedMachine = if ('${{ matrix.arch }}' -eq 'arm64') { 'AA64 machine \(ARM64\)' } else { '8664 machine \(x64\)' }
+          if ($LASTEXITCODE -ne 0 -or $headers -notmatch $expectedMachine) {
+            throw "zanod.exe is not a ${{ matrix.arch }} PE binary"
+          }
+
+      - name: Derive package version
+        run: |
+          $versionHeader = Get-Content -LiteralPath 'src\version.h.in' -Raw
+          function Get-QuotedDefine([string] $name) {
+            $match = [regex]::Match($versionHeader, "(?m)^#define\s+$name\s+`"([^`"]+)`"")
+            if (-not $match.Success) {
+              throw "Could not read $name from src/version.h.in"
+            }
+            return $match.Groups[1].Value
+          }
+
+          $major = Get-QuotedDefine 'PROJECT_MAJOR_VERSION'
+          $minor = Get-QuotedDefine 'PROJECT_MINOR_VERSION'
+          $revision = Get-QuotedDefine 'PROJECT_REVISION'
+          $buildMatch = [regex]::Match($versionHeader, '(?m)^#define\s+PROJECT_VERSION_BUILD_NO\s+(\d+)')
+          if (-not $buildMatch.Success) {
+            throw "Could not read PROJECT_VERSION_BUILD_NO from src/version.h.in"
+          }
+
+          $appVersion = "$major.$minor.$revision.$($buildMatch.Groups[1].Value)"
+          $commit = (& git.exe rev-parse --short=7 HEAD).Trim()
+          if ($LASTEXITCODE -ne 0 -or -not $commit) {
+            throw "Could not derive the Git commit"
+          }
+          $packageVersion = "$appVersion-$commit"
+          $networkSuffix = if ('${{ inputs.testnet }}' -eq 'true') { '-testnet' } else { '' }
+
+          "APP_VERSION=$appVersion" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "PACKAGE_VERSION=$packageVersion" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          $arch = '${{ matrix.arch }}'
+          "CLI_BASENAME=zano-windows-$arch-cli$networkSuffix-$packageVersion" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "GUI_BASENAME=zano-windows-$arch-gui$networkSuffix-$packageVersion" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "INSTALLER_BASENAME=zano-windows-$arch-gui$networkSuffix-$packageVersion-installer" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "NETWORK_NAME=$(if ($networkSuffix) { 'testnet' } else { 'mainnet' })" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Check code-signing configuration
+        id: signcheck
+        # The private key is a non-exportable Google Cloud HSM key. GitHub
+        # authenticates with a short-lived OIDC token through Workload Identity
+        # Federation, so there is no PFX, no service-account JSON and nothing
+        # here that survives the job.
+        env:
+          GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+          GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          GCP_KMS_KEYRING: ${{ vars.GCP_KMS_KEYRING }}
+          GCP_KMS_KEY_ALIAS: ${{ vars.GCP_KMS_KEY_ALIAS }}
+          GCP_KMS_KEY_VERSION: ${{ vars.GCP_KMS_KEY_VERSION }}
+        run: |
+          $required = [ordered]@{
+            GCP_PROJECT_ID                 = $env:GCP_PROJECT_ID
+            GCP_WORKLOAD_IDENTITY_PROVIDER = $env:GCP_WORKLOAD_IDENTITY_PROVIDER
+            GCP_KMS_KEYRING                = $env:GCP_KMS_KEYRING
+            GCP_KMS_KEY_ALIAS              = $env:GCP_KMS_KEY_ALIAS
+            GCP_KMS_KEY_VERSION            = $env:GCP_KMS_KEY_VERSION
+          }
+          $missing = @($required.GetEnumerator() |
+            Where-Object { [string]::IsNullOrWhiteSpace($_.Value) } |
+            ForEach-Object { $_.Key })
+
+          # A half-configured repository is a mistake, never an opt-out.
+          if ($missing.Count -gt 0 -and $missing.Count -lt $required.Count) {
+            throw "Incomplete code-signing configuration; these variables are unset: $($missing -join ', ')"
+          }
+
+          # The Workload Identity provider only admits refs/heads/master and
+          # refs/tags/*; from any other ref the token exchange is rejected. Skip
+          # signing there rather than failing an otherwise good build.
+          $ref = '${{ github.ref }}'
+          $refAllowed = ($ref -eq 'refs/heads/master') -or $ref.StartsWith('refs/tags/')
+
+          if ($missing.Count -eq $required.Count) {
+            'sign=false' | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+            'SIGNING_STATUS=unsigned' | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+            Write-Host '::notice title=Authenticode signing::SKIPPED - signing variables are absent; producing unsigned artifacts'
+          }
+          elseif (-not $refAllowed) {
+            'sign=false' | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+            'SIGNING_STATUS=unsigned' | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+            Write-Host "::notice title=Authenticode signing::SKIPPED - $ref is neither refs/heads/master nor a tag; producing unsigned artifacts"
+          }
+          else {
+            'sign=true' | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+            'SIGNING_STATUS=authenticode' | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+            $scope = if ('${{ matrix.gui }}' -eq 'true') { 'project binaries and the Inno Setup installer/uninstaller' } else { 'project binaries' }
+            Write-Host "::notice title=Authenticode signing::ENABLED - $scope will be signed through Google Cloud KMS"
+          }
+
+      - name: Authenticate to Google Cloud
+        id: google-auth
+        if: steps.signcheck.outputs.sign == 'true'
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          create_credentials_file: true
+
+      - name: Install Google Cloud CLI
+        if: steps.signcheck.outputs.sign == 'true'
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3
+
+      - name: Prepare Jsign and verify the signing certificate
+        if: steps.signcheck.outputs.sign == 'true'
+        env:
+          GCP_KMS_KEYRING: ${{ vars.GCP_KMS_KEYRING }}
+          GCP_KMS_KEY_ALIAS: ${{ vars.GCP_KMS_KEY_ALIAS }}
+          GCP_KMS_KEY_VERSION: ${{ vars.GCP_KMS_KEY_VERSION }}
+        run: |
+          function Get-Sha256Hex([byte[]] $bytes) {
+            $sha256 = [System.Security.Cryptography.SHA256]::Create()
+            try {
+              return [BitConverter]::ToString($sha256.ComputeHash($bytes)).Replace('-', '')
+            }
+            finally {
+              $sha256.Dispose()
+            }
+          }
+
+          # --- Java runtime (Jsign ships as a JAR) ----------------------------
+          $javaHome = @($env:JAVA_HOME_17_X64, $env:JAVA_HOME_11_X64, $env:JAVA_HOME) |
+            Where-Object { $_ -and (Test-Path -LiteralPath (Join-Path $_ 'bin\java.exe')) } |
+            Select-Object -First 1
+          $javaExe = if ($javaHome) {
+            Join-Path $javaHome 'bin\java.exe'
+          }
+          else {
+            (Get-Command java.exe -ErrorAction SilentlyContinue).Source
+          }
+          if (-not $javaExe) {
+            throw "No Java runtime was found to run Jsign"
+          }
+
+          # --- Jsign, pinned by version and SHA-256 ---------------------------
+          $jsignJar = Join-Path $env:RUNNER_TEMP "jsign-$env:JSIGN_VERSION.jar"
+          Invoke-WebRequest `
+            -Uri "https://repo1.maven.org/maven2/net/jsign/jsign/$env:JSIGN_VERSION/jsign-$env:JSIGN_VERSION.jar" `
+            -OutFile $jsignJar `
+            -UseBasicParsing `
+            -MaximumRetryCount 3 `
+            -RetryIntervalSec 5
+          $jarHash = (Get-FileHash -LiteralPath $jsignJar -Algorithm SHA256).Hash
+          if ($jarHash -ne $env:JSIGN_SHA256.ToUpperInvariant()) {
+            throw "Jsign checksum mismatch: expected $($env:JSIGN_SHA256.ToUpperInvariant()), got $jarHash"
+          }
+
+          # --- Windows SDK signtool, used for independent verification --------
+          $signTool = Get-ChildItem `
+            -Path "${env:ProgramFiles(x86)}\Windows Kits\10\bin" `
+            -Filter 'signtool.exe' `
+            -File `
+            -Recurse |
+            Where-Object { $_.FullName -match '\\x64\\signtool\.exe$' } |
+            Sort-Object { [version]$_.Directory.Parent.Name } -Descending |
+            Select-Object -First 1
+          if (-not $signTool) {
+            throw "The x64 Windows SDK signtool.exe was not found"
+          }
+
+          # --- Certificate chain ----------------------------------------------
+          # Cloud KMS holds only the private key, so the issued chain has to be
+          # supplied to Jsign separately. Certificates are public data - this is
+          # the same chain that ends up embedded in every signed binary - and it
+          # is pinned by fingerprint below, so a substituted chain fails here.
+          $certPath = Join-Path $env:RUNNER_TEMP 'ravaga-apps-code-signing-full-chain.p7b'
+          @'
+          -----BEGIN PKCS7-----
+          MIIYfgYJKoZIhvcNAQcCoIIYbzCCGGsCAQExADALBgkqhkiG9w0BBwGgghhTMIIF
+          yjCCBDKgAwIBAgIQbq4faZ00nDktp+dS93QJsTANBgkqhkiG9w0BAQwFADBUMQsw
+          CQYDVQQGEwJHQjEYMBYGA1UEChMPU2VjdGlnbyBMaW1pdGVkMSswKQYDVQQDEyJT
+          ZWN0aWdvIFB1YmxpYyBDb2RlIFNpZ25pbmcgQ0EgUjM2MB4XDTI2MDgyMTAwMDAw
+          MFoXDTI3MDkyNDIzNTk1OVowYTELMAkGA1UEBhMCQUUxDjAMBgNVBAgMBUR1YmFp
+          MSAwHgYDVQQKDBdSYXZhZ2EgQXBwcyBTdHVkaW8gRlpDTzEgMB4GA1UEAwwXUmF2
+          YWdhIEFwcHMgU3R1ZGlvIEZaQ08wggGiMA0GCSqGSIb3DQEBAQUAA4IBjwAwggGK
+          AoIBgQCL5zUGQQ1bDAzmwr/UW4hhg7VNK8Ri6SHcTBxnlGkzbLt8LyzamiiDnoS/
+          HMqhXa3DKVGtQeW9GAiRH2Oq6odGap4i5HTXOaN7Qp9Ia6DYRZX0mpdIYSboFeHF
+          rPjxWm8OZx1YibBkFZxEus7oK8znID6xl34OW6cAMGahQu39ophVZvgvCqUZ13uF
+          ZoB5PUrdLWemmlDfQwZD6w+No/aQvn6OP+dKO2lEkB9iUSoeAA22O7iF80CZ25qU
+          Bsay3JWOdzAeqFgOVgBeQjS7SKTI5X+ylZ+bsS9fhHyrAlxRQlWsRvMwT8Zd5DnB
+          zHELZoEHV8smKYxn78JgMNEAvgAhZntiQEpGuU87Ztk2MuVFnAggH+K7Pw+H2cyE
+          uE8nFMfwwzvbKhbYT1ZhcKbM85ug8vink+wpjMabnglzxguKaqZCI18k9eZ2fl4v
+          5O0p8n8E0cG0c/bTaqGR7kdbqh/w13tisz4eL7EiyWKgM0ou6oeiO8TTEuMEzn6y
+          2g9K52UCAwEAAaOCAYkwggGFMB8GA1UdIwQYMBaAFA8qyyCHKLjsb0iuK1SmKaoX
+          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
+          CDAGAQH/AgEAMBMGA1UdJQQMMAoGCCsGAQUFBwMDMBsGA1UdIAQUMBIwBgYEVR0g
+          ADAIBgZngQwBBAEwSwYDVR0fBEQwQjBAoD6gPIY6aHR0cDovL2NybC5zZWN0aWdv
+          LmNvbS9TZWN0aWdvUHVibGljQ29kZVNpZ25pbmdSb290UjQ2LmNybDB7BggrBgEF
+          BQcBAQRvMG0wRgYIKwYBBQUHMAKGOmh0dHA6Ly9jcnQuc2VjdGlnby5jb20vU2Vj
+          dGlnb1B1YmxpY0NvZGVTaWduaW5nUm9vdFI0Ni5wN2MwIwYIKwYBBQUHMAGGF2h0
+          dHA6Ly9vY3NwLnNlY3RpZ28uY29tMA0GCSqGSIb3DQEBDAUAA4ICAQAG/4Lhd2M2
+          bnuhFSCbE/8E/ph1RGHDVpVx0ZE/haHrQECxyNbgcv2FymQ5PPmNS6Dah66dtgCj
+          BsULYAor5wxxcgEPRl05pZOzI3IEGwwsepp+8iGsLKaVpL3z5CmgELIqmk/Q5zFg
+          R1TSGmxqoEEhk60FqONzDn7D8p4W89h8sX+V1imaUb693TGqWp3T32IKGfIgy9jk
+          d7GM7YCa2xulWfQ6E1xZtYNEX/ewGnp9ZeHPsNwwviJMBZL4xVd40uPWUnOJUoSi
+          ugaz0yWLODRtQxs5qU6E58KKmfHwJotl5WZ7nIQuDT0mWjwEx7zSM7fs9Tx6N+Q/
+          3+49qTtUvAQsrEAxwmzOTJ6Jp6uWmHCgrHW4dHM3ITpvG5Ipy62KyqYovk5O6cC+
+          040Si15KJpuQ9VJnbPvqYqfMB9nEKX/d2rd1Q3DiuDexMKCCQdJGpOqUsxLuCOuF
+          OoGbO7Uv3RjUpY39jkkp0a+yls6tN85fJe+Y8voTnbPU1knpy24wUFBkfenBa+pR
+          FHwCBB1QtS+vGNRhsceP3kSPNrrfN2sRzFYsNfrFaWz8YOdU254qNZQfd9O/VjxZ
+          2Gjr3xgANHtM3HxfzPYF6/pKK8EE4dj66qKKtm2DTL1KFCg/OYJyfrdLJq1q2/HX
+          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
+          h5uinzVn3GJnUxW4NU6VfAYfRYSXF8To262aUDk2mm/YE8cqjszng95qlJh42/vp
+          YOpPYMqdqhDmqmPpnydf8HOIp7bt6gkRUYhEBeZo4a6L4XtEtjWIMIw1o5XLSDtc
+          GddwsKucY8tFu7Yst5B4oMWQRdDLqh5K7RNZN4022GXbepon7IUNLoj/+wtVKf4G
+          TIRr3AHyscXZxNOaEyQwggXeMIIDxqADAgECAhAB/W0w/KPKUagbvGQONQMtMA0G
+          CSqGSIb3DQEBDAUAMIGIMQswCQYDVQQGEwJVUzETMBEGA1UECBMKTmV3IEplcnNl
+          eTEUMBIGA1UEBxMLSmVyc2V5IENpdHkxHjAcBgNVBAoTFVRoZSBVU0VSVFJVU1Qg
+          TmV0d29yazEuMCwGA1UEAxMlVVNFUlRydXN0IFJTQSBDZXJ0aWZpY2F0aW9uIEF1
+          dGhvcml0eTAeFw0xMDAyMDEwMDAwMDBaFw0zODAxMTgyMzU5NTlaMIGIMQswCQYD
+          VQQGEwJVUzETMBEGA1UECBMKTmV3IEplcnNleTEUMBIGA1UEBxMLSmVyc2V5IENp
+          dHkxHjAcBgNVBAoTFVRoZSBVU0VSVFJVU1QgTmV0d29yazEuMCwGA1UEAxMlVVNF
+          UlRydXN0IFJTQSBDZXJ0aWZpY2F0aW9uIEF1dGhvcml0eTCCAiIwDQYJKoZIhvcN
+          AQEBBQADggIPADCCAgoCggIBAIASZRc2DsPbCLPQrFcNdu3NJ9NMrVCDYeKqIE0J
+          LWQJ3M6Jn8w9qez2z8Hc8dOx1ns3KBErR9o5xrw6GbRfpr19naNjQrZ28qk7K5H4
+          4m/Q7BYgkAk+4uh0yRi0kdRiZNt/owbxiBhqkCI8vP4T8IcUe/bkH47U5FHGEWdG
+          CFHLhhRUP7wz/n5snP8WnRi9UY41pqdmyHJn2yFmsdSbeAPAUDrozPDcvJ5M/q8F
+          ljUfV1q3/875PbcstvZU3cjnEjpNrkyKt1yatLcgPcp/IjSufjtoZgFE5wFORlOb
+          M2D3lL5TN5BzQ/Myw1Pv26r+dE5px2uMYJPexMcM3+EyrsyTO1F4lWeL7j1W/gzQ
+          aQ8bD/MlJmszbfduR/pzQ+V+DqVmsSl8MoRjVYnEDcGTVDAZE6zTfTen6106bDVc
+          20HXEtqpSQvf2ICKCZNijrVmzyWIzYS4sT+kOQ/ZAp7rEkyVfPNrBaleFoPMuGfi
+          6BOdzFuC00yz7Vv/3uVzrCM7LQC/NVV0CUnYSVgaf5I25lGSDvMmfRxNF7zJ7EMm
+          0L9BX0CpRET0medXh55QH1dUqD79dGMvsVBlCeZYQi5DGky08CVHWfoEHpPUJkZK
+          UIGy3r54t/xnFeHJV4QeD2PW6WK61l9VLupcxigIBCU5uA4rqfJMlxwHPw1S9e3v
+          L4IPAgMBAAGjQjBAMB0GA1UdDgQWBBRTeb9aqitKz1SA4dibwJ3ysgNmyzAOBgNV
+          HQ8BAf8EBAMCAQYwDwYDVR0TAQH/BAUwAwEB/zANBgkqhkiG9w0BAQwFAAOCAgEA
+          XNR8Dc/3AX1BmWUMc8VSn8v4z5kGfxvaQxWfngJVV5YU8VI8J4eUKO0fOgE3onb8
+          U1DAhJvGa066jCFPoo5VYpHzaRXYvIjjxKoL/e+o6UtVKgYgbVV4KRnuXzBcSyQR
+          Vf8kmm5eKivuC02ff/cBOJQUlUMHCftgqe4cqxKMoJpep5hqWW2LPwj7yNFFrxgV
+          ZJASD3MoLsXiJE78WOzw9EX+IrPrL47S2UVhBcGXb6h2co+LjDavvw0FznGN5qZv
+          H2ymcWLF2NCDcgzxZxGJDJwTTHI037zVcd+qcd3huWyMPBJdZdq9VxK2Q2v/5d5N
+          ZhFRz5mu7Be26HGRjN5J/t01caIVJ5Qcz2HjJrtvo2clIV3m3R0LLmgbO4Kv7INn
+          hdSYUXSxuZmAif9/eBlceUpgLpJArkw3KizJx2LIDl33NlvK4CUlAbTdGgecdwA/
+          0NzV7D3U+rs/zIXWb3+pLd+5Avf1l5q1NdrDZ7CHSqkoniOO/1wna+GwT/MH7gAu
+          1FmHy1JBler0R9fuZEFVfI1ZApXdYp3Cue5aKHSEpZu3kMcMB9/1iTZ0MtYowbCw
+          C+CcTMMc1vzjabVHRoEvooKr02NEcMSN/y0zuq2Pe7VwiK4+Gc9AKNj8yJC7XZki
+          9VLmWMUfiDFD7ogd18aOPENqHacY3n09FvFi+cqQqP0xAA==
+          -----END PKCS7-----
+          '@ | Set-Content -LiteralPath $certPath -Encoding ascii
+
+          $pkcs7Base64 = [regex]::Match(
+            (Get-Content -LiteralPath $certPath -Raw),
+            '(?s)-----BEGIN PKCS7-----(.*?)-----END PKCS7-----').Groups[1].Value
+          if ([string]::IsNullOrWhiteSpace($pkcs7Base64)) {
+            throw "The embedded certificate chain is not a PEM-armoured PKCS#7 block"
+          }
+          $chainCertificates = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2Collection
+          $chainCertificates.Import([Convert]::FromBase64String(($pkcs7Base64 -replace '\s', '')))
+
+          # 1. Identify the leaf by its pinned SHA-256 fingerprint.
+          $expectedCertHash = $env:SIGN_EXPECTED_CERT_SHA256.ToUpperInvariant()
+          $leafMatches = @($chainCertificates | Where-Object { (Get-Sha256Hex $_.RawData) -eq $expectedCertHash })
+          if ($leafMatches.Count -ne 1) {
+            throw "The chain does not contain exactly one certificate matching SIGN_EXPECTED_CERT_SHA256 (found $($leafMatches.Count))"
+          }
+          $leaf = $leafMatches[0]
+
+          if ($leaf.Subject -notmatch [regex]::Escape("CN=$($env:SIGN_EXPECTED_SUBJECT_CN)")) {
+            throw "Unexpected certificate subject: $($leaf.Subject)"
+          }
+          if ($leaf.Issuer -notmatch [regex]::Escape("CN=$($env:SIGN_EXPECTED_ISSUER_CN)")) {
+            throw "Unexpected certificate issuer: $($leaf.Issuer)"
+          }
+          if ($leaf.SerialNumber.ToUpperInvariant() -ne $env:SIGN_EXPECTED_CERT_SERIAL.ToUpperInvariant()) {
+            throw "Unexpected certificate serial: $($leaf.SerialNumber)"
+          }
+
+          # 2. Code-signing EKU, validity window, and a full chain build.
+          $codeSigningOid = '1.3.6.1.5.5.7.3.3'
+          $enhancedKeyUsages = @($leaf.Extensions |
+            Where-Object { $_ -is [System.Security.Cryptography.X509Certificates.X509EnhancedKeyUsageExtension] } |
+            ForEach-Object { $_.EnhancedKeyUsages } |
+            ForEach-Object { $_.Value })
+          if ($enhancedKeyUsages -notcontains $codeSigningOid) {
+            throw "The certificate does not carry the Code Signing EKU"
+          }
+
+          $utcNow = [DateTime]::UtcNow
+          if ($leaf.NotBefore.ToUniversalTime() -gt $utcNow -or $leaf.NotAfter.ToUniversalTime() -le $utcNow) {
+            throw "The certificate is not currently valid (NotBefore $($leaf.NotBefore.ToUniversalTime()), NotAfter $($leaf.NotAfter.ToUniversalTime()))"
+          }
+
+          $chain = New-Object System.Security.Cryptography.X509Certificates.X509Chain
+          $chain.ChainPolicy.RevocationMode = 'Online'
+          $chain.ChainPolicy.RevocationFlag = 'ExcludeRoot'
+          $chain.ChainPolicy.ExtraStore.AddRange($chainCertificates)
+          [void]$chain.ChainPolicy.ApplicationPolicy.Add((New-Object System.Security.Cryptography.Oid $codeSigningOid))
+          $chainBuilt = $chain.Build($leaf)
+          # A CI runner may not reach the CRL/OCSP responders; that is worth a
+          # warning but is not evidence of a bad chain. Anything else is fatal.
+          $tolerated = @('NoError', 'RevocationStatusUnknown', 'OfflineRevocation')
+          $fatalStatus = @($chain.ChainStatus | Where-Object { $tolerated -notcontains $_.Status.ToString() })
+          if ($fatalStatus.Count -gt 0) {
+            $detail = ($fatalStatus | ForEach-Object { "$($_.Status): $($_.StatusInformation.Trim())" }) -join '; '
+            throw "Certificate chain validation failed: $detail"
+          }
+          if (-not $chainBuilt) {
+            $detail = ($chain.ChainStatus | ForEach-Object { $_.Status.ToString() }) -join ', '
+            Write-Host "::warning title=Certificate chain::Revocation status could not be checked: $detail"
+          }
+
+          # 3. The certificate's public key must be the KMS key version's public
+          #    key - otherwise the chain being attached does not belong to the
+          #    key that actually produces the signature.
+          # RSACertificateExtensions/RSA.ExportSubjectPublicKeyInfo are available
+          # far further back than PublicKey.ExportSubjectPublicKeyInfo (.NET 7).
+          $leafRsa = [System.Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSAPublicKey($leaf)
+          if (-not $leafRsa) {
+            throw "The signing certificate does not carry an RSA public key"
+          }
+          try {
+            $spkiHash = Get-Sha256Hex $leafRsa.ExportSubjectPublicKeyInfo()
+          }
+          finally {
+            $leafRsa.Dispose()
+          }
+          if ($spkiHash -ne $env:SIGN_EXPECTED_SPKI_SHA256.ToUpperInvariant()) {
+            throw "Certificate SPKI digest $spkiHash does not match the pinned SIGN_EXPECTED_SPKI_SHA256"
+          }
+
+          $accessToken = & gcloud auth application-default print-access-token
+          if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($accessToken)) {
+            throw "Could not obtain a Google Cloud access token from the federated credentials"
+          }
+          Write-Output "::add-mask::$accessToken"
+
+          $kmsPublicKey = Invoke-RestMethod `
+            -Method Get `
+            -Uri "https://cloudkms.googleapis.com/v1/$($env:GCP_KMS_KEY_VERSION)/publicKey" `
+            -Headers @{ Authorization = "Bearer $accessToken" }
+          if ($kmsPublicKey.algorithm -ne $env:SIGN_EXPECTED_KMS_ALGORITHM) {
+            throw "KMS key algorithm is $($kmsPublicKey.algorithm), expected $($env:SIGN_EXPECTED_KMS_ALGORITHM)"
+          }
+          # The KMS "pem" field is itself a SubjectPublicKeyInfo document, so its
+          # DER body hashes directly - no key import needed.
+          $kmsSpkiBase64 = ($kmsPublicKey.pem -replace '-----[A-Z ]+-----', '') -replace '\s', ''
+          if ([string]::IsNullOrWhiteSpace($kmsSpkiBase64)) {
+            throw "Cloud KMS returned no public key for $($env:GCP_KMS_KEY_VERSION)"
+          }
+          $kmsSpkiHash = Get-Sha256Hex ([Convert]::FromBase64String($kmsSpkiBase64))
+          if ($kmsSpkiHash -ne $spkiHash) {
+            throw "The certificate public key ($spkiHash) does not match KMS key version $($env:GCP_KMS_KEY_VERSION) ($kmsSpkiHash)"
+          }
+
+          Write-Host "Signing certificate verified: $($leaf.Subject)"
+          Write-Host "  issuer     : $($leaf.Issuer)"
+          Write-Host "  serial     : $($leaf.SerialNumber)"
+          Write-Host "  valid      : $($leaf.NotBefore.ToUniversalTime().ToString('u')) .. $($leaf.NotAfter.ToUniversalTime().ToString('u'))"
+          Write-Host "  SPKI SHA256: $spkiHash (matches KMS key version)"
+
+          # --- Reusable sign / verify helpers ---------------------------------
+          # Inno Setup invokes a signer as an external command per file, so both
+          # operations live in scripts that the steps below share.
+          $verifyScript = Join-Path $env:RUNNER_TEMP 'zano-verify-signature.ps1'
+          @'
+          param(
+            [Parameter(Mandatory = $true)]
+            [string] $FilePath
+          )
+
+          $ErrorActionPreference = 'Stop'
+
+          & $env:SIGNTOOL_EXE verify /pa /all /v /tw $FilePath
+          if ($LASTEXITCODE -ne 0) {
+            throw "signtool could not verify $FilePath"
+          }
+
+          $signature = Get-AuthenticodeSignature -LiteralPath $FilePath
+          if ($signature.Status -ne 'Valid') {
+            throw "Authenticode status for $FilePath is $($signature.Status): $($signature.StatusMessage)"
+          }
+          if (-not $signature.SignerCertificate) {
+            throw "$FilePath carries no signer certificate"
+          }
+          if ($signature.SignerCertificate.Thumbprint -ne $env:SIGN_CERT_THUMBPRINT) {
+            throw "$FilePath was signed by an unexpected certificate ($($signature.SignerCertificate.Thumbprint))"
+          }
+          if ($signature.SignerCertificate.Subject -notmatch [regex]::Escape("CN=$($env:SIGN_EXPECTED_SUBJECT_CN)")) {
+            throw "$FilePath reports publisher $($signature.SignerCertificate.Subject)"
+          }
+          if (-not $signature.TimeStamperCertificate) {
+            throw "$FilePath carries no RFC 3161 timestamp"
+          }
+
+          Write-Host "Verified $([IO.Path]::GetFileName($FilePath)): publisher '$($signature.SignerCertificate.Subject)', timestamped by '$($signature.TimeStamperCertificate.Subject)'"
+          '@ | Set-Content -LiteralPath $verifyScript -Encoding utf8
+
+          $signScript = Join-Path $env:RUNNER_TEMP 'zano-sign-file.ps1'
+          @'
+          param(
+            [Parameter(Mandatory = $true)]
+            [string] $FilePath
+          )
+
+          $ErrorActionPreference = 'Stop'
+
+          # Federated access tokens are short-lived, so mint one per file rather
+          # than carrying a single token across a build that can run for hours.
+          # The token is never echoed: Inno Setup captures this script's output,
+          # where an ::add-mask:: command would not reach the runner.
+          $accessToken = & gcloud auth application-default print-access-token
+          if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($accessToken)) {
+            throw "Could not obtain a Google Cloud access token"
+          }
+
+          $env:GCP_ACCESS_TOKEN = $accessToken
+          try {
+            # --storepass env:NAME keeps the token off the process command line.
+            & $env:JAVA_EXE -jar $env:JSIGN_JAR `
+              --storetype GOOGLECLOUD `
+              --keystore $env:GCP_KMS_KEYRING `
+              --storepass env:GCP_ACCESS_TOKEN `
+              --alias $env:GCP_KMS_KEY_ALIAS `
+              --certfile $env:SIGN_CERT_CHAIN `
+              --alg SHA-256 `
+              --tsaurl $env:WINDOWS_SIGN_TIMESTAMP_URL `
+              --tsmode RFC3161 `
+              --tsretries 5 `
+              --tsretrywait 15 `
+              --name Zano `
+              --url https://zano.org `
+              $FilePath
+            if ($LASTEXITCODE -ne 0) {
+              throw "Jsign failed for $FilePath"
+            }
+          }
+          finally {
+            $env:GCP_ACCESS_TOKEN = $null
+          }
+
+          & $env:VERIFY_SCRIPT -FilePath $FilePath
+          '@ | Set-Content -LiteralPath $signScript -Encoding utf8
+
+          @(
+            "JAVA_EXE=$javaExe",
+            "JSIGN_JAR=$jsignJar",
+            "SIGNTOOL_EXE=$($signTool.FullName)",
+            "SIGN_CERT_CHAIN=$certPath",
+            "SIGN_CERT_THUMBPRINT=$($leaf.Thumbprint)",
+            "SIGN_SCRIPT=$signScript",
+            "VERIFY_SCRIPT=$verifyScript",
+            "GCP_KMS_KEYRING=$env:GCP_KMS_KEYRING",
+            "GCP_KMS_KEY_ALIAS=$env:GCP_KMS_KEY_ALIAS"
+          ) | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Sign and verify project executables
+        if: steps.signcheck.outputs.sign == 'true'
+        run: |
+          $releaseDir = Join-Path $env:BUILD_DIR 'src\Release'
+          $fileNames = @(
+            'zanod.exe',
+            'simplewallet.exe',
+            'connectivity_tool.exe',
+            'gateway_rpc_proxy.exe'
+          )
+          if ('${{ matrix.gui }}' -eq 'true') {
+            $fileNames += 'Zano.exe'
+          }
+
+          foreach ($fileName in $fileNames) {
+            & $env:SIGN_SCRIPT -FilePath (Join-Path $releaseDir $fileName)
+          }
+
+      - name: Assemble CLI and GUI packages
+        if: matrix.gui
+        run: |
+          New-Item -ItemType Directory -Path $env:DIST_DIR -Force | Out-Null
+          $stageRoot = Join-Path $env:RUNNER_TEMP "zano-stage-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
+          New-Item -ItemType Directory -Path $stageRoot -Force | Out-Null
+          "STAGE_ROOT=$stageRoot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+          $releaseDir = Join-Path $env:BUILD_DIR 'src\Release'
+          $cliRoot = Join-Path $stageRoot $env:CLI_BASENAME
+          $guiRoot = Join-Path $stageRoot $env:GUI_BASENAME
+          New-Item -ItemType Directory -Path $cliRoot, $guiRoot -Force | Out-Null
+
+          function Copy-CommonLicenses([string] $packageRoot) {
+            Copy-Item -LiteralPath 'LICENSE' -Destination (Join-Path $packageRoot 'LICENSE.txt') -Force
+            $licenseRoot = Join-Path $packageRoot 'licenses'
+            New-Item -ItemType Directory -Path $licenseRoot -Force | Out-Null
+            Copy-Item -LiteralPath 'LICENSE' -Destination (Join-Path $licenseRoot 'Zano.txt') -Force
+            Copy-Item -LiteralPath (Join-Path $env:DEPS_DIR 'boost\LICENSE_1_0.txt') `
+              -Destination (Join-Path $licenseRoot 'Boost-1.0.txt') -Force
+            Copy-Item -LiteralPath (Join-Path $env:DEPS_DIR 'openssl\LICENSE.txt') `
+              -Destination (Join-Path $licenseRoot 'OpenSSL.txt') -Force
+
+            $sourceLicenseRoot = Join-Path $licenseRoot 'source-tree'
+            $scanRoots = @('contrib', 'src\gui\qt-daemon\layout')
+            foreach ($scanRoot in $scanRoots) {
+              Get-ChildItem -LiteralPath $scanRoot -File -Recurse |
+                Where-Object { $_.Name -match '^(LICENSE|COPYING)(\..*)?$' } |
+                ForEach-Object {
+                  $relativePath = [IO.Path]::GetRelativePath($env:GITHUB_WORKSPACE, $_.FullName)
+                  $destination = Join-Path $sourceLicenseRoot $relativePath
+                  New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null
+                  Copy-Item -LiteralPath $_.FullName -Destination $destination -Force
+                }
+            }
+          }
+
+          $cliFiles = @(
+            'zanod.exe',
+            'zanod.pdb',
+            'simplewallet.exe',
+            'simplewallet.pdb',
+            'connectivity_tool.exe',
+            'connectivity_tool.pdb',
+            'gateway_rpc_proxy.exe',
+            'gateway_rpc_proxy.pdb'
+          )
+          foreach ($name in $cliFiles) {
+            Copy-Item -LiteralPath (Join-Path $releaseDir $name) -Destination $cliRoot -Force
+          }
+
+          $guiFiles = @(
+            'Zano.exe',
+            'Zano.pdb',
+            'zanod.exe',
+            'zanod.pdb',
+            'simplewallet.exe',
+            'simplewallet.pdb'
+          )
+          foreach ($name in $guiFiles) {
+            Copy-Item -LiteralPath (Join-Path $releaseDir $name) -Destination $guiRoot -Force
+          }
+
+          # Match the macOS application bundle: the GUI loads its web frontend
+          # from a sibling html directory at runtime. Keep build-only inputs out
+          # of the portable package.
+          $htmlSource = (Resolve-Path -LiteralPath 'src\gui\qt-daemon\layout\html').Path
+          $htmlDestination = Join-Path $guiRoot 'html'
+          & robocopy.exe $htmlSource $htmlDestination /E `
+            /XD (Join-Path $htmlSource 'less') `
+            /XF package.json gulpfile.js `
+            /NFL /NDL /NJH /NJS /NP
+          $robocopyExitCode = $LASTEXITCODE
+          if ($robocopyExitCode -ge 8) {
+            throw "Copying the GUI html runtime failed with robocopy exit code $robocopyExitCode"
+          }
+          if (-not (Test-Path -LiteralPath (Join-Path $htmlDestination 'index.html') -PathType Leaf)) {
+            throw "The staged GUI package is missing html\index.html"
+          }
+
+          $redistSearchRoot = Join-Path $env:VS_PATH 'VC\Redist\MSVC'
+          $redist = Get-ChildItem -LiteralPath $redistSearchRoot -Filter 'vc_redist.x64.exe' -File -Recurse |
+            Sort-Object { [version]::new($_.VersionInfo.FileMajorPart, $_.VersionInfo.FileMinorPart, $_.VersionInfo.FileBuildPart, $_.VersionInfo.FilePrivatePart) } -Descending |
+            Select-Object -First 1
+          if (-not $redist) {
+            throw "vc_redist.x64.exe was not found below $redistSearchRoot"
+          }
+          $redistSignature = Get-AuthenticodeSignature -LiteralPath $redist.FullName
+          if ($redistSignature.Status -ne 'Valid' -or
+              $redistSignature.SignerCertificate.Subject -notmatch 'Microsoft Corporation') {
+            throw "vc_redist.x64.exe does not have the expected valid Microsoft signature"
+          }
+          Copy-Item -LiteralPath $redist.FullName -Destination $cliRoot -Force
+          Copy-Item -LiteralPath $redist.FullName -Destination $guiRoot -Force
+
+          $windeployqt = Join-Path $env:QT_ROOT_DIR 'bin\windeployqt.exe'
+          if (-not (Test-Path -LiteralPath $windeployqt)) {
+            throw "windeployqt.exe was not found at $windeployqt"
+          }
+          & $windeployqt `
+            --release `
+            --no-compiler-runtime `
+            --dir $guiRoot `
+            (Join-Path $guiRoot 'Zano.exe')
+          if ($LASTEXITCODE -ne 0) {
+            throw "windeployqt failed"
+          }
+
+          $requiredQtFiles = @(
+            'QtWebEngineProcess.exe',
+            'platforms\qwindows.dll',
+            'tls\qschannelbackend.dll',
+            'resources\icudtl.dat'
+          )
+          foreach ($relativePath in $requiredQtFiles) {
+            $path = Join-Path $guiRoot $relativePath
+            if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+              throw "windeployqt did not produce required runtime file: $path"
+            }
+          }
+          $webEngineLocales = Get-ChildItem -LiteralPath $guiRoot -Filter 'qtwebengine_locales' -Directory -Recurse |
+            Select-Object -First 1
+          if (-not $webEngineLocales) {
+            throw "windeployqt did not produce the Qt WebEngine locales directory"
+          }
+
+          Copy-CommonLicenses $cliRoot
+          Copy-CommonLicenses $guiRoot
+
+          $qtLicenseDestination = Join-Path $guiRoot 'licenses\Qt'
+          New-Item -ItemType Directory -Path $qtLicenseDestination -Force | Out-Null
+
+          # A curated release bundle can be added here once the final
+          # commercial/open-source Qt distribution terms are known.
+          $curatedQtLicenseRoot = 'utils\windows_licenses\qt'
+          $hasCuratedQtBundle = Test-Path -LiteralPath $curatedQtLicenseRoot -PathType Container
+          if ($hasCuratedQtBundle) {
+            $curatedQtLicenseDestination = Join-Path $qtLicenseDestination 'release-approved'
+            New-Item -ItemType Directory -Path $curatedQtLicenseDestination -Force | Out-Null
+            Copy-Item -Path (Join-Path $curatedQtLicenseRoot '*') `
+              -Destination $curatedQtLicenseDestination `
+              -Recurse -Force
+          }
+
+          # Binary kits installed by aqt do not guarantee a single LICENSES
+          # location. Preserve every license directory/file that the kit does
+          # provide, without pretending the first match is a complete bundle.
+          $qtLicenseDirectories = @(Get-ChildItem -LiteralPath $env:QT_ROOT_DIR `
+            -Filter 'LICENSES' -Directory -Recurse)
+          foreach ($directory in $qtLicenseDirectories) {
+            $relativePath = [IO.Path]::GetRelativePath($env:QT_ROOT_DIR, $directory.FullName)
+            $destination = Join-Path $qtLicenseDestination (Join-Path 'kit' $relativePath)
+            New-Item -ItemType Directory -Path $destination -Force | Out-Null
+            Copy-Item -Path (Join-Path $directory.FullName '*') -Destination $destination -Recurse -Force
+          }
+
+          $qtStandaloneLicenses = @(Get-ChildItem -LiteralPath $env:QT_ROOT_DIR -File -Recurse |
+            Where-Object { $_.Name -match '^(LICENSE|COPYING|licenseInfo)(\..*)?$' })
+          foreach ($file in $qtStandaloneLicenses) {
+            $relativePath = [IO.Path]::GetRelativePath($env:QT_ROOT_DIR, $file.FullName)
+            $destination = Join-Path $qtLicenseDestination (Join-Path 'kit-files' $relativePath)
+            New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null
+            Copy-Item -LiteralPath $file.FullName -Destination $destination -Force
+          }
+
+          if (-not $hasCuratedQtBundle) {
+            Write-Host '::warning title=Qt release licensing::No curated utils/windows_licenses/qt bundle is present; review Qt/WebEngine obligations before publishing'
+          }
+          @"
+          Qt / Qt WebEngine release licensing checkpoint
+
+          Files under kit\ and kit-files\ were copied from the exact Qt $env:QT_VERSION
+          binary kit used for this build. They are included when available, but
+          are not assumed to be a complete Chromium/Qt WebEngine notice bundle.
+
+          Before public release, legal/release owners must review the applicable
+          Qt commercial or open-source agreement and WebEngine third-party
+          notices. Put the approved distributable bundle in
+          utils\windows_licenses\qt so CI copies it to release-approved\.
+
+          Reference inventories for Qt 6.8:
+          https://doc.qt.io/qt-6.8/licenses-used-in-qt.html
+          https://doc.qt.io/qt-6.8/qtwebengine-licensing.html
+          "@ | Set-Content -LiteralPath (Join-Path $qtLicenseDestination 'README-RELEASE-LICENSING.txt') -Encoding utf8
+
+          @"
+          Zano Windows x64 CLI package
+          Network: $env:NETWORK_NAME
+          Version: $env:PACKAGE_VERSION
+          Signing: $env:SIGNING_STATUS
+
+          Programs:
+            zanod.exe                    full-node daemon
+            simplewallet.exe             CLI wallet and wallet RPC mode
+            connectivity_tool.exe        connectivity diagnostics
+            gateway_rpc_proxy.exe        gateway RPC proxy
+
+          This build uses the Microsoft Visual C++ dynamic runtime. Run
+          vc_redist.x64.exe if the required runtime is not already installed.
+          License texts are under licenses\.
+          "@ | Set-Content -LiteralPath (Join-Path $cliRoot 'README-WINDOWS.txt') -Encoding utf8
+
+          @"
+          Zano Windows x64 GUI package
+          Network: $env:NETWORK_NAME
+          Version: $env:PACKAGE_VERSION
+          Signing: $env:SIGNING_STATUS
+
+          Programs:
+            Zano.exe                     desktop GUI wallet
+            zanod.exe                    full-node daemon
+            simplewallet.exe             CLI wallet and wallet RPC mode
+
+          Qt 6 and Qt WebEngine runtime files are deployed beside Zano.exe.
+          This build uses the Microsoft Visual C++ dynamic runtime. Run
+          vc_redist.x64.exe if the required runtime is not already installed.
+          License texts are under licenses\.
+          "@ | Set-Content -LiteralPath (Join-Path $guiRoot 'README-WINDOWS.txt') -Encoding utf8
+
+          @"
+          This distribution contains Zano and third-party components.
+
+          License texts shipped by the project, Boost, and OpenSSL are collected
+          under licenses\. The source-tree subdirectory preserves notices from
+          bundled dependencies.
+          "@ | Set-Content -LiteralPath (Join-Path $cliRoot 'THIRD-PARTY-NOTICES.txt') -Encoding utf8
+
+          @"
+          This distribution contains Zano and third-party components.
+
+          The corresponding license texts shipped by the project, Boost, OpenSSL,
+          and those available in the Qt binary kit are collected under licenses\.
+          The source-tree subdirectory preserves notices from bundled dependencies.
+
+          Qt WebEngine contains Chromium-derived third-party software. See
+          licenses\Qt\README-RELEASE-LICENSING.txt: a release-approved bundle
+          is still required unless one is present under release-approved\.
+          "@ | Set-Content -LiteralPath (Join-Path $guiRoot 'THIRD-PARTY-NOTICES.txt') -Encoding utf8
+
+          $buildInfo = @"
+          Source commit: $env:GITHUB_SHA
+          Source ref: $env:GITHUB_REF
+          Configuration: Release
+          Platform: Windows x64
+          Toolchain: Visual Studio 2022 / MSVC v143
+          Boost: $env:BOOST_VERSION (static libraries, shared CRT)
+          OpenSSL: $env:OPENSSL_VERSION (static libraries, shared CRT)
+          Qt: $env:QT_VERSION (MSVC 2022 x64)
+          Network: $env:NETWORK_NAME
+          Signing: $env:SIGNING_STATUS
+          "@
+          $buildInfo | Set-Content -LiteralPath (Join-Path $cliRoot 'BUILD-INFO.txt') -Encoding utf8
+          $buildInfo | Set-Content -LiteralPath (Join-Path $guiRoot 'BUILD-INFO.txt') -Encoding utf8
+
+      - name: Assemble ARM64 CLI package
+        if: matrix.gui == false
+        run: |
+          New-Item -ItemType Directory -Path $env:DIST_DIR -Force | Out-Null
+          $stageRoot = Join-Path $env:RUNNER_TEMP "zano-stage-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
+          New-Item -ItemType Directory -Path $stageRoot -Force | Out-Null
+          "STAGE_ROOT=$stageRoot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+          $releaseDir = Join-Path $env:BUILD_DIR 'src\Release'
+          $cliRoot = Join-Path $stageRoot $env:CLI_BASENAME
+          New-Item -ItemType Directory -Path $cliRoot -Force | Out-Null
+
+          $cliFiles = @(
+            'zanod.exe',
+            'zanod.pdb',
+            'simplewallet.exe',
+            'simplewallet.pdb',
+            'connectivity_tool.exe',
+            'connectivity_tool.pdb',
+            'gateway_rpc_proxy.exe',
+            'gateway_rpc_proxy.pdb'
+          )
+          foreach ($name in $cliFiles) {
+            Copy-Item -LiteralPath (Join-Path $releaseDir $name) -Destination $cliRoot -Force
+          }
+
+          $redistSearchRoot = if (-not [string]::IsNullOrWhiteSpace($env:VCToolsRedistDir) -and
+              (Test-Path -LiteralPath $env:VCToolsRedistDir)) {
+            $env:VCToolsRedistDir
+          }
+          else {
+            Join-Path $env:VS_PATH 'VC\Redist\MSVC'
+          }
+          # Microsoft's x64 redistributable also carries the ARM64 runtime.
+          $redistName = 'vc_redist.x64.exe'
+          $redist = Get-ChildItem -LiteralPath $redistSearchRoot -Filter $redistName -File -Recurse |
+            Sort-Object { [version]::new($_.VersionInfo.FileMajorPart, $_.VersionInfo.FileMinorPart, $_.VersionInfo.FileBuildPart, $_.VersionInfo.FilePrivatePart) } -Descending |
+            Select-Object -First 1
+          if (-not $redist) {
+            throw "$redistName was not found below $redistSearchRoot"
+          }
+          $redistSignature = Get-AuthenticodeSignature -LiteralPath $redist.FullName
+          if ($redistSignature.Status -ne 'Valid' -or
+              $redistSignature.SignerCertificate.Subject -notmatch 'Microsoft Corporation') {
+            throw "$redistName does not have the expected valid Microsoft signature"
+          }
+          Copy-Item -LiteralPath $redist.FullName -Destination $cliRoot -Force
+
+          $licenseRoot = Join-Path $cliRoot 'licenses'
+          New-Item -ItemType Directory -Path $licenseRoot -Force | Out-Null
+          Copy-Item -LiteralPath 'LICENSE' -Destination (Join-Path $cliRoot 'LICENSE.txt') -Force
+          Copy-Item -LiteralPath 'LICENSE' -Destination (Join-Path $licenseRoot 'Zano.txt') -Force
+          Copy-Item -LiteralPath (Join-Path $env:DEPS_DIR 'boost\LICENSE_1_0.txt') `
+            -Destination (Join-Path $licenseRoot 'Boost-1.0.txt') -Force
+          Copy-Item -LiteralPath (Join-Path $env:DEPS_DIR 'openssl\LICENSE.txt') `
+            -Destination (Join-Path $licenseRoot 'OpenSSL.txt') -Force
+
+          $sourceLicenseRoot = Join-Path $licenseRoot 'source-tree'
+          foreach ($scanRoot in @('contrib', 'src\gui\qt-daemon\layout')) {
+            Get-ChildItem -LiteralPath $scanRoot -File -Recurse |
+              Where-Object { $_.Name -match '^(LICENSE|COPYING)(\..*)?$' } |
+              ForEach-Object {
+                $relativePath = [IO.Path]::GetRelativePath($env:GITHUB_WORKSPACE, $_.FullName)
+                $destination = Join-Path $sourceLicenseRoot $relativePath
+                New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null
+                Copy-Item -LiteralPath $_.FullName -Destination $destination -Force
+              }
+          }
+
+          @"
+          Zano Windows ARM64 CLI package
+          Network: $env:NETWORK_NAME
+          Version: $env:PACKAGE_VERSION
+          Signing: $env:SIGNING_STATUS
+
+          Programs:
+            zanod.exe                    full-node daemon
+            simplewallet.exe             CLI wallet and wallet RPC mode
+            connectivity_tool.exe        connectivity diagnostics
+            gateway_rpc_proxy.exe        gateway RPC proxy
+
+          This build uses the Microsoft Visual C++ dynamic runtime. Run
+          $redistName if the required runtime is not already installed.
+          License texts are under licenses\.
+          "@ | Set-Content -LiteralPath (Join-Path $cliRoot 'README-WINDOWS.txt') -Encoding utf8
+
+          @"
+          This distribution contains Zano and third-party components.
+
+          License texts shipped by the project, Boost, and OpenSSL are collected
+          under licenses\. The source-tree subdirectory preserves notices from
+          bundled dependencies.
+          "@ | Set-Content -LiteralPath (Join-Path $cliRoot 'THIRD-PARTY-NOTICES.txt') -Encoding utf8
+
+          @"
+          Source commit: $env:GITHUB_SHA
+          Source ref: $env:GITHUB_REF
+          Configuration: Release
+          Platform: Windows ARM64
+          Toolchain: Visual Studio 2022 / MSVC v143 (x64 to ARM64)
+          Boost: $env:BOOST_VERSION (static libraries, shared CRT)
+          OpenSSL: $env:OPENSSL_VERSION (static libraries, shared CRT)
+          Qt: not included (CLI-only package)
+          Network: $env:NETWORK_NAME
+          Signing: $env:SIGNING_STATUS
+          "@ | Set-Content -LiteralPath (Join-Path $cliRoot 'BUILD-INFO.txt') -Encoding utf8
+
+      - name: Build and optionally sign Inno Setup installer
+        if: matrix.gui
+        env:
+          SIGN_ENABLED: ${{ steps.signcheck.outputs.sign }}
+        run: |
+          $guiRoot = Join-Path $env:STAGE_ROOT $env:GUI_BASENAME
+          $isccCandidates = @(
+            "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
+            "$env:ProgramFiles\Inno Setup 6\ISCC.exe"
+          )
+          $iscc = $isccCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+          if (-not $iscc) {
+            throw "Inno Setup 6 compiler was not found"
+          }
+
+          $isccArguments = @(
+            "/DBinariesPath=$guiRoot",
+            "/DMyAppVersion=$env:APP_VERSION",
+            "/O$env:DIST_DIR",
+            "/F$env:INSTALLER_BASENAME"
+          )
+
+          if ($env:SIGN_ENABLED -eq 'true') {
+            # Inno expands $f to an already quoted file name; $q is only needed
+            # around the helper script path. The helper signs through Cloud KMS
+            # and verifies the result, so the uninstaller Inno signs during
+            # compilation gets exactly the same checks as everything else.
+            $signCommand = 'pwsh.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $q{0}$q -FilePath $f' -f $env:SIGN_SCRIPT
+            $isccArguments += '/DCodeSigningEnabled'
+            $isccArguments += "/SZanoCi=$signCommand"
+          }
+
+          & $iscc @isccArguments 'utils\setup_64.iss'
+          if ($LASTEXITCODE -ne 0) {
+            throw "Inno Setup compilation failed"
+          }
+
+          $installer = Join-Path $env:DIST_DIR "$env:INSTALLER_BASENAME.exe"
+          if (-not (Test-Path -LiteralPath $installer -PathType Leaf)) {
+            throw "Expected installer was not produced: $installer"
+          }
+          if ($env:SIGN_ENABLED -eq 'true') {
+            & $env:VERIFY_SCRIPT -FilePath $installer
+          }
+
+      - name: Create ZIP archives
+        run: |
+          $cliRoot = Join-Path $env:STAGE_ROOT $env:CLI_BASENAME
+          $guiRoot = Join-Path $env:STAGE_ROOT $env:GUI_BASENAME
+
+          Compress-Archive -LiteralPath $cliRoot `
+            -DestinationPath (Join-Path $env:DIST_DIR "$env:CLI_BASENAME.zip") `
+            -CompressionLevel Optimal
+          if ('${{ matrix.gui }}' -eq 'true') {
+            Compress-Archive -LiteralPath $guiRoot `
+              -DestinationPath (Join-Path $env:DIST_DIR "$env:GUI_BASENAME.zip") `
+              -CompressionLevel Optimal
+          }
+          Get-ChildItem -LiteralPath $env:DIST_DIR -File | Format-Table Name, Length
+
+      - name: Upload CLI package
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: zano-windows-${{ matrix.arch }}-cli${{ inputs.testnet == true && '-testnet' || '' }}
+          path: dist-windows/zano-windows-${{ matrix.arch }}-cli*.zip
+          if-no-files-found: error
+
+      - name: Upload GUI package
+        if: matrix.gui
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: zano-windows-${{ matrix.arch }}-gui${{ inputs.testnet == true && '-testnet' || '' }}
+          path: dist-windows/zano-windows-${{ matrix.arch }}-gui*.zip
+          if-no-files-found: error
+
+      - name: Upload installer
+        if: matrix.gui
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: zano-windows-${{ matrix.arch }}-installer${{ inputs.testnet == true && '-testnet' || '' }}
+          path: dist-windows/zano-windows-${{ matrix.arch }}-gui*-installer.exe
+          if-no-files-found: error
+
+      - name: Remove signing material from the runner
+        if: always() && steps.signcheck.outputs.sign == 'true'
+        run: |
+          # google-github-actions/auth removes the federated credentials file in
+          # its own post step; this clears what this workflow wrote itself. No
+          # private key material is ever present on the runner - it stays in the
+          # Google Cloud HSM - so this is tidy-up, not damage control.
+          $paths = @(
+            $env:SIGN_CERT_CHAIN,
+            $env:SIGN_SCRIPT,
+            $env:VERIFY_SCRIPT,
+            $env:JSIGN_JAR
+          )
+          foreach ($path in $paths) {
+            if (-not [string]::IsNullOrWhiteSpace($path) -and (Test-Path -LiteralPath $path)) {
+              Remove-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue
+            }
+          }
+          $env:GCP_ACCESS_TOKEN = $null
