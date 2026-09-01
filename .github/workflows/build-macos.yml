@@ -423,8 +423,11 @@ jobs:
           mv Zano.app/Contents/MacOS/zano Zano.app/Contents/MacOS/Zano || true
           cp zanod simplewallet Zano.app/Contents/MacOS/
           "$QT_ROOT_DIR/bin/macdeployqt" Zano.app
-          # ship html layout as in the official package
-          rsync -a ../../src/gui/qt-daemon/layout/html Zano.app/Contents/MacOS --exclude less --exclude package.json --exclude gulpfile.js
+          # The html UI is NOT copied into the bundle. On macOS the app loads it
+          # from embedded Qt resources ("qrc:/html", see wallets_manager.cpp) - the
+          # filesystem copy was never read. It also has to stay out of
+          # Contents/MacOS, which codesign treats as a code directory: loose .svg
+          # files there are unsigned subcomponents and fail --strict verification.
           cp ../../src/gui/qt-daemon/app.icns Zano.app/Contents/Resources/
 
           # Info.plist.in ships both version keys empty, and the notary service
@@ -668,8 +671,11 @@ jobs:
           mv Zano.app/Contents/MacOS/zano Zano.app/Contents/MacOS/Zano || true
           cp zanod simplewallet Zano.app/Contents/MacOS/
           "$QT_ROOT_DIR/bin/macdeployqt" Zano.app
-          # ship html layout as in the official package
-          rsync -a ../../src/gui/qt-daemon/layout/html Zano.app/Contents/MacOS --exclude less --exclude package.json --exclude gulpfile.js
+          # The html UI is NOT copied into the bundle. On macOS the app loads it
+          # from embedded Qt resources ("qrc:/html", see wallets_manager.cpp) - the
+          # filesystem copy was never read. It also has to stay out of
+          # Contents/MacOS, which codesign treats as a code directory: loose .svg
+          # files there are unsigned subcomponents and fail --strict verification.
           cp ../../src/gui/qt-daemon/app.icns Zano.app/Contents/Resources/
 
           # Info.plist.in ships both version keys empty, and the notary service
