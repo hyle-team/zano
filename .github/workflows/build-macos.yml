@@ -22,6 +22,10 @@ jobs:
     name: macOS CLI ${{ matrix.arch }}${{ inputs.testnet == true && ' (testnet)' || '' }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 240
+    # Holds the MACOS_SIGN_* / MACOS_NOTARY_* secrets and is where required
+    # reviewers and protected release refs belong. The signing certificate is
+    # a long-lived exportable private key, so it is worth gating.
+    environment: macos-code-signing
     strategy:
       fail-fast: false
       matrix:
@@ -214,6 +218,7 @@ jobs:
     runs-on: macos-15
     # notarytool --wait blocks on Apple's queue; 15 minutes is not enough.
     timeout-minutes: 90
+    environment: macos-code-signing
     steps:
       # This job signs, so it needs utils/macos_codesign.sh on disk. It does not
       # build anything, so a blob-less, single-commit checkout is plenty.
@@ -322,6 +327,7 @@ jobs:
     name: macOS GUI x64 (Qt 6.8)${{ inputs.testnet == true && ' (testnet)' || '' }}
     runs-on: macos-15-intel
     timeout-minutes: 240
+    environment: macos-code-signing
     env:
       DEPS_DIR: ${{ github.workspace }}/_deps
       OSX_MIN: '10.15'
@@ -566,6 +572,7 @@ jobs:
     name: macOS GUI arm64 (Qt 6.8)${{ inputs.testnet == true && ' (testnet)' || '' }}
     runs-on: macos-15
     timeout-minutes: 240
+    environment: macos-code-signing
     env:
       DEPS_DIR: ${{ github.workspace }}/_deps
       OSX_MIN: '11.0' # for the cached deps (same key as the CLI arm64 job)
