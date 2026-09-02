@@ -7,6 +7,14 @@ on:
         description: 'Build testnet binaries (-D TESTNET=TRUE)'
         type: boolean
         default: false
+  # Also callable from build-all.yml, which fans mainnet and testnet
+  # builds out across all three platforms in a single run.
+  workflow_call:
+    inputs:
+      testnet:
+        description: 'Build testnet binaries (-D TESTNET=TRUE)'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
