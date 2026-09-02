@@ -7609,30 +7609,31 @@ void wallet2::add_sent_tx_detailed_info(const transaction& tx, const std::vector
   const std::vector<currency::tx_destination_entry>& destinations,
   const std::vector<uint64_t>& selected_transfers)
 {
-  payment_id_t payment_id;
-  get_tx_wide_payment_id_from_decrypted_container(decrypted_att, payment_id);
+  payment_id_t tx_wide_payment_id;
+  get_tx_wide_payment_id_from_decrypted_container(decrypted_att, tx_wide_payment_id);
 
   std::vector<std::string> recipients;
-  std::unordered_set<account_public_address> used_addresses;
-  std::unordered_set<gateway_address_id_type> used_gw_addresses;
+  std::unordered_set<std::string> used_addresses;
   for (const auto& d : destinations)
   {
 
     for (const auto& addr : d.addr)
     {
+      payment_id_t payment_id = tx_wide_payment_id;
       bool need_to_add_address = false;
       if (addr.type() == typeid(account_public_address))
       {
         account_public_address a = boost::get<account_public_address>(addr);
-        if(used_addresses.insert(a).second && a != m_account.get_public_address())
-        {
-          need_to_add_address = true;
-        }
+        need_to_add_address = (a != m_account.get_public_address());
       }
       else if (addr.type() == typeid(gateway_address_id_type))
       {
-        gateway_address_id_type ga = boost::get<gateway_address_id_type>(addr);
-        need_to_add_address = used_gw_addresses.insert(ga).second;
+        if (payment_id.size() > CURRENCY_HF6_INTRINSIC_PAYMENT_ID_SIZE)
+        {
+          WLT_LOG_YELLOW("outgoing tx " << get_transaction_hash(tx) << " has gw destination " << boost::get<gateway_address_id_type>(addr) << " AND a legacy tx-wide PID > 8 bytes, won't be properly added to wti/recipients", LOG_LEVEL_0);
+          payment_id.clear(); // clearing payment id so the get_account_address_as_str() below doesn't fail, rather making plain gw addr
+        }
+        need_to_add_address = true;
       }
       else
       {
@@ -7641,14 +7642,20 @@ void wallet2::add_sent_tx_detailed_info(const transaction& tx, const std::vector
 
       if (need_to_add_address)
       {
-        recipients.push_back(get_account_address_as_str(addr, payment_id));
+        // if tx-wide payment id is specified -- use legacy approach and ignore intrinsic payment ids (they shouldn't be present tho)
+        if (tx_wide_payment_id.empty() && d.payment_id != 0)
+          payment_id = currency::convert_payment_id(d.payment_id);
+        // restore integrated address original str representation
+        std::string address_str = get_account_address_as_str(addr, payment_id);
+        if (used_addresses.insert(address_str).second)
+          recipients.push_back(address_str);
       }
     }
   }
   if (!recipients.size())
   {
-    //transaction send to ourself
-    recipients.push_back(get_account_address_as_str(m_account.get_public_address(), payment_id));
+    // sending fund to self (no payment id is used, because sending to self with payment ID is prohibited anyway)
+    recipients.push_back(get_account_address_as_str(m_account.get_public_address()));
   }
 
   add_sent_unconfirmed_tx(tx, recipients, selected_transfers, destinations);
