@@ -52,17 +52,41 @@ jobs:
             exit 1
           fi
 
+      - name: Check that the bump app is configured
+        env:
+          APP_ID: ${{ vars.CI_BUMP_APP_ID }}
+          APP_PRIVATE_KEY: ${{ secrets.CI_BUMP_APP_PRIVATE_KEY }}
+        run: |
+          if [ -z "$APP_ID" ] || [ -z "$APP_PRIVATE_KEY" ]; then
+            echo "::error title=Bump app not configured::Set the CI_BUMP_APP_ID variable and the CI_BUMP_APP_PRIVATE_KEY secret. GITHUB_TOKEN cannot be used here: github-actions[bot] is not an eligible ruleset bypass actor, so its pushes to a protected branch are always rejected."
+            exit 1
+          fi
+
+      # GITHUB_TOKEN authenticates as the GitHub Actions app, which rulesets
+      # cannot grant bypass to - no repository setting makes that push work.
+      # A GitHub App IS an eligible bypass actor, so the push is made as one.
+      - name: Mint a token for the bump app
+        id: app-token
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
+        with:
+          app-id: ${{ vars.CI_BUMP_APP_ID }}
+          private-key: ${{ secrets.CI_BUMP_APP_PRIVATE_KEY }}
+
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           submodules: false
           fetch-depth: 1
           # Unlike the build workflows, this one has to push, so the token must
-          # stay configured on the remote.
+          # stay configured on the remote - and it must be the app's token, not
+          # the default GITHUB_TOKEN.
           persist-credentials: true
+          token: ${{ steps.app-token.outputs.token }}
 
       - name: Increment PROJECT_VERSION_BUILD_NO
         id: bump
+        env:
+          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
         run: |
           set -euo pipefail
           file=src/version.h.in
@@ -95,11 +119,15 @@ jobs:
           }
           version="$(quoted_define PROJECT_MAJOR_VERSION).$(quoted_define PROJECT_MINOR_VERSION).$(quoted_define PROJECT_REVISION).${next}"
 
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git config user.name "${APP_SLUG}[bot]"
+          git config user.email "${APP_SLUG}[bot]@users.noreply.github.com"
           git add "$file"
           git commit -m "=== build number: ${previous} -> ${next} ==="
-          git push origin "HEAD:${{ github.ref_name }}"
+
+          if ! git push origin "HEAD:${{ github.ref_name }}"; then
+            echo "::error title=Push rejected::Could not push the bump to '${{ github.ref_name }}'. If this is a rule violation, add the '${APP_SLUG}' app to the bypass list of EVERY ruleset targeting that branch - repository and organization level both - with the mode set to 'Always allow'. Rules in effect: https://github.com/${{ github.repository }}/rules?ref=refs%2Fheads%2F${{ github.ref_name }}"
+            exit 1
+          fi
 
           sha=$(git rev-parse HEAD)
           {
