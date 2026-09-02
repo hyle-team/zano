@@ -15,6 +15,10 @@ on:
         description: 'Build testnet binaries (-DTESTNET=TRUE)'
         type: boolean
         default: false
+      ref:
+        description: 'Commit SHA or ref to build (defaults to the triggering commit)'
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -73,6 +77,7 @@ jobs:
       - name: Checkout (with submodules)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          ref: ${{ inputs.ref || github.sha }}
           submodules: recursive
           # src/version.cmake and libmdbx derive versions from Git history.
           fetch-depth: 0

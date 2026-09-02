@@ -1,0 +1,122 @@
+name: Increment build number
+
+# Bumps PROJECT_VERSION_BUILD_NO in src/version.h.in by one and pushes the
+# commit, following the repository's existing convention for those commits
+# ("=== build number: 507 -> 508 ===").
+#
+# Callable on its own, or from build-all.yml, which passes the resulting commit
+# SHA down to the platform builds so they all compile the bumped number.
+
+on:
+  workflow_dispatch:
+  workflow_call:
+    outputs:
+      build_number:
+        description: 'PROJECT_VERSION_BUILD_NO after the bump'
+        value: ${{ jobs.increment.outputs.build_number }}
+      previous_build_number:
+        description: 'PROJECT_VERSION_BUILD_NO before the bump'
+        value: ${{ jobs.increment.outputs.previous_build_number }}
+      version:
+        description: 'Full version string after the bump, e.g. 2.2.1.509'
+        value: ${{ jobs.increment.outputs.version }}
+      sha:
+        description: 'SHA of the commit carrying the bump - build from this'
+        value: ${{ jobs.increment.outputs.sha }}
+
+permissions:
+  contents: read
+
+jobs:
+  increment:
+    name: Increment build number
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      # Needed to push the bump commit.
+      contents: write
+    # Two runs bumping at once would race on the push; serialise per branch.
+    concurrency:
+      group: increment-build-number-${{ github.ref }}
+      cancel-in-progress: false
+    outputs:
+      build_number: ${{ steps.bump.outputs.build_number }}
+      previous_build_number: ${{ steps.bump.outputs.previous_build_number }}
+      version: ${{ steps.bump.outputs.version }}
+      sha: ${{ steps.bump.outputs.sha }}
+    steps:
+      - name: Refuse to bump anything but a branch
+        run: |
+          if [ "${{ github.ref_type }}" != "branch" ]; then
+            echo "::error title=Cannot increment::This workflow pushes a commit, so it must run on a branch. It was dispatched on ${{ github.ref_type }} '${{ github.ref_name }}'."
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          submodules: false
+          fetch-depth: 1
+          # Unlike the build workflows, this one has to push, so the token must
+          # stay configured on the remote.
+          persist-credentials: true
+
+      - name: Increment PROJECT_VERSION_BUILD_NO
+        id: bump
+        run: |
+          set -euo pipefail
+          file=src/version.h.in
+          pattern='^[[:space:]]*#define[[:space:]]+PROJECT_VERSION_BUILD_NO[[:space:]]+[0-9]+[[:space:]]*$'
+
+          matches=$(grep -cE "$pattern" "$file" || true)
+          if [ "$matches" -ne 1 ]; then
+            echo "::error title=Cannot increment::Expected exactly one PROJECT_VERSION_BUILD_NO definition in $file, found $matches"
+            exit 1
+          fi
+
+          previous=$(sed -nE 's/^[[:space:]]*#define[[:space:]]+PROJECT_VERSION_BUILD_NO[[:space:]]+([0-9]+)[[:space:]]*$/\1/p' "$file")
+          if [ -z "$previous" ]; then
+            echo "::error title=Cannot increment::Could not read the current build number from $file"
+            exit 1
+          fi
+          next=$((previous + 1))
+
+          sed -i -E "s|^([[:space:]]*#define[[:space:]]+PROJECT_VERSION_BUILD_NO[[:space:]]+)[0-9]+([[:space:]]*)$|\1${next}\2|" "$file"
+
+          # Read it back rather than trusting the substitution.
+          written=$(sed -nE 's/^[[:space:]]*#define[[:space:]]+PROJECT_VERSION_BUILD_NO[[:space:]]+([0-9]+)[[:space:]]*$/\1/p' "$file")
+          if [ "$written" != "$next" ]; then
+            echo "::error title=Cannot increment::Rewrite failed - $file now reads '$written', expected '$next'"
+            exit 1
+          fi
+
+          quoted_define() {
+            sed -nE "s/^[[:space:]]*#define[[:space:]]+$1[[:space:]]+\"([^\"]*)\".*$/\1/p" "$file"
+          }
+          version="$(quoted_define PROJECT_MAJOR_VERSION).$(quoted_define PROJECT_MINOR_VERSION).$(quoted_define PROJECT_REVISION).${next}"
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add "$file"
+          git commit -m "=== build number: ${previous} -> ${next} ==="
+          git push origin "HEAD:${{ github.ref_name }}"
+
+          sha=$(git rev-parse HEAD)
+          {
+            echo "previous_build_number=$previous"
+            echo "build_number=$next"
+            echo "version=$version"
+            echo "sha=$sha"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo "### Build number ${previous} -> ${next}"
+            echo
+            echo "| | |"
+            echo "| --- | --- |"
+            echo "| Version | \`$version\` |"
+            echo "| Branch | \`${{ github.ref_name }}\` |"
+            echo "| Commit | \`$sha\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          echo "bumped $previous -> $next ($version) as $sha"
