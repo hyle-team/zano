@@ -1,8 +1,8 @@
 name: Build all platforms
 
 # Fans the three per-platform workflows out across both networks in a single
-# run. Each tick box adds one build per platform, so ticking both produces six
-# builds that all start at once (subject to runner availability).
+# run. Each network tick box adds one build per platform, so ticking both
+# produces six builds that all start at once (subject to runner availability).
 #
 # The platform workflows stay independently dispatchable; this one calls them
 # through workflow_call, so everything lands in one run with one artifact list
@@ -19,6 +19,10 @@ on:
         description: 'Build testnet'
         type: boolean
         default: false
+      increment:
+        description: 'Increment build number'
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -51,39 +55,92 @@ jobs:
             for platform in Linux macOS Windows; do
               echo "| $platform | $([ "$mainnet" = "true" ] && echo 'yes' || echo '-') | $([ "$testnet" = "true" ] && echo 'yes' || echo '-') |"
             done
+            echo
+            if [ "${{ inputs.increment }}" = "true" ]; then
+              echo "Build number will be incremented first."
+            else
+              echo "Build number left as-is."
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
 
-  # --------------------------------------------------------------- mainnet ---
+  # ------------------------------------------------------------ build number ---
+
+  increment-build-number:
+    name: Increment build number
+    needs: check-selection
+    if: inputs.increment == true
+    uses: ./.github/workflows/increment-build-number.yml
+    permissions:
+      # The called workflow pushes the bump commit, and a called workflow can
+      # never hold more permissions than its caller grants.
+      contents: write
+    secrets: inherit
+
+  resolve-ref:
+    name: Resolve build ref
+    needs: [check-selection, increment-build-number]
+    # Runs whether or not the bump happened, but not if the bump failed - in
+    # that case nothing should be built, because the version would be wrong.
+    if: ${{ !cancelled() && needs.check-selection.result == 'success' && needs.increment-build-number.result != 'failure' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      ref: ${{ steps.pick.outputs.ref }}
+    steps:
+      - name: Pick the commit every platform will build
+        id: pick
+        env:
+          BUMP_SHA: ${{ needs.increment-build-number.outputs.sha }}
+          BUMP_VERSION: ${{ needs.increment-build-number.outputs.version }}
+        run: |
+          # Reusable workflows check out a fixed commit, so the bump has to be
+          # passed down explicitly - otherwise every build would compile the
+          # pre-bump tree that triggered this run.
+          if [ -n "$BUMP_SHA" ]; then
+            ref="$BUMP_SHA"
+            echo "building $BUMP_VERSION from the bump commit $ref"
+            echo "Building **$BUMP_VERSION** from \`$ref\`" >> "$GITHUB_STEP_SUMMARY"
+          else
+            ref='${{ github.sha }}'
+            echo "no bump requested; building the triggering commit $ref"
+            echo "Building \`$ref\` (build number unchanged)" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+
+  # ---------------------------------------------------------------- mainnet ---
 
   linux-mainnet:
     name: Linux (mainnet)
-    needs: check-selection
+    needs: resolve-ref
     if: inputs.mainnet == true
     uses: ./.github/workflows/build-linux.yml
     with:
       testnet: false
+      ref: ${{ needs.resolve-ref.outputs.ref }}
     permissions:
       contents: read
     secrets: inherit
 
   macos-mainnet:
     name: macOS (mainnet)
-    needs: check-selection
+    needs: resolve-ref
     if: inputs.mainnet == true
     uses: ./.github/workflows/build-macos.yml
     with:
       testnet: false
+      ref: ${{ needs.resolve-ref.outputs.ref }}
     permissions:
       contents: read
     secrets: inherit
 
   windows-mainnet:
     name: Windows (mainnet)
-    needs: check-selection
+    needs: resolve-ref
     if: inputs.mainnet == true
     uses: ./.github/workflows/build-windows.yml
     with:
       testnet: false
+      ref: ${{ needs.resolve-ref.outputs.ref }}
     permissions:
       contents: read
       # Authenticode signing exchanges a GitHub OIDC token for Cloud KMS access.
@@ -92,37 +149,40 @@ jobs:
       id-token: write
     secrets: inherit
 
-  # --------------------------------------------------------------- testnet ---
+  # ---------------------------------------------------------------- testnet ---
 
   linux-testnet:
     name: Linux (testnet)
-    needs: check-selection
+    needs: resolve-ref
     if: inputs.testnet == true
     uses: ./.github/workflows/build-linux.yml
     with:
       testnet: true
+      ref: ${{ needs.resolve-ref.outputs.ref }}
     permissions:
       contents: read
     secrets: inherit
 
   macos-testnet:
     name: macOS (testnet)
-    needs: check-selection
+    needs: resolve-ref
     if: inputs.testnet == true
     uses: ./.github/workflows/build-macos.yml
     with:
       testnet: true
+      ref: ${{ needs.resolve-ref.outputs.ref }}
     permissions:
       contents: read
     secrets: inherit
 
   windows-testnet:
     name: Windows (testnet)
-    needs: check-selection
+    needs: resolve-ref
     if: inputs.testnet == true
     uses: ./.github/workflows/build-windows.yml
     with:
       testnet: true
+      ref: ${{ needs.resolve-ref.outputs.ref }}
     permissions:
       contents: read
       id-token: write
