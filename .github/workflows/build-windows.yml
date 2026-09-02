@@ -70,9 +70,10 @@ jobs:
             boost_arch: arm
             gui: false
     # Holds the GCP_* signing identifiers (they may also be repository
-    # variables) and is where required reviewers belong. Google Cloud only
-    # admits refs/heads/master and refs/tags/* from hyle-team/zano, so protect
-    # those refs here as well.
+    # variables) and is where required reviewers belong. The Workload Identity
+    # provider still pins the repository, so only hyle-team/zano can reach the
+    # key, but it no longer restricts which ref is allowed to sign - any ref
+    # with the variables configured will produce signed artifacts.
     environment: windows-code-signing
     env:
       DEPS_DIR: ${{ github.workspace }}\_deps
@@ -489,21 +490,10 @@ jobs:
             throw "Incomplete code-signing configuration; these variables are unset: $($missing -join ', ')"
           }
 
-          # The Workload Identity provider only admits refs/heads/master and
-          # refs/tags/*; from any other ref the token exchange is rejected. Skip
-          # signing there rather than failing an otherwise good build.
-          $ref = '${{ github.ref }}'
-          $refAllowed = ($ref -eq 'refs/heads/master') -or $ref.StartsWith('refs/tags/')
-
           if ($missing.Count -eq $required.Count) {
             'sign=false' | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
             'SIGNING_STATUS=unsigned' | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
             Write-Host '::notice title=Authenticode signing::SKIPPED - signing variables are absent; producing unsigned artifacts'
-          }
-          elseif (-not $refAllowed) {
-            'sign=false' | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-            'SIGNING_STATUS=unsigned' | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-            Write-Host "::notice title=Authenticode signing::SKIPPED - $ref is neither refs/heads/master nor a tag; producing unsigned artifacts"
           }
           else {
             'sign=true' | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
