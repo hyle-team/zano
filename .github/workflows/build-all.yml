@@ -1,0 +1,129 @@
+name: Build all platforms
+
+# Fans the three per-platform workflows out across both networks in a single
+# run. Each tick box adds one build per platform, so ticking both produces six
+# builds that all start at once (subject to runner availability).
+#
+# The platform workflows stay independently dispatchable; this one calls them
+# through workflow_call, so everything lands in one run with one artifact list
+# rather than six separate runs.
+
+on:
+  workflow_dispatch:
+    inputs:
+      mainnet:
+        description: 'Build mainnet'
+        type: boolean
+        default: true
+      testnet:
+        description: 'Build testnet'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  check-selection:
+    name: Check selection
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: At least one network must be selected
+        run: |
+          mainnet='${{ inputs.mainnet }}'
+          testnet='${{ inputs.testnet }}'
+
+          if [ "$mainnet" != "true" ] && [ "$testnet" != "true" ]; then
+            echo "::error title=Nothing to build::Tick 'Build mainnet', 'Build testnet', or both."
+            exit 1
+          fi
+
+          networks=""
+          if [ "$mainnet" = "true" ]; then networks="mainnet"; fi
+          if [ "$testnet" = "true" ]; then networks="${networks:+$networks and }testnet"; fi
+
+          {
+            echo "### Building $networks"
+            echo
+            echo "| Platform | mainnet | testnet |"
+            echo "| --- | --- | --- |"
+            for platform in Linux macOS Windows; do
+              echo "| $platform | $([ "$mainnet" = "true" ] && echo 'yes' || echo '-') | $([ "$testnet" = "true" ] && echo 'yes' || echo '-') |"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # --------------------------------------------------------------- mainnet ---
+
+  linux-mainnet:
+    name: Linux (mainnet)
+    needs: check-selection
+    if: inputs.mainnet == true
+    uses: ./.github/workflows/build-linux.yml
+    with:
+      testnet: false
+    permissions:
+      contents: read
+    secrets: inherit
+
+  macos-mainnet:
+    name: macOS (mainnet)
+    needs: check-selection
+    if: inputs.mainnet == true
+    uses: ./.github/workflows/build-macos.yml
+    with:
+      testnet: false
+    permissions:
+      contents: read
+    secrets: inherit
+
+  windows-mainnet:
+    name: Windows (mainnet)
+    needs: check-selection
+    if: inputs.mainnet == true
+    uses: ./.github/workflows/build-windows.yml
+    with:
+      testnet: false
+    permissions:
+      contents: read
+      # Authenticode signing exchanges a GitHub OIDC token for Cloud KMS access.
+      # A called workflow can never hold more than the caller grants it, so this
+      # has to be requested here as well as in build-windows.yml.
+      id-token: write
+    secrets: inherit
+
+  # --------------------------------------------------------------- testnet ---
+
+  linux-testnet:
+    name: Linux (testnet)
+    needs: check-selection
+    if: inputs.testnet == true
+    uses: ./.github/workflows/build-linux.yml
+    with:
+      testnet: true
+    permissions:
+      contents: read
+    secrets: inherit
+
+  macos-testnet:
+    name: macOS (testnet)
+    needs: check-selection
+    if: inputs.testnet == true
+    uses: ./.github/workflows/build-macos.yml
+    with:
+      testnet: true
+    permissions:
+      contents: read
+    secrets: inherit
+
+  windows-testnet:
+    name: Windows (testnet)
+    needs: check-selection
+    if: inputs.testnet == true
+    uses: ./.github/workflows/build-windows.yml
+    with:
+      testnet: true
+    permissions:
+      contents: read
+      id-token: write
+    secrets: inherit
