@@ -1079,6 +1079,44 @@ bool hard_fork_6_intrinsic_payment_id_rpc_test::c1(currency::core& c, size_t ev_
   CHECK_AND_ASSERT_EQ(wtis[idx].subtransfers_by_pid.back().subtransfers[1-jdx].asset_id,                                  m_asset_id);
   CHECK_AND_ASSERT_EQ(wtis[idx].subtransfers_by_pid.back().subtransfers[1-jdx].is_income,                                 true);
 
+  //
+  // Check recipients (remote_addresses) recorded for each of Alice's outgoing txs.
+  // This has to be read from the very wallet that sent them (recipient addresses can't be
+  // recovered from a fresh re-sync). Expectations: an integrated address is reconstructed as it
+  // was given, identical recipients are collapsed into one, a tx-wide (legacy) payment id is
+  // applied to every recipient, and intrinsic per-destination payment ids are kept individually.
+  //
+  alice_wlt->refresh();
+
+  std::vector<tools::wallet_public::wallet_transfer_info> alice_wtis;
+  total = 0, last_item_index = 0;
+  alice_wlt->get_recent_transfers_history(alice_wtis, 0, 100, total, last_item_index, false /*exclude_mining_txs*/, false /*start_form_end*/);
+
+  std::string bob_addr_with_intrinsic_pid  = get_account_address_as_str(m_accounts[BOB_ACC_IDX].get_public_address(),   convert_payment_id(18361836));
+  std::string carol_addr_with_too_long_pid = get_account_address_as_str(m_accounts[CAROL_ACC_IDX].get_public_address(), long_legacy_payment_id);
+
+  auto check_remote_addresses = [&](const crypto::hash& h, std::vector<std::string> expected) -> bool
+  {
+    auto it = std::find_if(alice_wtis.begin(), alice_wtis.end(), [&](auto& t){ return t.tx_hash == h; });
+    CHECK_AND_ASSERT_MES(it != alice_wtis.end(), false, "outgoing tx " << h << " not found in Alice's history");
+    std::vector<std::string> got = it->remote_addresses;
+    std::sort(got.begin(), got.end());
+    std::sort(expected.begin(), expected.end());
+    CHECK_AND_ASSERT_MES(got == expected, false, "remote_addresses mismatch for outgoing tx " << h << " (got " << got.size() << ", expected " << expected.size() << ")");
+    return true;
+  };
+
+  CHECK_AND_ASSERT_TRUE(check_remote_addresses(successfull_txs[0], { bob_addr }));
+  CHECK_AND_ASSERT_TRUE(check_remote_addresses(successfull_txs[1], { bob_addr }));                                                    // identical recipients collapsed
+  CHECK_AND_ASSERT_TRUE(check_remote_addresses(successfull_txs[2], { bob_addr_with_short_pid }));                                     // pre-HF6: tx-wide pid applied to both, collapsed
+  CHECK_AND_ASSERT_TRUE(check_remote_addresses(successfull_txs[3], { bob_addr_with_too_long_pid }));                                  // pre-HF6: legacy tx-wide pid applied to both, collapsed
+  CHECK_AND_ASSERT_TRUE(check_remote_addresses(successfull_txs[4], { bob_addr }));
+  CHECK_AND_ASSERT_TRUE(check_remote_addresses(successfull_txs[5], { bob_addr, bob_addr_with_short_pid }));
+  CHECK_AND_ASSERT_TRUE(check_remote_addresses(successfull_txs[6], { bob_addr_with_short_pid, bob_addr_with_intrinsic_pid }));
+  CHECK_AND_ASSERT_TRUE(check_remote_addresses(successfull_txs[7], { bob_addr_with_short_pid, bob_addr_with_short_pid2 }));           // distinct intrinsic pids kept
+  CHECK_AND_ASSERT_TRUE(check_remote_addresses(successfull_txs[8], { bob_addr_with_too_long_pid, carol_addr_with_too_long_pid }));    // legacy tx-wide pid applied to every recipient
+  CHECK_AND_ASSERT_TRUE(check_remote_addresses(successfull_txs[9], { bob_addr_with_short_pid, bob_addr_with_short_pid2, bob_addr_with_intrinsic_pid }));
+
   return true;
 }
 
