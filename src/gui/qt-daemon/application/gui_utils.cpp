@@ -12,6 +12,7 @@
 
 // #include <QAbstractItemView>
 #include <QApplication>
+#include <QByteArrayView>
 #include <QCryptographicHash>
 #include <QDir>
 #include <QDirIterator>
@@ -398,7 +399,7 @@ namespace gui_tools
     }
 
     QCryptographicHash final_hasher(QCryptographicHash::Sha256);
-    final_hasher.addData(combined.c_str(), static_cast<int>(combined.size()));
+    final_hasher.addData(QByteArrayView(combined.data(), static_cast<qsizetype>(combined.size())));
     result_hash = final_hasher.result().toHex().toLower().toStdString();
 
     LOG_PRINT_L0("calculate_html_folder_hash: computed hash = " << result_hash << " (" << relative_paths.size() << " files)");

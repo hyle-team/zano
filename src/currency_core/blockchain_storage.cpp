@@ -4766,11 +4766,9 @@ bool blockchain_storage::pop_alias_info(const extra_alias_entry& ai, const crypt
   CHECK_AND_ASSERT_MES(alias_history_ptr && alias_history_ptr->size(), false, "empty name list in pop_alias_info");
   aliases_container::t_value_type local_alias_hist = *alias_history_ptr;
 
-    // check if it was just an info update or actual owner change
-  bool owner_change = true;
+  // check if it was just an info update or actual owner change
   if(local_alias_hist.size() > 1 && local_alias_hist.back().m_address == std::prev(local_alias_hist.end(), 2)->m_address)
   {
-    owner_change = false;
     // we consider it as set default operation only if description didn't change, otherwise it is just an info update
     if(local_alias_hist.back().m_text_comment == std::prev(local_alias_hist.end(), 2)->m_text_comment && local_alias_hist.back().m_view_key == std::prev(local_alias_hist.end(), 2)->m_view_key)
     {
@@ -4838,11 +4836,9 @@ bool blockchain_storage::put_alias_info(const transaction& tx, extra_alias_entry
       << "signature:                  " << epee::string_tools::pod_to_hex(ai.m_sign) << ENDL 
       << "local_alias_history.size(): " << local_alias_history.size());
 
-    bool owner_change = true;
     if(local_alias_history.back().m_address == ai.m_address)
     {
       // making this alias default
-      owner_change = false;
       // SITUATION CODE 1_3;
       // we consider it as set default operation only if description didn't change, otherwise it is just an info update
       if(local_alias_history.back().m_text_comment == ai.m_text_comment && local_alias_history.back().m_view_key == ai.m_view_key)

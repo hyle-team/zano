@@ -8,6 +8,7 @@
 #include <QtWebEngineWidgets>
 #include <QPrinter>
 #include <QPrintDialog>
+#include <QWebChannel>
 
 #include "string_coding.h"
 #include "gui_utils.h"
@@ -68,27 +69,7 @@ QString make_response_dbg(const T& r, const std::string& location)
 
 #include "mainwindow.h"
 #include "html_content_hash.h"
-// 
-// void MediatorObject::from_html_to_c(const QString &text)
-// {
-//   from_c_to_html(text);
-// }
-// 
-// template<typename Arg, typename R, typename C>
-// struct InvokeWrapper {
-//   R *receiver;
-//   void (C::*memberFun)(Arg);
-//   void operator()(Arg result) {
-//     (receiver->*memberFun)(result);
-//   }
-// };
-// 
-// template<typename Arg, typename R, typename C>
-// InvokeWrapper<Arg, R, C> invoke(R *receiver, void (C::*memberFun)(Arg))
-// {
-//   InvokeWrapper<Arg, R, C> wrapper = { receiver, memberFun };
-//   return wrapper;
-// }
+#include "web_channel_bridge.h"
 
 
 std::wstring convert_to_lower_via_qt(const std::wstring& w)
@@ -98,11 +79,12 @@ std::wstring convert_to_lower_via_qt(const std::wstring& w)
 }
 
 MainWindow::MainWindow()
-  : m_gui_deinitialize_done_1(false)
+  : m_view(nullptr)
+  , m_channel(nullptr)
+  , m_web_channel_bridge(nullptr)
+  , m_gui_deinitialize_done_1(false)
   , m_backend_stopped_2(false)
   , m_system_shutdown(false)
-  , m_view(nullptr)
-  , m_channel(nullptr)
   , m_ui_dispatch_id_counter(0)
 {
 #ifndef _MSC_VER
@@ -121,7 +103,11 @@ MainWindow::~MainWindow()
   }
   if (m_channel)
   {
-    m_channel->deregisterObject(this);
+    if (m_web_channel_bridge)
+    {
+      m_channel->deregisterObject(m_web_channel_bridge);
+    }
+    m_web_channel_bridge = nullptr;
     delete m_channel;
     m_channel = nullptr;
   }
@@ -142,6 +128,8 @@ bool MainWindow::init_window()
 {
   m_view = new QWebEngineView(this);
   m_channel = new QWebChannel(m_view->page());
+  m_web_channel_bridge = new WebChannelBridge(*this, m_channel);
+  m_channel->registerObject(QStringLiteral("mediator_object"), m_web_channel_bridge);
   m_view->page()->setWebChannel(m_channel);
 
   QWidget* central_widget_to_be_set = m_view;
@@ -179,9 +167,6 @@ bool MainWindow::init_window()
 
     central_widget_to_be_set = spliter;
   }
-
-  // register QObjects to be exposed to JavaScript
-  m_channel->registerObject(QStringLiteral("mediator_object"), this);
 
   connect(m_view, SIGNAL(loadFinished(bool)), SLOT(on_load_finished(bool)));
 
@@ -513,10 +498,16 @@ void MainWindow::init_tray_icon(const std::string& html_path)
 
 
   m_restore_action = std::unique_ptr<QAction>(new QAction(tr("&Restore"), this));
-  connect(m_restore_action.get(), SIGNAL(triggered()), this, SLOT(on_menu_show()));
+  connect(m_restore_action.get(), &QAction::triggered, this, [this]()
+    {
+      on_menu_show(QString{});
+    });
 
   m_quit_action = std::unique_ptr<QAction>(new QAction(tr("&Quit"), this));
-  connect(m_quit_action.get(), SIGNAL(triggered()), this, SLOT(tray_quit_requested()));
+  connect(m_quit_action.get(), &QAction::triggered, this, [this]()
+    {
+      tray_quit_requested(QString{});
+    });
 
   m_minimize_action = std::unique_ptr<QAction>(new QAction(tr("minimizeAction"), this));
   connect(m_minimize_action.get(), SIGNAL(triggered()), this, SLOT(showMinimized()));
