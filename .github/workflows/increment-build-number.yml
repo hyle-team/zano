@@ -54,13 +54,24 @@ jobs:
 
       - name: Check that the bump app is configured
         env:
-          APP_ID: ${{ vars.CI_BUMP_APP_ID }}
+          # The app id is not sensitive, so it can live in either namespace -
+          # accept both, since Variables and Secrets are separate tabs and it is
+          # easy to add it to the wrong one.
+          APP_ID: ${{ vars.CI_BUMP_APP_ID || secrets.CI_BUMP_APP_ID }}
           APP_PRIVATE_KEY: ${{ secrets.CI_BUMP_APP_PRIVATE_KEY }}
         run: |
-          if [ -z "$APP_ID" ] || [ -z "$APP_PRIVATE_KEY" ]; then
-            echo "::error title=Bump app not configured::Set the CI_BUMP_APP_ID variable and the CI_BUMP_APP_PRIVATE_KEY secret. GITHUB_TOKEN cannot be used here: github-actions[bot] is not an eligible ruleset bypass actor, so its pushes to a protected branch are always rejected."
+          missing=""
+          if [ -z "$APP_ID" ]; then
+            missing="CI_BUMP_APP_ID (add it as a repository Variable, or a Secret)"
+          fi
+          if [ -z "$APP_PRIVATE_KEY" ]; then
+            missing="${missing:+$missing and }CI_BUMP_APP_PRIVATE_KEY (must be a repository Secret)"
+          fi
+          if [ -n "$missing" ]; then
+            echo "::error title=Bump app not configured::Missing $missing. Settings > Secrets and variables > Actions has separate tabs for Secrets and Variables; check the value landed on one of them and is repository-scoped, not tied to an environment this job does not declare."
             exit 1
           fi
+          echo "bump app id resolved"
 
       # GITHUB_TOKEN authenticates as the GitHub Actions app, which rulesets
       # cannot grant bypass to - no repository setting makes that push work.
@@ -69,7 +80,7 @@ jobs:
         id: app-token
         uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
         with:
-          app-id: ${{ vars.CI_BUMP_APP_ID }}
+          app-id: ${{ vars.CI_BUMP_APP_ID || secrets.CI_BUMP_APP_ID }}
           private-key: ${{ secrets.CI_BUMP_APP_PRIVATE_KEY }}
 
       - name: Checkout
