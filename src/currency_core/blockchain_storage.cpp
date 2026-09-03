@@ -7062,12 +7062,6 @@ bool blockchain_storage::prune_aged_alt_blocks()
   CRITICAL_REGION_LOCAL1(m_alternative_chains_lock);
   uint64_t current_height = get_current_blockchain_size();
 
-  size_t count_to_delete = 0;
-  if(m_alternative_chains.size() > m_core_runtime_config.max_alt_blocks)
-    count_to_delete = m_alternative_chains.size() - m_core_runtime_config.max_alt_blocks;
-
-  std::map<uint64_t, alt_chain_container::iterator> alts_to_delete;
-
   for(auto it = m_alternative_chains.begin(); it != m_alternative_chains.end();)
   {
     if (current_height > it->second.height && current_height - it->second.height > CURRENCY_ALT_BLOCK_LIVETIME_COUNT)
@@ -7076,27 +7070,33 @@ bool blockchain_storage::prune_aged_alt_blocks()
     }
     else
     {
-      if (count_to_delete)
-      {
-        if (!alts_to_delete.size())
-          alts_to_delete[it->second.timestamp] = it;
-        else
-        {
-          if (it->second.timestamp >= alts_to_delete.rbegin()->first)
-            alts_to_delete[it->second.timestamp] = it;
-
-          if (alts_to_delete.size() > count_to_delete)
-            alts_to_delete.erase(alts_to_delete.begin());
-        }
-      }
-
       ++it;
     }
   }
-  //now, if there was count_to_delete we should erase most oldest entries of altblocks
-  for (auto& itd : alts_to_delete)
+
+  if (m_alternative_chains.size() <= m_core_runtime_config.max_alt_blocks)
+    return true;
+
+  const size_t count_to_delete = m_alternative_chains.size() - m_core_runtime_config.max_alt_blocks;
+  // alt block timestamps have one-second precision, so keep duplicate timestamps as distinct candidates
+  std::multimap<uint64_t, alt_chain_container::iterator> alts_to_delete;
+
+  for (auto it = m_alternative_chains.begin(); it != m_alternative_chains.end(); ++it)
   {
-    m_alternative_chains.erase(itd.second);
+    alts_to_delete.emplace(it->second.timestamp, it);
+
+    if (alts_to_delete.size() > count_to_delete)
+    {
+      auto newest_it = alts_to_delete.end();
+      --newest_it;
+      alts_to_delete.erase(newest_it);
+    }
+  }
+
+  // erase the oldest entries when the alt block limit is exceeded
+  for (const auto& itd : alts_to_delete)
+  {
+    do_erase_altblock(itd.second);
   }
 
   return true;
