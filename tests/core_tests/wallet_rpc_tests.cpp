@@ -2488,6 +2488,18 @@ bool wallet_rpc_gateway_signatures::c1(currency::core& c, size_t ev_index, const
   eth_gw_create_req.fee = TESTS_DEFAULT_FEE;
   eth_gw_create_req.comment = "eth gateway transfer test";
   eth_gw_create_req.gateway_view_secret_key = eth_gw_view_sec_key;
+
+  crypto::public_key wrong_gw_view_pub_key{};
+  crypto::secret_key wrong_gw_view_sec_key{};
+  crypto::generate_keys(wrong_gw_view_pub_key, wrong_gw_view_sec_key);
+  currency::COMMAND_RPC_GATEWAY_CREATE_TRANSFER::request wrong_view_key_req = eth_gw_create_req;
+  currency::COMMAND_RPC_GATEWAY_CREATE_TRANSFER::response wrong_view_key_resp = {};
+  wrong_view_key_req.gateway_view_secret_key = wrong_gw_view_sec_key;
+  r = invoke_text_json_for_rpc(core_rpc_wrapper, "gateway_create_transfer", wrong_view_key_req, wrong_view_key_resp);
+  CHECK_AND_ASSERT_MES(r, false, "gateway_create_transfer (wrong view key) RPC call failed");
+  CHECK_AND_ASSERT_EQ(wrong_view_key_resp.status, API_RETURN_CODE_BAD_ARG);
+  CHECK_AND_ASSERT_MES(!wrong_view_key_resp.status_error.empty(), false, "gateway_create_transfer (wrong view key) returned no error details");
+
   r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_create_transfer", eth_gw_create_req, eth_gw_create_resp);
   CHECK_AND_ASSERT_MES(r, false, "gateway_create_transfer (ETH) failed");
 
@@ -2500,6 +2512,23 @@ bool wallet_rpc_gateway_signatures::c1(currency::core& c, size_t ev_index, const
   eth_sign_req.opt_ecdsa_signature = eth_sig;
   eth_sign_req.tx_blob = eth_gw_create_resp.tx_blob;
   eth_sign_req.tx_id = eth_gw_create_resp.tx_id;
+
+  crypto::eth_secret_key wrong_eth_owner_sec_key{};
+  crypto::eth_public_key wrong_eth_owner_pub_key{};
+  r = crypto::generate_eth_key_pair(wrong_eth_owner_sec_key, wrong_eth_owner_pub_key);
+  CHECK_AND_ASSERT_MES(r, false, "generate_eth_key_pair for wrong owner failed");
+  crypto::eth_signature wrong_eth_sig{};
+  r = crypto::generate_eth_signature(eth_gw_create_resp.tx_hash_to_sign, wrong_eth_owner_sec_key, wrong_eth_sig);
+  CHECK_AND_ASSERT_MES(r, false, "generate_eth_signature for wrong owner failed");
+
+  currency::COMMAND_RPC_GATEWAY_SIGN_TRANSFER::request wrong_eth_sign_req = eth_sign_req;
+  currency::COMMAND_RPC_GATEWAY_SIGN_TRANSFER::response wrong_eth_sign_resp = {};
+  wrong_eth_sign_req.opt_ecdsa_signature = wrong_eth_sig;
+  r = invoke_text_json_for_rpc(core_rpc_wrapper, "gateway_sign_transfer", wrong_eth_sign_req, wrong_eth_sign_resp);
+  CHECK_AND_ASSERT_MES(r, false, "gateway_sign_transfer (ETH, wrong owner) RPC call failed");
+  CHECK_AND_ASSERT_EQ(wrong_eth_sign_resp.status, API_RETURN_CODE_BAD_ARG);
+  CHECK_AND_ASSERT_MES(!wrong_eth_sign_resp.status_error.empty(), false, "gateway_sign_transfer (ETH, wrong owner) returned no error details");
+
   r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_sign_transfer", eth_sign_req, eth_sign_resp);
   CHECK_AND_ASSERT_MES(r, false, "gateway_sign_transfer (ETH) failed");
 
@@ -2601,6 +2630,25 @@ bool wallet_rpc_gateway_signatures::c1(currency::core& c, size_t ev_index, const
   eddsa_sign_req.opt_eddsa_signature = eddsa_sig;
   eddsa_sign_req.tx_blob = eddsa_gw_create_resp.tx_blob;
   eddsa_sign_req.tx_id = eddsa_gw_create_resp.tx_id;
+
+  crypto::eddsa_seed wrong_eddsa_seed{};
+  CHECK_AND_ASSERT_TRUE(crypto::eddsa_generate_random_seed(wrong_eddsa_seed));
+  crypto::eddsa_sec_prefix wrong_eddsa_prefix{};
+  crypto::eddsa_secret_key wrong_eddsa_owner_sec_key{};
+  crypto::eddsa_public_key wrong_eddsa_owner_pub_key{};
+  CHECK_AND_ASSERT_TRUE(crypto::eddsa_seed_to_secret_key_public_key_and_prefix(wrong_eddsa_seed, wrong_eddsa_owner_sec_key, wrong_eddsa_owner_pub_key, wrong_eddsa_prefix));
+  crypto::eddsa_signature wrong_eddsa_sig{};
+  r = crypto::generate_eddsa_signature(eddsa_gw_create_resp.tx_hash_to_sign, wrong_eddsa_prefix, wrong_eddsa_owner_sec_key, wrong_eddsa_owner_pub_key, wrong_eddsa_sig);
+  CHECK_AND_ASSERT_MES(r, false, "generate_eddsa_signature for wrong owner failed");
+
+  currency::COMMAND_RPC_GATEWAY_SIGN_TRANSFER::request wrong_eddsa_sign_req = eddsa_sign_req;
+  currency::COMMAND_RPC_GATEWAY_SIGN_TRANSFER::response wrong_eddsa_sign_resp = {};
+  wrong_eddsa_sign_req.opt_eddsa_signature = wrong_eddsa_sig;
+  r = invoke_text_json_for_rpc(core_rpc_wrapper, "gateway_sign_transfer", wrong_eddsa_sign_req, wrong_eddsa_sign_resp);
+  CHECK_AND_ASSERT_MES(r, false, "gateway_sign_transfer (EdDSA, wrong owner) RPC call failed");
+  CHECK_AND_ASSERT_EQ(wrong_eddsa_sign_resp.status, API_RETURN_CODE_BAD_ARG);
+  CHECK_AND_ASSERT_MES(!wrong_eddsa_sign_resp.status_error.empty(), false, "gateway_sign_transfer (EdDSA, wrong owner) returned no error details");
+
   r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_sign_transfer", eddsa_sign_req, eddsa_sign_resp);
   CHECK_AND_ASSERT_MES(r, false, "gateway_sign_transfer (EdDSA) failed");
 
@@ -2979,6 +3027,45 @@ bool wallet_rpc_gateway_overspend::c1(currency::core& c, size_t ev_index, const 
     CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
   }
 
+  // F: an output to an unregistered gateway would fail when applied to a block and must be rejected by the API
+  LOG_PRINT_GREEN_L0("--- F: unregistered destination gateway");
+  {
+    crypto::public_key unregistered_gw_pub{};
+    crypto::secret_key unregistered_gw_sec{};
+    crypto::generate_keys(unregistered_gw_pub, unregistered_gw_sec);
+
+    currency::COMMAND_RPC_GATEWAY_CREATE_TRANSFER::request req = {};
+    currency::COMMAND_RPC_GATEWAY_CREATE_TRANSFER::response resp = {};
+    req.origin_gateway_id = eth_gw_view_pub_key;
+    req.gateway_view_secret_key = eth_gw_view_sec_key;
+    const std::string unregistered_gw_address = currency::get_account_address_as_str(unregistered_gw_pub);
+    req.destinations.push_back({1, unregistered_gw_address, os_asset_id});
+    req.destinations.push_back({1, unregistered_gw_address, os_asset_id});
+    req.fee = TESTS_DEFAULT_FEE;
+    r = invoke_text_json_for_rpc(core_rpc_wrapper, "gateway_create_transfer", req, resp);
+    CHECK_AND_ASSERT_MES(r, false, "gateway_create_transfer (unregistered destination gateway) RPC call failed");
+    CHECK_AND_ASSERT_EQ(resp.status, API_RETURN_CODE_BAD_ARG);
+    CHECK_AND_ASSERT_MES(!resp.status_error.empty(), false, "gateway_create_transfer (unregistered destination gateway) returned no error details");
+    CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
+  }
+
+  // G: destination aggregation must not wrap around before the balance check
+  LOG_PRINT_GREEN_L0("--- G: destination amount overflow");
+  {
+    currency::COMMAND_RPC_GATEWAY_CREATE_TRANSFER::request req = {};
+    currency::COMMAND_RPC_GATEWAY_CREATE_TRANSFER::response resp = {};
+    req.origin_gateway_id = eth_gw_view_pub_key;
+    req.gateway_view_secret_key = eth_gw_view_sec_key;
+    req.destinations.push_back({UINT64_MAX, miner_wlt->get_account().get_public_address_str(), os_asset_id});
+    req.destinations.push_back({1, bob_wlt->get_account().get_public_address_str(), os_asset_id});
+    req.fee = TESTS_DEFAULT_FEE;
+    r = invoke_text_json_for_rpc(core_rpc_wrapper, "gateway_create_transfer", req, resp);
+    CHECK_AND_ASSERT_MES(r, false, "gateway_create_transfer (amount overflow) RPC call failed");
+    CHECK_AND_ASSERT_EQ(resp.status, API_RETURN_CODE_BAD_ARG);
+    CHECK_AND_ASSERT_MES(!resp.status_error.empty(), false, "gateway_create_transfer (amount overflow) returned no error details");
+    CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
+  }
+
   // verify that all failed and unsigned attempts left the gateway balances untouched.
   eth_gw_info_resp = {};
   r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_get_address_info", eth_gw_info_req, eth_gw_info_resp);
@@ -3102,6 +3189,23 @@ bool wallet_rpc_gateway_service_entries::c1(currency::core& c, size_t ev_index, 
   sign_req.opt_ecdsa_signature = eth_sig;
   sign_req.tx_blob = ct_resp.tx_blob;
   sign_req.tx_id = ct_resp.tx_id;
+
+  currency::transaction tampered_attachment_tx{};
+  r = t_unserializable_object_from_blob(tampered_attachment_tx, ct_resp.tx_blob);
+  CHECK_AND_ASSERT_MES(r, false, "failed to deserialize gateway transaction for attachment tampering");
+  CHECK_AND_ASSERT_MES(!tampered_attachment_tx.attachment.empty() && tampered_attachment_tx.attachment.front().type() == typeid(currency::tx_service_attachment),
+    false, "expected a service attachment in gateway transaction");
+  boost::get<currency::tx_service_attachment>(tampered_attachment_tx.attachment.front()).body += " tampered";
+  CHECK_AND_ASSERT_EQ(currency::get_transaction_hash(tampered_attachment_tx), ct_resp.tx_id);
+
+  currency::COMMAND_RPC_GATEWAY_SIGN_TRANSFER::request tampered_attachment_req = sign_req;
+  currency::COMMAND_RPC_GATEWAY_SIGN_TRANSFER::response tampered_attachment_resp = {};
+  tampered_attachment_req.tx_blob = t_serializable_object_to_blob(tampered_attachment_tx);
+  r = invoke_text_json_for_rpc(core_rpc_wrapper, "gateway_sign_transfer", tampered_attachment_req, tampered_attachment_resp);
+  CHECK_AND_ASSERT_MES(r, false, "gateway_sign_transfer (tampered attachment) RPC call failed");
+  CHECK_AND_ASSERT_EQ(tampered_attachment_resp.status, API_RETURN_CODE_BAD_ARG);
+  CHECK_AND_ASSERT_MES(!tampered_attachment_resp.status_error.empty(), false, "gateway_sign_transfer (tampered attachment) returned no error details");
+
   r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_sign_transfer", sign_req, sign_resp);
   CHECK_AND_ASSERT_MES(r, false, "gateway_sign_transfer failed");
 
@@ -3713,6 +3817,43 @@ bool wallet_rpc_gateway_owner_change_altchain::c1(currency::core& c, size_t ev_i
     so_req.opt_ownership_custom_schnorr_signature = ownership_sig;
     so_req.tx_blob = oc_resp.tx_blob;
     so_req.tx_id = oc_resp.tx_id;
+
+    crypto::generic_schnorr_sig_s wrong_transfer_sig{};
+    ok = crypto::generate_schnorr_sig(oc_resp.hash_to_sign_transfer, new_owner_sec, wrong_transfer_sig);
+    CHECK_AND_ASSERT_MES(ok, false, "generate_schnorr_sig (wrong transfer owner) failed");
+    currency::COMMAND_RPC_GATEWAY_SUBMIT_OWNER_CHANGE::request wrong_transfer_req = so_req;
+    currency::COMMAND_RPC_GATEWAY_SUBMIT_OWNER_CHANGE::response wrong_transfer_resp = {};
+    wrong_transfer_req.opt_transfer_custom_schnorr_signature = wrong_transfer_sig;
+    const size_t pool_size_before_wrong_transfer = c.get_pool_transactions_count();
+    ok = invoke_text_json_for_rpc(core_rpc_wrapper, "gateway_submit_owner_change", wrong_transfer_req, wrong_transfer_resp);
+    CHECK_AND_ASSERT_MES(ok, false, "gateway_submit_owner_change (wrong transfer signature) RPC call failed");
+    CHECK_AND_ASSERT_EQ(wrong_transfer_resp.status, API_RETURN_CODE_BAD_ARG);
+    CHECK_AND_ASSERT_MES(!wrong_transfer_resp.status_error.empty(), false, "gateway_submit_owner_change (wrong transfer signature) returned no error details");
+    CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), pool_size_before_wrong_transfer);
+
+    crypto::generic_schnorr_sig_s wrong_ownership_sig{};
+    ok = crypto::generate_schnorr_sig(oc_resp.hash_to_sign_ownership, new_owner_sec, wrong_ownership_sig);
+    CHECK_AND_ASSERT_MES(ok, false, "generate_schnorr_sig (wrong ownership owner) failed");
+    currency::COMMAND_RPC_GATEWAY_SUBMIT_OWNER_CHANGE::request wrong_ownership_req = so_req;
+    currency::COMMAND_RPC_GATEWAY_SUBMIT_OWNER_CHANGE::response wrong_ownership_resp = {};
+    wrong_ownership_req.opt_ownership_custom_schnorr_signature = wrong_ownership_sig;
+    const size_t pool_size_before_wrong_ownership = c.get_pool_transactions_count();
+    ok = invoke_text_json_for_rpc(core_rpc_wrapper, "gateway_submit_owner_change", wrong_ownership_req, wrong_ownership_resp);
+    CHECK_AND_ASSERT_MES(ok, false, "gateway_submit_owner_change (wrong ownership signature) RPC call failed");
+    CHECK_AND_ASSERT_EQ(wrong_ownership_resp.status, API_RETURN_CODE_BAD_ARG);
+    CHECK_AND_ASSERT_MES(!wrong_ownership_resp.status_error.empty(), false, "gateway_submit_owner_change (wrong ownership signature) returned no error details");
+    CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), pool_size_before_wrong_ownership);
+
+    currency::COMMAND_RPC_GATEWAY_SUBMIT_OWNER_CHANGE::request extra_ownership_req = so_req;
+    currency::COMMAND_RPC_GATEWAY_SUBMIT_OWNER_CHANGE::response extra_ownership_resp = {};
+    extra_ownership_req.opt_ownership_ecdsa_signature = crypto::eth_signature{};
+    const size_t pool_size_before_extra_ownership = c.get_pool_transactions_count();
+    ok = invoke_text_json_for_rpc(core_rpc_wrapper, "gateway_submit_owner_change", extra_ownership_req, extra_ownership_resp);
+    CHECK_AND_ASSERT_MES(ok, false, "gateway_submit_owner_change (extra ownership signature) RPC call failed");
+    CHECK_AND_ASSERT_EQ(extra_ownership_resp.status, API_RETURN_CODE_BAD_ARG);
+    CHECK_AND_ASSERT_MES(!extra_ownership_resp.status_error.empty(), false, "gateway_submit_owner_change (extra ownership signature) returned no error details");
+    CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), pool_size_before_extra_ownership);
+
     ok = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_submit_owner_change", so_req, so_resp);
     CHECK_AND_ASSERT_MES(ok, false, "gateway_submit_owner_change failed");
 
@@ -3854,12 +3995,13 @@ bool wallet_rpc_gateway_limits::generate(std::vector<test_event_entry>& events) 
 
 bool wallet_rpc_gateway_limits::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
-  // Test idea: check consensus enforcement of gateway descriptor limits (validate_gateway_descriptor_operation_limits),
-  // For both register and update operations:
+  // Test idea: check early RPC validation (validate_gateway_descriptor_base_limits) and consensus enforcement
+  // (validate_gateway_descriptor_operation_limits) of gateway descriptor limits. For both register and update operations:
   //   - meta_info size limit (GATEWAY_ADDRESS_META_INFO_MAX_SIZE = 4000): == limit accepted, > limit rejected
   //   - etc must be empty: any non-empty etc rejected
-  // The check lives in validate_tx_for_hardfork_specific_terms (runs at pool add and block add), so we assert at
-  // the pool via add_tx. Every descriptor is built with valid signatures, so the only variable is its content.
+  // Consensus checks live in validate_tx_for_hardfork_specific_terms (runs at pool add and block add), so we assert
+  // them at the pool via add_tx. Every consensus-test descriptor is built with valid signatures, so the only variable
+  // is its content.
 
   bool r = false;
   const size_t GW_META_MAX = 4000; // mirrors GATEWAY_ADDRESS_META_INFO_MAX_SIZE (currency_format_utils.cpp)
@@ -3957,7 +4099,21 @@ bool wallet_rpc_gateway_limits::c1(currency::core& c, size_t ev_index, const std
   //
   // update operation
   //
-  auto build_update_tx = [&](const std::string& meta_info, bool add_etc, currency::transaction& out_tx) -> bool
+  // gateway_create_owner_change must reject an oversized descriptor before constructing a transaction
+  {
+    currency::COMMAND_RPC_GATEWAY_CREATE_OWNER_CHANGE::request oc_req = {};
+    currency::COMMAND_RPC_GATEWAY_CREATE_OWNER_CHANGE::response oc_resp = {};
+    oc_req.address_id = gw_view_pub;
+    oc_req.new_descriptor_info.opt_owner_custom_schnorr_pub_key = new_owner_pub;
+    oc_req.new_descriptor_info.meta_info = std::string(GW_META_MAX + 1, 'x');
+    oc_req.fee = TESTS_DEFAULT_FEE;
+    r = invoke_text_json_for_rpc(core_rpc_wrapper, "gateway_create_owner_change", oc_req, oc_resp);
+    CHECK_AND_ASSERT_MES(r, false, "gateway_create_owner_change (oversized meta_info) RPC call failed");
+    CHECK_AND_ASSERT_EQ(oc_resp.status, API_RETURN_CODE_BAD_ARG);
+    CHECK_AND_ASSERT_MES(!oc_resp.status_error.empty(), false, "gateway_create_owner_change (oversized meta_info) returned no error details");
+  }
+
+  auto build_update_tx = [&](const std::string& meta_info, bool make_meta_oversized, bool add_etc, currency::transaction& out_tx) -> bool
   {
     currency::COMMAND_RPC_GATEWAY_CREATE_OWNER_CHANGE::request oc_req = {};
     currency::COMMAND_RPC_GATEWAY_CREATE_OWNER_CHANGE::response oc_resp = {};
@@ -3971,7 +4127,7 @@ bool wallet_rpc_gateway_limits::c1(currency::core& c, size_t ev_index, const std
     ok = t_unserializable_object_from_blob(out_tx, oc_resp.tx_blob);
     CHECK_AND_ASSERT_MES(ok, false, "failed to deserialize update tx blob");
 
-    if (add_etc)
+    if (make_meta_oversized || add_etc)
     {
       bool patched = false;
       for (auto& e : out_tx.extra)
@@ -3980,7 +4136,10 @@ bool wallet_rpc_gateway_limits::c1(currency::core& c, size_t ev_index, const std
         {
           currency::gateway_address_descriptor_operation& gw_op = boost::get<currency::gateway_address_descriptor_operation>(e);
           currency::gateway_address_descriptor_operation_update& op_upd = boost::get<currency::gateway_address_descriptor_operation_update>(gw_op.operation);
-          op_upd.descriptor.etc.push_back(currency::dummy{});
+          if (make_meta_oversized)
+            op_upd.descriptor.meta_info = std::string(GW_META_MAX + 1, 'x');
+          if (add_etc)
+            op_upd.descriptor.etc.push_back(currency::dummy{});
           patched = true;
         }
       }
@@ -4015,15 +4174,15 @@ bool wallet_rpc_gateway_limits::c1(currency::core& c, size_t ev_index, const std
 
   // meta_info at the limit, empty etc -> accepted
   currency::transaction upd_tx_ok{};
-  CHECK_AND_ASSERT_MES(build_update_tx(std::string(GW_META_MAX, 'x'), false, upd_tx_ok), false, "build update (limit) failed");
+  CHECK_AND_ASSERT_MES(build_update_tx(std::string(GW_META_MAX, 'x'), false, false, upd_tx_ok), false, "build update (limit) failed");
   CHECK_AND_ASSERT_MES(submit_to_pool(upd_tx_ok), false, "update with meta_info at the limit should be accepted");
-  // meta_info one byte over the limit -> rejected
+  // construct via RPC with valid meta_info, then mutate it one byte over the limit -> rejected
   currency::transaction upd_tx_big{};
-  CHECK_AND_ASSERT_MES(build_update_tx(std::string(GW_META_MAX + 1, 'x'), false, upd_tx_big), false, "build update (oversized) failed");
+  CHECK_AND_ASSERT_MES(build_update_tx("ok", true, false, upd_tx_big), false, "build update (oversized) failed");
   CHECK_AND_ASSERT_MES(!submit_to_pool(upd_tx_big), false, "update with oversized meta_info should be rejected");
   // non-empty etc -> rejected
   currency::transaction upd_tx_etc{};
-  CHECK_AND_ASSERT_MES(build_update_tx("ok", true, upd_tx_etc), false, "build update (etc) failed");
+  CHECK_AND_ASSERT_MES(build_update_tx("ok", false, true, upd_tx_etc), false, "build update (etc) failed");
   CHECK_AND_ASSERT_MES(!submit_to_pool(upd_tx_etc), false, "update with non-empty etc should be rejected");
   
 
