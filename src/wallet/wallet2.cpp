@@ -786,14 +786,14 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
               // -- sowle
 
               //WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(it->second < m_transfers.size(), "m_key_images entry has wrong m_transfers index, it->second: " << it->second << ", m_transfers.size(): " << m_transfers.size());
-              const transfer_details& local_td = m_transfers.at(it->second);
-
               std::stringstream ss;
               ss << "tx " << ptc.tx_hash() << " @ block " << height << " has output #" << o << " with amount " << out.amount;
               if (!out.is_native_coin())
                 ss << "(asset_id: " << out.asset_id << ") ";
-              ss << "and key image " << ki << " that has already been seen in output #" << local_td.m_internal_output_index << " in tx " << get_transaction_hash(local_td.m_ptx_wallet_info->m_tx)
-                << " @ block " << local_td.m_spent_height << ". This output can't ever be spent and will be skipped.";
+              ss << "and key image " << ki << " that has already been seen (tid=" << it->second << ")";
+              if (auto td_it = m_transfers.find(it->second); td_it != m_transfers.end())
+                ss << " in output #" << td_it->second.m_internal_output_index << " in tx " << get_transaction_hash(td_it->second.m_ptx_wallet_info->m_tx) << " @ block " << td_it->second.m_spent_height;
+              ss << ". This output can't ever be spent and will be skipped.";
               WLT_LOG_YELLOW(ss.str(), LOG_LEVEL_0);
               if (auto wcb = m_wcallback.lock())
                 wcb->on_message(i_wallet2_callback::ms_yellow, ss.str());
