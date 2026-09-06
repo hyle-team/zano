@@ -1588,9 +1588,7 @@ QString MainWindow::store_secure_app_data(const QString& param, const QString& p
     return MAKE_RESPONSE(ar);
   }
 
-  crypto::hash master_password_pre_hash = crypto::cn_fast_hash(m_master_password.c_str(), m_master_password.length());
-  crypto::hash master_password_hash = crypto::cn_fast_hash(&master_password_pre_hash, sizeof master_password_pre_hash);
-  LOG_PRINT_L0("store_secure_app_data, r = " << ar.error_code << ", pass hash: " << master_password_hash);
+  LOG_PRINT_L0("store_secure_app_data, r = " << ar.error_code);
 
   return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
@@ -1619,9 +1617,7 @@ QString MainWindow::get_secure_app_data(const QString& param)
     return MAKE_RESPONSE(ar);
   }
   m_master_password = pwd.pass;
-  crypto::hash master_password_pre_hash = crypto::cn_fast_hash(m_master_password.c_str(), m_master_password.length());
-  crypto::hash master_password_hash = crypto::cn_fast_hash(&master_password_pre_hash, sizeof master_password_pre_hash);
-  LOG_PRINT_L0("gui secure config loaded ok from " << filename << ", pass hash: " << master_password_hash);
+  LOG_PRINT_L0("gui secure config loaded ok from " << filename);
 
   return res_body.c_str();
   CATCH_ENTRY2(API_RETURN_CODE_INTERNAL_ERROR);
@@ -1647,9 +1643,7 @@ QString MainWindow::set_master_password(const QString& param)
 
   m_master_password = pwd.pass;
 
-  crypto::hash master_password_pre_hash = crypto::cn_fast_hash(m_master_password.c_str(), m_master_password.length());
-  crypto::hash master_password_hash = crypto::cn_fast_hash(&master_password_pre_hash, sizeof master_password_pre_hash);
-  LOG_PRINT_L0("set_master_password, pass hash: " << master_password_hash);
+  LOG_PRINT_L0("set_master_password: OK");
 
   ar.error_code = API_RETURN_CODE_OK;
   return MAKE_RESPONSE(ar);
@@ -1666,15 +1660,10 @@ QString MainWindow::check_master_password(const QString& param)
     return MAKE_RESPONSE(ar);
   }
 
-  crypto::hash master_password_pre_hash = crypto::cn_fast_hash(m_master_password.c_str(), m_master_password.length());
-  crypto::hash master_password_hash = crypto::cn_fast_hash(&master_password_pre_hash, sizeof master_password_pre_hash);
-  crypto::hash pwd_pre_hash = crypto::cn_fast_hash(pwd.pass.c_str(), pwd.pass.length());
-  crypto::hash pwd_hash = crypto::cn_fast_hash(&pwd_pre_hash, sizeof pwd_pre_hash);
- 
   if (m_master_password != pwd.pass)
   {
     ar.error_code = API_RETURN_CODE_WRONG_PASSWORD;
-    LOG_PRINT_L0("check_master_password: pwd hash: " << pwd_hash << ", expected: " << master_password_hash);
+    LOG_PRINT_L0("check_master_password: mismatch");
   }
   else
   {
