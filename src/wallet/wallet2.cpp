@@ -9169,7 +9169,7 @@ bool wallet2::configure_socks_relay(const std::string& addr_port)
   socks5::socks5_proxy_settings cfg = m_socks5_relay_cfg;
 
   socks5::socks5_endpoint_config ep {};
-  // if already configured � keep timeouts/use_remote_dns/target_url
+  // if already configured - keep timeouts/use_remote_dns/target_url
   if(cfg.transactions)
     ep = *cfg.transactions;
 

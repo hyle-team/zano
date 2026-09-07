@@ -907,7 +907,7 @@ std::string get_nix_version_display_string()
 //         {
 //           unsigned char c2 = data[i + 1];
 //           // Valid second byte: 10xxxxxx
-//           // Also ensure it’s not an overlong encoding (0xC0, 0xC1 are invalid starts)
+//           // Also ensure it's not an overlong encoding (0xC0, 0xC1 are invalid starts)
 //           if ((c2 & 0xC0) == 0x80 && (c & 0xFE) != 0xC0)
 //           {
 //             sanitized.push_back(static_cast<char>(c));

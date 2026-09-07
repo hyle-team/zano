@@ -2496,8 +2496,8 @@ bool tx_pool_validation_and_chain_switch::c1(currency::core& c, size_t ev_index,
   return true;
 }
 
-// Сoinbase transactions must NOT allow the TX_FLAG_SIGNATURE_MODE_SEPARATE flag.
-// Сhecks that setting this flag for coinbase fails, while a default coinbase (without the flag) succeeds.
+// Coinbase transactions must NOT allow the TX_FLAG_SIGNATURE_MODE_SEPARATE flag.
+// Checks that setting this flag for coinbase fails, while a default coinbase (without the flag) succeeds.
 bool tx_coinbase_separate_sig_flag::generate(std::vector<test_event_entry>& events) const
 {
   GENERATE_ACCOUNT(miner);
@@ -2517,7 +2517,7 @@ bool tx_coinbase_separate_sig_flag::generate(std::vector<test_event_entry>& even
     return true;
   };
 
-  // сonstruct a block with the forbidden flag, should fail after hf4
+  // construct a block with the forbidden flag, should fail after hf4
   bool with_separate_flag = generator.construct_block_gentime_with_coinbase_cb(blk_1r, miner, coinbase_separate_cb, blk_2);
   CHECK_AND_ASSERT_MES(with_separate_flag, false, "expected failure because TX_FLAG_SIGNATURE_MODE_SEPARATE is forbidden for coinbase after HF4");
 

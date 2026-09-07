@@ -270,7 +270,7 @@ TEST(wallet_seed, word_from_timestamp)
   ASSERT_EQ("moan", currency::get_word_from_timestamp(2027462399, true));
 
   /*
-    If you pass values ​​>= 2027462399 + 1, then the inequality
+    If you pass values >= 2027462399 + 1, then the inequality
     weeks_count < WALLET_BRAIN_DATE_MAX_WEEKS_COUNT is not satisfied. The
     function throws an exception.
   */

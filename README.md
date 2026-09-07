@@ -167,10 +167,10 @@ To build GUI application:
 1. Create self-signing certificate via Keychain Access:\
     a. Run Keychain Access.\
     b. Choose Keychain Access > Certificate Assistant > Create a Certificate.\
-    c. Use “Zano” (without quotes) as certificate name.\
-    d. Choose “Code Signing” in “Certificate Type” field.\
-    e. Press “Create”, then “Done”.\
-    f. Make sure the certificate was added to keychain "System". If not—move it to "System".\
+    c. Use "Zano" (without quotes) as certificate name.\
+    d. Choose "Code Signing" in "Certificate Type" field.\
+    e. Press "Create", then "Done".\
+    f. Make sure the certificate was added to keychain "System". If not-move it to "System".\
     g. Double click the certificate you've just added, enter the trust section and under "When using this certificate" select "Always trust".\
     h. Unfold the certificate in Keychain Access window and double click the underlying private key "Zano". Select "Access Control" tab, then select "Allow all applications to access this item". Click "Save Changes".
 2. Revise building script, comment out unwanted steps and run it:  `utils/build_script_mac_osx.sh`

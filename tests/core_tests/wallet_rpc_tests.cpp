@@ -2980,7 +2980,7 @@ bool wallet_rpc_gateway_overspend::c1(currency::core& c, size_t ev_index, const 
   //   native coin = 1 = TESTS_DEFAULT_FEE all consumed by fee in any tx
   //   os_asset_id = 10
 
-  // С: native coin, over by exactly 1 unit, total_native_needed = 1 (dest) + TESTS_DEFAULT_FEE (fee) = TESTS_DEFAULT_FEE + 1
+  // C: native coin, over by exactly 1 unit, total_native_needed = 1 (dest) + TESTS_DEFAULT_FEE (fee) = TESTS_DEFAULT_FEE + 1
   // balance = TESTS_DEFAULT_FEE -> exceeds by 1 -> must reject
   LOG_PRINT_GREEN_L0("--- C: native coin over by 1 unit");
   {
@@ -3339,7 +3339,7 @@ bool wallet_rpc_gateway_history_after_outgoing::c1(currency::core& c, size_t /*e
     CHECK_AND_ASSERT_MES(hist_resp.transactions.size() >= 1, false, "baseline history must contain the inflow");
   }
 
-  // ыpend from GW: build -> sign (ECDSA) -> broadcast
+  // Spend from GW: build -> sign (ECDSA) -> broadcast
   currency::COMMAND_RPC_GATEWAY_CREATE_TRANSFER::request  ct_req = {};
   currency::COMMAND_RPC_GATEWAY_CREATE_TRANSFER::response ct_resp = {};
   ct_req.origin_gateway_id = gw_view_pub_key;
@@ -3896,7 +3896,7 @@ bool wallet_rpc_gateway_owner_change_altchain::c1(currency::core& c, size_t ev_i
   crypto::hash b_tip = c.get_tail_id();
   LOG_PRINT_GREEN_L0("Chain B built: 2 blocks, tip=" << b_tip);
 
-  //   C: 3 blocks (owner change + 2 empty) — overtakes B
+  //   C: 3 blocks (owner change + 2 empty) - overtakes B
   r = mine_next_pow_blocks_in_playtime_with_given_txs(miner_addr, { tx_c_owner_change }, c, 3, fork_point);
   CHECK_AND_ASSERT_MES(r, false, "mine chain C (3 blocks) failed");
   // C is main (3 > 2), reorg happened
@@ -5526,7 +5526,7 @@ bool wallet_rpc_sweep_below_wo_reservation::c1(currency::core& c, size_t ev_inde
   CHECK_AND_ASSERT_MES(res1.outs_swept == 4, false, "outs_swept=" << res1.outs_swept);
   CHECK_AND_ASSERT_MES(!res1.tx_unsigned_hex.empty(), false, "empty unsigned hex (1)");
 
-  // second sweep without clear must fail — UTXOs are reserved
+  // second sweep without clear must fail - UTXOs are reserved
   tools::wallet_public::COMMAND_SWEEP_BELOW::response res2{};
   code = call_sweep_below(alice_rpc_wo, req, res2);
   CHECK_AND_ASSERT_MES(code != 0, false, "second sweep_below must fail on reserved UTXOs, code=" << code);
@@ -5632,7 +5632,7 @@ bool wallet_rpc_sweep_below_double_sweep::c1(currency::core& c, size_t ev_index,
   CHECK_AND_ASSERT_MES(res1.outs_swept == 3, false, "outs_swept=" << res1.outs_swept);
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "tx must be in pool");
 
-  // before mining: UTXOs are already flagged spent locally → must fail
+  // before mining: UTXOs are already flagged spent locally -> must fail
   tools::wallet_public::COMMAND_SWEEP_BELOW::response res2{};
   code = call_sweep_below(alice_rpc, req, res2);
   CHECK_AND_ASSERT_MES(code != 0, false, "sweep_below before mining must fail, code=" << code);

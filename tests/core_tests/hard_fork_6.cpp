@@ -1868,7 +1868,7 @@ bool hard_fork_6_coinbase_size_rules::generate(std::vector<test_event_entry>& ev
     };
   };
 
-  // №1
+  // #1
   const size_t big_coinbase_target = CURRENCY_COINBASE_BLOB_RESERVED_SIZE_HF6 + 256;
   block blk_hf5_big{};
   {
@@ -1888,7 +1888,7 @@ bool hard_fork_6_coinbase_size_rules::generate(std::vector<test_event_entry>& ev
 
   DO_CALLBACK_PARAMS(events, "check_hardfork_active", static_cast<size_t>(ZANO_HARDFORK_06));
 
-  { // №2
+  { // #2
     block blk_bad{};
     bool r = build_specific_cumnul_block(blk_hf6_ancestor, seed_ecbs(0), pad_coinbase_to(big_coinbase_target), {}, blk_bad);
     CHECK_AND_ASSERT_MES(r, false, "HF6 big-coinbase block construction failed");
@@ -1898,7 +1898,7 @@ bool hard_fork_6_coinbase_size_rules::generate(std::vector<test_event_entry>& ev
     events.push_back(blk_bad);
   }
 
-  { // №2b: coinbase size == CURRENCY_COINBASE_BLOB_RESERVED_SIZE_HF6 + 1 - rejected, one over
+  { // #2b: coinbase size == CURRENCY_COINBASE_BLOB_RESERVED_SIZE_HF6 + 1 - rejected, one over
     block blk_bad{};
     bool r = build_specific_cumnul_block(blk_hf6_ancestor, seed_ecbs(0), pad_coinbase_to(CURRENCY_COINBASE_BLOB_RESERVED_SIZE_HF6 + 1), {}, blk_bad);
     CHECK_AND_ASSERT_MES(r, false, "HF6 boundary (==limit+1) block construction failed");
@@ -1908,7 +1908,7 @@ bool hard_fork_6_coinbase_size_rules::generate(std::vector<test_event_entry>& ev
     events.push_back(blk_bad);
   }
 
-  { // №3
+  { // #3
     block blk_bad{};
     bool r = build_specific_cumnul_block(blk_hf6_ancestor, {}, {}, {}, blk_bad); // no ecbs seeded - none extra
     CHECK_AND_ASSERT_MES(r, false, "HF6 missing ecbs block construction failed");
@@ -1916,7 +1916,7 @@ bool hard_fork_6_coinbase_size_rules::generate(std::vector<test_event_entry>& ev
     events.push_back(blk_bad);
   }
 
-  { // №4
+  { // #4
     block blk_bad{};
     bool r = build_specific_cumnul_block(blk_hf6_ancestor, seed_ecbs(123456), {}, {}, blk_bad);
     CHECK_AND_ASSERT_MES(r, false, "HF6 wrong ecbs block construction failed");
@@ -1925,7 +1925,7 @@ bool hard_fork_6_coinbase_size_rules::generate(std::vector<test_event_entry>& ev
   }
 
   block blk_hf6_boundary_ok{};
-  { // №2a: coinbase size == CURRENCY_COINBASE_BLOB_RESERVED_SIZE_HF6 - accepted boundary inclusive
+  { // #2a: coinbase size == CURRENCY_COINBASE_BLOB_RESERVED_SIZE_HF6 - accepted boundary inclusive
     bool r = build_specific_cumnul_block(blk_hf6_ancestor, seed_ecbs(0), pad_coinbase_to(CURRENCY_COINBASE_BLOB_RESERVED_SIZE_HF6), {}, blk_hf6_boundary_ok);
     CHECK_AND_ASSERT_MES(r, false, "HF6 boundary (==limit) block construction failed");
     CHECK_AND_ASSERT_MES(get_object_blobsize(blk_hf6_boundary_ok.miner_tx) == CURRENCY_COINBASE_BLOB_RESERVED_SIZE_HF6, false,
@@ -1934,7 +1934,7 @@ bool hard_fork_6_coinbase_size_rules::generate(std::vector<test_event_entry>& ev
   }
 
   block blk_hf6_sanity{};
-  { // №5
+  { // #5
     bool r = build_specific_cumnul_block(blk_hf6_boundary_ok, seed_ecbs(0), {}, {}, blk_hf6_sanity);
     CHECK_AND_ASSERT_MES(r, false, "HF6 sanity block construction failed");
     CHECK_AND_ASSERT_MES(get_object_blobsize(blk_hf6_sanity.miner_tx) <= CURRENCY_COINBASE_BLOB_RESERVED_SIZE_HF6, false, "HF6 unexpectedly big coinbase");
@@ -1946,7 +1946,7 @@ bool hard_fork_6_coinbase_size_rules::generate(std::vector<test_event_entry>& ev
   const size_t tx_for_hf6_block_size = get_object_blobsize(tx_for_hf6_block);
 
   block blk_hf6_with_tx{};
-  { // №6
+  { // #6
     bool r = build_specific_cumnul_block(blk_hf6_sanity, seed_ecbs(tx_for_hf6_block_size), {}, { tx_for_hf6_block }, blk_hf6_with_tx);
     CHECK_AND_ASSERT_MES(r, false, "HF6 block with tx construction failed");
     events.push_back(blk_hf6_with_tx);
@@ -1954,7 +1954,7 @@ bool hard_fork_6_coinbase_size_rules::generate(std::vector<test_event_entry>& ev
 
   DO_CALLBACK(events, "set_far_checkpoint");
 
-  { // №7
+  { // #7
     block blk_ok{};
     bool r = build_specific_cumnul_block(blk_hf6_with_tx, seed_ecbs(999), {}, {}, blk_ok);
     CHECK_AND_ASSERT_MES(r, false, "HF6 in-zone bogus-ecbs block construction failed");

@@ -246,7 +246,7 @@ if(BUILD_GUI)
     file(APPEND "${GUI_QRC}" "    <file alias=\"${f}\">${ABS_FPATH}</file>\n")
   endforeach()
 
-  # сlose QRC
+  # close QRC
   file(APPEND "${GUI_QRC}" "  </qresource>\n</RCC>\n")
 
   qt6_add_resources(ZANO_RESOURCES "${GUI_QRC}")

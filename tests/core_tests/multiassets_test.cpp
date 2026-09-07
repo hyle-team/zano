@@ -1105,7 +1105,7 @@ bool asset_operation_and_hardfork_checks::generate(
   /* A transaction that contains a registration operation descriptor in its
   attachement, but extra is empty, is valid, but doesn't register the asset. The
   fact that the asset is not registered is checked in the assertions in the
-  callback с2. */
+  callback c2. */
 
   success = fill_tx_sources_and_destinations(events,
                                              /* head = */ blk_2r,

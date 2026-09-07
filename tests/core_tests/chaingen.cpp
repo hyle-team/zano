@@ -647,7 +647,7 @@ bool test_generator::build_wallets(const blockchain_vector& blockchain,
         // Fallback 3 - global passage through the remaining heights 
         if (total < target)
         {
-          // from hul_exclusive down to 1 (0 — genesis)
+          // from hul_exclusive down to 1 (0 - genesis)
           for (uint64_t h = hul_exclusive; h >= 1 && total < target; --h)
           {
             if (seen.count(h))

@@ -805,7 +805,7 @@ inline bool do_replay_events(const std::vector<test_event_entry>& events, t_test
 
   before_deinit_cb(c);
 
-  // сapture end-of-test block stats when the feature is enabled --report-block-stats
+  // capture end-of-test block stats when the feature is enabled --report-block-stats
   if (g_report_block_stats && !g_current_test_name.empty())
   {
     test_block_stats stats;
