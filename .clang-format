@@ -1,4 +1,4 @@
-﻿BasedOnStyle: WebKit
+BasedOnStyle: WebKit
 AlignAfterOpenBracket: Align
 AlignConsecutiveAssignments: 'true'
 AlignConsecutiveDeclarations: 'false'

@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2014-2024 Zano Project
+// Copyright (c) 2014-2024 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -811,7 +811,7 @@ namespace currency
           // If we repeatedly call NOTIFY_REQUEST_GET_OBJECTS with the IDs obtained from 
           // get_short_chain_history, it would create an endless loop. However, we still need 
           // to retrieve the full alternate chain from the remote daemon because it could 
-          // potentially be “heavier” (in terms of consensus).
+          // potentially be "heavier" (in terms of consensus).
           //
           // Therefore, we provide only the last ten blocks returned by the remote daemon 
           // in the NOTIFY_REQUEST_CHAIN request, expecting to receive the subsequent batch 
