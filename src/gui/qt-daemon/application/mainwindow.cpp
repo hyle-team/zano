@@ -9,6 +9,7 @@
 #include <QPrinter>
 #include <QPrintDialog>
 #include <QWebChannel>
+#include <set>
 
 #include "string_coding.h"
 #include "gui_utils.h"
@@ -70,6 +71,20 @@ QString make_response_dbg(const T& r, const std::string& location)
 #include "mainwindow.h"
 #include "html_content_hash.h"
 #include "web_channel_bridge.h"
+#include "currency_core/currency_config.h"
+#include "profile_tools.h"
+
+namespace
+{
+  // Core diagnostics and profiling can leave these named logs from a previous
+  // session, before the current logger has opened their streams.
+  const std::set<std::string> gui_diagnostic_log_names =
+  {
+    CURRENCY_CONSTRUCT_TX_LOG_FILENAME,
+    CURRENCY_FAILED_MINED_BLOCKS_LOG_FILENAME,
+    EPEE_PROFILE_DETAILS_LOG_FILENAME
+  };
+}
 
 
 std::wstring convert_to_lower_via_qt(const std::wstring& w)
@@ -1889,6 +1904,26 @@ QString MainWindow::get_log_level(const QString& param)
   PREPARE_RESPONSE(currency::struct_with_one_t_type<int>, ar);
   ar.response_data.v = epee::log_space::get_set_log_detalisation_level();
   ar.error_code = API_RETURN_CODE_OK;
+  return MAKE_RESPONSE(ar);
+  CATCH_ENTRY_FAIL_API_RESPONCE();
+}
+
+QString MainWindow::get_log_files_size(const QString& param)
+{
+  TRY_ENTRY();
+  PREPARE_RESPONSE(view::log_files_size_response, ar);
+  ar.error_code = log_space::log_singletone::get_log_files_size(ar.response_data.total_size, gui_diagnostic_log_names)
+    ? API_RETURN_CODE_OK : API_RETURN_CODE_FAIL;
+  return MAKE_RESPONSE(ar);
+  CATCH_ENTRY_FAIL_API_RESPONCE();
+}
+
+QString MainWindow::clear_log_files(const QString& param)
+{
+  TRY_ENTRY();
+  view::api_response ar = AUTO_VAL_INIT(ar);
+  ar.error_code = log_space::log_singletone::clear_log_files(gui_diagnostic_log_names)
+    ? API_RETURN_CODE_OK : API_RETURN_CODE_FAIL;
   return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }

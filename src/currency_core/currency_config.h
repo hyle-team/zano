@@ -284,6 +284,8 @@ static_assert(CURRENCY_FORMATION_VERSION == 103);
 #define GUI_IPC_MESSAGE_CHANNEL_NAME                    CURRENCY_NAME_BASE "_message_que"
 
 #define CURRENCY_VOTING_CONFIG_DEFAULT_FILENAME         "voting_config.json"
+#define CURRENCY_CONSTRUCT_TX_LOG_FILENAME               "construct_tx.log"
+#define CURRENCY_FAILED_MINED_BLOCKS_LOG_FILENAME        "failed_mined_blocks.log"
 
 
 #define CURRENT_TRANSACTION_CHAIN_ENTRY_ARCHIVE_VER     3

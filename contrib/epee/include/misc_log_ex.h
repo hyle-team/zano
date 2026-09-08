@@ -39,6 +39,7 @@
 #include <fstream>
 #include <algorithm>
 #include <list>
+#include <limits>
 #include <map>
 #include <set>
 #include <time.h>
@@ -346,6 +347,8 @@ namespace log_space
     virtual bool set_max_logfile_size(uint64_t max_size){return true;};
     virtual bool set_log_rotate_cmd(const std::string& cmd){return true;};
     virtual bool truncate_log_files() { return true; }
+    virtual bool get_log_files_size(uint64_t& size, const std::set<std::string>& additional_log_names) { size = 0; return true; }
+    virtual bool clear_log_files(const std::set<std::string>& additional_log_names) { return true; }
     virtual std::string copy_logs_to_buffer() { return ""; }
   };
 
@@ -786,6 +789,97 @@ namespace log_space
       return true;
     }
 
+    bool collect_additional_log_paths(const std::set<std::string>& additional_log_names, std::list<boost::filesystem::path>& paths)
+    {
+      bool success = true;
+      for (const auto& name : additional_log_names)
+      {
+        if (name.empty() || name == "." || name == ".." || name.find_first_of("/\\:") != std::string::npos || name.find('\0') != std::string::npos)
+        {
+          success = false;
+          continue;
+        }
+        if (m_log_file_names.count(name))
+          continue;
+        boost::filesystem::path target_path = boost::filesystem::path(m_default_log_path_w) / epee::string_encoding::utf8_to_wstring(name);
+        boost::system::error_code ec;
+        boost::filesystem::file_status status = boost::filesystem::status(target_path, ec);
+        if (status.type() == boost::filesystem::file_not_found)
+          continue;
+        if (ec || !boost::filesystem::is_regular_file(status))
+        {
+          success = false;
+          continue;
+        }
+        paths.push_back(target_path);
+      }
+      return success;
+    }
+
+    bool get_log_files_size(uint64_t& size, const std::set<std::string>& additional_log_names)
+    {
+      size = 0;
+      if (!m_pdefault_file_stream)
+        return false;
+      std::list<boost::filesystem::path> additional_paths;
+      if (!collect_additional_log_paths(additional_log_names, additional_paths))
+        return false;
+      uint64_t total_size = 0;
+      for (const auto& entry : m_log_file_names)
+      {
+        boost::system::error_code ec;
+        boost::uintmax_t file_size = boost::filesystem::file_size(boost::filesystem::path(entry.second.second), ec);
+        if (ec || file_size > (std::numeric_limits<uint64_t>::max)() - total_size)
+          return false;
+        total_size += file_size;
+      }
+      for (const auto& path : additional_paths)
+      {
+        boost::system::error_code ec;
+        boost::uintmax_t file_size = boost::filesystem::file_size(path, ec);
+        if (ec || file_size > (std::numeric_limits<uint64_t>::max)() - total_size)
+          return false;
+        total_size += file_size;
+      }
+      size = total_size;
+      return true;
+    }
+
+    bool clear_log_files(const std::set<std::string>& additional_log_names)
+    {
+      std::list<boost::filesystem::path> additional_paths;
+      bool success = collect_additional_log_paths(additional_log_names, additional_paths);
+      if (!m_pdefault_file_stream)
+        success = false;
+      for (const auto& entry : m_log_file_names)
+      {
+        boost::filesystem::path target_path(entry.second.second);
+        boost::filesystem::ofstream* pstream = entry.second.first;
+        if (!pstream)
+        {
+          success = false;
+          continue;
+        }
+
+        if (pstream->is_open())
+          pstream->close();
+        pstream->clear();
+        boost::system::error_code ec;
+        boost::filesystem::resize_file(target_path, 0, ec);
+        pstream->open(target_path, std::ios_base::out | std::ios_base::app);
+        if (ec || !pstream->is_open() || pstream->fail())
+          success = false;
+      }
+      for (const auto& path : additional_paths)
+      {
+        boost::system::error_code ec;
+        boost::filesystem::resize_file(path, 0, ec);
+        if (ec)
+          success = false;
+      }
+      return success;
+    }
+
     std::string copy_logs_to_buffer()
     {
       std::stringstream res;
@@ -920,6 +1014,32 @@ namespace log_space
       for (streams_container::iterator it = m_log_streams.begin(); it != m_log_streams.end(); it++)
         it->first->truncate_log_files();
       return true;
+    }
+
+    bool get_log_files_size(uint64_t& size, const std::set<std::string>& additional_log_names)
+    {
+      size = 0;
+      uint64_t total_size = 0;
+      for (const auto& entry : m_log_streams)
+      {
+        uint64_t stream_size = 0;
+        if (!entry.first->get_log_files_size(stream_size, additional_log_names) || stream_size > (std::numeric_limits<uint64_t>::max)() - total_size)
+          return false;
+        total_size += stream_size;
+      }
+      size = total_size;
+      return true;
+    }
+
+    bool clear_log_files(const std::set<std::string>& additional_log_names)
+    {
+      bool success = true;
+      for (const auto& entry : m_log_streams)
+      {
+        if (!entry.first->clear_log_files(additional_log_names))
+          success = false;
+      }
+      return success;
     }
 
     std::string copy_logs_to_buffer()
@@ -1118,6 +1238,18 @@ namespace log_space
       FAST_CRITICAL_REGION_BEGIN(m_critical_sec);
       return m_log_target.truncate_log_files();
       FAST_CRITICAL_REGION_END();
+    }
+
+    bool get_log_files_size(uint64_t& size, const std::set<std::string>& additional_log_names)
+    {
+      FAST_CRITICAL_REGION_LOCAL(m_critical_sec);
+      return m_log_target.get_log_files_size(size, additional_log_names);
+    }
+
+    bool clear_log_files(const std::set<std::string>& additional_log_names)
+    {
+      FAST_CRITICAL_REGION_LOCAL(m_critical_sec);
+      return m_log_target.clear_log_files(additional_log_names);
     }
 
     bool take_away_journal(std::list<std::string>& journal)
@@ -1425,6 +1557,21 @@ namespace log_space
       logger* plogger = get_or_create_instance();
       if (!plogger) return false;
       return plogger->truncate_log_files();
+    }
+
+    static bool get_log_files_size(uint64_t& size, const std::set<std::string>& additional_log_names = {})
+    {
+      size = 0;
+      logger* plogger = get_or_create_instance();
+      if (!plogger) return false;
+      return plogger->get_log_files_size(size, additional_log_names);
+    }
+
+    static bool clear_log_files(const std::set<std::string>& additional_log_names = {})
+    {
+      logger* plogger = get_or_create_instance();
+      if (!plogger) return false;
+      return plogger->clear_log_files(additional_log_names);
     }
 
 

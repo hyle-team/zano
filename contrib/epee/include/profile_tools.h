@@ -34,6 +34,7 @@
 #include "misc_log_ex.h"
 #include "print_fixed_point_helper.h"
 #define ENABLE_PROFILING
+#define EPEE_PROFILE_DETAILS_LOG_FILENAME "profile_details.log"
 
 namespace epee
 {
@@ -91,7 +92,7 @@ namespace profile_tools
     if (!is_initialized)
     {
       is_initialized = true;
-      LOG_PRINT2("profile_details.log", "=================================================================================================================================================", LOG_LEVEL_0);
+      LOG_PRINT2(EPEE_PROFILE_DETAILS_LOG_FILENAME, "=================================================================================================================================================", LOG_LEVEL_0);
     }
   }
 
@@ -109,7 +110,7 @@ namespace profile_tools
 		{
 			NESTED_TRY_ENTRY();
 
-      LOG_PRINT2("profile_details.log", "PROFILE "<< std::left << std::setw(50) << (m_name + ":")
+      LOG_PRINT2(EPEE_PROFILE_DETAILS_LOG_FILENAME, "PROFILE "<< std::left << std::setw(50) << (m_name + ":")
         << "av_time:" << std::setw(15) << epee::string_tools::print_fixed_decimal_point (m_count_of_call ? (m_summary_time_used / m_count_of_call) : 0, 3)
         << "sum_time: " << std::setw(15) << epee::string_tools::print_fixed_decimal_point(m_summary_time_used, 3)
         << "call_count: " << std::setw(15) << m_count_of_call, LOG_LEVEL_0);
