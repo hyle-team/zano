@@ -811,7 +811,25 @@ namespace log_space
           success = false;
           continue;
         }
-        paths.push_back(target_path);
+        // a known name can refer to a registered file with different casing, so check for equivalence to avoid duplicates
+        bool skip_path = false;
+        for (const auto& entry : m_log_file_names)
+        {
+          bool already_registered = boost::filesystem::equivalent(target_path, boost::filesystem::path(entry.second.second), ec);
+          if (ec)
+          {
+            success = false;
+            skip_path = true;
+            break;
+          }
+          if (already_registered)
+          {
+            skip_path = true;
+            break;
+          }
+        }
+        if (!skip_path)
+          paths.push_back(target_path);
       }
       return success;
     }

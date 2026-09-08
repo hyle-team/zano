@@ -76,13 +76,16 @@ QString make_response_dbg(const T& r, const std::string& location)
 
 namespace
 {
-  // Core diagnostics and profiling can leave these named logs from a previous
-  // session, before the current logger has opened their streams.
+  // Known GUI/CLI log files in the configured log folder, including past sessions
+  // The logger also includes the actual current log and other registered streams, skipping additional names that are already registered
   const std::set<std::string> gui_diagnostic_log_names =
   {
+    "Zano.log",
     CURRENCY_CONSTRUCT_TX_LOG_FILENAME,
     CURRENCY_FAILED_MINED_BLOCKS_LOG_FILENAME,
-    EPEE_PROFILE_DETAILS_LOG_FILENAME
+    EPEE_PROFILE_DETAILS_LOG_FILENAME,
+    "zanod.log",
+    "simplewallet.log"
   };
 }
 
