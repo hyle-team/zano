@@ -45,6 +45,10 @@ namespace currency
     std::shared_ptr<const block_extended_info> block_ptr;
     std::shared_ptr<const transaction_chain_entry> coinbase_ptr;
     std::list<std::shared_ptr<const transaction_chain_entry> > txs_ptr;
+    // wallet transport metadata; never serialized into the blockchain database
+    uint64_t coinbase_original_size = 0;
+    std::vector<uint64_t> tx_original_sizes;
+    bool compact = false;
   };
 
   /************************************************************************/

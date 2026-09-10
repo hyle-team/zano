@@ -24,6 +24,7 @@ namespace tools
     {
       m_daemon_address = url;
       m_http_client.disconnect();
+      m_compact_rpc_unsupported = false;
     }
     return true;
   }
@@ -40,6 +41,41 @@ namespace tools
   //------------------------------------------------------------------------------------------------------------------------------
   bool default_http_core_proxy::call_COMMAND_RPC_GET_BLOCKS_DIRECT(const currency::COMMAND_RPC_GET_BLOCKS_DIRECT::request& rqt, currency::COMMAND_RPC_GET_BLOCKS_DIRECT::response& rsp)
   {
+    if (rqt.compact && !m_compact_rpc_unsupported)
+    {
+      currency::COMMAND_RPC_GET_BLOCKS_COMPACT::request compact_req;
+      compact_req.minimum_height = rqt.minimum_height;
+      compact_req.block_ids = rqt.block_ids;
+      std::string request_body;
+      if (!epee::serialization::store_t_to_binary(compact_req, request_body))
+        return false;
+
+      bool unsupported = false;
+      const bool result = call_request([&]()
+      {
+        const epee::net_utils::http::http_response_info* response = nullptr;
+        if (!epee::net_utils::http::invoke_request(m_daemon_address + "/getblocks_compact.bin", m_http_client, m_connection_timeout, &response, "GET", request_body) || !response)
+          return false;
+        if (response->m_response_code == 404)
+        {
+          unsupported = true;
+          return true;
+        }
+        if (response->m_response_code != 200)
+          return false;
+
+        currency::COMMAND_RPC_GET_BLOCKS_COMPACT::response compact_res;
+        if (!epee::serialization::load_t_from_binary(compact_res, response->m_body, storage_limits_wallet_rpc::get_storage_limits()))
+          return false;
+        return currency::unserialize_compact_wallet_blocks(compact_req, compact_res, rsp);
+      });
+      if (!result || !unsupported)
+        return result;
+      // only an absent endpoint permits a compatibility fallback, a bad compact response or a transport/server error remains a failed request
+      m_compact_rpc_unsupported = true;
+      LOG_PRINT_L0("[COMPACT_SYNC] /getblocks_compact.bin returned HTTP 404; falling back to Full sync.");
+    }
+
     currency::COMMAND_RPC_GET_BLOCKS_FAST::request req;
     req.block_ids = rqt.block_ids;
     req.minimum_height = rqt.minimum_height;

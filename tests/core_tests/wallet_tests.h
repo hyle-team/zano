@@ -6,6 +6,7 @@
 #pragma once 
 #include "chaingen.h"
 #include "wallet_tests_basic.h"
+#include "escrow_wallet_tests.h"
 
 
 struct gen_wallet_basic_transfer : public wallet_test
@@ -327,4 +328,20 @@ struct wallet_reorganize_and_trim_test : public wallet_test
   wallet_reorganize_and_trim_test();
   bool generate(std::vector<test_event_entry>& events) const;
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};
+
+struct wallet_compact_sync : public wallet_test
+{
+  wallet_compact_sync();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool check_sync(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};
+
+// reuses the signed escrow proposal/release/cancellation scenarios with compact wire responses
+struct wallet_compact_sync_escrow : public escrow_wallet_test
+{
+  wallet_compact_sync_escrow();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool check_transport(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+  void set_core_proxy(std::shared_ptr<tools::i_core_proxy> proxy);
 };
