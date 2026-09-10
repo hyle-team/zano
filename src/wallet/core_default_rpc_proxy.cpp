@@ -41,12 +41,11 @@ namespace tools
   //------------------------------------------------------------------------------------------------------------------------------
   bool default_http_core_proxy::call_COMMAND_RPC_GET_BLOCKS_DIRECT(const currency::COMMAND_RPC_GET_BLOCKS_DIRECT::request& rqt, currency::COMMAND_RPC_GET_BLOCKS_DIRECT::response& rsp)
   {
-    if (rqt.compact_full_blocks_count && !m_compact_rpc_unsupported)
+    if (rqt.compact && !m_compact_rpc_unsupported)
     {
       currency::COMMAND_RPC_GET_BLOCKS_COMPACT::request compact_req;
       compact_req.minimum_height = rqt.minimum_height;
       compact_req.block_ids = rqt.block_ids;
-      compact_req.full_blocks_count = rqt.compact_full_blocks_count;
       std::string request_body;
       if (!epee::serialization::store_t_to_binary(compact_req, request_body))
         return false;

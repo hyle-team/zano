@@ -298,8 +298,8 @@ namespace currency
   {
     struct request : COMMAND_RPC_GET_BLOCKS_FAST_T<block_direct_data_entry>::request
     {
-      // local proxy option only,zero keeps the existing full RPC path
-      uint64_t compact_full_blocks_count = 0;
+      // local proxy option only; false keeps the existing full RPC path
+      bool compact = false;
     };
   };
 
@@ -324,19 +324,18 @@ namespace currency
     END_KV_SERIALIZE_MAP()
   };
 
+  // all non genesis transactions omit top level signatures/proofs
+  // clients must keep these copies out of transaction relay, including after a chain reorg
   struct COMMAND_RPC_GET_BLOCKS_COMPACT
   {
     struct request
     {
       uint64_t minimum_height = 0;
       std::list<crypto::hash> block_ids;
-      // all transactions in this many most recent blocks remain full
-      uint64_t full_blocks_count = 0;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(minimum_height)
         KV_SERIALIZE_CONTAINER_POD_AS_BLOB(block_ids)
-        KV_SERIALIZE(full_blocks_count)
       END_KV_SERIALIZE_MAP()
     };
 

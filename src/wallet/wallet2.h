@@ -153,7 +153,7 @@ namespace tools
     uint64_t m_last_pow_block_h = 0;
     std::list<std::pair<uint64_t, wallet_event_t>> m_rollback_events;
     std::list<std::pair<uint64_t, uint64_t> > m_last_zc_global_indexs; // <height, last_zc_global_indexs>, biggest height comes in front
-    uint64_t m_last_compact_block_height = 0; // a reorg through compact transactions needs a rescan: their signatures/proofs cannot be relayed
+    uint64_t m_last_compact_block_height = 0; // highest compact block started; >= chain size identifies incomplete processing
 
     //variables that not being serialized
     std::atomic<uint64_t> m_last_bc_timestamp = 0;
@@ -814,7 +814,7 @@ namespace tools
     // сallers opt in to compact transport; missing endpoints (HTTP 404) fall back to full sync.
     void set_compact_sync(bool enabled)
     {
-      WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(!enabled || WALLET_FILE_SERIALIZATION_VERSION >= 171, "Compact sync requires wallet serialization version 171 to preserve its reorg boundary");
+      WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(!enabled || WALLET_FILE_SERIALIZATION_VERSION >= 171, "Compact sync requires wallet serialization version 171 to detect incomplete blocks");
       m_compact_sync = enabled;
     }
     bool get_compact_sync() const { return m_compact_sync; }
@@ -846,7 +846,7 @@ private:
     void remove_transfer_from_expiration_list(uint64_t transfer_index);
     void load_keys(const std::string& keys_file_name, const std::string& password, uint64_t file_signature, keys_file_data& kf_data, std::string* out_body_password = nullptr);
     void process_ado_in_new_transaction(const currency::asset_descriptor_operation& ado, process_transaction_context& ptc);
-    void process_new_transaction(const currency::transaction& tx, uint64_t height, const currency::block& b, const std::vector<uint64_t>* pglobal_indexes, uint64_t original_size = 0);
+    void process_new_transaction(const currency::transaction& tx_from_block, uint64_t height, const currency::block& b, const std::vector<uint64_t>* pglobal_indexes, uint64_t original_size = 0);
     void fetch_tx_global_indixes(const currency::transaction& tx, std::vector<uint64_t>& goutputs_indexes);
     void fetch_tx_global_indixes(const std::list<std::reference_wrapper<const currency::transaction>>& txs, std::vector<std::vector<uint64_t>>& goutputs_indexes);
     void detach_blockchain(uint64_t including_height);

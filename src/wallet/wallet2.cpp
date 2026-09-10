@@ -5,6 +5,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <numeric>
+#include <optional>
 #include <boost/archive/binary_oarchive.hpp>
 #include <boost/archive/binary_iarchive.hpp>
 #include <boost/iostreams/stream.hpp>
@@ -576,9 +577,20 @@ uint64_t wallet2::get_actual_zc_global_index()
   throw std::runtime_error(""); //mostly to suppress compiler warning 
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t height, const currency::block& b, const std::vector<uint64_t>* pglobal_indexes, uint64_t original_size /* = 0 */)
+void wallet2::process_new_transaction(const currency::transaction& tx_from_block, uint64_t height, const currency::block& b, const std::vector<uint64_t>* pglobal_indexes, uint64_t original_size /* = 0 */)
 {
   const bool hf6_active = is_in_hardfork_zone(ZANO_HARDFORK_06);
+
+  // preserve an existing full pending copy when confirmation arrives via Compact
+  // own the copy locally: process_unconfirmed erases the pending entry below
+  std::optional<currency::transaction> full_tx;
+  if (tx_from_block.signatures.empty() && !m_unconfirmed_txs.empty())
+  {
+    const auto pending = m_unconfirmed_txs.find(get_transaction_hash(tx_from_block));
+    if (pending != m_unconfirmed_txs.end() && !pending->second.tx.signatures.empty())
+      full_tx = pending->second.tx;
+  }
+  const currency::transaction& tx = full_tx ? *full_tx : tx_from_block;
 
   //check for transaction spends
   process_transaction_context ptc(tx);
@@ -994,6 +1006,10 @@ void wallet2::resend_unconfirmed()
 
   for (auto& ut : m_unconfirmed_txs)
   {
+    // compact transactions from detached blocks remain pending for accounting
+    // but cannot be relayed without their signatures, full pending txs still relay
+    if (ut.second.tx.signatures.empty())
+      continue;
     req.txs_as_hex.push_back(epee::string_tools::buff_to_hex_nodelimer(tx_to_blob(ut.second.tx)));
     WLT_LOG_GREEN("Relaying tx: " << ut.second.tx_hash, LOG_LEVEL_0);
   }
@@ -1710,14 +1726,14 @@ void wallet2::process_new_blockchain_entry(const currency::block& b, const curre
     !(height == m_minimum_height || get_blockchain_current_size() <= 1), error::wallet_internal_error,
     "current_index=" + std::to_string(height) + ", get_blockchain_current_height()=" + std::to_string(get_blockchain_current_size()));
 
-  WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(!bche.compact || WALLET_FILE_SERIALIZATION_VERSION >= 171, "Compact sync requires wallet serialization version 171 to preserve its reorg boundary");
+  WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(!bche.compact || WALLET_FILE_SERIALIZATION_VERSION >= 171, "Compact sync requires wallet serialization version 171 to detect incomplete blocks");
   WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(!bche.compact || (height != 0 && bche.coinbase_original_size != 0 && bche.tx_original_sizes.size() == bche.txs_ptr.size()), "Incomplete compact block metadata");
   WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(bche.tx_original_sizes.empty() || bche.tx_original_sizes.size() == bche.txs_ptr.size(), "Transaction size metadata count mismatch");
   WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(bche.coinbase_original_size <= std::numeric_limits<uint32_t>::max(), "Coinbase original size does not fit wallet history");
   for (uint64_t original_size : bche.tx_original_sizes)
     WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(original_size != 0 && original_size <= std::numeric_limits<uint32_t>::max(), "Transaction original size does not fit wallet history");
 
-  // transaction processing and callbacks may throw after changing wallet state, preserve the boundary before any such changes, including when this block is only partially processed
+  // record the height before processing: a callback may throw after changing transfers but before this block is added to m_chain
   if (bche.compact)
   {
     if (m_last_compact_block_height == 0)
@@ -1825,8 +1841,7 @@ void wallet2::pull_blocks(size_t& blocks_added, std::atomic<bool>& stop, bool& f
   currency::COMMAND_RPC_GET_BLOCKS_DIRECT::response res = AUTO_VAL_INIT(res);
 
   req.minimum_height = get_wallet_minimum_height();
-  if (WALLET_FILE_SERIALIZATION_VERSION >= 171 && m_compact_sync && m_concise_mode)
-    req.compact_full_blocks_count = std::max<uint64_t>(1, m_wallet_concise_mode_max_reorg_blocks);
+  req.compact = WALLET_FILE_SERIALIZATION_VERSION >= 171 && m_compact_sync;
   if (req.minimum_height > m_height_of_start_sync)
     m_height_of_start_sync = req.minimum_height;
 
@@ -2005,15 +2020,10 @@ void wallet2::handle_pulled_blocks(size_t& blocks_added, std::atomic<bool>& stop
           WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(been_matched_block,
             "unmatched block while never been mathced block");
         }
-        // this guard survives mode changes and wallet reloads, compact transactions must never reach detach_blockchain unconfirmed queue, where they would be relayed without proofs
-        const bool detaches_compact_blocks = last_matched_index < m_last_compact_block_height;
         //TODO: take into account date of wallet creation
         //reorganize
-        if (detaches_compact_blocks ||
-          (m_concise_mode && m_chain.get_blockchain_current_size() - (last_matched_index) > m_wallet_concise_mode_max_reorg_blocks))
+        if (m_concise_mode && m_chain.get_blockchain_current_size() - (last_matched_index) > m_wallet_concise_mode_max_reorg_blocks)
         {
-          if (detaches_compact_blocks)
-            WLT_LOG_L0("Reorg crosses compact block history at height " << m_last_compact_block_height << "; rescanning wallet");
           m_full_resync_requested_at_h = m_chain.get_blockchain_current_size() - (last_matched_index + 1);
           wallet_reset_needed = true;
           return;
@@ -3012,6 +3022,9 @@ void wallet2::detach_blockchain(uint64_t including_height)
 
   //asset descriptors
   handle_rollback_events(including_height);
+
+  // detached compact blocks are no longer part of this history, otherwise a shorter replacement batch could be mistaken for an interrupted block
+  m_last_compact_block_height = std::min(m_last_compact_block_height, including_height ? including_height - 1 : 0);
 
   WLT_LOG_L0("Detached blockchain on height " << including_height << ", transfers detached " << transfers_detached << ", blocks detached " << blocks_detached
     << ", new top: " << print16(m_chain.get_top_block_id()) << " @ " << m_chain.get_top_block_height());

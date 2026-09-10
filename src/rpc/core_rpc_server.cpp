@@ -424,12 +424,6 @@ namespace currency
   bool core_rpc_server::on_get_blocks_compact(const COMMAND_RPC_GET_BLOCKS_COMPACT::request& req, COMMAND_RPC_GET_BLOCKS_COMPACT::response& res, connection_context& cntx)
   {
     res.protocol_version = 1;
-    if (!req.full_blocks_count)
-    {
-      res.status = API_RETURN_CODE_BAD_ARG;
-      return true;
-    }
-
     if (req.block_ids.empty())
     {
       res.status = API_RETURN_CODE_GENESIS_MISMATCH;
@@ -448,8 +442,6 @@ namespace currency
     if (!result || res.status != API_RETURN_CODE_OK)
       return result;
 
-    const uint64_t full_from_height = res.current_height > req.full_blocks_count
-      ? res.current_height - req.full_blocks_count : 0;
     uint64_t height = res.start_height;
     for (const auto& source : direct_res.blocks)
     {
@@ -457,7 +449,8 @@ namespace currency
       const auto& source_block = source.block_ptr->bl;
       res.blocks.emplace_back();
       auto& entry = res.blocks.back();
-      entry.compact = height > 0 && height < full_from_height;
+      // genesis stays full; all later blocks, including the tip, are compact
+      entry.compact = height > 0;
       blobdata coinbase_blob;
       CHECK_AND_ASSERT_MES(tx_to_blob(source_block.miner_tx, coinbase_blob), false, "Failed to serialize wallet coinbase");
       entry.coinbase_original_size = coinbase_blob.size();

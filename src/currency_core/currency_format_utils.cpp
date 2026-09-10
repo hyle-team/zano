@@ -4070,7 +4070,7 @@ namespace currency
   //---------------------------------------------------------------
   bool unserialize_compact_wallet_blocks(const currency::COMMAND_RPC_GET_BLOCKS_COMPACT::request& request, const currency::COMMAND_RPC_GET_BLOCKS_COMPACT::response& serialized, currency::COMMAND_RPC_GET_BLOCKS_DIRECT::response& unserialized)
   {
-    CHECK_AND_ASSERT_MES(request.full_blocks_count && serialized.protocol_version == 1, false, "Unsupported compact wallet RPC version or tail depth");
+    CHECK_AND_ASSERT_MES(serialized.protocol_version == 1, false, "Unsupported compact wallet RPC version");
     currency::COMMAND_RPC_GET_BLOCKS_DIRECT::response result = AUTO_VAL_INIT(result);
     result.status = serialized.status;
     result.start_height = serialized.start_height;
@@ -4087,8 +4087,6 @@ namespace currency
       false, "Invalid compact wallet RPC block count");
     CHECK_AND_ASSERT_MES(serialized.start_height >= request.minimum_height && serialized.start_height < serialized.current_height &&
       serialized.blocks.size() <= serialized.current_height - serialized.start_height, false, "Invalid compact wallet RPC height range");
-    const uint64_t full_from_height = serialized.current_height > request.full_blocks_count
-      ? serialized.current_height - request.full_blocks_count : 0;
     uint64_t height = serialized.start_height;
     crypto::hash previous_hash = currency::null_hash;
     bool first = true;
@@ -4101,7 +4099,7 @@ namespace currency
 
     for (const auto& entry : serialized.blocks)
     {
-      CHECK_AND_ASSERT_MES(entry.compact == (height > 0 && height < full_from_height), false, "Compact wallet RPC tail boundary mismatch");
+      CHECK_AND_ASSERT_MES(entry.compact == (height > 0), false, "Compact wallet RPC block format mismatch");
       auto block_info = std::make_shared<currency::block_extended_info>();
       CHECK_AND_ASSERT_MES(currency::parse_and_validate_block_from_blob(entry.block, block_info->bl), false, "Invalid compact wallet block blob");
       const auto& block = block_info->bl;
