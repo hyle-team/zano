@@ -4,6 +4,7 @@
 // Copyright (c) 2012-2013 The Boolberry developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
+#include <limits>
 #include <regex>
 #include "include_base_utils.h"
 #include <boost/foreach.hpp>
@@ -4066,6 +4067,87 @@ namespace currency
     return true;
   }
 
+  //---------------------------------------------------------------
+  bool unserialize_compact_wallet_blocks(const currency::COMMAND_RPC_GET_BLOCKS_COMPACT::request& request, const currency::COMMAND_RPC_GET_BLOCKS_COMPACT::response& serialized, currency::COMMAND_RPC_GET_BLOCKS_DIRECT::response& unserialized)
+  {
+    CHECK_AND_ASSERT_MES(request.full_blocks_count && serialized.protocol_version == 1, false, "Unsupported compact wallet RPC version or tail depth");
+    currency::COMMAND_RPC_GET_BLOCKS_DIRECT::response result = AUTO_VAL_INIT(result);
+    result.status = serialized.status;
+    result.start_height = serialized.start_height;
+    result.current_height = serialized.current_height;
+    result.current_hardfork = serialized.current_hardfork;
+    if (serialized.status != API_RETURN_CODE_OK)
+    {
+      CHECK_AND_ASSERT_MES(!serialized.status.empty(), false, "Missing compact wallet RPC status");
+      unserialized = std::move(result);
+      return true;
+    }
+
+    CHECK_AND_ASSERT_MES(!serialized.blocks.empty() && serialized.blocks.size() <= COMMAND_RPC_GET_BLOCKS_FAST_MAX_COUNT,
+      false, "Invalid compact wallet RPC block count");
+    CHECK_AND_ASSERT_MES(serialized.start_height >= request.minimum_height && serialized.start_height < serialized.current_height &&
+      serialized.blocks.size() <= serialized.current_height - serialized.start_height, false, "Invalid compact wallet RPC height range");
+    const uint64_t full_from_height = serialized.current_height > request.full_blocks_count
+      ? serialized.current_height - request.full_blocks_count : 0;
+    uint64_t height = serialized.start_height;
+    crypto::hash previous_hash = currency::null_hash;
+    bool first = true;
+
+    const auto valid_size = [](uint64_t original_size, size_t encoded_size, bool compact)
+    {
+      return original_size > 0 && original_size <= (std::numeric_limits<uint32_t>::max)() &&
+        (compact ? original_size >= encoded_size : original_size == encoded_size);
+    };
+
+    for (const auto& entry : serialized.blocks)
+    {
+      CHECK_AND_ASSERT_MES(entry.compact == (height > 0 && height < full_from_height), false, "Compact wallet RPC tail boundary mismatch");
+      auto block_info = std::make_shared<currency::block_extended_info>();
+      CHECK_AND_ASSERT_MES(currency::parse_and_validate_block_from_blob(entry.block, block_info->bl), false, "Invalid compact wallet block blob");
+      const auto& block = block_info->bl;
+      CHECK_AND_ASSERT_MES((block.miner_tx.vin.size() == 1 || block.miner_tx.vin.size() == 2) &&
+        block.miner_tx.vin.front().type() == typeid(currency::txin_gen) && currency::get_block_height(block) == height,
+        false, "Invalid compact wallet block height");
+      CHECK_AND_ASSERT_MES(first || block.prev_id == previous_hash, false, "Broken compact wallet block links");
+      previous_hash = currency::get_block_hash(block);
+      first = false;
+      CHECK_AND_ASSERT_MES(entry.coinbase_global_outs.size() == block.miner_tx.vout.size(), false, "Invalid compact wallet coinbase indexes");
+      CHECK_AND_ASSERT_MES(entry.txs.size() == block.tx_hashes.size() && entry.tx_global_outs.size() == entry.txs.size() &&
+        entry.tx_original_sizes.size() == entry.txs.size(), false, "Invalid compact wallet transaction counts");
+      CHECK_AND_ASSERT_MES(!entry.compact || (block.miner_tx.signatures.empty() && block.miner_tx.proofs.empty()),
+        false, "Unexpected signatures or proofs in compact coinbase");
+      currency::blobdata coinbase_blob;
+      CHECK_AND_ASSERT_MES(currency::tx_to_blob(block.miner_tx, coinbase_blob) &&
+        valid_size(entry.coinbase_original_size, coinbase_blob.size(), entry.compact), false, "Invalid original coinbase size in compact wallet RPC");
+
+      currency::block_direct_data_entry decoded;
+      block_info->height = height;
+      decoded.block_ptr = block_info;
+      auto coinbase_info = std::make_shared<currency::transaction_chain_entry>();
+      coinbase_info->m_global_output_indexes = entry.coinbase_global_outs;
+      decoded.coinbase_ptr = coinbase_info;
+      decoded.coinbase_original_size = entry.coinbase_original_size;
+      decoded.tx_original_sizes = entry.tx_original_sizes;
+      decoded.compact = entry.compact;
+      size_t index = 0;
+      for (const auto& tx_blob : entry.txs)
+      {
+        auto tx_info = std::make_shared<currency::transaction_chain_entry>();
+        CHECK_AND_ASSERT_MES(currency::parse_and_validate_tx_from_blob(tx_blob, tx_info->tx), false, "Invalid compact wallet transaction blob");
+        CHECK_AND_ASSERT_MES(currency::get_transaction_hash(tx_info->tx) == block.tx_hashes[index], false, "Compact wallet transaction hash mismatch");
+        CHECK_AND_ASSERT_MES(entry.tx_global_outs[index].v.size() == tx_info->tx.vout.size(), false, "Invalid compact wallet transaction indexes");
+        CHECK_AND_ASSERT_MES(!entry.compact || (tx_info->tx.signatures.empty() && tx_info->tx.proofs.empty()), false, "Unexpected signatures or proofs in compact wallet transaction");
+        CHECK_AND_ASSERT_MES(valid_size(entry.tx_original_sizes[index], tx_blob.size(), entry.compact), false, "Invalid original transaction size in compact wallet RPC");
+        tx_info->m_global_output_indexes = entry.tx_global_outs[index].v;
+        decoded.txs_ptr.push_back(tx_info);
+        ++index;
+      }
+      result.blocks.push_back(std::move(decoded));
+      ++height;
+    }
+    unserialized = std::move(result);
+    return true;
+  }
   //---------------------------------------------------------------
   uint64_t get_alias_coast_from_fee(const std::string& alias, uint64_t median_fee)
   {

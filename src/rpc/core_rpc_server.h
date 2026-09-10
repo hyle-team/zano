@@ -45,6 +45,7 @@ namespace currency
 
     bool on_get_height(const COMMAND_RPC_GET_HEIGHT::request& req, COMMAND_RPC_GET_HEIGHT::response& res, connection_context& cntx);
     bool on_get_blocks(const COMMAND_RPC_GET_BLOCKS_FAST::request& req, COMMAND_RPC_GET_BLOCKS_FAST::response& res, connection_context& cntx);
+    bool on_get_blocks_compact(const COMMAND_RPC_GET_BLOCKS_COMPACT::request& req, COMMAND_RPC_GET_BLOCKS_COMPACT::response& res, connection_context& cntx);
     bool on_get_transactions(const COMMAND_RPC_GET_TRANSACTIONS::request& req, COMMAND_RPC_GET_TRANSACTIONS::response& res, connection_context& cntx);
     bool on_get_indexes(const COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES::request& req, COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES::response& res, connection_context& cntx);
     bool on_send_raw_tx(const COMMAND_RPC_SEND_RAW_TX::request& req, COMMAND_RPC_SEND_RAW_TX::response& res, connection_context& cntx);
@@ -129,6 +130,7 @@ namespace currency
       MAP_URI_AUTO_JON2("/getinfo",                   on_get_info,                    COMMAND_RPC_GET_INFO)
       // binary RPCs
       MAP_URI_AUTO_BIN2("/getblocks.bin",             on_get_blocks,                  COMMAND_RPC_GET_BLOCKS_FAST)
+      MAP_URI_AUTO_BIN2("/getblocks_compact.bin",     on_get_blocks_compact,          COMMAND_RPC_GET_BLOCKS_COMPACT)
       MAP_URI_AUTO_BIN2("/get_o_indexes.bin",         on_get_indexes,                 COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES)      
       MAP_URI_AUTO_BIN2("/getrandom_outs.bin",        on_get_random_outs,             COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS_LEGACY)
       MAP_URI_AUTO_BIN2("/getrandom_outs1.bin",       on_get_random_outs1,            COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS)
