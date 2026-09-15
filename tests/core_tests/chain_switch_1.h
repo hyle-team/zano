@@ -73,6 +73,21 @@ struct alt_blocks_with_the_same_txs : public test_chain_unit_enchanced
   bool check_tx_not_related_to_altblock(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };
 
+struct alt_blocks_pruning : public test_chain_unit_enchanced
+{
+  alt_blocks_pruning();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool check_oldest_pruned(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+  bool prepare_same_timestamp_pruning(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+  bool check_same_timestamp_pruning(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+
+  mutable crypto::hash m_oldest_alt_block_id;
+  mutable crypto::hash m_middle_alt_block_id;
+  mutable crypto::hash m_newest_alt_block_id;
+  mutable crypto::hash m_extra_alt_block_id;
+  mutable crypto::hash m_oldest_alt_tx_id;
+};
+
 struct chain_switching_when_out_spent_in_alt_chain_mixin : public test_chain_unit_enchanced
 {
   bool generate(std::vector<test_event_entry>& events) const;
