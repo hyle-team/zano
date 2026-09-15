@@ -13,6 +13,7 @@
 #define TX_POOL_USE_UNSECURE_TEST_FUNCTIONS // turns on special tests functions of tx pool
 
 #include "currency_core/currency_basic.h"
+#include "currency_core/currency_config.h"
 #include "currency_core/currency_core.h"
 #include "wallet/wallet2.h"
 #include "test_core_time.h"
@@ -1048,7 +1049,7 @@ bool construct_broken_tx(const currency::account_keys& sender_account_keys, cons
     i++;
   }
 
-  LOG_PRINT2("construct_tx.log", "transaction_created: " << get_transaction_hash(tx) << ENDL << obj_to_json_str(tx) << ENDL << ss_ring_s.str(), LOG_LEVEL_3);
+  LOG_PRINT2(CURRENCY_CONSTRUCT_TX_LOG_FILENAME, "transaction_created: " << get_transaction_hash(tx) << ENDL << obj_to_json_str(tx) << ENDL << ss_ring_s.str(), LOG_LEVEL_3);
 
   return true;
 }

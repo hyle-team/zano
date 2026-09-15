@@ -72,6 +72,8 @@ public slots:
   QString stop_pos_mining(const QString& param);
   QString set_log_level(const QString& param);
   QString get_log_level(const QString& param);
+  QString get_log_files_size(const QString& param);
+  QString clear_log_files(const QString& param);
   QString set_enable_tor(const QString& param);
   QString webkit_launched_script(const QString& param);
   QString get_smart_wallet_info(const QString& param);
