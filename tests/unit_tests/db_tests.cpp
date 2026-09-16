@@ -101,10 +101,12 @@ namespace db_test
     basic_test<db::lmdb_db_backend>();
   }
 
+#ifdef ENABLED_ENGINE_MDBX
   TEST(mdbx, basic_test)
   {
     basic_test<db::mdbx_db_backend>();
   }
+#endif
 
 
   //////////////////////////////////////////////////////////////////////////////
@@ -387,10 +389,12 @@ namespace db_test
     multithread_test_1<db::lmdb_db_backend>();
   }
 
+#ifdef ENABLED_ENGINE_MDBX
   TEST(mdbx, multithread_test_1)
   {
     multithread_test_1<db::mdbx_db_backend>();
   }
+#endif
 
 
   //////////////////////////////////////////////////////////////////////////////
@@ -512,10 +516,12 @@ namespace db_test
     basic_accessor_test<db::lmdb_db_backend>();
   }
 
+#ifdef ENABLED_ENGINE_MDBX
   TEST(mdbx, basic_accessor_test)
   {
     basic_accessor_test<db::mdbx_db_backend>();
   }
+#endif
 
   //////////////////////////////////////////////////////////////////////////////
   // single_value_test
@@ -609,10 +615,12 @@ namespace db_test
     single_value_test<db::lmdb_db_backend>();
   }
 
+#ifdef ENABLED_ENGINE_MDBX
   TEST(mdbx, single_value_test)
   {
     single_value_test<db::mdbx_db_backend>();
   }
+#endif
 
   //////////////////////////////////////////////////////////////////////////////
   // array_basic_test
@@ -740,10 +748,12 @@ namespace db_test
     array_basic_test<db::lmdb_db_backend>();
   }
 
+#ifdef ENABLED_ENGINE_MDBX
   TEST(mdbx, array_basic_test)
   {
     array_basic_test<db::mdbx_db_backend>();
   }
+#endif
 
 
   //////////////////////////////////////////////////////////////////////////////
@@ -858,10 +868,12 @@ namespace db_test
     array_accessor_test<db::lmdb_db_backend>();
   }
 
+#ifdef ENABLED_ENGINE_MDBX
   TEST(mdbx, array_accessor_test)
   {
     array_accessor_test<db::mdbx_db_backend>();
   }
+#endif
 
   //////////////////////////////////////////////////////////////////////////////
   // key_value_test
@@ -971,10 +983,12 @@ namespace db_test
     key_value_test<db::lmdb_db_backend>();
   }
 
+#ifdef ENABLED_ENGINE_MDBX
   TEST(mdbx, key_value_test)
   {
     key_value_test<db::mdbx_db_backend>();
   }
+#endif
 
 
   //////////////////////////////////////////////////////////////////////////////
@@ -1147,10 +1161,12 @@ namespace db_test
     db_2gb_test<db::lmdb_db_backend>();
   }
 
+#ifdef ENABLED_ENGINE_MDBX
   TEST(mdbx, 2gb_test)
   {
     db_2gb_test<db::mdbx_db_backend>();
   }
+#endif
 
 
   //////////////////////////////////////////////////////////////////////////////
@@ -1241,10 +1257,12 @@ namespace db_test
     close_contaier_test<db::lmdb_db_backend>();
   }
 
+#ifdef ENABLED_ENGINE_MDBX
   TEST(mdbx, close_contaier_test)
   {
     close_contaier_test<db::mdbx_db_backend>();
   }
+#endif
 
   //////////////////////////////////////////////////////////////////////////////
   // key_value_prefix_enum_multithread_test  (backend::enumerate_prefix, MT)
@@ -1404,8 +1422,10 @@ namespace db_test
     key_value_prefix_enum_multithread_test<db::lmdb_db_backend>();
   }
 
+#ifdef ENABLED_ENGINE_MDBX
   TEST(mdbx, key_value_prefix_enum_multithread_test)
   {
     key_value_prefix_enum_multithread_test<db::mdbx_db_backend>();
   }
+#endif
 } // namespace lmdb_test

@@ -135,7 +135,7 @@ namespace crypto
       }
     }
 
-    // the third loop: Horner’s rule
+    // the third loop: Horner's rule
     point_t result = Gk_inited[K - 1] ? Gk[K - 1] : c_point_0;
     for (size_t k = K - 2; k != SIZE_MAX; --k)
     {

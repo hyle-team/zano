@@ -19,6 +19,7 @@
 #include "common/callstack_helper.h"
 
 #define TX_BLOBSIZE_CHECKER_LOG_FILENAME "get_object_blobsize(tx).log"
+#define BLOCK_STATS_LOG_FILENAME         "coretests_block_stats.log"
 
 using namespace chaingen_args;
 
@@ -33,6 +34,9 @@ namespace
   coretests_shm::shared_state* g_shm_state = nullptr;
   std::unique_ptr<boost::interprocess::mapped_region> g_shm_region;
   thread_local int32_t g_current_job_idx = -1;
+  bool g_report_block_stats = false;
+  std::vector<std::pair<std::string, test_block_stats>> g_test_block_stats;
+  thread_local std::string g_current_test_name;
 }
 
 #define GENERATE(filename, genclass) \
@@ -243,8 +247,12 @@ bool generate_and_play(const char* const genclass_name, size_t hardfork_id = SIZ
       LOG_PRINT_MAGENTA(std::string(100, '=') << std::endl <<
         "#TEST# >>>> " << genclass_name << " <<<< start replaying events" << std::endl <<
         std::string(100, '=') << std::endl, LOG_LEVEL_0);
-      
+
+      if (g_report_block_stats)
+        g_current_test_name = genclass_name;
       result = do_replay_events(events, g);
+      if (g_report_block_stats)
+        g_current_test_name.clear();
     }
   }
   catch (const std::exception& ex)
@@ -329,7 +337,11 @@ bool gen_and_play_intermitted_by_blockchain_saveload(const char* const genclass_
   uint64_t core_time = test_core_time::get_time();
   {
     random_state_test_restorer random_restorer; // use it to achive equal random generator's state before Stage 1 and before Stage 2
+    if (g_report_block_stats)
+      g_current_test_name = genclass_name;
     r = do_replay_events(events, g, 0, SIZE_MAX, false, [](currency::core&) {}, [&core_state_before](currency::core& c) { core_state_before.fill(c); });
+    if (g_report_block_stats)
+      g_current_test_name.clear();
     if (!r)
       return false;
     std::cout << concolor::green << "#TEST# " << genclass_name << ": STAGE 1: Succeeded (all events were played back normally)" << concolor::normal << std::endl;
@@ -793,6 +805,39 @@ inline bool do_replay_events(const std::vector<test_event_entry>& events, t_test
 
   before_deinit_cb(c);
 
+  // capture end-of-test block stats when the feature is enabled --report-block-stats
+  if (g_report_block_stats && !g_current_test_name.empty())
+  {
+    test_block_stats stats;
+    stats.blockchain_size  = c.get_blockchain_storage().get_current_blockchain_size();
+    stats.top_block_height = c.get_blockchain_storage().get_top_block_height();
+    stats.alt_blocks_count = c.get_blockchain_storage().get_alternative_blocks_count();
+    stats.pool_tx_count    = c.get_pool_transactions_count();
+
+    bool replaced = false;
+    for (auto& p : g_test_block_stats)
+    {
+      if (p.first == g_current_test_name)
+      {
+        p.second = stats;
+        replaced = true;
+        break;
+      }
+    }
+    if (!replaced)
+      g_test_block_stats.emplace_back(g_current_test_name, stats);
+
+    const int32_t wid = command_line::get_arg(g_vm, chaingen_args::arg_worker_id);
+    LOG_PRINT2(BLOCK_STATS_LOG_FILENAME,
+      "#TEST# " << g_current_test_name
+      << (wid >= 0 ? " [w" + std::to_string(wid) + "]" : std::string())
+      << "  chain_size=" << stats.blockchain_size
+      << "  top_height=" << stats.top_block_height
+      << "  alt_blocks=" << stats.alt_blocks_count
+      << "  pool_txs="   << stats.pool_tx_count,
+      LOG_LEVEL_0);
+  }
+
   c.deinit(); // always deinitialize the core
   protocol_handler.deinit();
 
@@ -1088,6 +1133,9 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY_HF(gen_alias_too_many_regs_in_block_template, "3"); // disabled in HF4 due to tx outputs count limitation
     GENERATE_AND_PLAY_HF(gen_alias_update_for_free, "3-*");
     GENERATE_AND_PLAY_HF(gen_alias_in_coinbase, "3-*");
+    GENERATE_AND_PLAY_HF(gen_alias_default_alias, "3-*");
+    GENERATE_AND_PLAY_HF(gen_alias_default_alias_last_alias_reorg, "3-*");
+    GENERATE_AND_PLAY_HF(gen_alias_default_alias_info_update, "3-*");
 
     GENERATE_AND_PLAY(gen_wallet_basic_transfer);
     GENERATE_AND_PLAY(gen_wallet_refreshing_on_chain_switch);
@@ -1101,6 +1149,7 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY(gen_wallet_unlock_by_block_and_by_time);
     GENERATE_AND_PLAY(wallet_unlock_time_tx_spend_detection);
     GENERATE_AND_PLAY(gen_wallet_payment_id);
+    GENERATE_AND_PLAY(gen_wallet_payment_id_mempool);
     GENERATE_AND_PLAY(gen_wallet_oversized_payment_id);
     GENERATE_AND_PLAY(gen_wallet_transfers_and_outdated_unconfirmed_txs);
     GENERATE_AND_PLAY(gen_wallet_transfers_and_chain_switch);
@@ -1146,12 +1195,15 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY_HF(wallet_rpc_gateway_reorg_receive, "6-*");
     GENERATE_AND_PLAY_HF(wallet_rpc_gateway_owner_change_altchain, "6-*");
     GENERATE_AND_PLAY_HF(wallet_rpc_gateway_limits, "6-*");
+    GENERATE_AND_PLAY_HF(wallet_rpc_gateway_decrypt_op, "6-*");
     GENERATE_AND_PLAY_HF(wallet_rpc_and_tx_unlock_time, "5-*");
     GENERATE_AND_PLAY_HF(wallet_rpc_sweep_below, "4-*");
     GENERATE_AND_PLAY_HF(wallet_rpc_sweep_below_wo_native, "4-*");
     GENERATE_AND_PLAY_HF(wallet_rpc_sweep_below_wo_reservation, "4-*");
     GENERATE_AND_PLAY_HF(wallet_rpc_sweep_below_double_sweep, "4-*");
     GENERATE_AND_PLAY_HF(wallet_rpc_sweep_below_wo_multi_asset, "4-*");
+    GENERATE_AND_PLAY_HF(wallet_rpc_get_outputs_and_utxo_stats, "4-*");
+    GENERATE_AND_PLAY(wallet_rpc_sign_message_with_alias);
 
     // GENERATE_AND_PLAY(emission_test); // simulate 1 year of blockchain, too long run (1 y ~= 1 hr), by demand only
     // LOG_ERROR2("print_reward_change_first_blocks.log", currency::print_reward_change_first_blocks(525601).str()); // outputs first 1 year of blocks' rewards (simplier)
@@ -1329,6 +1381,7 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY_HF(hardfork_4_wallet_transfer_with_mandatory_mixins, "3-*");
     GENERATE_AND_PLAY(hardfork_4_wallet_sweep_bare_outs);
     GENERATE_AND_PLAY_HF(hardfork_4_pop_tx_from_global_index, "4-*");
+    GENERATE_AND_PLAY(hardfork_4_pos_decoy_transition);
 
     // HF5
     GENERATE_AND_PLAY_HF(hard_fork_5_tx_version, "5-*");
@@ -1340,6 +1393,7 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY_HF(hard_fork_6_and_alt_chain, "6-*");
     GENERATE_AND_PLAY_HF(hard_fork_6_and_self_directed_tx_with_payment_id, "6-*");
     GENERATE_AND_PLAY(hard_fork_6_coinbase_size_rules);
+    GENERATE_AND_PLAY_HF(hard_fork_6_gw_incompatible_with_mode_separate, "6-*");
     GENERATE_AND_PLAY(hard_fork_6_asset_descriptor_limits);
 
     // GW address alt-chain tests
@@ -1356,6 +1410,7 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY_HF(multiassets_basic_test, "4-*");
     GENERATE_AND_PLAY_HF(ionic_swap_basic_test, "4-*");
     GENERATE_AND_PLAY_HF(ionic_swap_exact_amounts_test, "4-*");
+    GENERATE_AND_PLAY_HF(ionic_swap_overflow_check_test, "4-*");
     GENERATE_AND_PLAY(zarcanum_test_n_inputs_validation);
     GENERATE_AND_PLAY(zarcanum_gen_time_balance);
     GENERATE_AND_PLAY(zarcanum_txs_with_big_shuffled_decoy_set_shuffled);
@@ -1364,7 +1419,7 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY_HF(zarcanum_in_alt_chain_2, "4-*");
     GENERATE_AND_PLAY(assets_and_explicit_native_coins_in_outs);
     GENERATE_AND_PLAY(zarcanum_block_with_txs);
-    GENERATE_AND_PLAY_HF(txs_and_invalid_range_proofs, "5-*");
+    GENERATE_AND_PLAY_HF(block_template_and_invalid_tx_proofs, "5-*");
     GENERATE_AND_PLAY(asset_depoyment_and_few_zc_utxos);
     GENERATE_AND_PLAY_HF(assets_and_pos_mining, "4-*");
     GENERATE_AND_PLAY_HF(asset_emission_and_unconfirmed_balance, "4-*");
@@ -1463,6 +1518,7 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_options, arg_run_multiple_tests);
   command_line::add_arg(desc_options, arg_enable_debug_asserts);
   command_line::add_arg(desc_options, arg_stop_on_fail);
+  command_line::add_arg(desc_options, arg_report_block_stats);
   command_line::add_arg(desc_options, command_line::arg_data_dir, std::string("."));
   command_line::add_arg(desc_options, command_line::arg_stop_after_height);
   command_line::add_arg(desc_options, command_line::arg_disable_ntp);
@@ -1503,6 +1559,8 @@ int main(int argc, char* argv[])
   {
     stop_on_first_fail = command_line::get_arg(g_vm, arg_stop_on_fail);
   }
+
+  g_report_block_stats = command_line::has_arg(g_vm, arg_report_block_stats) && command_line::get_arg(g_vm, arg_report_block_stats);
 
   const int32_t worker_id = command_line::get_arg(g_vm, arg_worker_id);
   const bool is_worker = (worker_id >= 0);
@@ -1665,6 +1723,8 @@ int main(int argc, char* argv[])
       rep.tests_running_time = tests_running_time;
       rep.failed_tests = failed_tests;
       rep.skip_all_till_the_end = skip_all_till_the_end;
+      if (g_report_block_stats)
+        rep.block_stats = g_test_block_stats;
       rep.exit_code = (serious_failures_count == 0 ? 0 : 1);
 
       if (g_runner)
@@ -1700,6 +1760,22 @@ int main(int argc, char* argv[])
       }
 
       std::cout << concolor::normal << std::endl;
+
+      if (g_report_block_stats)
+      {
+        LOG_PRINT2(BLOCK_STATS_LOG_FILENAME, "===== FINAL BLOCK STATS REPORT (" << g_test_block_stats.size() << " tests) =====", LOG_LEVEL_0);
+        for (const auto& p : g_test_block_stats)
+        {
+          LOG_PRINT2(BLOCK_STATS_LOG_FILENAME,
+            p.first
+            << "  chain_size=" << p.second.blockchain_size
+            << "  top_height=" << p.second.top_block_height
+            << "  alt_blocks=" << p.second.alt_blocks_count
+            << "  pool_txs="   << p.second.pool_tx_count,
+            LOG_LEVEL_0);
+        }
+        print_block_stats_table(g_test_block_stats);
+      }
     }
   }
 

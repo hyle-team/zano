@@ -483,7 +483,7 @@ std::string get_nix_version_display_string()
     std::string config_folder;
 #ifdef WIN32
     // Windows
-#ifdef _M_X64
+#if defined(_M_X64) || defined(_M_ARM64)
     config_folder = get_special_folder_path_utf8(CSIDL_APPDATA, true) + "/" + CURRENCY_NAME_SHORT;
 #else 
     config_folder = get_special_folder_path_utf8(CSIDL_APPDATA, true) + "/" + CURRENCY_NAME_SHORT + "-x86";
@@ -907,7 +907,7 @@ std::string get_nix_version_display_string()
 //         {
 //           unsigned char c2 = data[i + 1];
 //           // Valid second byte: 10xxxxxx
-//           // Also ensure it’s not an overlong encoding (0xC0, 0xC1 are invalid starts)
+//           // Also ensure it's not an overlong encoding (0xC0, 0xC1 are invalid starts)
 //           if ((c2 & 0xC0) == 0x80 && (c & 0xFE) != 0xC0)
 //           {
 //             sanitized.push_back(static_cast<char>(c));

@@ -1693,6 +1693,77 @@ TEST(crypto, schnorr_sig)
 }
 
 
+TEST(crypto, double_schnorr_sig)
+{
+  public_key invalid_pk = parse_tpod_from_hex_string<public_key>("000000000000000000000000000000000000000000000000000000000000000c");
+  ASSERT_FALSE(check_key(invalid_pk));
+  scalar_t s_rnd = scalar_t::random();
+  hash m = *(crypto::hash*)(&s_rnd);
+  for(size_t i = 0; i < 100; ++i)
+  {
+    generic_double_schnorr_sig_s ss{};
+    scalar_t a = scalar_t::random();
+    scalar_t b = scalar_t::random();
+    point_t B_pt = b * c_point_G;
+    public_key B = B_pt.to_public_key();
+
+    // <gt_G, gt_G>
+    point_t A_pt = a * c_point_G;
+    ASSERT_TRUE((generate_double_schnorr_sig<gt_G, gt_G>(m, A_pt, a, B_pt, b, ss)));
+    ASSERT_TRUE((verify_double_schnorr_sig<gt_G, gt_G>(m, A_pt, B, ss)));
+    ASSERT_FALSE((verify_double_schnorr_sig<gt_X, gt_G>(m, A_pt, B, ss))); // wrong generator for A
+
+    // <gt_X, gt_G>
+    A_pt = a * c_point_X;
+    ASSERT_TRUE((generate_double_schnorr_sig<gt_X, gt_G>(m, A_pt, a, B_pt, b, ss)));
+    ASSERT_TRUE((verify_double_schnorr_sig<gt_X, gt_G>(m, A_pt, B, ss)));
+    ASSERT_FALSE((verify_double_schnorr_sig<gt_G, gt_G>(m, A_pt, B, ss))); // wrong generator for A
+
+    ASSERT_FALSE((verify_double_schnorr_sig<gt_X, gt_G>(currency::null_hash, A_pt, B, ss)));
+    ASSERT_FALSE((verify_double_schnorr_sig<gt_X, gt_G>(m, A_pt, invalid_pk, ss)));
+
+    // non-reduced scalars are rejected
+    generic_double_schnorr_sig_s bad_ss = ss;
+    bad_ss.c = c_scalar_Pm1;
+    ASSERT_FALSE(bad_ss.c.is_reduced());
+    ASSERT_FALSE((verify_double_schnorr_sig<gt_X, gt_G>(m, A_pt, B, bad_ss)));
+    bad_ss = ss;
+    bad_ss.y0 = c_scalar_Pm1;
+    ASSERT_FALSE(bad_ss.y0.is_reduced());
+    ASSERT_FALSE((verify_double_schnorr_sig<gt_X, gt_G>(m, A_pt, B, bad_ss)));
+    bad_ss = ss;
+    bad_ss.y1 = c_scalar_Pm1;
+    ASSERT_FALSE(bad_ss.y1.is_reduced());
+    ASSERT_FALSE((verify_double_schnorr_sig<gt_X, gt_G>(m, A_pt, B, bad_ss)));
+
+    // c + L is non-canonical
+    bad_ss = ss;
+    mp::uint256_t c_mp = bad_ss.c.as_boost_mp_type<mp::uint256_t>();
+    c_mp += c_scalar_L.as_boost_mp_type<mp::uint256_t>();
+    memcpy(bad_ss.c.data(), c_mp.backend().limbs(), sizeof(scalar_t));
+    ASSERT_FALSE(bad_ss.c.is_reduced());
+    scalar_t tmp(bad_ss.c);
+    tmp.reduce();
+    ASSERT_EQ(tmp, ss.c);
+    ASSERT_FALSE((verify_double_schnorr_sig<gt_X, gt_G>(m, A_pt, B, bad_ss)));
+
+    // binary serialization
+    std::string blob = t_serializable_object_to_blob(ss);
+    generate_random_bytes(sizeof ss, &ss);
+    ASSERT_TRUE(t_unserializable_object_from_blob(ss, blob));
+    ASSERT_TRUE((verify_double_schnorr_sig<gt_X, gt_G>(m, A_pt, B, ss)));
+
+    // boost serialization
+    ASSERT_TRUE(tools::serialize_obj_to_buff(ss, blob));
+    generate_random_bytes(sizeof ss, &ss);
+    ASSERT_TRUE(tools::unserialize_obj_from_buff(ss, blob));
+    ASSERT_TRUE((verify_double_schnorr_sig<gt_X, gt_G>(m, A_pt, B, ss)));
+  }
+
+  return true;
+}
+
+
 TEST(crypto, point_negation)
 {
   ASSERT_EQ(c_point_0, -c_point_0);

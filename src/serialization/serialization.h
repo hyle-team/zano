@@ -82,16 +82,20 @@ do { \
   bool _ser_res = ::do_serialize(_ser_ar, f); \
   if (!_ser_res || !_ser_ar.stream().good()) return false; \
 } while (0);
-#define FIELDS(f) \
-  _ser_ar.tag("AGGREGATED"); \
-  bool _ser_res = ::do_serialize(_ser_ar, f); \
-if (!_ser_res || !_ser_ar.stream().good()) return false;
+// Serialize base-class fields inline into the current object
+#define CHAIN_BASE(base_type) \
+do { \
+  bool _ser_res = static_cast<base_type&>(*this).do_serialize_object(_ser_ar); \
+  if (!_ser_res || !_ser_ar.stream().good()) return false; \
+} while (0);
 #define FIELD(f) \
 do { \
   _ser_ar.tag(#f); \
   bool _ser_res = ::do_serialize(_ser_ar, f); \
   if (!_ser_res || !_ser_ar.stream().good()) return false; \
 } while (0);
+// Serialize an aggregated member under its own field name
+#define FIELDS(f) FIELD(f)
 #define VARINT_FIELD(f) \
 do { \
   _ser_ar.tag(#f); \

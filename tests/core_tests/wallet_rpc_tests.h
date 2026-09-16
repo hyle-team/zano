@@ -163,6 +163,13 @@ struct wallet_rpc_gateway_limits : public wallet_test
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };
 
+struct wallet_rpc_gateway_decrypt_op : public wallet_test
+{
+  wallet_rpc_gateway_decrypt_op();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};
+
 struct wallet_rpc_and_tx_unlock_time : public wallet_test
 {
   wallet_rpc_and_tx_unlock_time();
@@ -204,6 +211,20 @@ struct wallet_rpc_sweep_below_double_sweep : public wallet_test
 struct wallet_rpc_sweep_below_wo_multi_asset : public wallet_test
 {
   wallet_rpc_sweep_below_wo_multi_asset();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};
+
+struct wallet_rpc_get_outputs_and_utxo_stats : public wallet_test
+{
+  wallet_rpc_get_outputs_and_utxo_stats();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};
+
+struct wallet_rpc_sign_message_with_alias : public wallet_test
+{
+  wallet_rpc_sign_message_with_alias();
   bool generate(std::vector<test_event_entry>& events) const;
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };

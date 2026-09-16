@@ -13,11 +13,10 @@ namespace tools
 {
   struct proxy_diagnostic_info 
   {
-    proxy_diagnostic_info():is_busy(false), last_success_interract_time(0), last_daemon_is_disconnected(0)
-    {}
-    std::atomic<bool> is_busy;
-    std::atomic<time_t> last_success_interract_time;
-    std::atomic<bool> last_daemon_is_disconnected;
+    std::atomic<bool> is_busy = false;
+    std::atomic<time_t> last_success_interract_time = 0;
+    std::atomic<bool> last_daemon_is_disconnected = 0;
+    std::atomic<bool> incompatible_server = false;
   };
 
   /*
@@ -35,7 +34,6 @@ namespace tools
     virtual bool call_COMMAND_RPC_GET_INFO(const currency::COMMAND_RPC_GET_INFO::request& rqt, currency::COMMAND_RPC_GET_INFO::response& rsp){ return false; }
     virtual bool call_COMMAND_RPC_GET_TX_POOL(const currency::COMMAND_RPC_GET_TX_POOL::request& rqt, currency::COMMAND_RPC_GET_TX_POOL::response& rsp){ return false; }
     virtual bool call_COMMAND_RPC_GET_ALIASES_BY_ADDRESS(const currency::COMMAND_RPC_GET_ALIASES_BY_ADDRESS::request& rqt, currency::COMMAND_RPC_GET_ALIASES_BY_ADDRESS::response& rsp){ return false; }
-    virtual bool call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS(const currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::request& rqt, currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::response& rsp){ return false; }
     virtual bool call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3(const currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::request& rqt, currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::response& rsp) { return false; }
     virtual bool call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4(const currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request& rqt, currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::response& rsp) { return false; }
     virtual bool call_COMMAND_RPC_SEND_RAW_TX(const currency::COMMAND_RPC_SEND_RAW_TX::request& rqt, currency::COMMAND_RPC_SEND_RAW_TX::response& rsp){ return false; }
@@ -73,6 +71,7 @@ namespace tools
     virtual void set_connectivity(unsigned int connection_timeout, size_t repeats_count) {}
     // This method determines if the daemons share the same address space as the caller (which may help decide if some RPC calls can be skipped).
     virtual bool is_daemon_inbox() { return false; }
+    virtual void set_incompatible_server_flag(bool v){if(m_pdiganostic_info)  m_pdiganostic_info->incompatible_server = v;}
   protected: 
     std::shared_ptr<proxy_diagnostic_info> m_pdiganostic_info;
   };

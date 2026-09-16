@@ -11,6 +11,7 @@
 #include <vector>
 #include <string>
 #include <algorithm>
+#include <type_traits>
 
 #include "common/pod-class.h"
 #include "generic-ops.h"
@@ -143,6 +144,16 @@ namespace crypto {
     static CONSTEXPR uint64_t max() { return UINT64_MAX; }
     uint64_t operator()() { return rand<uint64_t>(); }
   };
+
+  // securely destructs data, zeros aren't garanteed
+  void wipe(void* p, size_t n) noexcept;
+
+  template<class T>
+  inline void wipe(T& obj) noexcept
+  {
+    static_assert(std::is_trivially_copyable<T>::value, "trivially copyable objects only, please");
+    wipe(&obj, sizeof(T));
+  }
 
 
   /* Generate a new key pair

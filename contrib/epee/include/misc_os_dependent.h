@@ -41,9 +41,7 @@
 #include <mach/clock.h>
 #include <mach/mach.h>
 #endif
-#ifndef ANDROID_BUILD
-  #include <boost/stacktrace.hpp>
-#endif
+#include <boost/stacktrace.hpp>
 
 
 #pragma once 
@@ -119,11 +117,7 @@ namespace misc_utils
     {
       std::stringstream ss;
       ss << std::endl << "STACK" << std::endl;
-#ifdef ANDROID_BUILD
-      ss << "(stacktrace is not supported on this platform)" << std::endl;
-#else
       ss << boost::stacktrace::stacktrace() << std::endl;
-#endif
       return ss.str();
     }
     catch(...)

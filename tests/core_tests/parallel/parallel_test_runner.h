@@ -4,6 +4,7 @@
 #include <boost/interprocess/shared_memory_object.hpp>
 #include <boost/interprocess/mapped_region.hpp>
 #include <boost/property_tree/ptree.hpp>
+#include <cstdint>
 #include <filesystem>
 #include <string>
 #include <vector>
@@ -16,6 +17,17 @@ struct test_job
   std::string name;
   std::function<bool()> run;
 };
+
+// enabled via --report-block-stats
+struct test_block_stats
+{
+  uint64_t blockchain_size  = 0; // get_current_blockchain_size()
+  uint64_t top_block_height = 0; // get_top_block_height()
+  size_t   alt_blocks_count = 0; // get_alternative_blocks_count()
+  size_t   pool_tx_count    = 0; // get_pool_transactions_count()
+};
+// pretty-prints for test_block_stats
+void print_block_stats_table(const std::vector<std::pair<std::string, test_block_stats>>& stats);
 
 namespace coretests_shm
 {
@@ -129,6 +141,9 @@ public:
     std::vector<std::pair<std::string, uint64_t>> tests_running_time;
     std::set<std::string> failed_tests;
     bool skip_all_till_the_end = false;
+
+    // End-of-test block stats per test executed by this worker.
+    std::vector<std::pair<std::string, test_block_stats>> block_stats;
 
     int exit_code = 0;
   };

@@ -269,7 +269,7 @@ namespace currency
   bool collect_rangeproofs_data_from_tx(const transaction& tx, const crypto::hash& tx_id, std::vector<zc_outs_range_proofs_with_commitments>& agregated_proofs);
   bool verify_multiple_zc_outs_range_proofs(const std::vector<zc_outs_range_proofs_with_commitments>& range_proofs);
   bool generate_asset_surjection_proof(const crypto::hash& context_hash, bool has_non_zc_inputs, tx_generation_context& ogc, transaction& tx_to_add_proof_to);
-  bool verify_asset_surjection_proof(const transaction& tx, const crypto::hash& tx_id);
+  bool verify_asset_surjection_proof(const transaction& tx, const crypto::hash& tx_id) noexcept;
   bool generate_tx_balance_proof(const crypto::hash& tx_id, const tx_generation_context& ogc, uint64_t block_reward_for_miner_tx, transaction& tx_to_add_proof_to);
   bool generate_zc_outs_range_proof(const crypto::hash& context_hash, const tx_generation_context& outs_gen_context, transaction& tx_to_add_proof_to);
   bool check_tx_bare_balance(const transaction& tx, uint64_t additional_inputs_amount_and_fees_for_mining_tx = 0);
@@ -310,7 +310,8 @@ namespace currency
   //bool construct_tx_out(const tx_destination_entry& de, const crypto::secret_key& tx_sec_key, size_t output_index, transaction& tx, std::set<uint16_t>& deriv_cache, uint8_t tx_outs_attr = CURRENCY_TO_KEY_OUT_RELAXED);
 
   bool validate_alias_name(const std::string& al);
-  bool validate_password(const std::string& password);
+  bool validate_password(const std::string& password); // validates allowed character set only
+  bool validate_password(const std::string& password, size_t min_length, size_t max_length);
   void get_attachment_extra_info_details(const std::vector<attachment_v>& attachment, extra_attachment_info& eai);
   bool construct_tx(const account_keys& sender_account_keys, 
     const std::vector<tx_source_entry>& sources, 
@@ -479,11 +480,14 @@ namespace currency
   std::string get_word_from_timestamp(uint64_t timestamp, bool use_password);
   uint64_t get_timestamp_from_word(std::string word, bool& password_used, const std::string& buff);
   uint64_t get_timestamp_from_word(std::string word, bool& password_used);
+  uint64_t round_timestamp_to_brain_date_quantum(uint64_t timestamp);
   bool parse_vote(const std::string& buff, std::list<std::pair<std::string, bool>>& votes);
   void prepare_wti_decrypted_attachments(tools::wallet_public::wallet_transfer_info& wti, const std::vector<currency::payload_items_v>& decrypted_att);
   bool validate_ado_update_allowed(const asset_descriptor_base& a, const asset_descriptor_base& b, bool hf6_active = false);
   bool validate_ado_initial(const asset_descriptor_base& a, bool hf6_active = false);
   bool gateway_prepare_wti(const currency::gateway_address_id_type& gw_id, const crypto::hash& tx_id, const crypto::secret_key& decrypt_key, tools::wallet_public::wallet_transfer_info& wti, const transaction_chain_entry& tx_chain_entry);
+  bool gateway_prepare_wti_public(const currency::gateway_address_id_type& gw_id, const crypto::hash& tx_id, tools::wallet_public::wallet_transfer_info& wti, const transaction_chain_entry& tx_chain_entry, bool& out_decrypt_as_income, bool& out_found);
+  bool gateway_decrypt_wti(const crypto::secret_key& view_secret_key, const currency::gateway_address_id_type& gw_id, tools::wallet_public::wallet_transfer_info& wti);
   void normalize_asset_operation_for_hashing(asset_descriptor_operation& op);
   crypto::hash get_signature_hash_for_asset_operation(const asset_descriptor_operation& ado);
 

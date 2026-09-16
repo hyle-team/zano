@@ -25,7 +25,7 @@ endif()
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(ZANO_BOOST_MIN_VER 1.75)
+set(ZANO_BOOST_MIN_VER 1.83)
 
 
 if(CMAKE_SYSTEM_NAME STREQUAL "iOS" OR CMAKE_SYSTEM_NAME STREQUAL "Android")
@@ -296,10 +296,9 @@ elseif(NOT MSVC)
 endif()
 
 if(BUILD_GUI)
-  cmake_minimum_required(VERSION 3.1) # <-- this is important for Linux GUI build, don't touch it -- sowle
-  find_package(Qt5Widgets REQUIRED)  
-  find_package(Qt5WebEngineWidgets REQUIRED)  
-  find_package(Qt5WebChannel REQUIRED)  
+  cmake_minimum_required(VERSION 3.5) # <-- this is important for Linux GUI build, don't touch it -- sowle
+  find_package(Qt6 REQUIRED COMPONENTS Widgets WebEngineWidgets WebChannel)
+  message(STATUS "Building GUI with Qt ${Qt6_VERSION}")
 endif()
 
 set(COMMIT_ID_IN_VERSION ON CACHE BOOL "Include commit ID in version")

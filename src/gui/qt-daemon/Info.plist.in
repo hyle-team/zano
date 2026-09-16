@@ -21,10 +21,18 @@
 	<string>APPL</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
+	<!-- CFBundleVersion and CFBundleShortVersionString are filled in by the
+	     macOS CI workflow from the version the daemon reports, so the bundle
+	     always matches the build it came from. Notarization rejects a bundle
+	     whose CFBundleVersion is empty. -->
 	<key>CFBundleVersion</key>
 	<string></string>
+	<key>CFBundleShortVersionString</key>
+	<string></string>
+	<!-- Reverse-DNS bundle identifier; matches the primary-bundle-id the
+	     project has always notarized under (see utils/build_script_mac_osx.sh). -->
 	<key>CFBundleIdentifier</key>
-	<string>Zano</string>
+	<string>org.zano.desktop</string>
 	<key>CSResourcesFileMapped</key>
 	<true/>
 	<key>DTCompiler</key>
@@ -46,7 +54,7 @@
 	<key>NSHumanReadableCopyright</key>
 	<string></string>
 	<key>NSHighResolutionCapable</key>
-    <string>True</string>
+	<true/>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

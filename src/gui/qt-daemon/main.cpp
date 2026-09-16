@@ -37,7 +37,7 @@ int main(int argc, char *argv[])
   _set_FMA3_enable(0);
   #endif
   //mutex to let InnoSetup know about running instance
-  ::CreateMutex(NULL, FALSE, CURRENCY_NAME_BASE "_instance");
+  ::CreateMutexA(NULL, FALSE, CURRENCY_NAME_BASE "_instance");
   //::CreateMutex(NULL, FALSE, "Global\\" CURRENCY_NAME_BASE "_instance");
 #endif
 
@@ -52,13 +52,6 @@ int main(int argc, char *argv[])
 
   TRY_ENTRY();
   epee::string_tools::set_module_name_and_folder(path_to_process_utf8);
-  QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
-#ifdef _MSC_VER
-#if _MSC_VER >= 1910
-  QCoreApplication::setAttribute(Qt::AA_UseHighDpiPixmaps); //HiDPI pixmaps
-  //qputenv("QT_SCALE_FACTOR", "0.75");
-#endif
-#endif
 
   log_space::get_set_log_detalisation_level(true, LOG_LEVEL_0);
   log_space::get_set_need_thread_id(true, true);

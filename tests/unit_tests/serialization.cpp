@@ -98,6 +98,140 @@ bool try_parse(const string &blob)
   return serialization::parse_binary(blob, s1);
 }
 
+void fill_test_tx(currency::transaction& tx, uint64_t tx_version);
+
+namespace fields_macro_tests
+{
+  struct base_part
+  {
+    uint64_t version = 4;
+
+    BEGIN_SERIALIZE()
+      VARINT_FIELD(version)
+    END_SERIALIZE()
+  };
+
+  struct member_part
+  {
+    uint64_t v = 7;
+
+    BEGIN_SERIALIZE_OBJECT()
+      VARINT_FIELD(v)
+    END_SERIALIZE()
+  };
+
+  struct derived : public base_part
+  {
+    uint64_t sig = 9;
+
+    BEGIN_SERIALIZE_OBJECT()
+      CHAIN_BASE(base_part)
+      VARINT_FIELD(sig)
+    END_SERIALIZE()
+  };
+
+  struct holder
+  {
+    member_part tx;
+    uint64_t h = 3;
+
+    BEGIN_SERIALIZE_OBJECT()
+      FIELDS(tx)
+      VARINT_FIELD(h)
+    END_SERIALIZE()
+  };
+
+  struct two_members
+  {
+    member_part a;
+    member_part b;
+
+    BEGIN_SERIALIZE_OBJECT()
+      FIELDS(a)
+      FIELDS(b)
+    END_SERIALIZE()
+  };
+
+  struct conditional
+  {
+    uint64_t version = 0;
+    member_part a;
+
+    BEGIN_SERIALIZE_OBJECT()
+      VARINT_FIELD(version)
+      if (version > 100) FIELDS(a);
+    END_SERIALIZE()
+  };
+
+  template<class T>
+  std::string to_json(T value)
+  {
+    std::stringstream stream;
+    json_archive<true> archive(stream, false);
+    EXPECT_TRUE(::serialization::serialize(archive, value));
+    return stream.str();
+  }
+}
+
+TEST(Serialization, ChainBaseFlattensBaseClassInJson)
+{
+  EXPECT_EQ(
+    "{\"version\": 4, \"sig\": 9}",
+    fields_macro_tests::to_json(fields_macro_tests::derived{}));
+}
+
+TEST(Serialization, FieldsMacroUsesMemberNameInJson)
+{
+  EXPECT_EQ(
+    "{\"tx\": {\"v\": 7}, \"h\": 3}",
+    fields_macro_tests::to_json(fields_macro_tests::holder{}));
+}
+
+TEST(Serialization, FieldsMacroAllowsMultipleMembers)
+{
+  EXPECT_EQ(
+    "{\"a\": {\"v\": 7}, \"b\": {\"v\": 7}}",
+    fields_macro_tests::to_json(fields_macro_tests::two_members{}));
+}
+
+TEST(Serialization, FieldsMacrosPreserveBinaryLayout)
+{
+  EXPECT_EQ(
+    std::string("\x04\x09", 2),
+    t_serializable_object_to_blob(fields_macro_tests::derived{}));
+  EXPECT_EQ(
+    std::string("\x07\x03", 2),
+    t_serializable_object_to_blob(fields_macro_tests::holder{}));
+
+  // how to get blob:
+  //   currency::transaction tx;
+  //   fill_test_tx(tx, TRANSACTION_VERSION_INITAL);
+  //   std::string blob;
+  //   serialization::dump_binary(tx, blob);
+  //   print_hex_from_blob(blob);
+  const std::string legacy_blob_hex = R"(000201E756021911608F59F8080E2FBFE3C8C80EB6E6A953D47CF2D6AEBD345BADA3A1CAB99852B9601911608F59F8080E2FBFE3C8C80EB6E6A953D47CF2D6AEBD345BADA3A1CAB99852B29204CC608F59F8080E2FBFE3C8C80EB6E6A953D47CF2D6AEBD345BADA3A1CAB998520111010201CEAD01021933608F59F8080E2FBFE3C8C80EB6E6A953D47CF2D6AEBD345BADA3A1CAB998526F1933608F59F8080E2FBFE3C8C80EB6E6A953D47CF2D6AEBD345BADA3A1CAB99852DE0122608F59F8080E2FBFE3C8C80EB6E6A953D47CF2D6AEBD345BADA3A1CAB998520002B584020344F3A4E5B6C7D8E90112233445566778899AABBCCDDEEFF0011223344556670716B584020344F3A4E5B6C7D8E90112233445566778899AABBCCDDEEFF001122334455667071602070D64756D6D792D636F6D6D656E74210B64756D6D792D616C696173DCE222654FD00C269314225DF54FAFBFC0B35A310C77714F195ED0DE224393822A46F7C02C0128711CD0FC004F101C8E5E641DC629410EFFB676E7D02B423E28000A64756D6D792D6E6F74650000010222608F59F8080E2FBFE3C8C80EB6E6A953D47CF2D6AEBD345BADA3A1CAB9985222608F59F8080E2FBFE3C8C80EB6E6A953D47CF2D6AEBD345BADA3A1CAB9985222608F59F8080E2FBFE3C8C80EB6E6A953D47CF2D6AEBD345BADA3A1CAB9985222608F59F8080E2FBFE3C8C80EB6E6A953D47CF2D6AEBD345BADA3A1CAB99852010C0000000000)";
+
+  std::string legacy_blob;
+  ASSERT_TRUE(epee::string_tools::parse_hexstr_to_binbuff(legacy_blob_hex, legacy_blob));
+
+  currency::transaction tx;
+  fill_test_tx(tx, TRANSACTION_VERSION_INITAL);
+
+  std::string current_blob;
+  ASSERT_TRUE(serialization::dump_binary(tx, current_blob));
+  EXPECT_EQ(legacy_blob, current_blob);
+}
+
+TEST(Serialization, FieldsMacroRespectsFalseCondition)
+{
+  fields_macro_tests::conditional value;
+
+  EXPECT_EQ(
+    "{\"version\": 0}",
+    fields_macro_tests::to_json(value));
+  EXPECT_EQ(1, t_serializable_object_to_blob(value).size());
+}
+
 TEST(Serialization, BinaryArchiveInts) {
   uint64_t x = 0xff00000000, x1;
 
@@ -553,7 +687,7 @@ public:
 
 
   BEGIN_SERIALIZE_OBJECT()
-    FIELDS(*static_cast<transaction_prefix_old_tests *>(this))
+    CHAIN_BASE(transaction_prefix_old_tests)
     FIELD(signatures)
     FIELD(attachment)
   END_SERIALIZE()
@@ -625,7 +759,7 @@ public:
   transaction_new_tests();
 
   BEGIN_SERIALIZE_OBJECT()
-    FIELDS(*static_cast<transaction_prefix_new_tests *>(this))
+    CHAIN_BASE(transaction_prefix_new_tests)
     FIELD(signatures)
     FIELD(attachment)
     END_SERIALIZE()

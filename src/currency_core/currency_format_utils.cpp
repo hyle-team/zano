@@ -127,8 +127,9 @@ namespace currency
     return true;
   }
   //--------------------------------------------------------------------------------
-  bool verify_asset_surjection_proof_hf4(const transaction& tx, const crypto::hash& tx_id)
+  bool verify_asset_surjection_proof_hf4(const transaction& tx, const crypto::hash& tx_id) noexcept
   {
+    TRY_ENTRY()
     if (tx.version <= TRANSACTION_VERSION_PRE_HF4)
       return true;
 
@@ -195,6 +196,7 @@ namespace currency
     }
 
     return true;
+    CATCH_ENTRY_L0_RED(LOCATION_SS, false);
   }
   //--------------------------------------------------------------------------------
   bool generate_asset_surjection_proof_hf6(const crypto::hash& context_hash, bool has_native_coin_bare_inputs_, tx_generation_context& ogc, transaction& tx)
@@ -254,12 +256,15 @@ namespace currency
       const auto& out_v = tx.vout[j];
       VARIANT_SWITCH_BEGIN(out_v)
         VARIANT_CASE_CONST(tx_out_zarcanum, out_zc)
+          size_t confidential_out_index = confidential_outs_count;
           ++confidential_outs_count;
           if (has_only_native_coin_bare_inputs)
           {
             CHECK_AND_ASSERT_MES(out_zc.blinded_asset_id == native_coin_asset_id_1div8, false, "output #" << j << " has a non explicitly native asset id");
-            CHECK_AND_ASSERT_MES(ogc.blinded_asset_ids[j] == currency::native_coin_asset_id_pt, false, "no ZC ins: out #" << j << " has a non-explicit asset id");
-            CHECK_AND_ASSERT_MES(ogc.asset_id_blinding_masks[j] == 0, false, "no ZC ins: out #" << j << " has non-zero asset id blinding mask");
+            CHECK_AND_ASSERT_MES(confidential_out_index < ogc.blinded_asset_ids.size(), false, "unexpected: ogc.blinded_asset_ids.size() = " << ogc.blinded_asset_ids.size());
+            CHECK_AND_ASSERT_MES(ogc.blinded_asset_ids.size() == ogc.asset_id_blinding_masks.size(), false, "unexpected: ogc.blinded_asset_ids.size(" << ogc.blinded_asset_ids.size() << ") != ogc.asset_id_blinding_masks.size(" << ogc.asset_id_blinding_masks.size() << ")" );
+            CHECK_AND_ASSERT_MES(ogc.blinded_asset_ids[confidential_out_index] == currency::native_coin_asset_id_pt, false, "no ZC ins: out #" << j << " has a non-explicit asset id");
+            CHECK_AND_ASSERT_MES(ogc.asset_id_blinding_masks[confidential_out_index] == 0, false, "no ZC ins: out #" << j << " has non-zero asset id blinding mask");
           }
     //  VARIANT_CASE_CONST(tx_out_confidential_gateway, out_cgw)
     //    ++confidential_outs_count;
@@ -483,7 +488,7 @@ namespace currency
     return true;
   }
   //--------------------------------------------------------------------------------
-  bool verify_asset_surjection_proof(const transaction& tx, const crypto::hash& tx_id)
+  bool verify_asset_surjection_proof(const transaction& tx, const crypto::hash& tx_id) noexcept
   {
     if (tx.version >= TRANSACTION_VERSION_POST_HF6)
       return verify_asset_surjection_proof_hf6(tx, tx_id);
@@ -3233,7 +3238,7 @@ namespace currency
         CHECK_AND_ASSERT_MES(r, false, "generate_NLSAG_sig failed");
       }
 
-      LOG_PRINT2("construct_tx.log", "transaction_created: " << get_transaction_hash(tx) << ENDL << obj_to_json_str(tx) << ENDL << ss_ring_s.str(), LOG_LEVEL_3);
+      LOG_PRINT2(CURRENCY_CONSTRUCT_TX_LOG_FILENAME, "transaction_created: " << get_transaction_hash(tx) << ENDL << obj_to_json_str(tx) << ENDL << ss_ring_s.str(), LOG_LEVEL_3);
     }
 
     //
@@ -3370,8 +3375,17 @@ namespace currency
       password_used = false;
     }
     uint64_t timestamp = count_of_weeks * WALLET_BRAIN_DATE_QUANTUM + WALLET_BRAIN_DATE_OFFSET;
-    
+
     return timestamp;
+  }
+  //---------------------------------------------------------------
+  uint64_t round_timestamp_to_brain_date_quantum(uint64_t timestamp)
+  {
+    if (timestamp <= WALLET_BRAIN_DATE_OFFSET)
+      return WALLET_BRAIN_DATE_OFFSET;
+    uint64_t date_offset = timestamp - WALLET_BRAIN_DATE_OFFSET;
+    uint64_t weeks_count = date_offset / WALLET_BRAIN_DATE_QUANTUM;
+    return weeks_count * WALLET_BRAIN_DATE_QUANTUM + WALLET_BRAIN_DATE_OFFSET;
   }
   //---------------------------------------------------------------
   bool parse_vote(const std::string& json_, std::list<std::pair<std::string, bool>>& votes)
@@ -4135,17 +4149,23 @@ namespace currency
 
     for (const auto ch : al)
     {
-      CHECK_AND_ASSERT_MES(alphabet[static_cast<unsigned char>(ch)], false, "Wrong character in alias: '" << ch << "'");
+      CHECK_AND_ASSERT_MES(alphabet[static_cast<unsigned char>(ch)], false, "Wrong character in alias: 0x" << std::hex << (int)static_cast<unsigned char>(ch));
     }
     return true;
   }
   //------------------------------------------------------------------
-  #define PASSWORD_REGEXP  R"([A-Za-z0-9~!?@#$%^&*_+|{}\[\]()<>:;"'\-=/.,]{0,40})"
+  #define PASSWORD_REGEXP  R"([A-Za-z0-9~!?@#$%^&*_+|{}\[\]()<>:;"'\-=/.,]*)"
   bool validate_password(const std::string& password)
   {
     // OLD: static const std::string allowed_password_symbols = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz~!?@#$%^&*_+|{}[]()<>:;\"'-=\\/.,";
     static std::regex password_regexp(PASSWORD_REGEXP);
     return std::regex_match(password, password_regexp);
+  }
+  bool validate_password(const std::string& password, size_t min_length, size_t max_length)
+  {
+    if (password.size() < min_length || password.size() > max_length)
+      return false;
+    return validate_password(password);
   }
   //------------------------------------------------------------------
 #define ANTI_OVERFLOW_AMOUNT       1000000
@@ -5411,9 +5431,9 @@ namespace currency
     }
   }
   //-----------------------------------------------------------------------------------------------------
-  bool gateway_prepare_wti(const currency::gateway_address_id_type& gw_id, const crypto::hash& tx_id, const crypto::secret_key& decrypt_key, tools::wallet_public::wallet_transfer_info& wti, const transaction_chain_entry& tx_chain_entry)
+  bool gateway_prepare_wti_public(const currency::gateway_address_id_type& gw_id, const crypto::hash& tx_id, tools::wallet_public::wallet_transfer_info& wti, const transaction_chain_entry& tx_chain_entry, bool& out_decrypt_as_income, bool& out_found)
   {
-    PROFILE_FUNC("wallet2::prepare_wti");
+    PROFILE_FUNC("currency::gateway_prepare_wti_public");
     wti.tx = tx_chain_entry.tx;
 
     wti.height = tx_chain_entry.m_keeper_block_height;
@@ -5423,22 +5443,16 @@ namespace currency
     wti.tx_hash = tx_id;
     load_wallet_transfer_info_flags(wti);
 
-    // escrow transactions, which are built with TX_FLAG_SIGNATURE_MODE_SEPARATE flag actually encrypt attachments 
-    // with buyer as a sender, and seller as receiver, despite the fact that for both sides transaction seen as outgoing.
-    // so here to decrypt tx properly we need to figure out, if this transaction is actually escrow acceptance. 
-    //we check if spent_indices have zero then input do not belong to this account, which means that we are seller for this 
-    //escrow, and decryption should be processed as income flag
-
-    //bool is_income = false;
-    //bool is_outcome = false;
+    // this is the public keyless half of gateway_prepare_wti, it only reads public gateway
+    // inputs/outputs and preserves the raw tx (wti.tx) so that gateway_decrypt_wti() can later recover
+    // the encrypted payment_id / attachments using the gateway view secret key
     bool is_outcome_native_coins = false;
-    bool found = false;
+    out_found = false;
     for (const auto& in : wti.tx.vin)
     {
       if(in.type() == typeid(txin_gateway) && boost::get<txin_gateway>(in).gateway_addr == gw_id)
       {
-        //is_outcome = true;
-        found = true;
+        out_found = true;
         if (boost::get<txin_gateway>(in).asset_id == currency::native_coin_asset_id_1div8)
         {
           is_outcome_native_coins = true;
@@ -5450,23 +5464,45 @@ namespace currency
     {
       if (out.type() == typeid(tx_out_gateway) && boost::get<tx_out_gateway>(out).gateway_addr == gw_id)
       {
-        //is_income = true;
-        found = true;
+        out_found = true;
       }
     }
 
-    if (!found)
+    if (!out_found)
     {
       LOG_ERROR("Detected transaction that don't have expected gatewate inputs/outputs, tx_id: " << tx_id << ", gw_id: " << gw_id);
+      out_decrypt_as_income = false;
       return true;
     }
 
     //let's assume that the one who pays for tx fee is sender of tx
+    out_decrypt_as_income = !(is_outcome_native_coins);
+    return true;
+  }
+  //-----------------------------------------------------------------------------------------------------
+  bool gateway_decrypt_wti(const crypto::secret_key& view_secret_key, const currency::gateway_address_id_type& gw_id, tools::wallet_public::wallet_transfer_info& wti)
+  {
+    PROFILE_FUNC("currency::gateway_decrypt_wti");
+    const crypto::hash& tx_id = wti.tx_hash;
+
+    wti.subtransfers_by_pid.clear();
+    wti.service_entries.clear();
+    wti.remote_addresses.clear();
+
+    bool is_outcome_native_coins = false;
+    for (const auto& in : wti.tx.vin)
+    {
+      if (in.type() == typeid(txin_gateway) && boost::get<txin_gateway>(in).gateway_addr == gw_id
+          && boost::get<txin_gateway>(in).asset_id == currency::native_coin_asset_id_1div8)
+      {
+        is_outcome_native_coins = true;
+      }
+    }
     bool decrypt_attachment_as_income = !(is_outcome_native_coins);
 
     currency::account_keys keys = {};
-    keys.spend_secret_key = decrypt_key;
-    keys.view_secret_key = decrypt_key; // for gateway transactions we use the same key for view and spend, so it doesn't matter which one we use for decryption
+    keys.spend_secret_key = view_secret_key;
+    keys.view_secret_key = view_secret_key; // for gateway transactions we use the same key for view and spend, so it doesn't matter which one we use for decryption
 
     std::vector<currency::payload_items_v> decrypted_att;
     crypto::key_derivation derivation = {};
@@ -5487,7 +5523,7 @@ namespace currency
     }
 
     out_index = 0;
-    std::map<uint64_t, std::unordered_map<crypto::public_key, boost::multiprecision::int128_t>> total_balance_change_per_payment_id; // { intrinsic_payment_id -> { asset_id -> balance_change } }    
+    std::map<uint64_t, std::unordered_map<crypto::public_key, boost::multiprecision::int128_t>> total_balance_change_per_payment_id; // { intrinsic_payment_id -> { asset_id -> balance_change } }
     std::unordered_map<crypto::public_key, std::map<uint64_t, boost::multiprecision::int128_t>> total_balance_change_per_asset_id; // { asset_id -> { intrinsic_payment_id -> balance_change } }
 
     for (const auto& out : wti.tx.vout)
@@ -5530,6 +5566,18 @@ namespace currency
     prepare_wti_decrypted_attachments(wti, decrypted_att); // should be called after wti subtransfer are populated
 
     return true;
+  }
+  //-----------------------------------------------------------------------------------------------------
+  bool gateway_prepare_wti(const currency::gateway_address_id_type& gw_id, const crypto::hash& tx_id, const crypto::secret_key& decrypt_key, tools::wallet_public::wallet_transfer_info& wti, const transaction_chain_entry& tx_chain_entry)
+  {
+    PROFILE_FUNC("wallet2::prepare_wti");
+    bool decrypt_as_income = false;
+    bool found = false;
+    if (!gateway_prepare_wti_public(gw_id, tx_id, wti, tx_chain_entry, decrypt_as_income, found))
+      return false;
+    if (!found)
+      return true; // nothing to decrypt; preserves legacy behavior
+    return gateway_decrypt_wti(decrypt_key, gw_id, wti);
   }
 
 

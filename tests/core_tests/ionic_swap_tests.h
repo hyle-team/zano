@@ -19,3 +19,10 @@ struct ionic_swap_exact_amounts_test : public wallet_test
   bool generate(std::vector<test_event_entry>& events) const;
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };
+
+struct ionic_swap_overflow_check_test : public wallet_test
+{
+  ionic_swap_overflow_check_test();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};

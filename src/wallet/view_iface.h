@@ -194,14 +194,18 @@ public:
     std::list<tools::wallet_public::asset_balance_entry> balances;
     uint64_t minied_total;
     bool has_bare_unspent_outputs;
+    uint64_t current_pos_attempts;
+    uint64_t est_iterations_per_pos_block;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_CHAIN_BASE(wallet_status_info_base)
       KV_SERIALIZE(balances)
       KV_SERIALIZE(minied_total)
       KV_SERIALIZE(has_bare_unspent_outputs)
+      KV_SERIALIZE(current_pos_attempts)
+      KV_SERIALIZE(est_iterations_per_pos_block)
     END_KV_SERIALIZE_MAP()
-  };  
+  };
   
   typedef tools::wallet_public::wallet_info wallet_info;
   typedef tools::wallet_public::wallet_info_extra wallet_info_extra;
@@ -504,12 +508,14 @@ public:
     bool is_server_busy;
     bool is_remote_node_mode;
     uint64_t last_proxy_communicate_timestamp;
+    bool incompatible_server;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(is_online)
       KV_SERIALIZE(last_daemon_is_disconnected)
       KV_SERIALIZE(is_server_busy)
       KV_SERIALIZE(is_remote_node_mode)
+      KV_SERIALIZE(incompatible_server)
       KV_SERIALIZE(last_proxy_communicate_timestamp)
     END_KV_SERIALIZE_MAP()
   };
@@ -773,6 +779,15 @@ public:
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(msg)
       KV_SERIALIZE(log_level)
+    END_KV_SERIALIZE_MAP()
+  };
+
+  struct log_files_size_response
+  {
+    uint64_t total_size;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(total_size)
     END_KV_SERIALIZE_MAP()
   };
 

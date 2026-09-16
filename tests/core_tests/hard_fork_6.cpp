@@ -1079,6 +1079,44 @@ bool hard_fork_6_intrinsic_payment_id_rpc_test::c1(currency::core& c, size_t ev_
   CHECK_AND_ASSERT_EQ(wtis[idx].subtransfers_by_pid.back().subtransfers[1-jdx].asset_id,                                  m_asset_id);
   CHECK_AND_ASSERT_EQ(wtis[idx].subtransfers_by_pid.back().subtransfers[1-jdx].is_income,                                 true);
 
+  //
+  // Check recipients (remote_addresses) recorded for each of Alice's outgoing txs.
+  // This has to be read from the very wallet that sent them (recipient addresses can't be
+  // recovered from a fresh re-sync). Expectations: an integrated address is reconstructed as it
+  // was given, identical recipients are collapsed into one, a tx-wide (legacy) payment id is
+  // applied to every recipient, and intrinsic per-destination payment ids are kept individually.
+  //
+  alice_wlt->refresh();
+
+  std::vector<tools::wallet_public::wallet_transfer_info> alice_wtis;
+  total = 0, last_item_index = 0;
+  alice_wlt->get_recent_transfers_history(alice_wtis, 0, 100, total, last_item_index, false /*exclude_mining_txs*/, false /*start_form_end*/);
+
+  std::string bob_addr_with_intrinsic_pid  = get_account_address_as_str(m_accounts[BOB_ACC_IDX].get_public_address(),   convert_payment_id(18361836));
+  std::string carol_addr_with_too_long_pid = get_account_address_as_str(m_accounts[CAROL_ACC_IDX].get_public_address(), long_legacy_payment_id);
+
+  auto check_remote_addresses = [&](const crypto::hash& h, std::vector<std::string> expected) -> bool
+  {
+    auto it = std::find_if(alice_wtis.begin(), alice_wtis.end(), [&](auto& t){ return t.tx_hash == h; });
+    CHECK_AND_ASSERT_MES(it != alice_wtis.end(), false, "outgoing tx " << h << " not found in Alice's history");
+    std::vector<std::string> got = it->remote_addresses;
+    std::sort(got.begin(), got.end());
+    std::sort(expected.begin(), expected.end());
+    CHECK_AND_ASSERT_MES(got == expected, false, "remote_addresses mismatch for outgoing tx " << h << " (got " << got.size() << ", expected " << expected.size() << ")");
+    return true;
+  };
+
+  CHECK_AND_ASSERT_TRUE(check_remote_addresses(successfull_txs[0], { bob_addr }));
+  CHECK_AND_ASSERT_TRUE(check_remote_addresses(successfull_txs[1], { bob_addr }));                                                    // identical recipients collapsed
+  CHECK_AND_ASSERT_TRUE(check_remote_addresses(successfull_txs[2], { bob_addr_with_short_pid }));                                     // pre-HF6: tx-wide pid applied to both, collapsed
+  CHECK_AND_ASSERT_TRUE(check_remote_addresses(successfull_txs[3], { bob_addr_with_too_long_pid }));                                  // pre-HF6: legacy tx-wide pid applied to both, collapsed
+  CHECK_AND_ASSERT_TRUE(check_remote_addresses(successfull_txs[4], { bob_addr }));
+  CHECK_AND_ASSERT_TRUE(check_remote_addresses(successfull_txs[5], { bob_addr, bob_addr_with_short_pid }));
+  CHECK_AND_ASSERT_TRUE(check_remote_addresses(successfull_txs[6], { bob_addr_with_short_pid, bob_addr_with_intrinsic_pid }));
+  CHECK_AND_ASSERT_TRUE(check_remote_addresses(successfull_txs[7], { bob_addr_with_short_pid, bob_addr_with_short_pid2 }));           // distinct intrinsic pids kept
+  CHECK_AND_ASSERT_TRUE(check_remote_addresses(successfull_txs[8], { bob_addr_with_too_long_pid, carol_addr_with_too_long_pid }));    // legacy tx-wide pid applied to every recipient
+  CHECK_AND_ASSERT_TRUE(check_remote_addresses(successfull_txs[9], { bob_addr_with_short_pid, bob_addr_with_short_pid2, bob_addr_with_intrinsic_pid }));
+
   return true;
 }
 
@@ -1830,7 +1868,7 @@ bool hard_fork_6_coinbase_size_rules::generate(std::vector<test_event_entry>& ev
     };
   };
 
-  // №1
+  // #1
   const size_t big_coinbase_target = CURRENCY_COINBASE_BLOB_RESERVED_SIZE_HF6 + 256;
   block blk_hf5_big{};
   {
@@ -1850,7 +1888,7 @@ bool hard_fork_6_coinbase_size_rules::generate(std::vector<test_event_entry>& ev
 
   DO_CALLBACK_PARAMS(events, "check_hardfork_active", static_cast<size_t>(ZANO_HARDFORK_06));
 
-  { // №2
+  { // #2
     block blk_bad{};
     bool r = build_specific_cumnul_block(blk_hf6_ancestor, seed_ecbs(0), pad_coinbase_to(big_coinbase_target), {}, blk_bad);
     CHECK_AND_ASSERT_MES(r, false, "HF6 big-coinbase block construction failed");
@@ -1860,7 +1898,7 @@ bool hard_fork_6_coinbase_size_rules::generate(std::vector<test_event_entry>& ev
     events.push_back(blk_bad);
   }
 
-  { // №2b: coinbase size == CURRENCY_COINBASE_BLOB_RESERVED_SIZE_HF6 + 1 - rejected, one over
+  { // #2b: coinbase size == CURRENCY_COINBASE_BLOB_RESERVED_SIZE_HF6 + 1 - rejected, one over
     block blk_bad{};
     bool r = build_specific_cumnul_block(blk_hf6_ancestor, seed_ecbs(0), pad_coinbase_to(CURRENCY_COINBASE_BLOB_RESERVED_SIZE_HF6 + 1), {}, blk_bad);
     CHECK_AND_ASSERT_MES(r, false, "HF6 boundary (==limit+1) block construction failed");
@@ -1870,7 +1908,7 @@ bool hard_fork_6_coinbase_size_rules::generate(std::vector<test_event_entry>& ev
     events.push_back(blk_bad);
   }
 
-  { // №3
+  { // #3
     block blk_bad{};
     bool r = build_specific_cumnul_block(blk_hf6_ancestor, {}, {}, {}, blk_bad); // no ecbs seeded - none extra
     CHECK_AND_ASSERT_MES(r, false, "HF6 missing ecbs block construction failed");
@@ -1878,7 +1916,7 @@ bool hard_fork_6_coinbase_size_rules::generate(std::vector<test_event_entry>& ev
     events.push_back(blk_bad);
   }
 
-  { // №4
+  { // #4
     block blk_bad{};
     bool r = build_specific_cumnul_block(blk_hf6_ancestor, seed_ecbs(123456), {}, {}, blk_bad);
     CHECK_AND_ASSERT_MES(r, false, "HF6 wrong ecbs block construction failed");
@@ -1887,7 +1925,7 @@ bool hard_fork_6_coinbase_size_rules::generate(std::vector<test_event_entry>& ev
   }
 
   block blk_hf6_boundary_ok{};
-  { // №2a: coinbase size == CURRENCY_COINBASE_BLOB_RESERVED_SIZE_HF6 - accepted boundary inclusive
+  { // #2a: coinbase size == CURRENCY_COINBASE_BLOB_RESERVED_SIZE_HF6 - accepted boundary inclusive
     bool r = build_specific_cumnul_block(blk_hf6_ancestor, seed_ecbs(0), pad_coinbase_to(CURRENCY_COINBASE_BLOB_RESERVED_SIZE_HF6), {}, blk_hf6_boundary_ok);
     CHECK_AND_ASSERT_MES(r, false, "HF6 boundary (==limit) block construction failed");
     CHECK_AND_ASSERT_MES(get_object_blobsize(blk_hf6_boundary_ok.miner_tx) == CURRENCY_COINBASE_BLOB_RESERVED_SIZE_HF6, false,
@@ -1896,7 +1934,7 @@ bool hard_fork_6_coinbase_size_rules::generate(std::vector<test_event_entry>& ev
   }
 
   block blk_hf6_sanity{};
-  { // №5
+  { // #5
     bool r = build_specific_cumnul_block(blk_hf6_boundary_ok, seed_ecbs(0), {}, {}, blk_hf6_sanity);
     CHECK_AND_ASSERT_MES(r, false, "HF6 sanity block construction failed");
     CHECK_AND_ASSERT_MES(get_object_blobsize(blk_hf6_sanity.miner_tx) <= CURRENCY_COINBASE_BLOB_RESERVED_SIZE_HF6, false, "HF6 unexpectedly big coinbase");
@@ -1908,7 +1946,7 @@ bool hard_fork_6_coinbase_size_rules::generate(std::vector<test_event_entry>& ev
   const size_t tx_for_hf6_block_size = get_object_blobsize(tx_for_hf6_block);
 
   block blk_hf6_with_tx{};
-  { // №6
+  { // #6
     bool r = build_specific_cumnul_block(blk_hf6_sanity, seed_ecbs(tx_for_hf6_block_size), {}, { tx_for_hf6_block }, blk_hf6_with_tx);
     CHECK_AND_ASSERT_MES(r, false, "HF6 block with tx construction failed");
     events.push_back(blk_hf6_with_tx);
@@ -1916,7 +1954,7 @@ bool hard_fork_6_coinbase_size_rules::generate(std::vector<test_event_entry>& ev
 
   DO_CALLBACK(events, "set_far_checkpoint");
 
-  { // №7
+  { // #7
     block blk_ok{};
     bool r = build_specific_cumnul_block(blk_hf6_with_tx, seed_ecbs(999), {}, {}, blk_ok);
     CHECK_AND_ASSERT_MES(r, false, "HF6 in-zone bogus-ecbs block construction failed");
@@ -1929,6 +1967,84 @@ bool hard_fork_6_coinbase_size_rules::generate(std::vector<test_event_entry>& ev
 
 bool hard_fork_6_coinbase_size_rules::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
+  return true;
+}
+
+//------------------------------------------------------------------------------
+
+bool hard_fork_6_gw_incompatible_with_mode_separate::generate(std::vector<test_event_entry>& events) const
+{
+  // Test idea: make sure gateway ins/outs are rejected in TX_FLAG_SIGNATURE_MODE_SEPARATE txs (HF6+).
+
+  bool r = false;
+  uint64_t ts = test_core_time::get_time();
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
+  DO_CALLBACK(events, "configure_core");
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+
+  // register a gateway address (gw outputs require it)
+  keypair gw_view  = keypair::generate();
+  keypair gw_spend = keypair::generate();
+  gateway_address_descriptor_operation gwdo{};
+  gateway_address_descriptor_operation_register gwdo_reg{};
+  gwdo_reg.view_pub_key = gw_view.pub;
+  gwdo_reg.descriptor.meta_info = "it's giving unencrypted balance vibes";
+  gwdo_reg.descriptor.owner_key = gw_spend.pub;
+  gwdo.operation = gwdo_reg;
+  MAKE_TX_EXTRA_ATTACH_FEE(events, tx_reg, miner_acc, miner_acc, 0, CURRENCY_GATEWAY_ADDRESS_REGISTRATION_FEE, blk_0r, std::vector<extra_v>({ gwdo }), empty_attachment);
+  MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_reg);
+  REWIND_BLOCKS_N(events, blk_1r, blk_1, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  // both txs below send the same gateway output (miner -> gw addr); the only difference is the separate-mode flag
+
+  // 1/2, error: gateway output in a complete separate-mode (consolidated) tx must be rejected
+  std::vector<tx_source_entry> sources;
+  r = fill_tx_sources(sources, events, blk_1r, miner_acc.get_keys(), MK_TEST_COINS(13) + TESTS_DEFAULT_FEE, 10);
+  CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources failed");
+  uint64_t change = get_sources_total_amount(sources) - MK_TEST_COINS(13) - TESTS_DEFAULT_FEE;
+  sources.back().separately_signed_tx_complete = true; // requires TX_FLAG_SIGNATURE_MODE_SEPARATE
+
+  std::vector<tx_destination_entry> destinations;
+  destinations.emplace_back(MK_TEST_COINS(13), gw_view.pub); // gateway output
+  if (change != 0)
+    destinations.push_back(tx_destination_entry(change, miner_acc.get_public_address()));
+
+  size_t tx_hardfork_id{};
+  uint64_t tx_version = get_tx_version_and_harfork_id_from_events(events, tx_hardfork_id);
+  crypto::secret_key one_time{};
+  tx_generation_context gen_context{};
+  transaction tx{};
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_extra, empty_attachment, tx, tx_version, tx_hardfork_id, one_time,
+    0, 0, 0, true, TX_FLAG_SIGNATURE_MODE_SEPARATE, TESTS_DEFAULT_FEE, gen_context);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
+
+  DO_CALLBACK(events, "mark_invalid_tx");
+  ADD_CUSTOM_EVENT(events, tx);
+
+  // 2/2, control: the exact same flow without TX_FLAG_SIGNATURE_MODE_SEPARATE is accepted
+  sources.clear();
+  r = fill_tx_sources(sources, events, blk_1r, miner_acc.get_keys(), MK_TEST_COINS(13) + TESTS_DEFAULT_FEE, 10);
+  CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources failed");
+  change = get_sources_total_amount(sources) - MK_TEST_COINS(13) - TESTS_DEFAULT_FEE;
+
+  destinations.clear();
+  destinations.emplace_back(MK_TEST_COINS(13), gw_view.pub); // gateway output
+  if (change != 0)
+    destinations.push_back(tx_destination_entry(change, miner_acc.get_public_address()));
+
+  gen_context = {};
+  tx = {};
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_extra, empty_attachment, tx, tx_version, tx_hardfork_id, one_time,
+    0, 0, 0, true, 0 /* no TX_FLAG_SIGNATURE_MODE_SEPARATE */, TESTS_DEFAULT_FEE, gen_context);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
+
+  ADD_CUSTOM_EVENT(events, tx);
+  MAKE_NEXT_BLOCK_TX1(events, blk_2, blk_1r, miner_acc, tx);
+  DO_CALLBACK_PARAMS_STR(events, "check_gw_balance", t_serializable_object_to_blob(gw_address_balance_check_param{ gw_view.pub, MK_TEST_COINS(13) }));
+
   return true;
 }
 

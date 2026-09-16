@@ -124,8 +124,10 @@ namespace db
     case db_lmdb:
       return std::shared_ptr<tools::db::i_db_backend>(new tools::db::lmdb_db_backend);
 
+#ifdef ENABLED_ENGINE_MDBX
     case db_mdbx:
       return std::shared_ptr<tools::db::i_db_backend>(new tools::db::mdbx_db_backend);
+#endif
 
     default:
       LOG_ERROR("db_backend_selector was no inited");

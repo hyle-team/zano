@@ -597,7 +597,7 @@ struct lmdb_txn_abort_test
 //     std::string out;
 //     bool found = backend->get(h, key.data(), key.size(), out);
 //     bdb.commit_transaction();
-//     CHECK_AND_ASSERT_MES(!found, false, "Data persisted after lmdb_txn destructor — expected abort");
+//     CHECK_AND_ASSERT_MES(!found, false, "Data persisted after lmdb_txn destructor - expected abort");
 // 
 //     bdb.close();
 //     LOG_PRINT_GREEN("Test successful", LOG_LEVEL_0);
@@ -698,7 +698,7 @@ struct lmdb_txn_stress_multithread_test
           // open depth nested read-only transactions
           for (int i = 0; i < depth; ++i) { acc.begin_transaction(true); ++opened; }
 
-          //just read the value — it should exist
+          //just read the value - it should exist
           auto p = acc.get(key);
           if (!p.get())
             ++read_failures;
