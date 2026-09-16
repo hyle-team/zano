@@ -577,7 +577,7 @@ uint64_t wallet2::get_actual_zc_global_index()
   throw std::runtime_error(""); //mostly to suppress compiler warning 
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::process_new_transaction(const currency::transaction& tx_from_block, uint64_t height, const currency::block& b, const std::vector<uint64_t>* pglobal_indexes, uint64_t original_size /* = 0 */)
+void wallet2::process_new_transaction(const currency::transaction& tx_from_block, uint64_t height, const currency::block& b, const std::vector<uint64_t>* pglobal_indexes)
 {
   const bool hf6_active = is_in_hardfork_zone(ZANO_HARDFORK_06);
 
@@ -594,7 +594,6 @@ void wallet2::process_new_transaction(const currency::transaction& tx_from_block
 
   //check for transaction spends
   process_transaction_context ptc(tx);
-  ptc.original_size = original_size;
 
   process_unconfirmed(tx, ptc.recipients, ptc.remote_aliases);
 
@@ -1539,8 +1538,7 @@ void wallet2::prepare_wti(wallet_public::wallet_transfer_info& wti, const proces
   wti.employed_entries = tx_process_context.employed_entries;
   wti.unlock_time = get_max_unlock_time_from_receive_indices(tx_process_context.tx, tx_process_context.employed_entries);
   wti.timestamp = tx_process_context.timestamp;
-  wti.tx_blob_size = static_cast<uint32_t>(tx_process_context.original_size != 0
-    ? tx_process_context.original_size : currency::get_tx_real_blobsize(wti.tx));
+  wti.tx_blob_size = static_cast<uint32_t>(currency::get_tx_real_blobsize(wti.tx));
   wti.tx_hash = tx_process_context.tx_hash();
   load_wallet_transfer_info_flags(wti);
   bc_services::extract_market_instructions(wti.marketplace_entries, wti.tx.attachment);
@@ -1726,20 +1724,8 @@ void wallet2::process_new_blockchain_entry(const currency::block& b, const curre
     !(height == m_minimum_height || get_blockchain_current_size() <= 1), error::wallet_internal_error,
     "current_index=" + std::to_string(height) + ", get_blockchain_current_height()=" + std::to_string(get_blockchain_current_size()));
 
-  WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(!bche.compact || WALLET_FILE_SERIALIZATION_VERSION >= 171, "Compact sync requires wallet serialization version 171 to detect incomplete blocks");
-  WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(!bche.compact || (height != 0 && bche.coinbase_original_size != 0 && bche.tx_original_sizes.size() == bche.txs_ptr.size()), "Incomplete compact block metadata");
-  WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(bche.tx_original_sizes.empty() || bche.tx_original_sizes.size() == bche.txs_ptr.size(), "Transaction size metadata count mismatch");
-  WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(bche.coinbase_original_size <= std::numeric_limits<uint32_t>::max(), "Coinbase original size does not fit wallet history");
-  for (uint64_t original_size : bche.tx_original_sizes)
-    WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(original_size != 0 && original_size <= std::numeric_limits<uint32_t>::max(), "Transaction original size does not fit wallet history");
+  WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(!bche.compact || height != 0, "Genesis cannot be compact");
 
-  // record the height before processing: a callback may throw after changing transfers but before this block is added to m_chain
-  if (bche.compact)
-  {
-    if (m_last_compact_block_height == 0)
-      WLT_LOG_L0("[COMPACT_SYNC] Received first compact block at height " << height);
-    m_last_compact_block_height = std::max(m_last_compact_block_height, height);
-  }
   //optimization: seeking only for blocks that are not older then the wallet creation time plus 1 day. 1 day is for possible user incorrect time setup
   const std::vector<uint64_t>* pglobal_index = nullptr;
   if (get_block_height(b) > get_wallet_minimum_height()) // b.timestamp + 60 * 60 * 24 > m_account.get_createtime())
@@ -1750,7 +1736,7 @@ void wallet2::process_new_blockchain_entry(const currency::block& b, const curre
       pglobal_index = &(bche.coinbase_ptr->m_global_output_indexes);
     }
     TIME_MEASURE_START(miner_tx_handle_time);
-    process_new_transaction(b.miner_tx, height, b, pglobal_index, bche.coinbase_original_size);
+    process_new_transaction(b.miner_tx, height, b, pglobal_index);
     TIME_MEASURE_FINISH(miner_tx_handle_time);
 
     TIME_MEASURE_START(txs_handle_time);
@@ -1762,7 +1748,7 @@ void wallet2::process_new_blockchain_entry(const currency::block& b, const curre
         LOG_ERROR("Found tx order fail in process_new_blockchain_entry: count=" << count
           << ", b.tx_hashes.size() = " << b.tx_hashes.size() << ", tx real id: " << currency::get_transaction_hash(tx_entry->tx) << ", bl_id: " << bl_id);
       }
-      process_new_transaction(tx_entry->tx, height, b, &(tx_entry->m_global_output_indexes), bche.tx_original_sizes.empty() ? 0 : bche.tx_original_sizes[count]);
+      process_new_transaction(tx_entry->tx, height, b, &(tx_entry->m_global_output_indexes));
       count++;
     }
     TIME_MEASURE_FINISH(txs_handle_time);
@@ -1841,7 +1827,7 @@ void wallet2::pull_blocks(size_t& blocks_added, std::atomic<bool>& stop, bool& f
   currency::COMMAND_RPC_GET_BLOCKS_DIRECT::response res = AUTO_VAL_INIT(res);
 
   req.minimum_height = get_wallet_minimum_height();
-  req.compact = WALLET_FILE_SERIALIZATION_VERSION >= 171 && m_compact_sync;
+  req.m_return_compact = m_compact_sync;
   if (req.minimum_height > m_height_of_start_sync)
     m_height_of_start_sync = req.minimum_height;
 
@@ -1925,15 +1911,6 @@ void wallet2::pull_blocks(size_t& blocks_added, std::atomic<bool>& stop, bool& f
 void wallet2::handle_pulled_blocks(size_t& blocks_added, std::atomic<bool>& stop,
   currency::COMMAND_RPC_GET_BLOCKS_DIRECT::response& res, bool& wallet_reset_needed)
 {
-  // an exception during transaction processing can leave compact transfers saved before their block was added to m_chain
-  // rebuild that partial state before either appending the block again or handling a replacement branch
-  if (m_last_compact_block_height != 0 && m_last_compact_block_height >= get_blockchain_current_size())
-  {
-    WLT_LOG_L0("Rescanning incomplete compact block at height " << m_last_compact_block_height);
-    m_full_resync_requested_at_h = 0;
-    wallet_reset_needed = true;
-    return;
-  }
   size_t current_index = res.start_height;
   m_last_known_daemon_height = res.current_height;
   bool been_matched_block = false;
@@ -3022,9 +2999,6 @@ void wallet2::detach_blockchain(uint64_t including_height)
 
   //asset descriptors
   handle_rollback_events(including_height);
-
-  // detached compact blocks are no longer part of this history, otherwise a shorter replacement batch could be mistaken for an interrupted block
-  m_last_compact_block_height = std::min(m_last_compact_block_height, including_height ? including_height - 1 : 0);
 
   WLT_LOG_L0("Detached blockchain on height " << including_height << ", transfers detached " << transfers_detached << ", blocks detached " << blocks_detached
     << ", new top: " << print16(m_chain.get_top_block_id()) << " @ " << m_chain.get_top_block_height());

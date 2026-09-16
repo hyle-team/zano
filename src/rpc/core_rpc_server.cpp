@@ -375,7 +375,7 @@ namespace currency
     CHECK_CORE_READY();
     CHECK_RPC_LIMITS(req.block_ids.size(), RPC_LIMIT_COMMAND_RPC_GET_BLOCKS_DIRECT_BLOCK_IDS);
     LOG_PRINT_L2("[on_get_blocks]: Prevalidating....");
-    if (req.block_ids.back() != m_core.get_blockchain_storage().get_block_id_by_height(0))
+    if (req.block_ids.empty() || req.block_ids.back() != m_core.get_blockchain_storage().get_block_id_by_height(0))
     {
       //genesis mismatch, return specific
       res.status = API_RETURN_CODE_GENESIS_MISMATCH;
@@ -400,17 +400,35 @@ namespace currency
     LOG_PRINT_L2("[on_get_blocks]: Enumerating over blocks ....");
     for (auto& b : bs)
     {
-      res.blocks.resize(res.blocks.size() + 1);
-      res.blocks.back().block = block_to_blob(b.first->bl);
+      res.blocks.emplace_back();
+      auto& entry = res.blocks.back();
+      entry.compact = req.m_return_compact && get_block_height(b.first->bl) != 0;
+      if (entry.compact)
+      {
+        block compact_block = b.first->bl;
+        compact_block.miner_tx.signatures.clear();
+        compact_block.miner_tx.proofs.clear();
+        entry.block = block_to_blob(compact_block);
+      }
+      else
+        entry.block = block_to_blob(b.first->bl);
       CHECK_AND_ASSERT_MES(b.third.get(), false, "Internal error on handling COMMAND_RPC_GET_BLOCKS_FAST: b.third is empty, ie coinbase info is not prepared");
-      res.blocks.back().coinbase_global_outs = b.third->m_global_output_indexes;
-      res.blocks.back().tx_global_outs.resize(b.second.size());
+      entry.coinbase_global_outs = b.third->m_global_output_indexes;
+      entry.tx_global_outs.resize(b.second.size());
       size_t i = 0;
 
       BOOST_FOREACH(auto & t, b.second)
       {
-        res.blocks.back().txs.push_back(tx_to_blob(t->tx));
-        res.blocks.back().tx_global_outs[i].v = t->m_global_output_indexes;
+        if (entry.compact)
+        {
+          transaction compact_tx = t->tx;
+          compact_tx.signatures.clear();
+          compact_tx.proofs.clear();
+          entry.txs.push_back(tx_to_blob(compact_tx));
+        }
+        else
+          entry.txs.push_back(tx_to_blob(t->tx));
+        entry.tx_global_outs[i].v = t->m_global_output_indexes;
         i++;
       }
     }
@@ -418,76 +436,6 @@ namespace currency
 
     LOG_PRINT_L2("[on_get_blocks]: Finished");
     res.status = API_RETURN_CODE_OK;
-    return true;
-  }
-  //------------------------------------------------------------------------------------------------------------------------------
-  bool core_rpc_server::on_get_blocks_compact(const COMMAND_RPC_GET_BLOCKS_COMPACT::request& req, COMMAND_RPC_GET_BLOCKS_COMPACT::response& res, connection_context& cntx)
-  {
-    res.protocol_version = 1;
-    if (req.block_ids.empty())
-    {
-      res.status = API_RETURN_CODE_GENESIS_MISMATCH;
-      return true;
-    }
-
-    COMMAND_RPC_GET_BLOCKS_DIRECT::request direct_req = AUTO_VAL_INIT(direct_req);
-    direct_req.minimum_height = req.minimum_height;
-    direct_req.block_ids = req.block_ids;
-    COMMAND_RPC_GET_BLOCKS_DIRECT::response direct_res = AUTO_VAL_INIT(direct_res);
-    const bool result = on_get_blocks_direct(direct_req, direct_res, cntx);
-    res.status = direct_res.status;
-    res.start_height = direct_res.start_height;
-    res.current_height = direct_res.current_height;
-    res.current_hardfork = direct_res.current_hardfork;
-    if (!result || res.status != API_RETURN_CODE_OK)
-      return result;
-
-    uint64_t height = res.start_height;
-    for (const auto& source : direct_res.blocks)
-    {
-      CHECK_AND_ASSERT_MES(source.block_ptr && source.coinbase_ptr, false, "Missing block data for compact wallet RPC");
-      const auto& source_block = source.block_ptr->bl;
-      res.blocks.emplace_back();
-      auto& entry = res.blocks.back();
-      // genesis stays full; all later blocks, including the tip, are compact
-      entry.compact = height > 0;
-      blobdata coinbase_blob;
-      CHECK_AND_ASSERT_MES(tx_to_blob(source_block.miner_tx, coinbase_blob), false, "Failed to serialize wallet coinbase");
-      entry.coinbase_original_size = coinbase_blob.size();
-      entry.coinbase_global_outs = source.coinbase_ptr->m_global_output_indexes;
-      if (entry.compact)
-      {
-        block compact_block = source_block;
-        compact_block.miner_tx.signatures.clear();
-        compact_block.miner_tx.proofs.clear();
-        CHECK_AND_ASSERT_MES(block_to_blob(compact_block, entry.block), false, "Failed to serialize compact wallet block");
-      }
-      else
-      {
-        CHECK_AND_ASSERT_MES(block_to_blob(source_block, entry.block), false, "Failed to serialize wallet block");
-      }
-
-      entry.tx_global_outs.resize(source.txs_ptr.size());
-      entry.tx_original_sizes.reserve(source.txs_ptr.size());
-      size_t index = 0;
-      for (const auto& source_tx : source.txs_ptr)
-      {
-        CHECK_AND_ASSERT_MES(source_tx, false, "Missing transaction for compact wallet RPC");
-        blobdata tx_blob;
-        CHECK_AND_ASSERT_MES(tx_to_blob(source_tx->tx, tx_blob), false, "Failed to serialize wallet transaction");
-        entry.tx_original_sizes.push_back(tx_blob.size());
-        if (entry.compact)
-        {
-          transaction compact_tx = source_tx->tx;
-          compact_tx.signatures.clear();
-          compact_tx.proofs.clear();
-          CHECK_AND_ASSERT_MES(tx_to_blob(compact_tx, tx_blob), false, "Failed to serialize compact wallet transaction");
-        }
-        entry.txs.push_back(std::move(tx_blob));
-        entry.tx_global_outs[index++].v = source_tx->m_global_output_indexes;
-      }
-      ++height;
-    }
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------

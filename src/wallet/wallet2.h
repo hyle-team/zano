@@ -153,7 +153,6 @@ namespace tools
     uint64_t m_last_pow_block_h = 0;
     std::list<std::pair<uint64_t, wallet_event_t>> m_rollback_events;
     std::list<std::pair<uint64_t, uint64_t> > m_last_zc_global_indexs; // <height, last_zc_global_indexs>, biggest height comes in front
-    uint64_t m_last_compact_block_height = 0; // highest compact block started; >= chain size identifies incomplete processing
 
     //variables that not being serialized
     std::atomic<uint64_t> m_last_bc_timestamp = 0;
@@ -228,12 +227,6 @@ namespace tools
       a & m_whitelisted_assets;
       a & m_use_assets_whitelisting;
       a & m_last_zc_global_indexs;
-
-      if (ver >= 171)
-        a & m_last_compact_block_height;
-      else if (t_archive::is_loading::value)
-        m_last_compact_block_height = 0;
-
     }
   };
   
@@ -335,7 +328,6 @@ namespace tools
     {
       process_transaction_context(const currency::transaction& t) : tx(t) {}
       const currency::transaction& tx;
-      uint64_t original_size = 0; // zero when the original serialized size was not supplied
       bool spent_own_native_inputs = false; 
       bool spent_own_outs_in_inputs = false;
       // check all outputs for spending (compare key images)
@@ -811,12 +803,8 @@ namespace tools
     //performance inefficient call, suitable only for rare ocasions or super lazy developers
     bool proxy_to_daemon(const std::string& uri, const std::string& body, int& response_code, std::string& response_body);
     void set_concise_mode(bool enabled) { m_concise_mode = enabled; }
-    // сallers opt in to compact transport; missing endpoints (HTTP 404) fall back to full sync.
-    void set_compact_sync(bool enabled)
-    {
-      WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(!enabled || WALLET_FILE_SERIALIZATION_VERSION >= 171, "Compact sync requires wallet serialization version 171 to detect incomplete blocks");
-      m_compact_sync = enabled;
-    }
+    // сallers opt in, older daemons ignore the request flag and return full blocks
+    void set_compact_sync(bool enabled) { m_compact_sync = enabled; }
     bool get_compact_sync() const { return m_compact_sync; }
     void set_concise_mode_reorg_max_reorg_blocks(uint64_t max_blocks) { m_wallet_concise_mode_max_reorg_blocks = max_blocks; }
     void set_concise_mode_truncate_history(uint64_t max_entries) { m_truncate_history_max_entries = max_entries; }
@@ -846,7 +834,7 @@ private:
     void remove_transfer_from_expiration_list(uint64_t transfer_index);
     void load_keys(const std::string& keys_file_name, const std::string& password, uint64_t file_signature, keys_file_data& kf_data, std::string* out_body_password = nullptr);
     void process_ado_in_new_transaction(const currency::asset_descriptor_operation& ado, process_transaction_context& ptc);
-    void process_new_transaction(const currency::transaction& tx_from_block, uint64_t height, const currency::block& b, const std::vector<uint64_t>* pglobal_indexes, uint64_t original_size = 0);
+    void process_new_transaction(const currency::transaction& tx_from_block, uint64_t height, const currency::block& b, const std::vector<uint64_t>* pglobal_indexes);
     void fetch_tx_global_indixes(const currency::transaction& tx, std::vector<uint64_t>& goutputs_indexes);
     void fetch_tx_global_indixes(const std::list<std::reference_wrapper<const currency::transaction>>& txs, std::vector<std::vector<uint64_t>>& goutputs_indexes);
     void detach_blockchain(uint64_t including_height);

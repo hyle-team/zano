@@ -140,7 +140,6 @@ namespace tools
     epee::critical_section m_lock;
     epee::net_utils::http::http_universal_client m_http_client;
     std::string m_daemon_address;
-    std::atomic<bool> m_compact_rpc_unsupported = false;
 
     unsigned int m_connection_timeout;
     size_t m_attempts_count;

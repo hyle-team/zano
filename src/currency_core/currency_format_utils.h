@@ -428,8 +428,6 @@ namespace currency
 
   bool unserialize_block_complete_entry(const COMMAND_RPC_GET_BLOCKS_FAST::response& serialized,
     COMMAND_RPC_GET_BLOCKS_DIRECT::response& unserialized);
-  bool unserialize_compact_wallet_blocks(const COMMAND_RPC_GET_BLOCKS_COMPACT::request& request, const COMMAND_RPC_GET_BLOCKS_COMPACT::response& serialized,
-    COMMAND_RPC_GET_BLOCKS_DIRECT::response& unserialized);
 
   
   uint64_t get_alias_coast_from_fee(const std::string& alias, uint64_t fee_median);

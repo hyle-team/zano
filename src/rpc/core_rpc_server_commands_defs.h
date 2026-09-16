@@ -268,10 +268,12 @@ namespace currency
     {
       uint64_t minimum_height;
       std::list<crypto::hash> block_ids;
+      bool m_return_compact = false;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(minimum_height)                  DOC_DSCR("The minimum height of the returning buch of blocks.") DOC_EXMP(0) DOC_END
         KV_SERIALIZE_CONTAINER_POD_AS_BLOB(block_ids) /* TODO !!! DOC_DSCR("Current state of the local blockchain. Hashes of the most recent 10 blocks goes first, then each 2nd, then 4th, 8, 16, 32, 64 and so on, and the last one is always hash of the genesis block.") DOC_END */
+        KV_SERIALIZE(m_return_compact)
       END_KV_SERIALIZE_MAP()
     };
 
@@ -294,70 +296,7 @@ namespace currency
   };
 
   typedef COMMAND_RPC_GET_BLOCKS_FAST_T<block_complete_entry> COMMAND_RPC_GET_BLOCKS_FAST;
-  struct COMMAND_RPC_GET_BLOCKS_DIRECT : COMMAND_RPC_GET_BLOCKS_FAST_T<block_direct_data_entry>
-  {
-    struct request : COMMAND_RPC_GET_BLOCKS_FAST_T<block_direct_data_entry>::request
-    {
-      // local proxy option only; false keeps the existing full RPC path
-      bool compact = false;
-    };
-  };
-
-  struct wallet_sync_block_entry
-  {
-    blobdata block;
-    std::list<blobdata> txs;
-    std::vector<uint64_t> coinbase_global_outs;
-    std::vector<struct_with_one_t_type<std::vector<uint64_t>>> tx_global_outs;
-    uint64_t coinbase_original_size = 0;
-    std::vector<uint64_t> tx_original_sizes;
-    bool compact = false;
-
-    BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(block)
-      KV_SERIALIZE(txs)
-      KV_SERIALIZE(coinbase_global_outs)
-      KV_SERIALIZE(tx_global_outs)
-      KV_SERIALIZE(coinbase_original_size)
-      KV_SERIALIZE(tx_original_sizes)
-      KV_SERIALIZE(compact)
-    END_KV_SERIALIZE_MAP()
-  };
-
-  // all non genesis transactions omit top level signatures/proofs
-  // clients must keep these copies out of transaction relay, including after a chain reorg
-  struct COMMAND_RPC_GET_BLOCKS_COMPACT
-  {
-    struct request
-    {
-      uint64_t minimum_height = 0;
-      std::list<crypto::hash> block_ids;
-
-      BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(minimum_height)
-        KV_SERIALIZE_CONTAINER_POD_AS_BLOB(block_ids)
-      END_KV_SERIALIZE_MAP()
-    };
-
-    struct response
-    {
-      uint64_t protocol_version = 0;
-      std::list<wallet_sync_block_entry> blocks;
-      uint64_t start_height = 0;
-      uint64_t current_height = 0;
-      uint64_t current_hardfork = 0;
-      std::string status;
-
-      BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(protocol_version)
-        KV_SERIALIZE(blocks)
-        KV_SERIALIZE(start_height)
-        KV_SERIALIZE(current_height)
-        KV_SERIALIZE(current_hardfork)
-        KV_SERIALIZE(status)
-      END_KV_SERIALIZE_MAP()
-    };
-  };
+  typedef COMMAND_RPC_GET_BLOCKS_FAST_T<block_direct_data_entry> COMMAND_RPC_GET_BLOCKS_DIRECT;
   
   //-----------------------------------------------
   struct COMMAND_RPC_GET_TRANSACTIONS
