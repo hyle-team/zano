@@ -253,7 +253,7 @@ namespace nodetool
     m_permanently_blocked_ips.clear();
     m_permanently_blocked_ips = new_block_list;
 
-    LOG_PRINT_L0("P2P network manual config file loaded(some of the p2p cpommand line options might be overridden by '" << P2P_MANUAL_CONFIG_FILENAME << "').");
+    LOG_PRINT_L0("P2P network manual config file loaded (some of the P2P command-line options might be overridden by '" << P2P_MANUAL_CONFIG_FILENAME << "').");
     return true;
   }
   //-----------------------------------------------------------------------------------
@@ -494,12 +494,12 @@ namespace nodetool
     m_net_server.set_connection_filter(this);
 
     //try to bind
-    LOG_PRINT_L0("Binding on " << m_bind_ip << ":" << m_port);
+    LOG_PRINT_L1("P2P binding on " << m_bind_ip << ":" << m_port << " ...");
     res = m_net_server.init_server(m_port, m_bind_ip);
-    CHECK_AND_ASSERT_MES(res, false, "Failed to bind server");
+    CHECK_AND_ASSERT_MES(res, false, "Failed to bind server P2P service to " << m_bind_ip << ":" << m_port);
 
-    m_listenning_port = m_net_server.get_binded_port();
-    LOG_PRINT_GREEN("Net service binded on " << m_bind_ip << ":" << m_listenning_port, LOG_LEVEL_0);
+    m_listenning_port = m_net_server.get_bound_port();
+    LOG_PRINT_GREEN("P2P service bound to " << m_bind_ip << ":" << m_listenning_port, LOG_LEVEL_0);
     if(m_external_port)
       LOG_PRINT_L0("External port defined as " << m_external_port);
 

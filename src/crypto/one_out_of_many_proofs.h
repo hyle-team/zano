@@ -1,5 +1,5 @@
-// Copyright (c) 2023 Zano Project
-// Copyright (c) 2023 sowle (val@zano.org, crypto.sowle@gmail.com)
+// Copyright (c) 2023-2026 Zano Project
+// Copyright (c) 2023-2026 sowle (val@zano.org, crypto.sowle@gmail.com)
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 //
@@ -41,7 +41,7 @@ namespace crypto
   bool generate_BGE_proof(const hash& context_hash, const std::vector<point_t>& ring, const scalar_t& secret, const size_t secret_index, BGE_proof& result, uint8_t* p_err = nullptr);
 
 
-  bool verify_BGE_proof(const hash& context_hash, const std::vector<const public_key*>& ring, const BGE_proof& sig, uint8_t* p_err = nullptr);
+  bool verify_BGE_proof(const hash& context_hash, const std::vector<const public_key*>& ring, const BGE_proof& sig, uint8_t* p_err = nullptr) noexcept;
 
 
 } // namespace crypto

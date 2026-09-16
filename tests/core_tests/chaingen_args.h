@@ -16,6 +16,7 @@ namespace chaingen_args
   extern command_line::arg_descriptor<std::string> arg_run_multiple_tests;
   extern command_line::arg_descriptor<bool>        arg_enable_debug_asserts;
   extern command_line::arg_descriptor<bool>        arg_stop_on_fail;
+  extern command_line::arg_descriptor<bool>        arg_report_block_stats;
   extern command_line::arg_descriptor<uint32_t>    arg_processes;
   extern command_line::arg_descriptor<int32_t>     arg_worker_id;
   extern command_line::arg_descriptor<std::string> arg_run_root;

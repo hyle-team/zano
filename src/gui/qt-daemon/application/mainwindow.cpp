@@ -8,6 +8,8 @@
 #include <QtWebEngineWidgets>
 #include <QPrinter>
 #include <QPrintDialog>
+#include <QWebChannel>
+#include <set>
 
 #include "string_coding.h"
 #include "gui_utils.h"
@@ -68,27 +70,24 @@ QString make_response_dbg(const T& r, const std::string& location)
 
 #include "mainwindow.h"
 #include "html_content_hash.h"
-// 
-// void MediatorObject::from_html_to_c(const QString &text)
-// {
-//   from_c_to_html(text);
-// }
-// 
-// template<typename Arg, typename R, typename C>
-// struct InvokeWrapper {
-//   R *receiver;
-//   void (C::*memberFun)(Arg);
-//   void operator()(Arg result) {
-//     (receiver->*memberFun)(result);
-//   }
-// };
-// 
-// template<typename Arg, typename R, typename C>
-// InvokeWrapper<Arg, R, C> invoke(R *receiver, void (C::*memberFun)(Arg))
-// {
-//   InvokeWrapper<Arg, R, C> wrapper = { receiver, memberFun };
-//   return wrapper;
-// }
+#include "web_channel_bridge.h"
+#include "currency_core/currency_config.h"
+#include "profile_tools.h"
+
+namespace
+{
+  // Known GUI/CLI log files in the configured log folder, including past sessions
+  // The logger also includes the actual current log and other registered streams, skipping additional names that are already registered
+  const std::set<std::string> gui_diagnostic_log_names =
+  {
+    "Zano.log",
+    CURRENCY_CONSTRUCT_TX_LOG_FILENAME,
+    CURRENCY_FAILED_MINED_BLOCKS_LOG_FILENAME,
+    EPEE_PROFILE_DETAILS_LOG_FILENAME,
+    "zanod.log",
+    "simplewallet.log"
+  };
+}
 
 
 std::wstring convert_to_lower_via_qt(const std::wstring& w)
@@ -98,11 +97,12 @@ std::wstring convert_to_lower_via_qt(const std::wstring& w)
 }
 
 MainWindow::MainWindow()
-  : m_gui_deinitialize_done_1(false)
+  : m_view(nullptr)
+  , m_channel(nullptr)
+  , m_web_channel_bridge(nullptr)
+  , m_gui_deinitialize_done_1(false)
   , m_backend_stopped_2(false)
   , m_system_shutdown(false)
-  , m_view(nullptr)
-  , m_channel(nullptr)
   , m_ui_dispatch_id_counter(0)
 {
 #ifndef _MSC_VER
@@ -121,7 +121,11 @@ MainWindow::~MainWindow()
   }
   if (m_channel)
   {
-    m_channel->deregisterObject(this);
+    if (m_web_channel_bridge)
+    {
+      m_channel->deregisterObject(m_web_channel_bridge);
+    }
+    m_web_channel_bridge = nullptr;
     delete m_channel;
     m_channel = nullptr;
   }
@@ -142,6 +146,8 @@ bool MainWindow::init_window()
 {
   m_view = new QWebEngineView(this);
   m_channel = new QWebChannel(m_view->page());
+  m_web_channel_bridge = new WebChannelBridge(*this, m_channel);
+  m_channel->registerObject(QStringLiteral("mediator_object"), m_web_channel_bridge);
   m_view->page()->setWebChannel(m_channel);
 
   QWidget* central_widget_to_be_set = m_view;
@@ -151,7 +157,6 @@ bool MainWindow::init_window()
   std::string qt_dev_tools_option = m_backend.get_qt_dev_tools_option();
   if (!qt_dev_tools_option.empty())
   {
-#if QT_VERSION >= QT_VERSION_CHECK(5, 11, 0)
     std::vector<std::string> qt_dev_tools_option_parts;
     boost::split(qt_dev_tools_option_parts, qt_dev_tools_option, [](char c) { return c == ','; });
     
@@ -179,17 +184,12 @@ bool MainWindow::init_window()
     spliter->setSizes(Sizes);
 
     central_widget_to_be_set = spliter;
-#else
-    LOG_ERROR("Qt Dev Tool is not available for this Qt version, try building with Qt 5.11.0 or higher");
-#endif
   }
-
-  // register QObjects to be exposed to JavaScript
-  m_channel->registerObject(QStringLiteral("mediator_object"), this);
 
   connect(m_view, SIGNAL(loadFinished(bool)), SLOT(on_load_finished(bool)));
 
   setCentralWidget(central_widget_to_be_set);
+  setMinimumSize(1200, 700);
   //this->setMouseTracking(true);
 
   m_view->page()->settings()->setAttribute(QWebEngineSettings::LocalContentCanAccessFileUrls, true);
@@ -516,10 +516,16 @@ void MainWindow::init_tray_icon(const std::string& html_path)
 
 
   m_restore_action = std::unique_ptr<QAction>(new QAction(tr("&Restore"), this));
-  connect(m_restore_action.get(), SIGNAL(triggered()), this, SLOT(on_menu_show()));
+  connect(m_restore_action.get(), &QAction::triggered, this, [this]()
+    {
+      on_menu_show(QString{});
+    });
 
   m_quit_action = std::unique_ptr<QAction>(new QAction(tr("&Quit"), this));
-  connect(m_quit_action.get(), SIGNAL(triggered()), this, SLOT(tray_quit_requested()));
+  connect(m_quit_action.get(), &QAction::triggered, this, [this]()
+    {
+      tray_quit_requested(QString{});
+    });
 
   m_minimize_action = std::unique_ptr<QAction>(new QAction(tr("minimizeAction"), this));
   connect(m_minimize_action.get(), SIGNAL(triggered()), this, SLOT(showMinimized()));
@@ -653,7 +659,7 @@ void MainWindow::restore_pos(bool consider_showed)
   }
   else
   {
-    QPoint point = QApplication::desktop()->screenGeometry().bottomRight();
+    QPoint point = QGuiApplication::primaryScreen()->geometry().bottomRight();
     if (m_config.m_window_position.first + m_config.m_window_size.second > point.x() ||
       m_config.m_window_position.second + m_config.m_window_size.first > point.y()
       )
@@ -975,6 +981,7 @@ bool MainWindow::init_backend(int argc, char* argv[])
     this->show_msg_box(command_line_fail_details);
     return false;
   }
+  m_allow_weak_password = m_backend.get_arguments()["allow-weak-password"].as<bool>();
 
   if (command_line::has_arg(m_backend.get_arguments(), command_line::arg_deeplink))
   {
@@ -1155,7 +1162,7 @@ bool MainWindow::update_tor_status(const view::current_action_status& opt)
   CATCH_ENTRY2(false);
 }
 
-bool MainWindow::nativeEventFilter(const QByteArray &eventType, void *message, long *result)
+bool MainWindow::nativeEventFilter(const QByteArray &eventType, void *message, qintptr *result)
 {
   TRY_ENTRY();
 #ifdef WIN32
@@ -1599,9 +1606,7 @@ QString MainWindow::store_secure_app_data(const QString& param, const QString& p
     return MAKE_RESPONSE(ar);
   }
 
-  crypto::hash master_password_pre_hash = crypto::cn_fast_hash(m_master_password.c_str(), m_master_password.length());
-  crypto::hash master_password_hash = crypto::cn_fast_hash(&master_password_pre_hash, sizeof master_password_pre_hash);
-  LOG_PRINT_L0("store_secure_app_data, r = " << ar.error_code << ", pass hash: " << master_password_hash);
+  LOG_PRINT_L0("store_secure_app_data, r = " << ar.error_code);
 
   return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
@@ -1630,9 +1635,7 @@ QString MainWindow::get_secure_app_data(const QString& param)
     return MAKE_RESPONSE(ar);
   }
   m_master_password = pwd.pass;
-  crypto::hash master_password_pre_hash = crypto::cn_fast_hash(m_master_password.c_str(), m_master_password.length());
-  crypto::hash master_password_hash = crypto::cn_fast_hash(&master_password_pre_hash, sizeof master_password_pre_hash);
-  LOG_PRINT_L0("gui secure config loaded ok from " << filename << ", pass hash: " << master_password_hash);
+  LOG_PRINT_L0("gui secure config loaded ok from " << filename);
 
   return res_body.c_str();
   CATCH_ENTRY2(API_RETURN_CODE_INTERNAL_ERROR);
@@ -1658,9 +1661,7 @@ QString MainWindow::set_master_password(const QString& param)
 
   m_master_password = pwd.pass;
 
-  crypto::hash master_password_pre_hash = crypto::cn_fast_hash(m_master_password.c_str(), m_master_password.length());
-  crypto::hash master_password_hash = crypto::cn_fast_hash(&master_password_pre_hash, sizeof master_password_pre_hash);
-  LOG_PRINT_L0("set_master_password, pass hash: " << master_password_hash);
+  LOG_PRINT_L0("set_master_password: OK");
 
   ar.error_code = API_RETURN_CODE_OK;
   return MAKE_RESPONSE(ar);
@@ -1677,15 +1678,10 @@ QString MainWindow::check_master_password(const QString& param)
     return MAKE_RESPONSE(ar);
   }
 
-  crypto::hash master_password_pre_hash = crypto::cn_fast_hash(m_master_password.c_str(), m_master_password.length());
-  crypto::hash master_password_hash = crypto::cn_fast_hash(&master_password_pre_hash, sizeof master_password_pre_hash);
-  crypto::hash pwd_pre_hash = crypto::cn_fast_hash(pwd.pass.c_str(), pwd.pass.length());
-  crypto::hash pwd_hash = crypto::cn_fast_hash(&pwd_pre_hash, sizeof pwd_pre_hash);
- 
   if (m_master_password != pwd.pass)
   {
     ar.error_code = API_RETURN_CODE_WRONG_PASSWORD;
-    LOG_PRINT_L0("check_master_password: pwd hash: " << pwd_hash << ", expected: " << master_password_hash);
+    LOG_PRINT_L0("check_master_password: mismatch");
   }
   else
   {
@@ -1915,6 +1911,26 @@ QString MainWindow::get_log_level(const QString& param)
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
 
+QString MainWindow::get_log_files_size(const QString& param)
+{
+  TRY_ENTRY();
+  PREPARE_RESPONSE(view::log_files_size_response, ar);
+  ar.error_code = log_space::log_singletone::get_log_files_size(ar.response_data.total_size, gui_diagnostic_log_names)
+    ? API_RETURN_CODE_OK : API_RETURN_CODE_FAIL;
+  return MAKE_RESPONSE(ar);
+  CATCH_ENTRY_FAIL_API_RESPONCE();
+}
+
+QString MainWindow::clear_log_files(const QString& param)
+{
+  TRY_ENTRY();
+  view::api_response ar = AUTO_VAL_INIT(ar);
+  ar.error_code = log_space::log_singletone::clear_log_files(gui_diagnostic_log_names)
+    ? API_RETURN_CODE_OK : API_RETURN_CODE_FAIL;
+  return MAKE_RESPONSE(ar);
+  CATCH_ENTRY_FAIL_API_RESPONCE();
+}
+
 QString MainWindow::set_enable_tor(const QString& param)
 {
   TRY_ENTRY();
@@ -2111,6 +2127,11 @@ QString MainWindow::generate_wallet(const QString& param)
   //return que_call2<view::open_wallet_request>("generate_wallet", param, [this](const view::open_wallet_request& owd, view::api_response& ar){
   PREPARE_ARG_FROM_JSON(view::open_wallet_request, owd);
   PREPARE_RESPONSE(view::open_wallet_response, ar);
+  if (!m_allow_weak_password && !currency::validate_password(owd.pass, WALLET_PASSWORD_MIN_LENGTH, WALLET_PASSWORD_MAX_LENGTH))
+  {
+    ar.error_code = API_RETURN_CODE_BAD_ARG_INVALID_PASSWORD;
+    return MAKE_RESPONSE(ar);
+  }
   ar.error_code = m_backend.generate_wallet(epee::string_encoding::utf8_to_wstring(owd.path), owd.pass, ar.response_data);
   return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
@@ -2124,6 +2145,11 @@ QString MainWindow::restore_wallet(const QString& param)
   //return que_call2<view::restore_wallet_request>("restore_wallet", param, [this](const view::restore_wallet_request& owd, view::api_response& ar){
   PREPARE_ARG_FROM_JSON(view::restore_wallet_request, owd);
   PREPARE_RESPONSE(view::open_wallet_response, ar);
+  if (!m_allow_weak_password && !currency::validate_password(owd.pass, WALLET_PASSWORD_MIN_LENGTH, WALLET_PASSWORD_MAX_LENGTH))
+  {
+    ar.error_code = API_RETURN_CODE_BAD_ARG_INVALID_PASSWORD;
+    return MAKE_RESPONSE(ar);
+  }
   ar.error_code = m_backend.restore_wallet(epee::string_encoding::utf8_to_wstring(owd.path), owd.pass, owd.seed_phrase, owd.seed_pass, ar.response_data);
   return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
@@ -2430,6 +2456,11 @@ QString MainWindow::reset_wallet_password(const QString& param)
   TRY_ENTRY();
   LOG_API_TIMING();
   PREPARE_ARG_FROM_JSON(view::reset_pass_request, me);
+  if (!m_allow_weak_password && !currency::validate_password(me.pass, WALLET_PASSWORD_MIN_LENGTH, WALLET_PASSWORD_MAX_LENGTH))
+  {
+    default_ar.error_code = API_RETURN_CODE_BAD_ARG_INVALID_PASSWORD;
+    return MAKE_RESPONSE(default_ar);
+  }
   default_ar.error_code = m_backend.reset_wallet_password(me.wallet_id, me.pass);
   return MAKE_RESPONSE(default_ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();

@@ -101,9 +101,9 @@ namespace epee
       return true;
     }
 
-    int get_binded_port()
+    int get_bound_port()
     {
-      return m_net_server.get_binded_port();
+      return m_net_server.get_bound_port();
     }
 
   protected: 

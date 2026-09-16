@@ -1017,7 +1017,7 @@ bool msm_and_check_zero_pippenger_v4(const scalar_vec_t& g_scalars, const scalar
     }
   }
 
-  // the third loop: Horner’s rule
+  // the third loop: Horner's rule
   point_t result = Gk_inited[K - 1] ? Gk[K - 1] : c_point_0;
   for (size_t k = K - 2; k != SIZE_MAX; --k)
   {

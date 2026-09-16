@@ -24,6 +24,7 @@ namespace tools
     {
       m_daemon_address = url;
       m_http_client.disconnect();
+      this->set_incompatible_server_flag(false);
     }
     return true;
   }
@@ -95,11 +96,6 @@ namespace tools
   bool default_http_core_proxy::call_COMMAND_RPC_GET_ALIASES_BY_ADDRESS(const currency::COMMAND_RPC_GET_ALIASES_BY_ADDRESS::request& req, currency::COMMAND_RPC_GET_ALIASES_BY_ADDRESS::response& res)
   {
     return invoke_http_json_rpc_update_is_disconnect("get_alias_by_address", req, res);
-  }
-  //------------------------------------------------------------------------------------------------------------------------------
-  bool default_http_core_proxy::call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS(const currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::request& req, currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::response& res)
-  {
-    return invoke_http_bin_remote_command2_update_is_disconnect("/getrandom_outs1.bin", req, res);
   }
   //------------------------------------------------------------------------------------------------------------------------------
   bool default_http_core_proxy::call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3(const currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::request& req, currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::response& res)

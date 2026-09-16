@@ -165,6 +165,8 @@ namespace tools
     // variables that should be part of state data object but should not be stored during serialization
     mutable std::atomic<bool> m_whitelist_updated = false;
     //===============================================================
+    void migrate_unconfirmed_payments_171();
+
     template <class t_archive>
     inline void serialize(t_archive &a, const unsigned int ver)
     {
@@ -227,6 +229,11 @@ namespace tools
       a & m_whitelisted_assets;
       a & m_use_assets_whitelisting;
       a & m_last_zc_global_indexs;
+
+      // v171 is wallet version that doesn't store mempool payments in m_payments
+      // and we remove legacy height-0 entries when loading an older wallet
+      if (t_archive::is_loading::value && ver < 171)
+        migrate_unconfirmed_payments_171();
     }
   };
   
@@ -677,9 +684,11 @@ namespace tools
     bool select_indices_for_transfer(assets_selection_context& needed_money_map, uint64_t fake_outputs_count, std::vector<uint64_t>& selected_indexes);
 
     //PoS
-    //synchronous version of function 
+    //synchronous version of function
     bool try_mint_pos();
     bool try_mint_pos(const currency::account_public_address& miner_address); // block reward will be sent to miner_address, stake will be returned back to the wallet
+    bool do_one_pos_mining_cycle(std::atomic<bool>& stop, std::function<bool()> idle_condition_cb, const currency::core_runtime_config& runtime_config);
+    bool do_one_pos_mining_cycle(std::atomic<bool>& stop, std::function<bool()> idle_condition_cb, const currency::core_runtime_config& runtime_config, const currency::account_public_address& miner_address);
     //for unit tests
     friend class ::test_generator;
     
@@ -970,8 +979,8 @@ private:
     void push_alias_info_to_extra_according_to_hf_status(const currency::extra_alias_entry& ai, std::vector<currency::extra_v>& extra);
     void remove_transfer_from_amount_gindex_map(uint64_t tid);
     uint64_t get_alias_cost(const std::string& alias);
-    void append_heights_with_distribution(std::vector<uint64_t>& heights, size_t oversample, uint64_t max_height, decoy_selection_generator::dist_kind kind) const;
-    void build_distribution_for_input(std::vector<uint64_t>& height_distrib, uint64_t own_height, decoy_selection_generator::dist_kind kind) const;
+    void append_heights_with_distribution(std::vector<uint64_t>& heights, size_t oversample, uint64_t preincluded_height, uint64_t min_height, decoy_selection_generator::dist_kind kind) const;
+    void build_distribution_for_input(std::vector<uint64_t>& height_distrib, uint64_t own_height, uint64_t min_height, decoy_selection_generator::dist_kind kind) const;
     void build_distribution_for_input(std::vector<uint64_t>& offsets, uint64_t own_index);
     void select_decoys(currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount & amount_entry, uint64_t own_g_index);
 

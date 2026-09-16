@@ -50,7 +50,19 @@ MACRO(ENABLE_SHARED_PCH_EXECUTABLE target)
 ENDMACRO(ENABLE_SHARED_PCH_EXECUTABLE)
 #####  End of Precompiled Headers macros  ######
 
-if(UNIX AND NOT APPLE)
+if(CMAKE_SYSTEM_NAME STREQUAL "Android")
+  set(_zano_backtrace_inc "${BACKTRACE_ROOT}/include")
+  set(_zano_backtrace_lib "${BACKTRACE_ROOT}/${CMAKE_ANDROID_ARCH_ABI}/lib/libbacktrace.a")
+  if(BACKTRACE_ROOT AND EXISTS "${_zano_backtrace_lib}" AND EXISTS "${_zano_backtrace_inc}/backtrace.h")
+    message(STATUS "Android stacktrace: libbacktrace backend (${_zano_backtrace_lib})")
+    include_directories(SYSTEM "${_zano_backtrace_inc}")
+    add_compile_definitions(BOOST_STACKTRACE_USE_BACKTRACE)
+    link_libraries("${_zano_backtrace_lib}" dl)
+  else()
+    message(STATUS "Android stacktrace: basic _Unwind_Backtrace backend (no libbacktrace via BACKTRACE_ROOT)")
+    link_libraries(dl)
+  endif()
+elseif(UNIX AND NOT APPLE)
   add_compile_definitions(BOOST_STACKTRACE_USE_BACKTRACE)
   link_libraries(backtrace dl)
   add_link_options(-rdynamic)
@@ -70,14 +82,15 @@ file(GLOB_RECURSE SIMPLEWALLET simplewallet/*)
 file(GLOB_RECURSE CONN_TOOL connectivity_tool/*)
 file(GLOB_RECURSE WALLET wallet/*)
 file(GLOB_RECURSE MINER miner/*)
+file(GLOB_RECURSE GATEWAY_RPC_PROXY gateway_rpc_proxy/*)
 
 if(BUILD_GUI)
   if(MSVC)
-    file(GLOB_RECURSE QTDAEMON gui/qt-daemon/*.cpp gui/qt-daemon/*.h gui/qt-daemon/app.rc)
+    file(GLOB_RECURSE QTDAEMON CONFIGURE_DEPENDS gui/qt-daemon/*.cpp gui/qt-daemon/*.h gui/qt-daemon/app.rc)
   elseif(APPLE)
-    file(GLOB_RECURSE QTDAEMON gui/qt-daemon/*.cpp gui/qt-daemon/*.h gui/qt-daemon/*.mm)
+    file(GLOB_RECURSE QTDAEMON CONFIGURE_DEPENDS gui/qt-daemon/*.cpp gui/qt-daemon/*.h gui/qt-daemon/*.mm)
   else()
-    file(GLOB_RECURSE QTDAEMON gui/qt-daemon/*.cpp gui/qt-daemon/*.h)    
+    file(GLOB_RECURSE QTDAEMON CONFIGURE_DEPENDS gui/qt-daemon/*.cpp gui/qt-daemon/*.h)
   endif()
   list(FILTER QTDAEMON EXCLUDE REGEX "node_modules")
 endif()
@@ -95,6 +108,7 @@ source_group(stratum FILES ${STRATUM})
 source_group(simplewallet FILES ${SIMPLEWALLET})
 source_group(connectivity-tool FILES ${CONN_TOOL})
 source_group(wallet FILES ${WALLET})
+source_group(gateway_rpc_proxy FILES ${GATEWAY_RPC_PROXY})
 
 if(BUILD_GUI)
   source_group(qtdaemon FILES ${QTDAEMON})
@@ -171,7 +185,10 @@ add_dependencies(stratum version ${PCH_LIB_NAME})
 ENABLE_SHARED_PCH(stratum STRATUM)
 
 
-target_link_libraries(currency_core lmdb mdbx)
+target_link_libraries(currency_core lmdb)
+if(NOT DISABLE_MDBX)
+  target_link_libraries(currency_core mdbx)
+endif()
 
 add_executable(daemon ${DAEMON} ${P2P} ${CURRENCY_PROTOCOL})
 add_dependencies(daemon version)
@@ -186,14 +203,20 @@ ENABLE_SHARED_PCH(connectivity_tool CONN_TOOL)
 ENABLE_SHARED_PCH_EXECUTABLE(connectivity_tool)
 
 add_executable(simplewallet ${SIMPLEWALLET})
-add_dependencies(simplewallet version) 
+add_dependencies(simplewallet version)
 target_link_libraries(simplewallet wallet rpc currency_core crypto common zlibstatic ethash ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES} OpenSSL::SSL OpenSSL::Crypto)
 
 ENABLE_SHARED_PCH(simplewallet SIMPLEWALLET)
 ENABLE_SHARED_PCH_EXECUTABLE(simplewallet)
 
+add_executable(gateway_rpc_proxy ${GATEWAY_RPC_PROXY})
+add_dependencies(gateway_rpc_proxy version)
+target_link_libraries(gateway_rpc_proxy currency_core crypto common zlibstatic ethash ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES} OpenSSL::SSL OpenSSL::Crypto)
+ENABLE_SHARED_PCH(gateway_rpc_proxy GATEWAY_RPC_PROXY)
+ENABLE_SHARED_PCH_EXECUTABLE(gateway_rpc_proxy)
+
 set_property(TARGET common crypto currency_core rpc stratum wallet PROPERTY FOLDER "libs")
-set_property(TARGET daemon simplewallet connectivity_tool PROPERTY FOLDER "prog")
+set_property(TARGET daemon simplewallet connectivity_tool gateway_rpc_proxy PROPERTY FOLDER "prog")
 set_property(TARGET daemon PROPERTY OUTPUT_NAME "zanod")
 
 if(BUILD_GUI)
@@ -223,21 +246,20 @@ if(BUILD_GUI)
     file(APPEND "${GUI_QRC}" "    <file alias=\"${f}\">${ABS_FPATH}</file>\n")
   endforeach()
 
-  # сlose QRC
+  # close QRC
   file(APPEND "${GUI_QRC}" "  </qresource>\n</RCC>\n")
 
-  qt5_add_resources(ZANO_RESOURCES "${GUI_QRC}")
+  qt6_add_resources(ZANO_RESOURCES "${GUI_QRC}")
   target_sources(Zano PRIVATE ${ZANO_RESOURCES})
+  list(LENGTH HTML_FILES HTML_COUNT)
   message(STATUS "[HTML-embed] Embedded ${HTML_COUNT} files into target 'Zano' via ${GUI_QRC}")
   ##### end qt resources ######
 
-  ENABLE_SHARED_PCH(Zano QTDAEMON)
   ENABLE_SHARED_PCH_EXECUTABLE(Zano)
 	  
-  #QT5_USE_MODULES(Zano WebEngineWidgets WebChannel)
-  find_package(Qt5PrintSupport REQUIRED)
+  find_package(Qt6 REQUIRED COMPONENTS PrintSupport)
 
-  target_link_libraries(Zano wallet rpc currency_core crypto common zlibstatic ethash Qt5::WebChannel Qt5::WebEngineWidgets Qt5::PrintSupport ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES} OpenSSL::SSL OpenSSL::Crypto)
+  target_link_libraries(Zano wallet rpc currency_core crypto common zlibstatic ethash Qt6::WebChannel Qt6::WebEngineWidgets Qt6::PrintSupport ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES} OpenSSL::SSL OpenSSL::Crypto)
   if (UNIX AND NOT APPLE)
 	target_link_libraries(Zano rt)
   endif()
@@ -248,6 +270,9 @@ if(BUILD_GUI)
   endif()
   if(MSVC)
     target_link_libraries(Zano shlwapi.lib)
+    # Qt6 pushes the merged Zano.pdb past its default max size; raise the PDB page
+    # size for this target only (keeps full, shippable debug symbols). -- sowle
+    target_link_options(Zano PRIVATE /PDBPAGESIZE:16384)
   endif()
 
   set_property(TARGET Zano PROPERTY FOLDER "prog")
@@ -270,7 +295,7 @@ endif()
 
 if(SIMPLE_BUNDLE)
   set(INSTALL_DIR "${CMAKE_BINARY_DIR}/hp-${VERSION}")
-  install(TARGETS daemon simplewallet connectivity_tool
+  install(TARGETS daemon simplewallet connectivity_tool gateway_rpc_proxy
       RUNTIME DESTINATION "${INSTALL_DIR}" COMPONENT Runtime
   )
 
