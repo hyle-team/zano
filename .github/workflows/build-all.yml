@@ -108,11 +108,20 @@ jobs:
           echo "ref=$ref" >> "$GITHUB_OUTPUT"
 
   # ---------------------------------------------------------------- mainnet ---
+  #
+  # Every build gate below keeps the !cancelled() guard on purpose. When
+  # 'increment' is unticked, increment-build-number is skipped, and GitHub
+  # propagates that skip down the whole needs chain (resolve-ref -> builds)
+  # unless a job opts out with a status-check function. resolve-ref opts out;
+  # a plain `if: inputs.mainnet == true` here does NOT, so the builds would
+  # inherit the skip even though resolve-ref succeeded and the input is true.
+  # Hence: opt out with !cancelled(), then require resolve-ref success and the
+  # network selection explicitly. Do not shorten these back to `inputs.x == true`.
 
   linux-mainnet:
     name: Linux (mainnet)
     needs: resolve-ref
-    if: inputs.mainnet == true
+    if: ${{ !cancelled() && needs.resolve-ref.result == 'success' && inputs.mainnet == true }}
     uses: ./.github/workflows/build-linux.yml
     with:
       testnet: false
@@ -124,7 +133,7 @@ jobs:
   macos-mainnet:
     name: macOS (mainnet)
     needs: resolve-ref
-    if: inputs.mainnet == true
+    if: ${{ !cancelled() && needs.resolve-ref.result == 'success' && inputs.mainnet == true }}
     uses: ./.github/workflows/build-macos.yml
     with:
       testnet: false
@@ -136,7 +145,7 @@ jobs:
   windows-mainnet:
     name: Windows (mainnet)
     needs: resolve-ref
-    if: inputs.mainnet == true
+    if: ${{ !cancelled() && needs.resolve-ref.result == 'success' && inputs.mainnet == true }}
     uses: ./.github/workflows/build-windows.yml
     with:
       testnet: false
@@ -154,7 +163,7 @@ jobs:
   linux-testnet:
     name: Linux (testnet)
     needs: resolve-ref
-    if: inputs.testnet == true
+    if: ${{ !cancelled() && needs.resolve-ref.result == 'success' && inputs.testnet == true }}
     uses: ./.github/workflows/build-linux.yml
     with:
       testnet: true
@@ -166,7 +175,7 @@ jobs:
   macos-testnet:
     name: macOS (testnet)
     needs: resolve-ref
-    if: inputs.testnet == true
+    if: ${{ !cancelled() && needs.resolve-ref.result == 'success' && inputs.testnet == true }}
     uses: ./.github/workflows/build-macos.yml
     with:
       testnet: true
@@ -178,7 +187,7 @@ jobs:
   windows-testnet:
     name: Windows (testnet)
     needs: resolve-ref
-    if: inputs.testnet == true
+    if: ${{ !cancelled() && needs.resolve-ref.result == 'success' && inputs.testnet == true }}
     uses: ./.github/workflows/build-windows.yml
     with:
       testnet: true
