@@ -4226,22 +4226,29 @@ namespace
       wire_req.m_return_compact = true;
       COMMAND_RPC_GET_BLOCKS_FAST::response wire_res{};
       CHECK_AND_ASSERT_MES(m_inner->call_COMMAND_RPC_GET_BLOCKS_FAST(wire_req, wire_res), false, "compact RPC request failed");
+      res.status = wire_res.status;
+      if (res.status != API_RETURN_CODE_OK)
+        return true;
+      res.current_height = wire_res.current_height;
+      res.start_height = wire_res.start_height;
+      res.current_hardfork = wire_res.current_hardfork;
       CHECK_AND_ASSERT_MES(currency::unserialize_block_complete_entry(wire_res, res), false, "compact production decoder failed");
       for (const auto& entry : res.blocks)
       {
         const uint64_t height = get_block_height(entry.block_ptr->bl);
-        CHECK_AND_ASSERT_MES(entry.compact == (height != 0), false, "compact RPC must trim every non-genesis block, including the tip");
-        if (entry.compact)
-        {
-          ++compact_blocks;
-          compact_transactions += entry.txs_ptr.size();
-          if (height + 1 == res.current_height)
-            ++compact_tip_blocks;
-          if (is_pos_block(entry.block_ptr->bl))
-            ++compact_pos_blocks;
-        }
-        else
-          ++full_blocks_received;
+        CHECK_AND_ASSERT_MES(entry.compact, false, "compact RPC must trim every block, including genesis and the tip");
+        const auto& miner_tx = entry.block_ptr->bl.miner_tx;
+        CHECK_AND_ASSERT_MES(miner_tx.signatures.empty() && miner_tx.proofs.empty(), false, "coinbase was not compact");
+        for (const auto& tx : entry.txs_ptr)
+          CHECK_AND_ASSERT_MES(tx->tx.signatures.empty() && tx->tx.proofs.empty(), false, "transaction was not compact");
+        ++compact_blocks;
+        compact_transactions += entry.txs_ptr.size();
+        if (height == 0)
+          ++compact_genesis_blocks;
+        if (height + 1 == res.current_height)
+          ++compact_tip_blocks;
+        if (is_pos_block(entry.block_ptr->bl))
+          ++compact_pos_blocks;
       }
 
       return true;
@@ -4282,7 +4289,7 @@ namespace
     uint64_t compact_transactions = 0;
     uint64_t compact_pos_blocks = 0;
     uint64_t compact_tip_blocks = 0;
-    uint64_t full_blocks_received = 0;
+    uint64_t compact_genesis_blocks = 0;
     uint64_t full_requests = 0;
     uint64_t compact_requests = 0;
     uint64_t genesis_requests = 0;
@@ -4380,7 +4387,7 @@ bool wallet_compact_sync::check_sync(currency::core& c, size_t ev_index, const s
   configure_compact_wallet(compact, proxy);
   full->refresh();
   compact->refresh();
-  CHECK_AND_ASSERT_MES(proxy->compact_blocks && proxy->compact_tip_blocks && proxy->full_blocks_received,
+  CHECK_AND_ASSERT_MES(proxy->compact_blocks && proxy->compact_tip_blocks && proxy->compact_genesis_blocks,
     false, "compact wire path was not exercised");
   CHECK_AND_ASSERT_MES(compare_wallet_sync_state(*full, *compact), false, "initial sync mismatch");
   CHECK_AND_ASSERT_MES(compact->m_transfer_history.size() == 1, false, "expected one historical deposit");
@@ -4633,13 +4640,13 @@ bool wallet_compact_sync_escrow::generate(std::vector<test_event_entry>& events)
 bool wallet_compact_sync_escrow::check_transport(currency::core&, size_t, const std::vector<test_event_entry>&)
 {
   const auto* proxy = dynamic_cast<const compact_sync_test_proxy*>(m_core_proxy.get());
-  CHECK_AND_ASSERT_MES(proxy && proxy->compact_transactions && proxy->compact_tip_blocks && proxy->full_blocks_received,
+  CHECK_AND_ASSERT_MES(proxy && proxy->compact_transactions && proxy->compact_tip_blocks && proxy->compact_genesis_blocks,
     false, "escrow fixture did not exercise the compact wire path");
   return true;
 }
 
 void wallet_compact_sync_escrow::set_core_proxy(std::shared_ptr<tools::i_core_proxy> proxy)
 {
-  // the reused legacy fixture creates its own wallets; force every confirmed non genesis transaction through Compact, preserving signed nested templates
+  // the reused legacy fixture creates its own wallets; force every confirmed transaction through Compact, preserving signed nested templates
   wallet_test::set_core_proxy(proxy ? std::make_shared<compact_sync_test_proxy>(std::move(proxy), true) : nullptr);
 }

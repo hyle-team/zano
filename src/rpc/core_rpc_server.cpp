@@ -420,7 +420,7 @@ namespace currency
     {
       res.blocks.emplace_back();
       auto& entry = res.blocks.back();
-      entry.compact = req.m_return_compact && get_block_height(b.first->bl) != 0;
+      entry.compact = req.m_return_compact;
       if (entry.compact)
       {
         block compact_block = b.first->bl;

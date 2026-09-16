@@ -46,14 +46,16 @@ namespace tools
     req.minimum_height = rqt.minimum_height;
     req.m_return_compact = rqt.m_return_compact;
     currency::COMMAND_RPC_GET_BLOCKS_FAST::response res = AUTO_VAL_INIT(res);
-    if (!call_COMMAND_RPC_GET_BLOCKS_FAST(req, res))
-      return false;
-    if (res.status == API_RETURN_CODE_OK && res.start_height < req.minimum_height)
+    bool r = call_COMMAND_RPC_GET_BLOCKS_FAST(req, res);
+    rsp.status = res.status;
+    if (rsp.status == API_RETURN_CODE_OK)
     {
-      for (const auto& entry : res.blocks)
-        CHECK_AND_ASSERT_MES(!entry.compact, false, "Compact wallet RPC response starts below the requested height");
+      rsp.current_height = res.current_height;
+      rsp.start_height = res.start_height;
+      rsp.current_hardfork = res.current_hardfork;
+      r = unserialize_block_complete_entry(res, rsp);
     }
-    return unserialize_block_complete_entry(res, rsp);
+    return r;
   }
   //------------------------------------------------------------------------------------------------------------------------------
   bool default_http_core_proxy::call_COMMAND_RPC_INVOKE(const std::string& uri, const std::string& body, int& response_code, std::string& response_body) 

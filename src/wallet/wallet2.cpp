@@ -1745,7 +1745,8 @@ void wallet2::process_new_blockchain_entry(const currency::block& b, const curre
     !(height == m_minimum_height || get_blockchain_current_size() <= 1), error::wallet_internal_error,
     "current_index=" + std::to_string(height) + ", get_blockchain_current_height()=" + std::to_string(get_blockchain_current_size()));
 
-  WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(!bche.compact || height != 0, "Genesis cannot be compact");
+
+
 
   //optimization: seeking only for blocks that are not older then the wallet creation time plus 1 day. 1 day is for possible user incorrect time setup
   const std::vector<uint64_t>* pglobal_index = nullptr;
@@ -1952,7 +1953,6 @@ void wallet2::handle_pulled_blocks(size_t& blocks_added, std::atomic<bool>& stop
   bool been_matched_block = false;
   if (res.start_height == 0 && get_blockchain_current_size() == 1 && !res.blocks.empty())
   {
-    WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(!res.blocks.front().compact, "Genesis cannot be compact");
     const currency::block& genesis = res.blocks.front().block_ptr->bl;
     THROW_IF_TRUE_WALLET_EX(get_block_height(genesis) != 0, error::wallet_internal_error, "first block expected to be genesis");
     WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(res.blocks.front().coinbase_ptr, "Unexpected empty coinbase");

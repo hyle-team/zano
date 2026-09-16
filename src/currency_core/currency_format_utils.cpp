@@ -4045,88 +4045,40 @@ namespace currency
   bool unserialize_block_complete_entry(const currency::COMMAND_RPC_GET_BLOCKS_FAST::response& serialized,
     currency::COMMAND_RPC_GET_BLOCKS_DIRECT::response& unserialized)
   {
-    currency::COMMAND_RPC_GET_BLOCKS_DIRECT::response result = AUTO_VAL_INIT(result);
-    result.status = serialized.status;
-    result.start_height = serialized.start_height;
-    result.current_height = serialized.current_height;
-    result.current_hardfork = serialized.current_hardfork;
-    if (serialized.status != API_RETURN_CODE_OK)
+    for (const auto& bl_entry : serialized.blocks)
     {
-      CHECK_AND_ASSERT_MES(!serialized.status.empty(), false, "Missing wallet RPC status");
-      unserialized = std::move(result);
-      return true;
-    }
-
-    // an old daemon may return full even when compact was requested
-    const bool has_compact = std::any_of(serialized.blocks.begin(), serialized.blocks.end(), [](const block_complete_entry& entry) { return entry.compact; });
-    if (has_compact)
-    {
-      CHECK_AND_ASSERT_MES(serialized.blocks.size() <= COMMAND_RPC_GET_BLOCKS_FAST_MAX_COUNT,
-        false, "Invalid compact wallet RPC block count");
-      CHECK_AND_ASSERT_MES(serialized.start_height < serialized.current_height &&
-        serialized.blocks.size() <= serialized.current_height - serialized.start_height, false, "Invalid compact wallet RPC height range");
-    }
-    uint64_t height = serialized.start_height;
-    crypto::hash previous_hash = currency::null_hash;
-    bool first = true;
-
-    for (const auto& entry : serialized.blocks)
-    {
-      auto block_info = std::make_shared<currency::block_extended_info>();
-      CHECK_AND_ASSERT_MES(currency::parse_and_validate_block_from_blob(entry.block, block_info->bl), false, "Invalid wallet block blob");
-      const auto& block = block_info->bl;
-      if (has_compact)
+      unserialized.blocks.push_back(block_direct_data_entry());
+      block_direct_data_entry& bdde = unserialized.blocks.back();
+      auto blextin_ptr = std::make_shared<currency::block_extended_info>();
+      bool r = currency::parse_and_validate_block_from_blob(bl_entry.block, blextin_ptr->bl);
+      bdde.block_ptr = blextin_ptr;
+      bdde.compact = bl_entry.compact;
+      CHECK_AND_ASSERT_MES(r, false, "failed to parse block from blob: " << string_tools::buff_to_hex_nodelimer(bl_entry.block));
+      size_t i = 0;
+      if (bl_entry.tx_global_outs.size())
       {
-        CHECK_AND_ASSERT_MES((block.miner_tx.vin.size() == 1 || block.miner_tx.vin.size() == 2) &&
-          block.miner_tx.vin.front().type() == typeid(currency::txin_gen) && currency::get_block_height(block) == height,
-          false, "Invalid compact wallet block height");
-        CHECK_AND_ASSERT_MES(first || block.prev_id == previous_hash, false, "Broken compact wallet block links");
-        previous_hash = currency::get_block_hash(block);
-        first = false;
+        CHECK_AND_ASSERT_MES(bl_entry.tx_global_outs.size() == bl_entry.txs.size(), false, "tx_global_outs count " << bl_entry.tx_global_outs.size() << " count missmatch with bl_entry.txs count " << bl_entry.txs.size());
       }
-      CHECK_AND_ASSERT_MES(entry.tx_global_outs.empty() || entry.tx_global_outs.size() == entry.txs.size(), false, "Wallet transaction index count mismatch");
-      if (entry.compact)
+      if (bl_entry.coinbase_global_outs.size())
       {
-        CHECK_AND_ASSERT_MES(height != 0, false, "Genesis cannot be compact");
-        CHECK_AND_ASSERT_MES(entry.coinbase_global_outs.size() == block.miner_tx.vout.size(), false, "Invalid compact wallet coinbase indexes");
-        CHECK_AND_ASSERT_MES(entry.txs.size() == block.tx_hashes.size() && entry.tx_global_outs.size() == entry.txs.size(),
-          false, "Invalid compact wallet transaction counts");
-        CHECK_AND_ASSERT_MES(block.miner_tx.signatures.empty() && block.miner_tx.proofs.empty(),
-          false, "Unexpected signatures or proofs in compact coinbase");
+        std::shared_ptr<currency::transaction_chain_entry> tche_ptr(new currency::transaction_chain_entry());
+        tche_ptr->m_global_output_indexes = bl_entry.coinbase_global_outs;
+        bdde.coinbase_ptr = tche_ptr;
       }
-
-      currency::block_direct_data_entry decoded;
-      block_info->height = height;
-      decoded.block_ptr = block_info;
-      if (entry.compact || !entry.coinbase_global_outs.empty())
+      for (const auto& tx_blob : bl_entry.txs)
       {
-        auto coinbase_info = std::make_shared<currency::transaction_chain_entry>();
-        coinbase_info->m_global_output_indexes = entry.coinbase_global_outs;
-        decoded.coinbase_ptr = coinbase_info;
-      }
-      decoded.compact = entry.compact;
-      size_t index = 0;
-      for (const auto& tx_blob : entry.txs)
-      {
-        auto tx_info = std::make_shared<currency::transaction_chain_entry>();
-        CHECK_AND_ASSERT_MES(currency::parse_and_validate_tx_from_blob(tx_blob, tx_info->tx), false, "Invalid wallet transaction blob");
-        if (!entry.tx_global_outs.empty())
+        std::shared_ptr<currency::transaction_chain_entry> tche_ptr(new currency::transaction_chain_entry());
+        r = parse_and_validate_tx_from_blob(tx_blob, tche_ptr->tx);
+        CHECK_AND_ASSERT_MES(r, false, "failed to parse tx from blob: " << string_tools::buff_to_hex_nodelimer(tx_blob));
+        bdde.txs_ptr.push_back(tche_ptr);
+        if (bl_entry.tx_global_outs.size())
         {
-          CHECK_AND_ASSERT_MES(entry.tx_global_outs[index].v.size() == tx_info->tx.vout.size(), false, "Invalid wallet transaction indexes");
-          tx_info->m_global_output_indexes = entry.tx_global_outs[index].v;
+          CHECK_AND_ASSERT_MES(bl_entry.tx_global_outs[i].v.size() == tche_ptr->tx.vout.size(), false, "tx_global_outs for tx" << bl_entry.tx_global_outs[i].v.size() << " count missmatch with tche_ptr->tx.vout.size() count " << tche_ptr->tx.vout.size());
+          tche_ptr->m_global_output_indexes = bl_entry.tx_global_outs[i].v;
         }
-        if (entry.compact)
-        {
-          CHECK_AND_ASSERT_MES(currency::get_transaction_hash(tx_info->tx) == block.tx_hashes[index], false, "Compact wallet transaction hash mismatch");
-          CHECK_AND_ASSERT_MES(tx_info->tx.signatures.empty() && tx_info->tx.proofs.empty(), false, "Unexpected signatures or proofs in compact wallet transaction");
-        }
-        decoded.txs_ptr.push_back(tx_info);
-        ++index;
+        i++;
       }
-      result.blocks.push_back(std::move(decoded));
-      ++height;
     }
-    unserialized = std::move(result);
     return true;
   }
   //---------------------------------------------------------------
