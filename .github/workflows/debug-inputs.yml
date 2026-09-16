@@ -1,5 +1,6 @@
 name: Debug dispatch inputs
 
+# Throwaway diagnostic. Mirrors build-all.yml's job graph
 on:
   workflow_dispatch:
     inputs:
@@ -64,10 +65,18 @@ jobs:
     steps:
       - run: echo "OLD-form mainnet gate PASSED - a real build WOULD run"
 
-  mainnet-fixed-form:
-    name: 5b - mainnet gate FIXED form (== true || == 'true')
+  mainnet-string-form:
+    name: 5b - mainnet gate string-tolerant form (== true || == 'true')
     needs: resolve-ref
     if: inputs.mainnet == true || inputs.mainnet == 'true'
     runs-on: ubuntu-latest
     steps:
-      - run: echo "FIXED-form mainnet gate PASSED - a real build WOULD run"
+      - run: echo "STRING-form mainnet gate PASSED (this form is ineffective for the real cause)"
+
+  mainnet-structural-form:
+    name: 5c - mainnet gate STRUCTURAL fix (!cancelled + needs success + == true)
+    needs: resolve-ref
+    if: ${{ !cancelled() && needs.resolve-ref.result == 'success' && inputs.mainnet == true }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "STRUCTURAL-fix mainnet gate PASSED - this is the real fix"
