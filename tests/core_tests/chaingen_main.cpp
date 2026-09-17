@@ -1236,6 +1236,7 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY(gen_simple_chain_split_1);
     GENERATE_AND_PLAY_HF(alt_blocks_validation_and_same_new_amount_in_two_txs, "3-*");
     GENERATE_AND_PLAY_HF(alt_blocks_with_the_same_txs, "3-*");
+    GENERATE_AND_PLAY_HF(alt_blocks_pruning, "3-*");
     GENERATE_AND_PLAY_HF(chain_switching_when_out_spent_in_alt_chain_mixin, "3-*");
     GENERATE_AND_PLAY_HF(chain_switching_when_out_spent_in_alt_chain_ref_id, "3-4");
     GENERATE_AND_PLAY_HF(alt_chain_and_block_tx_fee_median, "3-*");
