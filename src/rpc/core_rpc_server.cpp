@@ -410,7 +410,7 @@ namespace currency
     LOG_PRINT_L2("[on_get_blocks]: find_blockchain_supplement ....");
     blockchain_storage::blocks_direct_container bs;
     if (!m_core.get_blockchain_storage().find_blockchain_supplement(req.block_ids, bs, res.current_height, res.start_height, COMMAND_RPC_GET_BLOCKS_FAST_MAX_COUNT, req.minimum_height))
-    { 
+    {
       res.status = API_RETURN_CODE_FAIL;
       return false;
     }
@@ -418,17 +418,35 @@ namespace currency
     LOG_PRINT_L2("[on_get_blocks]: Enumerating over blocks ....");
     for (auto& b : bs)
     {
-      res.blocks.resize(res.blocks.size() + 1);
-      res.blocks.back().block = block_to_blob(b.first->bl);
+      res.blocks.emplace_back();
+      auto& entry = res.blocks.back();
+      entry.compact = req.m_return_compact;
+      if (entry.compact)
+      {
+        block compact_block = b.first->bl;
+        compact_block.miner_tx.signatures.clear();
+        compact_block.miner_tx.proofs.clear();
+        entry.block = block_to_blob(compact_block);
+      }
+      else
+        entry.block = block_to_blob(b.first->bl);
       CHECK_AND_ASSERT_MES(b.third.get(), false, "Internal error on handling COMMAND_RPC_GET_BLOCKS_FAST: b.third is empty, ie coinbase info is not prepared");
-      res.blocks.back().coinbase_global_outs = b.third->m_global_output_indexes;
-      res.blocks.back().tx_global_outs.resize(b.second.size());
+      entry.coinbase_global_outs = b.third->m_global_output_indexes;
+      entry.tx_global_outs.resize(b.second.size());
       size_t i = 0;
 
       BOOST_FOREACH(auto & t, b.second)
       {
-        res.blocks.back().txs.push_back(tx_to_blob(t->tx));
-        res.blocks.back().tx_global_outs[i].v = t->m_global_output_indexes;
+        if (entry.compact)
+        {
+          transaction compact_tx = t->tx;
+          compact_tx.signatures.clear();
+          compact_tx.proofs.clear();
+          entry.txs.push_back(tx_to_blob(compact_tx));
+        }
+        else
+          entry.txs.push_back(tx_to_blob(t->tx));
+        entry.tx_global_outs[i].v = t->m_global_output_indexes;
         i++;
       }
     }

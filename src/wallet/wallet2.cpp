@@ -5,6 +5,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <numeric>
+#include <optional>
 #include <boost/archive/binary_oarchive.hpp>
 #include <boost/archive/binary_iarchive.hpp>
 #include <boost/iostreams/stream.hpp>
@@ -597,9 +598,20 @@ uint64_t wallet2::get_actual_zc_global_index()
   throw std::runtime_error(""); //mostly to suppress compiler warning 
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t height, const currency::block& b, const std::vector<uint64_t>* pglobal_indexes)
+void wallet2::process_new_transaction(const currency::transaction& tx_from_block, uint64_t height, const currency::block& b, const std::vector<uint64_t>* pglobal_indexes)
 {
   const bool hf6_active = is_in_hardfork_zone(ZANO_HARDFORK_06);
+
+  // preserve an existing full pending copy when confirmation arrives via Compact
+  // own the copy locally: process_unconfirmed erases the pending entry below
+  std::optional<currency::transaction> full_tx;
+  if (tx_from_block.signatures.empty() && !m_unconfirmed_txs.empty())
+  {
+    const auto pending = m_unconfirmed_txs.find(get_transaction_hash(tx_from_block));
+    if (pending != m_unconfirmed_txs.end() && !pending->second.tx.signatures.empty())
+      full_tx = pending->second.tx;
+  }
+  const currency::transaction& tx = full_tx ? *full_tx : tx_from_block;
 
   //check for transaction spends
   process_transaction_context ptc(tx);
@@ -1014,6 +1026,10 @@ void wallet2::resend_unconfirmed()
 
   for (auto& ut : m_unconfirmed_txs)
   {
+    // compact transactions from detached blocks remain pending for accounting
+    // but cannot be relayed without their signatures, full pending txs still relay
+    if (ut.second.tx.signatures.empty())
+      continue;
     req.txs_as_hex.push_back(epee::string_tools::buff_to_hex_nodelimer(tx_to_blob(ut.second.tx)));
     WLT_LOG_GREEN("Relaying tx: " << ut.second.tx_hash, LOG_LEVEL_0);
   }
@@ -1833,6 +1849,7 @@ void wallet2::pull_blocks(size_t& blocks_added, std::atomic<bool>& stop, bool& f
   currency::COMMAND_RPC_GET_BLOCKS_DIRECT::response res = AUTO_VAL_INIT(res);
 
   req.minimum_height = get_wallet_minimum_height();
+  req.m_return_compact = m_compact_sync;
   if (req.minimum_height > m_height_of_start_sync)
     m_height_of_start_sync = req.minimum_height;
 

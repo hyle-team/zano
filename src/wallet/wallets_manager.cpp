@@ -933,6 +933,7 @@ void wallets_manager::init_wallet_entry(wallet_vs_options& wo, uint64_t id)
   wo.rpc_wrapper->set_flag_allow_legacy_payment_id_size(true); // always treas as --allow-legacy-payment-id-size
   if (m_remote_node_mode)
   {
+    wo.w.unlocked_get()->set_compact_sync(true);
     wo.core_conf = currency::get_default_core_runtime_config();
   }
   else

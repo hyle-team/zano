@@ -268,10 +268,12 @@ namespace currency
     {
       uint64_t minimum_height;
       std::list<crypto::hash> block_ids;
+      bool m_return_compact = false;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(minimum_height)                  DOC_DSCR("The minimum height of the returning buch of blocks.") DOC_EXMP(0) DOC_END
         KV_SERIALIZE_CONTAINER_POD_AS_BLOB(block_ids) /* TODO !!! DOC_DSCR("Current state of the local blockchain. Hashes of the most recent 10 blocks goes first, then each 2nd, then 4th, 8, 16, 32, 64 and so on, and the last one is always hash of the genesis block.") DOC_END */
+        KV_SERIALIZE(m_return_compact)
       END_KV_SERIALIZE_MAP()
     };
 
