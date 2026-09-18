@@ -467,6 +467,7 @@ jobs:
           $networkSuffix = if ('${{ inputs.testnet }}' -eq 'true') { '-testnet' } else { '' }
 
           "APP_VERSION=$appVersion" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "PKG_TAG=$($env:GITHUB_REF_NAME -replace '/','-')$networkSuffix-v$appVersion[$commit]" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "PACKAGE_VERSION=$packageVersion" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           $arch = '${{ matrix.arch }}'
           "CLI_BASENAME=zano-windows-$arch-cli$networkSuffix-$packageVersion" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
@@ -1374,7 +1375,7 @@ jobs:
       - name: Upload CLI package
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: zano-windows-${{ matrix.arch }}-cli${{ inputs.testnet == true && '-testnet' || '' }}
+          name: zano-win-${{ matrix.arch }}-cli-${{ env.PKG_TAG }}
           path: dist-windows/zano-windows-${{ matrix.arch }}-cli*.zip
           if-no-files-found: error
 
@@ -1382,7 +1383,7 @@ jobs:
         if: matrix.gui
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: zano-windows-${{ matrix.arch }}-gui${{ inputs.testnet == true && '-testnet' || '' }}
+          name: zano-win-${{ matrix.arch }}-gui-${{ env.PKG_TAG }}
           path: dist-windows/zano-windows-${{ matrix.arch }}-gui*.zip
           if-no-files-found: error
 
@@ -1390,7 +1391,7 @@ jobs:
         if: matrix.gui
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: zano-windows-${{ matrix.arch }}-installer${{ inputs.testnet == true && '-testnet' || '' }}
+          name: zano-win-${{ matrix.arch }}-installer-${{ env.PKG_TAG }}
           path: dist-windows/zano-windows-${{ matrix.arch }}-gui*-installer.exe
           if-no-files-found: error
 
