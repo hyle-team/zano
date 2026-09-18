@@ -195,7 +195,7 @@ jobs:
           tar -cjf "$pkg.tar.bz2" "$pkg"
           echo "CLI_PKG=$pkg" >> "$GITHUB_ENV"
           net=""; [ "${{ inputs.testnet }}" = "true" ] && net="-testnet"
-          echo "PKG_TAG=${GITHUB_REF_NAME//\//-}${net}-v${version_str#v}" >> "$GITHUB_ENV"
+          echo "PKG_TAG=${GITHUB_REF_NAME//\//-}${net}-v$(printf '%s' "${version_str#v}" | sed -E 's/\[([^]]*-)?([0-9a-f]{7,})\]/[\2]/')" >> "$GITHUB_ENV"
 
       - name: Notarize binaries
         if: steps.signcheck.outputs.sign == 'true'
@@ -269,7 +269,7 @@ jobs:
           done
           echo "PKG=$pkg" >> "$GITHUB_ENV"
           net=""; [ "${{ inputs.testnet }}" = "true" ] && net="-testnet"
-          vt="$(printf '%s' "$pkg" | grep -oE '[0-9]+(\.[0-9]+)+\[[0-9a-f]{7,}\]' || true)"
+          vt="$(printf '%s' "$pkg" | grep -oE '[0-9]+(\.[0-9]+)+\[[^]]+\]' | head -1 | sed -E 's/\[([^]]*-)?([0-9a-f]{7,})\]/[\2]/')"
           echo "PKG_TAG=${GITHUB_REF_NAME//\//-}${net}-v${vt}" >> "$GITHUB_ENV"
 
       - name: Check code signing configuration
@@ -475,7 +475,7 @@ jobs:
           echo "bundle version : $numeric_version (short $short_version)"
           echo "ZANO_VERSION=$version_str" >> "$GITHUB_ENV"
           net=""; [ "${{ inputs.testnet }}" = "true" ] && net="-testnet"
-          echo "PKG_TAG=${GITHUB_REF_NAME//\//-}${net}-v${version_str#v}" >> "$GITHUB_ENV"
+          echo "PKG_TAG=${GITHUB_REF_NAME//\//-}${net}-v$(printf '%s' "${version_str#v}" | sed -E 's/\[([^]]*-)?([0-9a-f]{7,})\]/[\2]/')" >> "$GITHUB_ENV"
 
           echo "--- architecture check ---"
           lipo -archs Zano.app/Contents/MacOS/Zano
@@ -726,7 +726,7 @@ jobs:
           echo "bundle version : $numeric_version (short $short_version)"
           echo "ZANO_VERSION=$version_str" >> "$GITHUB_ENV"
           net=""; [ "${{ inputs.testnet }}" = "true" ] && net="-testnet"
-          echo "PKG_TAG=${GITHUB_REF_NAME//\//-}${net}-v${version_str#v}" >> "$GITHUB_ENV"
+          echo "PKG_TAG=${GITHUB_REF_NAME//\//-}${net}-v$(printf '%s' "${version_str#v}" | sed -E 's/\[([^]]*-)?([0-9a-f]{7,})\]/[\2]/')" >> "$GITHUB_ENV"
 
           echo "--- architecture check ---"
           lipo -archs Zano.app/Contents/MacOS/Zano
