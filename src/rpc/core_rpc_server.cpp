@@ -153,6 +153,7 @@ namespace currency
     res.current_blocks_median = m_core.get_blockchain_storage().get_current_comulative_blocksize_limit() / 2;
     res.alias_count = m_core.get_blockchain_storage().get_aliases_count();
     res.current_max_allowed_block_size = m_core.get_blockchain_storage().get_current_comulative_blocksize_limit();
+    res.version = PROJECT_VERSION_LONG;
     if(m_ignore_offline_status)
     { 
       res.daemon_network_state = COMMAND_RPC_GET_INFO::daemon_network_state_online;
