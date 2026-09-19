@@ -35,6 +35,21 @@ readonly SEARCH_LIST_BACKUP="${RUNNER_TEMP:-/tmp}/zano-keychain-search-list.txt"
 die() { echo "::error::$*" >&2; exit 1; }
 note() { echo "==> $*"; }
 
+# Retry a flaky Apple-network command (e.g. stapler staple) up to NOTARIZE_RETRIES
+# times with linear back-off, then give up. Usage: retry_apple "label" cmd args...
+retry_apple() {
+  local what="$1"; shift
+  local tries="${NOTARIZE_RETRIES:-5}" i
+  for i in $(seq 1 "$tries"); do
+    if "$@"; then return 0; fi
+    if [ "$i" -lt "$tries" ]; then
+      note "$what failed; retry $i/$tries in $((i * 30))s"
+      sleep "$((i * 30))"
+    fi
+  done
+  die "$what failed after $tries attempts"
+}
+
 require_env() {
   local name
   for name in "$@"; do
@@ -276,29 +291,48 @@ cmd_notarize() {
 
   note "submitting $(basename "$target") to the notary service"
   local result_json="${RUNNER_TEMP}/zano-notary-result.json"
-  local submission_id submission_status
-  set +e
-  xcrun notarytool submit "$target" \
-    --key "$key" \
-    --key-id "$MACOS_NOTARY_API_KEY_ID" \
-    --issuer "$MACOS_NOTARY_API_ISSUER_ID" \
-    --wait --timeout 45m --output-format json > "$result_json"
-  set -e
-  cat "$result_json"
+  local submission_id submission_status rc n
+  local attempts="${NOTARIZE_RETRIES:-5}"
+  # notarytool uploads the image to Apple's notary service, which sometimes drops
+  # the connection mid-upload (HTTPClientError.connectTimeout) - a transient
+  # failure worth retrying. A terminal 'Invalid', however, means Apple rejected
+  # the content itself, so we stop immediately rather than resubmit.
+  for n in $(seq 1 "$attempts"); do
+    set +e
+    xcrun notarytool submit "$target" \
+      --key "$key" \
+      --key-id "$MACOS_NOTARY_API_KEY_ID" \
+      --issuer "$MACOS_NOTARY_API_ISSUER_ID" \
+      --wait --timeout 45m --output-format json > "$result_json"
+    rc=$?
+    set -e
+    cat "$result_json" 2>/dev/null || true
 
-  # Do not trust the exit code alone: a submission that finishes processing as
-  # Invalid has historically still exited 0. Assert the status explicitly.
-  submission_id="$(jq -r '.id // empty' "$result_json")"
-  submission_status="$(jq -r '.status // empty' "$result_json")"
+    # Do not trust the exit code alone: a submission that finishes processing as
+    # Invalid has historically still exited 0. Assert the status explicitly.
+    submission_id="$(jq -r '.id // empty' "$result_json" 2>/dev/null || true)"
+    submission_status="$(jq -r '.status // empty' "$result_json" 2>/dev/null || true)"
 
-  if [ "$submission_status" != "Accepted" ]; then
-    if [ -n "$submission_id" ]; then
-      echo "--- notarization log for $submission_id ---"
-      xcrun notarytool log "$submission_id" \
-        --key "$key" --key-id "$MACOS_NOTARY_API_KEY_ID" --issuer "$MACOS_NOTARY_API_ISSUER_ID" || true
+    [ "$submission_status" = "Accepted" ] && break
+
+    if [ "$submission_status" = "Invalid" ]; then
+      if [ -n "$submission_id" ]; then
+        echo "--- notarization log for $submission_id ---"
+        xcrun notarytool log "$submission_id" \
+          --key "$key" --key-id "$MACOS_NOTARY_API_KEY_ID" --issuer "$MACOS_NOTARY_API_ISSUER_ID" || true
+      fi
+      die "notarization rejected (Invalid) for $target"
     fi
-    die "notarization returned status '${submission_status:-unknown}' for $target"
-  fi
+
+    # No terminal status: the submit itself failed (e.g. connectTimeout while
+    # uploading). Retry after a short back-off.
+    if [ "$n" -lt "$attempts" ]; then
+      note "notarize submit did not complete (rc=$rc, status='${submission_status:-none}'); retry $n/$attempts in $((n * 30))s"
+      sleep "$((n * 30))"
+    else
+      die "notarization did not complete after $attempts attempts (last status '${submission_status:-unknown}') for $target"
+    fi
+  done
 
   rm -f "$key"
   trap - EXIT
@@ -309,7 +343,9 @@ cmd_notarize() {
   case "$target" in
     *.dmg|*.pkg)
       note "stapling $target"
-      xcrun stapler staple "$target"
+      # stapler downloads the ticket from Apple and can hit the same transient
+      # network failures as the submit, so retry it too. validate is local-only.
+      retry_apple "staple $(basename "$target")" xcrun stapler staple "$target"
       xcrun stapler validate "$target"
       ;;
     *.zip)
@@ -333,14 +369,14 @@ cmd_notarize_app() {
   rm -f "$archive"
 
   note "stapling $app"
-  xcrun stapler staple "$app"
+  retry_apple "staple $(basename "$app")" xcrun stapler staple "$app"
   xcrun stapler validate "$app"
 }
 
 cmd_staple() {
   local target="${1:?staple needs a path}"
   note "stapling $target"
-  xcrun stapler staple "$target"
+  retry_apple "staple $(basename "$target")" xcrun stapler staple "$target"
   xcrun stapler validate "$target"
 }
 
