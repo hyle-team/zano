@@ -112,7 +112,7 @@ TEST(wallet, decrypt_buffer_detects_tampering)
 
   std::string pt;
 
-  // tail bit flip (inside encrypted_data — most likely inside the embedded MAC).
+  // tail bit flip (inside encrypted_data - most likely inside the embedded MAC).
   std::string ct_tampered = ct;
   ct_tampered[ct_tampered.size() - 1] ^= 0x01;
   ASSERT_FALSE(wallet.decrypt_buffer(ct_tampered, pt)) << "tail tampering not detected";
@@ -147,7 +147,7 @@ TEST(wallet, decrypt_buffer_rejects_malformed_input)
   // truncate the last byte.
   ASSERT_FALSE(wallet.decrypt_buffer(ct.substr(0, ct.size() - 1), pt)) << "1-byte truncation accepted";
 
-  // truncate enough to drop the embedded 16-byte MAC plus more — should hit
+  // truncate enough to drop the embedded 16-byte MAC plus more - should hit
   // either deserialize failure or the explicit "too small data buffer" guard.
   ASSERT_FALSE(wallet.decrypt_buffer(ct.substr(0, ct.size() / 2), pt)) << "half-truncation accepted";
 
@@ -201,7 +201,7 @@ TEST(wallet, decrypt_buffer_legacy_round_trip_and_isolation_from_new_path)
   ASSERT_TRUE(wallet.decrypt_buffer_legacy(legacy_ct, pt));
   ASSERT_EQ(message, pt);
 
-  // legacy ciphertext must not be silently accepted by the new decrypt path —
+  // legacy ciphertext must not be silently accepted by the new decrypt path -
   // it has no magic/version framing.
   std::string pt_new;
   ASSERT_FALSE(wallet.decrypt_buffer(legacy_ct, pt_new)) << "legacy ciphertext unexpectedly accepted by new decrypt_buffer";

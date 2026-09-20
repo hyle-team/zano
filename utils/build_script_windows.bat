@@ -1,7 +1,7 @@
 call configure_local_paths.cmd
 
 ;; MSVC version-specific paths
-SET QT_MSVC_PATH=%QT_PREFIX_PATH%\msvc2017_64
+SET QT_MSVC_PATH=%QT_PREFIX_PATH%\msvc2022_64
 
 SET ACHIVE_NAME_PREFIX=zano-win-x64-
 SET MY_PATH=%~dp0
@@ -44,12 +44,12 @@ rmdir build /s /q
 mkdir build
 cd build
 
-cmake %TESTNET_DEF% -D OPENSSL_ROOT_DIR="%OPENSSL_ROOT_DIR%" -D CMAKE_PREFIX_PATH="%QT_MSVC_PATH%" -D BUILD_GUI=TRUE -D STATIC=FALSE -DBOOST_ROOT="%BOOST_ROOT%" -DBOOST_LIBRARYDIR="%BOOST_ROOT%\lib64-msvc-14.2" -G "Visual Studio 16 2019" -A x64 -T host=x64 ..
+cmake %TESTNET_DEF% -D OPENSSL_ROOT_DIR="%OPENSSL_ROOT_DIR%" -D CMAKE_PREFIX_PATH="%QT_MSVC_PATH%" -D BUILD_GUI=TRUE -D STATIC=FALSE -DBOOST_ROOT="%BOOST_ROOT%" -DBOOST_LIBRARYDIR="%BOOST_ROOT%\lib64-msvc-14.3" -G "Visual Studio 17 2022" -A x64 -T host=x64 ..
 IF %ERRORLEVEL% NEQ 0 (
   goto error
 )
 
-call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvars64.bat" x86_amd64
+call "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat" x86_amd64
 echo on
 cd %SOURCES_PATH%\build
 

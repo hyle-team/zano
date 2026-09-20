@@ -109,6 +109,9 @@
   throw std::runtime_error("[EXCEPTION FORWARDED]"); \
 }
 
+// use it before normal CATCH_ENTRY to rethrow bad_alloc
+#define CATCH_ENTRY_RETHROW_BAD_ALLOC() } \
+  catch (const std::bad_alloc&) { throw;
 
 
 #define NESTED_TRY_ENTRY() try { TRY_ENTRY();

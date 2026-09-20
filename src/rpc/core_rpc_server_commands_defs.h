@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2014-2026 Zano Project
+// Copyright (c) 2014-2026 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -1129,6 +1129,7 @@ namespace currency
       std::list<bool> is_hardfok_active;
       //market
       uint64_t offers_count;
+      std::string version;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(status)                     DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
@@ -1156,6 +1157,7 @@ namespace currency
         KV_SERIALIZE(default_fee)                DOC_DSCR("Default fee for transactions.") DOC_EXMP(10000000000) DOC_END
         KV_SERIALIZE(minimum_fee)                DOC_DSCR("Minimum fee for transactions.") DOC_EXMP(10000000000) DOC_END
         KV_SERIALIZE(mi)                         DOC_DSCR("The most recent mainterner's info.") DOC_EXMP_AUTO() DOC_END
+        KV_SERIALIZE(version)                    DOC_DSCR("Daemon version.") DOC_EXMP("v2.2.1.506[b76fa18]") DOC_END
 
         // Fields dependent on flags for their inclusion
         KV_SERIALIZE(net_time_delta_median)      DOC_DSCR("A value of 0 indicates no time synchronization issues, while a value of 1 indicates the presence of time sync issues. Only available if the COMMAND_RPC_GET_INFO_FLAG_NET_TIME_DELTA_MEDIAN flag is set.") DOC_EXMP(0) DOC_END
@@ -1561,11 +1563,13 @@ namespace currency
     struct response
     {
       std::vector<alias_rpc_details> alias_info_list;
+      std::string default_alias;
       std::string status;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(alias_info_list)            DOC_DSCR("List of alias_rpc_details objects, each containing detailed information about each alias registered to the specified address.") DOC_EXMP_AUTO(1) DOC_END
         KV_SERIALIZE(status)                     DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
+        KV_SERIALIZE(default_alias)              DOC_DSCR("Alias that should be used in UI by default.") DOC_EXMP("zina") DOC_END
       END_KV_SERIALIZE_MAP()
     };
   };
@@ -2288,6 +2292,8 @@ namespace currency
       crypto::hash tx_id;
       crypto::hash tx_hash_to_sign;
       std::string tx_blob;
+      crypto::secret_key tx_secret_key;
+      std::vector<std::string> outputs_addresses;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(status)                                          DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
@@ -2295,6 +2301,8 @@ namespace currency
         KV_SERIALIZE_POD_AS_HEX_STRING(tx_id)                         DOC_DSCR("Actual hash of the transaction") DOC_EXMP("a6e8da986858e6825fce7a192097e6afae4e889cabe853a9c29b964985b23da8") DOC_END
         KV_SERIALIZE_POD_AS_HEX_STRING(tx_hash_to_sign)               DOC_DSCR("Hash to be signed by the current owner for the gateway input") DOC_EXMP("b1c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef012") DOC_END
         KV_SERIALIZE_BLOB_AS_HEX_STRING(tx_blob)                      DOC_DSCR("Hex representation of the transaction blob.") DOC_EXMP("0100000001...") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(tx_secret_key)                 DOC_DSCR("Secret key of the transaction.") DOC_EXMP("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcd0f") DOC_END
+        KV_SERIALIZE(outputs_addresses)                               DOC_DSCR("Destination addresses list for decrypt_tx_details and similar methods") DOC_EXMP_AGGR("ZxDNaMeZjwCjnHuU5gUNyrP1pM3U5vckbakzzV6dEHyDYeCpW8XGLBFTshcaY8LkG9RQn7FsQx8w2JeJzJwPwuDm2NfixPAXf", "ZxBvJDuQjMG9R2j4WnYUhBYNrwZPwuyXrC7FHdVmWqaESgowDvgfWtiXeNGu8Px9B24pkmjsA39fzSSiEQG1ekB225ZnrMTBp") DOC_END
       END_KV_SERIALIZE_MAP()
     };
   };

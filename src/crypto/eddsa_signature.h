@@ -37,12 +37,12 @@ namespace crypto
 
   /*
     seed (32 bytes)                           <- this is what RFC 8032 calls "secret key"
-    │
+    |
     |
     sha512(seed) (64 bytes)
-    │
+    |
     |- first 32 bytes -> clamp -> scalar a    <- real secret key, meaning a * G = public key A
-    │
+    |
     |- last 32 bytes  -> "prefix"             <- used for nonce derivation r = sc_reduce(sha512(prefix | m)) instead of random
   */
 

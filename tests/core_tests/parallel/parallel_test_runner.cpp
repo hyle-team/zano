@@ -289,6 +289,11 @@ int parallel_test_runner::print_aggregated_report_and_return_rc(uint32_t process
 
   std::cout << concolor::normal << '\n';
 
+  std::vector<std::pair<std::string, test_block_stats>> all_block_stats;
+  for (const auto& r : reps)
+    all_block_stats.insert(all_block_stats.end(), r.block_stats.begin(), r.block_stats.end());
+  print_block_stats_table(all_block_stats);
+
   if (!reps.empty())
     (void)write_workers_report_file(processes, reps);
 
@@ -296,6 +301,49 @@ int parallel_test_runner::print_aggregated_report_and_return_rc(uint32_t process
     return 1;
 
   return serious_failures_count == 0 ? 0 : 1;
+}
+
+void print_block_stats_table(const std::vector<std::pair<std::string, test_block_stats>>& stats)
+{
+  if (stats.empty())
+    return;
+
+  std::vector<std::pair<std::string, test_block_stats>> sorted = stats;
+  std::sort(sorted.begin(), sorted.end(), [](const auto& a, const auto& b)
+    { return a.first < b.first; });
+
+  size_t max_name_len = std::string("TEST").size();
+  for (const auto& p : sorted)
+    max_name_len = std::max(max_name_len, p.first.size());
+
+  const int name_col = static_cast<int>(max_name_len) + 2;
+  const int num_col  = 12;
+  const int last_col = 10;
+  const size_t total_width = static_cast<size_t>(name_col) + 3 * num_col + last_col;
+
+  std::cout << concolor::bright_white
+    << "BLOCK STATS PER TEST (end-of-test snapshot, " << sorted.size() << " entries):"
+    << concolor::normal << '\n';
+  std::cout << std::left  << std::setw(name_col) << "TEST"
+    << std::right
+    << std::setw(num_col)  << "chain_size"
+    << std::setw(num_col)  << "top_height"
+    << std::setw(num_col)  << "alt_blocks"
+    << std::setw(last_col) << "pool_txs"
+    << '\n';
+  std::cout << std::string(total_width, '-') << '\n';
+
+  for (const auto& p : sorted)
+  {
+    std::cout << std::left  << std::setw(name_col) << p.first
+      << std::right
+      << std::setw(num_col)  << p.second.blockchain_size
+      << std::setw(num_col)  << p.second.top_block_height
+      << std::setw(num_col)  << p.second.alt_blocks_count
+      << std::setw(last_col) << p.second.pool_tx_count
+      << '\n';
+  }
+  std::cout << '\n';
 }
 
 void parallel_test_runner::print_worker_failure_reasons(uint32_t processes, const std::vector<int>& worker_exit_codes) const
@@ -619,6 +667,19 @@ bool parallel_test_runner::write_worker_report_file(const worker_report& rep) co
     }
     root.add_child("tests_running_time", times_arr);
 
+    pt::ptree block_stats_arr;
+    for (const auto& it : rep.block_stats)
+    {
+      pt::ptree node;
+      node.put("name", it.first);
+      node.put("chain_size", it.second.blockchain_size);
+      node.put("top_height", it.second.top_block_height);
+      node.put("alt_blocks", static_cast<uint64_t>(it.second.alt_blocks_count));
+      node.put("pool_txs",   static_cast<uint64_t>(it.second.pool_tx_count));
+      block_stats_arr.push_back(std::make_pair("", node));
+    }
+    root.add_child("block_stats", block_stats_arr);
+
     std::ofstream out(get_worker_report_path(rep.worker_id));
     if (!out.is_open())
       return false;
@@ -666,6 +727,20 @@ bool parallel_test_runner::read_worker_report_file(uint32_t worker_id, worker_re
       const uint64_t ms = node.get<uint64_t>("ms", 0);
       if (!name.empty())
         rep.tests_running_time.emplace_back(name, ms);
+    }
+
+    for (const auto& v : root.get_child("block_stats", pt::ptree()))
+    {
+      const auto& node = v.second;
+      const std::string name = node.get<std::string>("name", "");
+      if (name.empty())
+        continue;
+      test_block_stats s;
+      s.blockchain_size  = node.get<uint64_t>("chain_size", 0);
+      s.top_block_height = node.get<uint64_t>("top_height", 0);
+      s.alt_blocks_count = static_cast<size_t>(node.get<uint64_t>("alt_blocks", 0));
+      s.pool_tx_count    = static_cast<size_t>(node.get<uint64_t>("pool_txs", 0));
+      rep.block_stats.emplace_back(name, s);
     }
 
     return true;

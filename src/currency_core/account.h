@@ -64,7 +64,8 @@ namespace currency
     bool get_secret_derivation(std::string& secrete_keys_derivation, bool& is_auditable, uint64_t& creation_timestamp);
 
 
-    uint64_t get_createtime() const { return m_creation_timestamp; }
+    uint64_t get_createtime_precise() const { return m_creation_timestamp; }
+    uint64_t get_createtime_rounded() const;
     void set_createtime(uint64_t val) { m_creation_timestamp = val; }
 
     bool load(const std::string& file_path);

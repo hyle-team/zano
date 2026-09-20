@@ -18,7 +18,7 @@ Be sure to clone the repository properly:\
 | [MSVC](https://visualstudio.microsoft.com/downloads/) (Windows) | 2017 (15.9.30) | 2022 (17.11.5) | 2022 (17.12.3) |
 | [XCode](https://developer.apple.com/downloads/) (macOS) | 12.3 | 14.3 | 15.2 |
 | [CMake](https://cmake.org/download/) | 3.30.0 | 3.30.0 | 3.31.6 |
-| [Boost](https://www.boost.org/users/download/) | 1.75 | 1.84 | 1.84 |
+| [Boost](https://www.boost.org/users/download/) | 1.83 | 1.84 | 1.84 |
 | [OpenSSL](https://www.openssl.org/source/) [(win)](https://slproweb.com/products/Win32OpenSSL.html) | 1.1.1n | 3.5.7 | 3.5.7 | 
 | [Qt](https://download.qt.io/archive/qt/) (*only for GUI*) | 5.8.0 | 5.15.2 | 5.15.2 |
 
@@ -167,10 +167,10 @@ To build GUI application:
 1. Create self-signing certificate via Keychain Access:\
     a. Run Keychain Access.\
     b. Choose Keychain Access > Certificate Assistant > Create a Certificate.\
-    c. Use “Zano” (without quotes) as certificate name.\
-    d. Choose “Code Signing” in “Certificate Type” field.\
-    e. Press “Create”, then “Done”.\
-    f. Make sure the certificate was added to keychain "System". If not—move it to "System".\
+    c. Use "Zano" (without quotes) as certificate name.\
+    d. Choose "Code Signing" in "Certificate Type" field.\
+    e. Press "Create", then "Done".\
+    f. Make sure the certificate was added to keychain "System". If not-move it to "System".\
     g. Double click the certificate you've just added, enter the trust section and under "When using this certificate" select "Always trust".\
     h. Unfold the certificate in Keychain Access window and double click the underlying private key "Zano". Select "Access Control" tab, then select "Allow all applications to access this item". Click "Save Changes".
 2. Revise building script, comment out unwanted steps and run it:  `utils/build_script_mac_osx.sh`

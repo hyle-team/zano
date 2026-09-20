@@ -30,7 +30,24 @@ namespace tools
     return 0;
   }
 
+  //this number estimated based on the staking performance of the dev fund wallet during last month,
+  //and is used to give users some rough estimation of how many iterations they need to do to mint a block
+  //with their current stake; of course, it can be very different for different wallets, but at least it gives some reference point
+#ifndef TESTNET
+#define ITERATIONS_NEEDED_PER_ONE_COIN_MAGIC_NUMBER 464400000
+#else
+#define ITERATIONS_NEEDED_PER_ONE_COIN_MAGIC_NUMBER 283000 // testnet = mainnet * (pos_diff_testnet / pos_diff_mainnet)
+#endif
 
+  inline uint64_t estimate_iterations_per_pos_block(const std::list<tools::wallet_public::asset_balance_entry>& balances)
+  {
+    uint64_t native_amount = get_native_entry_balance(balances);
+    //reduce it to decimal part of the coin, to avoid overflow
+    native_amount /= COIN;
+    if (native_amount)
+      return ITERATIONS_NEEDED_PER_ONE_COIN_MAGIC_NUMBER / native_amount;
+    return 0;
+  }
 
   inline bool get_wallet_info_unlocked(wallet2& w, view::wallet_info& wi)
   {
@@ -44,27 +61,13 @@ namespace tools
     return true;
   }
 
-  //this number estimated based on the staking performance of the dev fund wallet during last month,
-  //and is used to give users some rough estimation of how many iterations they need to do to mint a block 
-  //with their current stake; of course, it can be very different for different wallets, but at least it gives some reference point
-#define ITERATIONS_NEEDED_PER_ONE_COIN_MAGIC_NUMBER 464400000
-
   inline bool get_wallet_info(wallet2& w, view::wallet_info& wi)
   {
     wi = AUTO_VAL_INIT_T(view::wallet_info);
     get_wallet_info_unlocked(w, wi);
     w.balance(wi.balances, wi.mined_total);
     wi.has_bare_unspent_outputs = w.has_bare_unspent_outputs();
-
-    uint64_t native_amount = get_native_entry_balance(wi.balances);
-    //reduce it to decimal part of the coin, to avoid overflow
-    native_amount /= COIN;
-
-    if (native_amount)
-    {
-      wi.est_iterations_per_pos_block = ITERATIONS_NEEDED_PER_ONE_COIN_MAGIC_NUMBER / native_amount;
-    }
-    
+    wi.est_iterations_per_pos_block = estimate_iterations_per_pos_block(wi.balances);
     return true;
   }
 

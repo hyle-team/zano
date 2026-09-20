@@ -1588,4 +1588,498 @@ bool gen_alias_in_coinbase::check(currency::core& c, size_t ev_index, const std:
 }
 
   
-  
+
+//------------------------------------------------------------------------------
+// default alias tests
+//------------------------------------------------------------------------------
+
+// note: all three names are at least ALIAS_MINIMUM_PUBLIC_SHORT_NAME_ALLOWED chars long, so no
+// authority signature is required. Their lexicographical order ("aa..." < "mm..." < "zz...") is
+// deliberately different from the order in which they are acquired below, so that a failure can
+// tell apart "the default alias was tracked properly" from "the first alias of the set was
+// returned by accident".
+#define ALIAS_DEFAULT_FIRST   "zzfirst"
+#define ALIAS_DEFAULT_SECOND  "aasecond"
+#define ALIAS_DEFAULT_THIRD   "mmthird"
+
+namespace
+{
+  std::string aliases_set_to_string(const std::set<std::string>& aliases)
+  {
+    std::stringstream ss;
+    ss << "{";
+    for (auto it = aliases.begin(); it != aliases.end(); ++it)
+      ss << (it == aliases.begin() ? " " : ", ") << *it;
+    ss << " }";
+    return ss.str();
+  }
+
+  // Checks both alias read paths at once for the given address:
+  //   blockchain_storage::get_alias_by_address()   -- returns the default alias directly
+  //   blockchain_storage::get_aliases_by_address() -- returns the whole set + the default via out-param
+  // Both must agree with each other, and the reported default must always be one of the aliases
+  // that the address actually owns.
+  bool check_default_alias_state(currency::core& c,
+                                 const currency::account_public_address& addr,
+                                 const std::string& expected_default,
+                                 const std::set<std::string>& expected_aliases,
+                                 const char* owner_name,
+                                 const char* stage)
+  {
+    const currency::blockchain_storage& bcs = c.get_blockchain_storage();
+
+    std::string alias_by_addr = bcs.get_alias_by_address(addr);
+    CHECK_AND_ASSERT_MES(alias_by_addr == expected_default, false,
+      stage << ": get_alias_by_address(" << owner_name << ") returned [" << alias_by_addr <<
+      "], expected [" << expected_default << "]");
+
+    // note: get_aliases_by_address() does not clear its out-param when the address owns aliases but
+    // has no default recorded at all -- poison it, so that such a case shows up as a failure instead
+    // of silently matching an empty expectation
+    static const char* const not_set_marker = "<out-param not set by callee>";
+    std::string default_alias = not_set_marker;
+    std::set<std::string> aliases = bcs.get_aliases_by_address(addr, default_alias);
+
+    CHECK_AND_ASSERT_MES(default_alias != not_set_marker, false,
+      stage << ": get_aliases_by_address(" << owner_name << ") left its out-param untouched");
+
+    CHECK_AND_ASSERT_MES(aliases == expected_aliases, false,
+      stage << ": " << owner_name << " owns " << aliases_set_to_string(aliases) <<
+      ", expected " << aliases_set_to_string(expected_aliases));
+
+    CHECK_AND_ASSERT_MES(default_alias == expected_default, false,
+      stage << ": get_aliases_by_address(" << owner_name << ") reported default alias [" <<
+      default_alias << "], expected [" << expected_default << "]");
+
+    if (!expected_default.empty())
+    {
+      CHECK_AND_ASSERT_MES(aliases.count(expected_default) == 1, false,
+        stage << ": default alias [" << expected_default << "] of " << owner_name <<
+        " is not among the aliases it actually owns");
+    }
+
+    return true;
+  }
+} // anonymous namespace
+
+gen_alias_default_alias::gen_alias_default_alias()
+{
+  REGISTER_CALLBACK_METHOD(gen_alias_default_alias, check_after_first_reg);
+  REGISTER_CALLBACK_METHOD(gen_alias_default_alias, check_after_second_alias);
+  REGISTER_CALLBACK_METHOD(gen_alias_default_alias, check_after_third_alias);
+  REGISTER_CALLBACK_METHOD(gen_alias_default_alias, check_after_set_default);
+  REGISTER_CALLBACK_METHOD(gen_alias_default_alias, check_after_default_transferred);
+  REGISTER_CALLBACK_METHOD(gen_alias_default_alias, check_after_transfer_rolled_back);
+  REGISTER_CALLBACK_METHOD(gen_alias_default_alias, check_after_set_default_rolled_back);
+}
+
+bool gen_alias_default_alias::generate(std::vector<test_event_entry>& events) const
+{
+  // Brief idea:
+  //   1) alice registers her first alias -- it silently becomes her default one;
+  //   2) carol registers the second alias and hands it over to alice -- alice's default must not change;
+  //   3) dan does the same with the third alias -- alice's default must still not change;
+  //   4) alice explicitly makes the third alias her default (a self-directed update);
+  //   5) alice hands that very alias over to bob -- her default must fall back to the previously
+  //      chosen alias that she still owns, and bob must get a default of his own;
+  //   6) a chain switch rolls step 5 back -- everything must return to the state after step 4;
+  //   7) a deeper chain switch rolls step 4 back as well -- back to the state after step 3.
+  //
+  // Note: a second alias cannot be registered directly to alice, because the tx pool rejects an
+  // unsigned alias registration for an address that already owns an alias. Hence carol and dan
+  // register the other two aliases and then transfer them over -- transfers are signed, so that
+  // rule does not apply to them.
+
+  uint64_t ts = test_core_time::get_time();
+  test_core_time::adjust(ts);
+
+  GENERATE_ACCOUNT(miner_acc);
+  GENERATE_ACCOUNT(alice);
+  GENERATE_ACCOUNT(bob);
+  GENERATE_ACCOUNT(carol);
+  GENERATE_ACCOUNT(dan);
+
+  m_alice_addr = alice.get_public_address();
+  m_bob_addr = bob.get_public_address();
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
+  set_hard_fork_heights_to_generator(generator);
+  DO_CALLBACK(events, "configure_core");
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  bool r = false;
+  std::list<currency::transaction> tx_list;
+
+  // 1. alice registers her first alias. She owned nothing before, so it becomes her default one.
+  currency::extra_alias_entry ai_first = AUTO_VAL_INIT(ai_first);
+  ai_first.m_alias = ALIAS_DEFAULT_FIRST;
+  ai_first.m_address = alice.get_public_address();
+  r = put_alias_via_tx_to_list(m_hardforks, events, tx_list, blk_0r, miner_acc, ai_first, generator);
+  CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_1, blk_0r, miner_acc, tx_list);
+  DO_CALLBACK(events, "check_after_first_reg");
+
+  // 2. carol registers the second alias...
+  tx_list.clear();
+  currency::extra_alias_entry ai_second = AUTO_VAL_INIT(ai_second);
+  ai_second.m_alias = ALIAS_DEFAULT_SECOND;
+  ai_second.m_address = carol.get_public_address();
+  r = put_alias_via_tx_to_list(m_hardforks, events, tx_list, blk_1, miner_acc, ai_second, generator);
+  CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_2, blk_1, miner_acc, tx_list);
+
+  // ...and hands it over to alice. Alice already owns an alias, so her default must stay untouched
+  // -- in particular it must NOT become the lexicographically smaller newcomer.
+  tx_list.clear();
+  ai_second.m_address = alice.get_public_address();
+  r = sign_extra_alias_entry(ai_second, carol.get_public_address().spend_public_key, carol.get_keys().spend_secret_key);
+  CHECK_AND_ASSERT_MES(r, false, "sign_extra_alias_entry failed");
+  r = put_alias_via_tx_to_list(m_hardforks, events, tx_list, blk_2, miner_acc, ai_second, generator);
+  CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_3, blk_2, miner_acc, tx_list);
+  DO_CALLBACK(events, "check_after_second_alias");
+
+  // 3. dan registers the third alias...
+  tx_list.clear();
+  currency::extra_alias_entry ai_third = AUTO_VAL_INIT(ai_third);
+  ai_third.m_alias = ALIAS_DEFAULT_THIRD;
+  ai_third.m_address = dan.get_public_address();
+  r = put_alias_via_tx_to_list(m_hardforks, events, tx_list, blk_3, miner_acc, ai_third, generator);
+  CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_4, blk_3, miner_acc, tx_list);
+
+  // ...and hands it over to alice as well.
+  tx_list.clear();
+  ai_third.m_address = alice.get_public_address();
+  r = sign_extra_alias_entry(ai_third, dan.get_public_address().spend_public_key, dan.get_keys().spend_secret_key);
+  CHECK_AND_ASSERT_MES(r, false, "sign_extra_alias_entry failed");
+  r = put_alias_via_tx_to_list(m_hardforks, events, tx_list, blk_4, miner_acc, ai_third, generator);
+  CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_5, blk_4, miner_acc, tx_list);
+  DO_CALLBACK(events, "check_after_third_alias");
+
+  // 4. alice explicitly makes the third alias her default one: an update that re-assigns the alias
+  //    to herself and changes neither the comment nor the view key. Both fields are left at their
+  //    defaults here (empty), which is exactly what the entry currently stored on chain holds.
+  tx_list.clear();
+  currency::extra_alias_entry ai_set_default = AUTO_VAL_INIT(ai_set_default);
+  ai_set_default.m_alias = ALIAS_DEFAULT_THIRD;
+  ai_set_default.m_address = alice.get_public_address();
+  r = sign_extra_alias_entry(ai_set_default, alice.get_public_address().spend_public_key, alice.get_keys().spend_secret_key);
+  CHECK_AND_ASSERT_MES(r, false, "sign_extra_alias_entry failed");
+  r = put_alias_via_tx_to_list(m_hardforks, events, tx_list, blk_5, miner_acc, ai_set_default, generator);
+  CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_6, blk_5, miner_acc, tx_list);
+  DO_CALLBACK(events, "check_after_set_default");
+
+  // 5. alice hands her current default alias over to bob. She still owns two aliases, so her default
+  //    must fall back to ALIAS_DEFAULT_FIRST -- the one she had chosen before and still owns --
+  //    and NOT to ALIAS_DEFAULT_SECOND, which merely happens to sort first.
+  tx_list.clear();
+  currency::extra_alias_entry ai_transfer = AUTO_VAL_INIT(ai_transfer);
+  ai_transfer.m_alias = ALIAS_DEFAULT_THIRD;
+  ai_transfer.m_address = bob.get_public_address();
+  r = sign_extra_alias_entry(ai_transfer, alice.get_public_address().spend_public_key, alice.get_keys().spend_secret_key);
+  CHECK_AND_ASSERT_MES(r, false, "sign_extra_alias_entry failed");
+  r = put_alias_via_tx_to_list(m_hardforks, events, tx_list, blk_6, miner_acc, ai_transfer, generator);
+  CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_7, blk_6, miner_acc, tx_list);
+  DO_CALLBACK(events, "check_after_default_transferred");
+
+  //  15    16    17    18    19             <- height
+  // (5 )- (6 )- (7 )
+  //          \- (8 )- (9 )                  <- chain switch, blk_7 gets rolled back
+  //    \- (10)- (11)- (12)- (13)            <- deeper chain switch, blk_6 gets rolled back as well
+
+  // 6. roll the transfer back
+  MAKE_NEXT_BLOCK(events, blk_8, blk_6, miner_acc);
+  MAKE_NEXT_BLOCK(events, blk_9, blk_8, miner_acc);
+  DO_CALLBACK(events, "check_after_transfer_rolled_back");
+
+  // 7. roll the explicit default alias assignment back too
+  MAKE_NEXT_BLOCK(events, blk_10, blk_5, miner_acc);
+  MAKE_NEXT_BLOCK(events, blk_11, blk_10, miner_acc);
+  MAKE_NEXT_BLOCK(events, blk_12, blk_11, miner_acc);
+  MAKE_NEXT_BLOCK(events, blk_13, blk_12, miner_acc);
+  DO_CALLBACK(events, "check_after_set_default_rolled_back");
+
+  return true;
+}
+
+bool gen_alias_default_alias::check_after_first_reg(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  bool r = check_default_alias_state(c, m_alice_addr, ALIAS_DEFAULT_FIRST,
+    { ALIAS_DEFAULT_FIRST }, "alice", "after the first registration");
+  CHECK_AND_ASSERT_MES(r, false, "check_default_alias_state failed");
+  return check_default_alias_state(c, m_bob_addr, "", {}, "bob", "after the first registration");
+}
+
+bool gen_alias_default_alias::check_after_second_alias(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  return check_default_alias_state(c, m_alice_addr, ALIAS_DEFAULT_FIRST,
+    { ALIAS_DEFAULT_FIRST, ALIAS_DEFAULT_SECOND }, "alice", "after receiving the second alias");
+}
+
+bool gen_alias_default_alias::check_after_third_alias(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  return check_default_alias_state(c, m_alice_addr, ALIAS_DEFAULT_FIRST,
+    { ALIAS_DEFAULT_FIRST, ALIAS_DEFAULT_SECOND, ALIAS_DEFAULT_THIRD }, "alice", "after receiving the third alias");
+}
+
+bool gen_alias_default_alias::check_after_set_default(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  return check_default_alias_state(c, m_alice_addr, ALIAS_DEFAULT_THIRD,
+    { ALIAS_DEFAULT_FIRST, ALIAS_DEFAULT_SECOND, ALIAS_DEFAULT_THIRD }, "alice", "after setting an explicit default alias");
+}
+
+bool gen_alias_default_alias::check_after_default_transferred(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  bool r = check_default_alias_state(c, m_alice_addr, ALIAS_DEFAULT_FIRST,
+    { ALIAS_DEFAULT_FIRST, ALIAS_DEFAULT_SECOND }, "alice", "after the default alias was transferred away");
+  CHECK_AND_ASSERT_MES(r, false, "check_default_alias_state failed");
+  return check_default_alias_state(c, m_bob_addr, ALIAS_DEFAULT_THIRD,
+    { ALIAS_DEFAULT_THIRD }, "bob", "after the default alias was transferred away");
+}
+
+bool gen_alias_default_alias::check_after_transfer_rolled_back(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  bool r = check_default_alias_state(c, m_alice_addr, ALIAS_DEFAULT_THIRD,
+    { ALIAS_DEFAULT_FIRST, ALIAS_DEFAULT_SECOND, ALIAS_DEFAULT_THIRD }, "alice", "after the transfer was rolled back");
+  CHECK_AND_ASSERT_MES(r, false, "check_default_alias_state failed");
+  return check_default_alias_state(c, m_bob_addr, "", {}, "bob", "after the transfer was rolled back");
+}
+
+bool gen_alias_default_alias::check_after_set_default_rolled_back(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  bool r = check_default_alias_state(c, m_alice_addr, ALIAS_DEFAULT_FIRST,
+    { ALIAS_DEFAULT_FIRST, ALIAS_DEFAULT_SECOND, ALIAS_DEFAULT_THIRD }, "alice", "after the default alias assignment was rolled back");
+  CHECK_AND_ASSERT_MES(r, false, "check_default_alias_state failed");
+  return check_default_alias_state(c, m_bob_addr, "", {}, "bob", "after the default alias assignment was rolled back");
+}
+
+//------------------------------------------------------------------------------
+
+gen_alias_default_alias_last_alias_reorg::gen_alias_default_alias_last_alias_reorg()
+{
+  REGISTER_CALLBACK_METHOD(gen_alias_default_alias_last_alias_reorg, check_after_reg);
+  REGISTER_CALLBACK_METHOD(gen_alias_default_alias_last_alias_reorg, check_after_transfer);
+  REGISTER_CALLBACK_METHOD(gen_alias_default_alias_last_alias_reorg, check_after_rollback);
+  REGISTER_CALLBACK_METHOD(gen_alias_default_alias_last_alias_reorg, check_after_regained_second_alias);
+}
+
+bool gen_alias_default_alias_last_alias_reorg::generate(std::vector<test_event_entry>& events) const
+{
+  // Brief idea: the corner case where an address gives away the only alias it has, and thus the only
+  // alias its default could possibly point at. There is no replacement to fall back to, so the daemon
+  // has to remember that the default was dropped, in order to be able to restore it on a chain switch.
+  //
+  // Note that while an address owns nothing, both read paths answer "no alias" without ever looking at
+  // the recorded default -- so the state of the default stack is simply not observable there. To make
+  // it observable again, the last step gives alice a SECOND alias after the rollback: if the rollback
+  // left anything stale on top of her stack, the default would fall back to the lexicographically
+  // smallest alias instead of the one she originally chose.
+
+  uint64_t ts = test_core_time::get_time();
+  test_core_time::adjust(ts);
+
+  GENERATE_ACCOUNT(miner_acc);
+  GENERATE_ACCOUNT(alice);
+  GENERATE_ACCOUNT(bob);
+  GENERATE_ACCOUNT(carol);
+
+  m_alice_addr = alice.get_public_address();
+  m_bob_addr = bob.get_public_address();
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
+  set_hard_fork_heights_to_generator(generator);
+  DO_CALLBACK(events, "configure_core");
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  bool r = false;
+  std::list<currency::transaction> tx_list;
+
+  // 1. alice registers her one and only alias
+  currency::extra_alias_entry ai = AUTO_VAL_INIT(ai);
+  ai.m_alias = ALIAS_DEFAULT_FIRST;
+  ai.m_address = alice.get_public_address();
+  r = put_alias_via_tx_to_list(m_hardforks, events, tx_list, blk_0r, miner_acc, ai, generator);
+  CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_1, blk_0r, miner_acc, tx_list);
+  DO_CALLBACK(events, "check_after_reg");
+
+  // 2. alice hands it over to bob and is left with no aliases at all
+  tx_list.clear();
+  currency::extra_alias_entry ai_transfer = AUTO_VAL_INIT(ai_transfer);
+  ai_transfer.m_alias = ALIAS_DEFAULT_FIRST;
+  ai_transfer.m_address = bob.get_public_address();
+  r = sign_extra_alias_entry(ai_transfer, alice.get_public_address().spend_public_key, alice.get_keys().spend_secret_key);
+  CHECK_AND_ASSERT_MES(r, false, "sign_extra_alias_entry failed");
+  r = put_alias_via_tx_to_list(m_hardforks, events, tx_list, blk_1, miner_acc, ai_transfer, generator);
+  CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_2, blk_1, miner_acc, tx_list);
+  DO_CALLBACK(events, "check_after_transfer");
+
+  //  11    12    13    14    15             <- height
+  // (1 )- (2 )
+  //    \- (3 )- (4 )- (5 )- (6 )            <- chain switch, blk_2 gets rolled back
+
+  // 3. roll the transfer back -- alice must get her alias and her default back
+  MAKE_NEXT_BLOCK(events, blk_3, blk_1, miner_acc);
+  MAKE_NEXT_BLOCK(events, blk_4, blk_3, miner_acc);
+  DO_CALLBACK(events, "check_after_rollback");
+
+  // 4. give alice a second alias, so that her recorded default becomes observable again: whatever sits
+  //    on top of her default stack now has to be ALIAS_DEFAULT_FIRST, otherwise both read paths would
+  //    report ALIAS_DEFAULT_SECOND (which sorts first) instead.
+  tx_list.clear();
+  currency::extra_alias_entry ai_second = AUTO_VAL_INIT(ai_second);
+  ai_second.m_alias = ALIAS_DEFAULT_SECOND;
+  ai_second.m_address = carol.get_public_address();
+  r = put_alias_via_tx_to_list(m_hardforks, events, tx_list, blk_4, miner_acc, ai_second, generator);
+  CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_5, blk_4, miner_acc, tx_list);
+
+  tx_list.clear();
+  ai_second.m_address = alice.get_public_address();
+  r = sign_extra_alias_entry(ai_second, carol.get_public_address().spend_public_key, carol.get_keys().spend_secret_key);
+  CHECK_AND_ASSERT_MES(r, false, "sign_extra_alias_entry failed");
+  r = put_alias_via_tx_to_list(m_hardforks, events, tx_list, blk_5, miner_acc, ai_second, generator);
+  CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_6, blk_5, miner_acc, tx_list);
+  DO_CALLBACK(events, "check_after_regained_second_alias");
+
+  return true;
+}
+
+bool gen_alias_default_alias_last_alias_reorg::check_after_reg(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  bool r = check_default_alias_state(c, m_alice_addr, ALIAS_DEFAULT_FIRST,
+    { ALIAS_DEFAULT_FIRST }, "alice", "after the registration");
+  CHECK_AND_ASSERT_MES(r, false, "check_default_alias_state failed");
+  return check_default_alias_state(c, m_bob_addr, "", {}, "bob", "after the registration");
+}
+
+bool gen_alias_default_alias_last_alias_reorg::check_after_transfer(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  bool r = check_default_alias_state(c, m_alice_addr, "", {}, "alice", "after the only alias was transferred away");
+  CHECK_AND_ASSERT_MES(r, false, "check_default_alias_state failed");
+  return check_default_alias_state(c, m_bob_addr, ALIAS_DEFAULT_FIRST,
+    { ALIAS_DEFAULT_FIRST }, "bob", "after the only alias was transferred away");
+}
+
+bool gen_alias_default_alias_last_alias_reorg::check_after_rollback(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  bool r = check_default_alias_state(c, m_alice_addr, ALIAS_DEFAULT_FIRST,
+    { ALIAS_DEFAULT_FIRST }, "alice", "after the transfer was rolled back");
+  CHECK_AND_ASSERT_MES(r, false, "check_default_alias_state failed");
+  return check_default_alias_state(c, m_bob_addr, "", {}, "bob", "after the transfer was rolled back");
+}
+
+bool gen_alias_default_alias_last_alias_reorg::check_after_regained_second_alias(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  return check_default_alias_state(c, m_alice_addr, ALIAS_DEFAULT_FIRST,
+    { ALIAS_DEFAULT_FIRST, ALIAS_DEFAULT_SECOND }, "alice", "after receiving a second alias post-rollback");
+}
+
+//------------------------------------------------------------------------------
+
+gen_alias_default_alias_info_update::gen_alias_default_alias_info_update()
+{
+  REGISTER_CALLBACK_METHOD(gen_alias_default_alias_info_update, check_before_info_update);
+  REGISTER_CALLBACK_METHOD(gen_alias_default_alias_info_update, check_after_info_update);
+  REGISTER_CALLBACK_METHOD(gen_alias_default_alias_info_update, check_after_info_update_rolled_back);
+}
+
+bool gen_alias_default_alias_info_update::generate(std::vector<test_event_entry>& events) const
+{
+  // Brief idea: a self-directed alias update counts as "make this my default alias" ONLY when it
+  // leaves the comment and the view key untouched. An ordinary info update -- same owner, but a
+  // different comment -- must not silently reassign the default. This is the negative half of that
+  // rule, which the other two tests never exercise.
+
+  uint64_t ts = test_core_time::get_time();
+  test_core_time::adjust(ts);
+
+  GENERATE_ACCOUNT(miner_acc);
+  GENERATE_ACCOUNT(alice);
+  GENERATE_ACCOUNT(carol);
+
+  m_alice_addr = alice.get_public_address();
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
+  set_hard_fork_heights_to_generator(generator);
+  DO_CALLBACK(events, "configure_core");
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  bool r = false;
+  std::list<currency::transaction> tx_list;
+
+  // 1. alice registers her first alias -- it becomes her default one
+  currency::extra_alias_entry ai_first = AUTO_VAL_INIT(ai_first);
+  ai_first.m_alias = ALIAS_DEFAULT_FIRST;
+  ai_first.m_address = alice.get_public_address();
+  r = put_alias_via_tx_to_list(m_hardforks, events, tx_list, blk_0r, miner_acc, ai_first, generator);
+  CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_1, blk_0r, miner_acc, tx_list);
+
+  // 2. carol registers a second alias and hands it over to alice
+  tx_list.clear();
+  currency::extra_alias_entry ai_second = AUTO_VAL_INIT(ai_second);
+  ai_second.m_alias = ALIAS_DEFAULT_SECOND;
+  ai_second.m_address = carol.get_public_address();
+  r = put_alias_via_tx_to_list(m_hardforks, events, tx_list, blk_1, miner_acc, ai_second, generator);
+  CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_2, blk_1, miner_acc, tx_list);
+
+  tx_list.clear();
+  ai_second.m_address = alice.get_public_address();
+  r = sign_extra_alias_entry(ai_second, carol.get_public_address().spend_public_key, carol.get_keys().spend_secret_key);
+  CHECK_AND_ASSERT_MES(r, false, "sign_extra_alias_entry failed");
+  r = put_alias_via_tx_to_list(m_hardforks, events, tx_list, blk_2, miner_acc, ai_second, generator);
+  CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_3, blk_2, miner_acc, tx_list);
+  DO_CALLBACK(events, "check_before_info_update");
+
+  // 3. alice updates the comment of the second alias. Same owner, but the comment changed, so this is
+  //    an info update and NOT a "make it my default" operation -- her default must stay unchanged.
+  tx_list.clear();
+  currency::extra_alias_entry ai_info_update = AUTO_VAL_INIT(ai_info_update);
+  ai_info_update.m_alias = ALIAS_DEFAULT_SECOND;
+  ai_info_update.m_address = alice.get_public_address();
+  ai_info_update.m_text_comment = "a brand new comment";
+  r = sign_extra_alias_entry(ai_info_update, alice.get_public_address().spend_public_key, alice.get_keys().spend_secret_key);
+  CHECK_AND_ASSERT_MES(r, false, "sign_extra_alias_entry failed");
+  r = put_alias_via_tx_to_list(m_hardforks, events, tx_list, blk_3, miner_acc, ai_info_update, generator);
+  CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_4, blk_3, miner_acc, tx_list);
+  DO_CALLBACK(events, "check_after_info_update");
+
+  //  13    14    15                         <- height
+  // (3 )- (4 )
+  //    \- (5 )- (6 )                        <- chain switch, blk_4 gets rolled back
+
+  // 4. roll the info update back -- popping it must not disturb the default either
+  MAKE_NEXT_BLOCK(events, blk_5, blk_3, miner_acc);
+  MAKE_NEXT_BLOCK(events, blk_6, blk_5, miner_acc);
+  DO_CALLBACK(events, "check_after_info_update_rolled_back");
+
+  return true;
+}
+
+bool gen_alias_default_alias_info_update::check_before_info_update(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  return check_default_alias_state(c, m_alice_addr, ALIAS_DEFAULT_FIRST,
+    { ALIAS_DEFAULT_FIRST, ALIAS_DEFAULT_SECOND }, "alice", "before the info update");
+}
+
+bool gen_alias_default_alias_info_update::check_after_info_update(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  return check_default_alias_state(c, m_alice_addr, ALIAS_DEFAULT_FIRST,
+    { ALIAS_DEFAULT_FIRST, ALIAS_DEFAULT_SECOND }, "alice", "after the info update");
+}
+
+bool gen_alias_default_alias_info_update::check_after_info_update_rolled_back(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  return check_default_alias_state(c, m_alice_addr, ALIAS_DEFAULT_FIRST,
+    { ALIAS_DEFAULT_FIRST, ALIAS_DEFAULT_SECOND }, "alice", "after the info update was rolled back");
+}

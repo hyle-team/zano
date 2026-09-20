@@ -1224,7 +1224,7 @@ struct block_choice_rule_bigger_fee::argument_assert
   END_SERIALIZE()
 };
 
-// Test idea: fork-choice rule based on transactions’ median fees
+// Test idea: fork-choice rule based on transactions' median fees
 /* Sets up three competing chains:
  * - Main(blk_1a): 4 transactions with fee 6  (fees = [6, 6, 6, 6], median = (6 + 6)   / 2 = 6,  score = 6  * 4 = 24)
  * - Alt1(blk_1b): 2 transactions with fee 11 (fees = [11, 11],     median = (11 + 11) / 2 = 11, score = 11 * 2 = 22)

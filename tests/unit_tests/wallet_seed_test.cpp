@@ -199,7 +199,7 @@ TEST(wallet_seed, basic_test)
     {
       if (wse.timestamp)
       {
-        ASSERT_EQ(wse.timestamp, acc.get_createtime());
+        ASSERT_EQ(wse.timestamp, acc.get_createtime_precise());
       }
 
       ASSERT_EQ(wse.auditable, acc.get_public_address().is_auditable());
@@ -270,7 +270,7 @@ TEST(wallet_seed, word_from_timestamp)
   ASSERT_EQ("moan", currency::get_word_from_timestamp(2027462399, true));
 
   /*
-    If you pass values ​​>= 2027462399 + 1, then the inequality
+    If you pass values >= 2027462399 + 1, then the inequality
     weeks_count < WALLET_BRAIN_DATE_MAX_WEEKS_COUNT is not satisfied. The
     function throws an exception.
   */

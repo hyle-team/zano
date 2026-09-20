@@ -25,7 +25,6 @@
 #define CURRENCY_TX_MIN_ALLOWED_OUTS                    2             // effective starting HF4 Zarcanum
 #define CURRENCY_TX_PRACTICAL_MAX_INPUTS                80            // limited by current tx size limit and typical input size; used in wallet to limit number of inputs in a single tx
 
-
 #define CURRENCY_PUBLIC_ADDRESS_BASE58_PREFIX           0xc5          // addresses start with 'Zx'
 #define CURRENCY_PUBLIC_INTEG_ADDRESS_BASE58_PREFIX     0x3678        // integrated addresses start with 'iZ'
 #define CURRENCY_PUBLIC_INTEG_ADDRESS_V2_BASE58_PREFIX  0x36f8        // integrated addresses start with 'iZ' (new format)
@@ -120,7 +119,7 @@
 #define CURRENCY_NOTIFY_REQUEST_CHAIN_MAX_BLOCKS_COUNT  100    // maximum number of blocks in a NOTIFY_REQUEST_CHAIN request           
 
 
-#define CURRENCY_ALT_BLOCK_LIVETIME_COUNT               (CURRENCY_BLOCKS_PER_DAY*7)//one week
+#define CURRENCY_ALT_BLOCK_LIVETIME_COUNT               (CURRENCY_BLOCKS_PER_DAY/12)//2 hours
 #define CURRENCY_ALT_BLOCK_MAX_COUNT                    43200 //30 days
 #define CURRENCY_MEMPOOL_TX_LIVETIME                    345600 //seconds, 4 days
 #define CURRENCY_MEMPOOL_MAX_TX_COUT                    10000 
@@ -208,6 +207,7 @@ static_assert(CURRENCY_FORMATION_VERSION == 103);
 #define WALLET_KDF_ALGO_NONE                            0
 #define WALLET_KDF_ALGO_ROMIX_KECCAK                    1
 #define WALLET_KDF_ROMIX_N_LOG2                         20 //phase 1: the buffer size is V = 2^(N_log2) * 32 bytes, where N_log2 = 20 -> 1 million blocks * 32 bytes = 32 MiB
+#define WALLET_KDF_ROMIX_N_LOG2_MAX                     22
 #define WALLET_KDF_ROMIX_PHASE2_LOG2_REDUCTION          3  //phase 2: iteration reduction: 0 = full N phase 2 iterations, 1 = N/2 iterations 2 = N/4, 3 = N/8, 4 = N/16 ... (still 32 MiB at N_log2=20)
 #define WALLET_KDF_SALT_SIZE                            16
 
@@ -217,6 +217,10 @@ static_assert(CURRENCY_FORMATION_VERSION == 103);
                                                                //which let us to address tools::mnemonic_encoding::NUMWORDS weeks after project launch
                                                                //which is about 15 years
 #define WALLET_BRAIN_DATE_MAX_WEEKS_COUNT               800
+
+// Password policy
+#define WALLET_PASSWORD_MIN_LENGTH                      8
+#define WALLET_PASSWORD_MAX_LENGTH                      256
 
 #define OFFER_MAXIMUM_LIFE_TIME                         (60*60*24*30)  // 30 days
 
@@ -280,20 +284,22 @@ static_assert(CURRENCY_FORMATION_VERSION == 103);
 #define GUI_IPC_MESSAGE_CHANNEL_NAME                    CURRENCY_NAME_BASE "_message_que"
 
 #define CURRENCY_VOTING_CONFIG_DEFAULT_FILENAME         "voting_config.json"
+#define CURRENCY_CONSTRUCT_TX_LOG_FILENAME               "construct_tx.log"
+#define CURRENCY_FAILED_MINED_BLOCKS_LOG_FILENAME        "failed_mined_blocks.log"
 
 
 #define CURRENT_TRANSACTION_CHAIN_ENTRY_ARCHIVE_VER     3
 #define CURRENT_BLOCK_EXTENDED_INFO_ARCHIVE_VER         1
 
 #define BLOCKCHAIN_STORAGE_MAJOR_COMPATIBILITY_VERSION  CURRENCY_FORMATION_VERSION + 11
-#define BLOCKCHAIN_STORAGE_MINOR_COMPATIBILITY_VERSION  2
+#define BLOCKCHAIN_STORAGE_MINOR_COMPATIBILITY_VERSION  3
 
 
 #define BC_OFFERS_CURRENT_OFFERS_SERVICE_ARCHIVE_VER    CURRENCY_FORMATION_VERSION + BLOCKCHAIN_STORAGE_MAJOR_COMPATIBILITY_VERSION + 9
 #define BC_OFFERS_CURRENCY_MARKET_FILENAME              "market.bin"
 
 
-#define WALLET_FILE_SERIALIZATION_VERSION               170
+#define WALLET_FILE_SERIALIZATION_VERSION               171
 #define WALLET_FILE_LAST_SUPPORTED_VERSION              170
 
 #define CURRENT_MEMPOOL_ARCHIVE_VER                     (CURRENCY_FORMATION_VERSION+31)
@@ -348,6 +354,7 @@ static_assert(CURRENCY_FORMATION_VERSION == 103);
 
 static_assert(CURRENCY_MINER_TX_MAX_OUTS <= CURRENCY_TX_MAX_ALLOWED_OUTS, "Miner tx must obey normal tx max outs limit");
 static_assert(PREMINE_AMOUNT / WALLET_MAX_ALLOWED_OUTPUT_AMOUNT < CURRENCY_MINER_TX_MAX_OUTS, "Premine can't be divided into reasonable number of outs");
+static_assert(WALLET_KDF_ROMIX_N_LOG2 <= WALLET_KDF_ROMIX_N_LOG2_MAX, "Default wallet KDF cost must fit the wallet-file load policy");
 
 #define CURRENCY_RELAY_TXS_MAX_COUNT                    5
 

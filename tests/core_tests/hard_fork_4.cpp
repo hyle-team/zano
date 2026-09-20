@@ -456,3 +456,293 @@ bool hardfork_4_pop_tx_from_global_index::c1(currency::core& c, size_t ev_index,
 
   return true;
 }
+
+//------------------------------------------------------------------------------
+
+hardfork_4_pos_decoy_transition::core_proxy::core_proxy(std::shared_ptr<tools::i_core_proxy> delegate)
+  : m_delegate(std::move(delegate))
+{}
+
+bool hardfork_4_pos_decoy_transition::core_proxy::call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4(const currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request& req, currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::response& rsp)
+{
+  m_called = true;
+  m_request = req;
+  const bool result = m_delegate->call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4(req, rsp);
+  m_response = rsp;
+  return result;
+}
+
+size_t hardfork_4_pos_decoy_transition::count_response_outputs(const currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::response& response)
+{
+  size_t result = 0;
+  for (const auto& batch : response.blocks_batches)
+    for (const auto& block : batch.blocks)
+      result += block.outs.size();
+  return result;
+}
+
+
+hardfork_4_pos_decoy_transition::hardfork_4_pos_decoy_transition()
+{
+  REGISTER_CALLBACK_METHOD(hardfork_4_pos_decoy_transition, configure_core);
+  REGISTER_CALLBACK_METHOD(hardfork_4_pos_decoy_transition, c1);
+
+  m_hardforks.clear();
+  m_hardforks.set_hardfork_height(ZANO_HARDFORK_01, 0);
+  m_hardforks.set_hardfork_height(ZANO_HARDFORK_02, 0);
+  m_hardforks.set_hardfork_height(ZANO_HARDFORK_03, 0);
+  m_hardforks.set_hardfork_height(ZANO_HARDFORK_04_ZARCANUM, HF4_TRANSITION_ACTIVE_AFTER);
+}
+
+bool hardfork_4_pos_decoy_transition::configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  CHECK_AND_ASSERT_MES(test_chain_unit_enchanced::configure_core(c, ev_index, events), false, "default configure_core failed");
+
+  currency::core_runtime_config config = c.get_blockchain_storage().get_core_runtime_config();
+  config.min_coinstake_age = CURRENCY_HF4_MANDATORY_MIN_COINAGE;
+  config.pos_minimum_heigh = 0;
+  config.hf4_minimum_mixins = CURRENCY_HF4_MANDATORY_DECOY_SET_SIZE;
+  config.hard_forks = m_hardforks;
+  c.get_blockchain_storage().set_core_runtime_config(config);
+
+  LOG_PRINT_MAGENTA("[HF4 TRANSITION] config: HF4 first block=" << HF4_TRANSITION_FIRST_HEIGHT
+    << ", maturity=" << config.min_coinstake_age
+    << ", mandatory decoys=" << config.hf4_minimum_mixins
+    << ", ring size=" << config.hf4_minimum_mixins + 1, LOG_LEVEL_0);
+  return true;
+}
+
+bool hardfork_4_pos_decoy_transition::generate(std::vector<test_event_entry>& events) const
+{
+  // [0, 1, 2, ... 20 - HF3 - 21, 22, ... 37 - HF4(pow) - 38] 38h it is first possible HF4 PoS
+  // top 30 -> one mature HF4 block; top 36 -> 14 outputs/13 decoys, ring fails;
+  // top 37 -> 16 outputs/15 decoys, PoS and regular transaction rings succeed
+
+  const uint64_t ts = test_core_time::get_time();
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
+  DO_CALLBACK(events, "configure_core");
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_hf3_tip, blk_0, miner_acc, HF4_TRANSITION_ACTIVE_AFTER);
+  CHECK_AND_ASSERT_MES(get_block_height(blk_hf3_tip) == HF4_TRANSITION_ACTIVE_AFTER, false, "unexpected HF3 tip height");
+  DO_CALLBACK(events, "c1");
+  return true;
+}
+
+bool hardfork_4_pos_decoy_transition::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  struct transition_snapshot
+  {
+    uint64_t top = 0;
+    uint64_t mature_max = 0;
+    size_t mature_heights = 0;
+    size_t eligible_zc_outputs = 0;
+    size_t wallet_pos_entries = 0;
+  };
+
+  auto& bcs = c.get_blockchain_storage();
+  CHECK_AND_ASSERT_EQ(bcs.get_top_block_height(), HF4_TRANSITION_ACTIVE_AFTER);
+  CHECK_AND_ASSERT_MES(!bcs.get_core_runtime_config().is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, HF4_TRANSITION_ACTIVE_AFTER), false, "HF4 is active one block too early");
+  CHECK_AND_ASSERT_MES(bcs.get_core_runtime_config().is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, HF4_TRANSITION_FIRST_HEIGHT), false, "HF4 is not active at its first block");
+
+  std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
+  miner_wlt->refresh();
+
+  auto read_and_log_snapshot = [&](const char* stage, transition_snapshot& snapshot) -> bool
+  {
+    snapshot.top = bcs.get_top_block_height();
+    const uint64_t chain_size = bcs.get_current_blockchain_size();
+    snapshot.mature_max = chain_size >= CURRENCY_HF4_MANDATORY_MIN_COINAGE ? chain_size - CURRENCY_HF4_MANDATORY_MIN_COINAGE : 0;
+
+    if (snapshot.mature_max >= HF4_TRANSITION_FIRST_HEIGHT)
+    {
+      snapshot.mature_heights = static_cast<size_t>(snapshot.mature_max - HF4_TRANSITION_FIRST_HEIGHT + 1);
+      for (uint64_t height = HF4_TRANSITION_FIRST_HEIGHT; height <= snapshot.mature_max; ++height)
+      {
+        std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry> outputs;
+        CHECK_AND_ASSERT_MES(bcs.collect_all_outs_in_block(0, height, outputs), false, "cannot collect ZC outputs at height " << height);
+        snapshot.eligible_zc_outputs += outputs.size();
+      }
+    }
+
+    snapshot.wallet_pos_entries = miner_wlt->get_pos_entries_count();
+    const std::string mature_range = snapshot.mature_heights ? std::to_string(HF4_TRANSITION_FIRST_HEIGHT) + ".." + std::to_string(snapshot.mature_max) : "empty";
+    LOG_PRINT_MAGENTA("[HF4 TRANSITION] " << stage
+      << ": top=" << snapshot.top
+      << ", next=" << snapshot.top + 1
+      << ", mature range=" << mature_range
+      << ", mature heights=" << snapshot.mature_heights
+      << ", eligible ZC outputs=" << snapshot.eligible_zc_outputs
+      << ", wallet PoS entries=" << snapshot.wallet_pos_entries, LOG_LEVEL_0);
+    return true;
+  };
+
+  auto mine_pow_until = [&](uint64_t target_top) -> bool
+  {
+    while (bcs.get_top_block_height() < target_top)
+    {
+      CHECK_AND_ASSERT_MES(mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c), false, "failed to mine transition PoW block");
+
+      block top_block{};
+      CHECK_AND_ASSERT_MES(bcs.get_top_block(top_block), false, "cannot get transition PoW block");
+      CHECK_AND_ASSERT_MES(!is_pos_block(top_block), false, "unexpected PoS block in PoW-only transition prefix");
+      const size_t zc_coinbase_outputs = std::count_if(top_block.miner_tx.vout.begin(), top_block.miner_tx.vout.end(),
+        [](const tx_out_v& output) { return output.type() == typeid(tx_out_zarcanum); });
+      CHECK_AND_ASSERT_MES(zc_coinbase_outputs == 2, false, "transition PoW block " << get_block_height(top_block) << " has " << zc_coinbase_outputs << " ZC coinbase outputs instead of 2");
+
+      miner_wlt->refresh();
+      transition_snapshot snapshot{};
+      CHECK_AND_ASSERT_MES(read_and_log_snapshot("after PoW", snapshot), false, "cannot read transition snapshot");
+      const size_t expected_mature_heights = snapshot.top >= HF4_TRANSITION_FIRST_HEIGHT + CURRENCY_HF4_MANDATORY_MIN_COINAGE - 1
+        ? static_cast<size_t>(snapshot.top - (HF4_TRANSITION_FIRST_HEIGHT + CURRENCY_HF4_MANDATORY_MIN_COINAGE - 2)) : 0;
+      CHECK_AND_ASSERT_EQ(snapshot.mature_heights, expected_mature_heights);
+      CHECK_AND_ASSERT_EQ(snapshot.eligible_zc_outputs, expected_mature_heights * 2);
+      CHECK_AND_ASSERT_EQ(snapshot.wallet_pos_entries, expected_mature_heights * 2);
+    }
+    return true;
+  };
+
+  transition_snapshot initial_snapshot{};
+  CHECK_AND_ASSERT_MES(read_and_log_snapshot("HF3 tip", initial_snapshot), false, "cannot read initial transition snapshot");
+  CHECK_AND_ASSERT_EQ(initial_snapshot.eligible_zc_outputs, 0);
+  CHECK_AND_ASSERT_EQ(initial_snapshot.wallet_pos_entries, 0);
+
+  // at top 30 - we have 10 confirmations for 21 height
+  CHECK_AND_ASSERT_MES(mine_pow_until(30), false, "cannot reach the exact maturity boundary");
+
+  tools::transfer_details stake_td{};
+  bool stake_found = false;
+  miner_wlt->enumerate_transfers([&](uint64_t, const tools::transfer_details& td) -> bool
+  {
+    if (td.is_zc() && td.is_native_coin() && td.m_ptx_wallet_info->m_block_height == HF4_TRANSITION_FIRST_HEIGHT)
+    {
+      stake_td = td;
+      stake_found = true;
+      return false;
+    }
+    return true;
+  });
+  CHECK_AND_ASSERT_MES(stake_found, false, "cannot find the first HF4 ZC output in miner wallet");
+  CHECK_AND_ASSERT_MES(stake_td.output().type() == typeid(tx_out_zarcanum), false, "selected stake is not a ZC output");
+  const tx_out_zarcanum& stake_out = boost::get<tx_out_zarcanum>(stake_td.output());
+
+  auto check_ring_attempt = [&](size_t expected_height_count, size_t expected_response_outputs, size_t expected_picked_decoys, bool expect_success) -> bool
+  {
+    const uint64_t current_top = bcs.get_top_block_height();
+    auto trace_proxy = std::make_shared<core_proxy>(m_core_proxy);
+    miner_wlt->set_core_proxy(trace_proxy);
+
+    txin_zc_input stake_input{};
+    std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry> decoys;
+    std::vector<crypto::CLSAG_GGXXG_input_ref_t> ring;
+    uint64_t secret_index = 0;
+    bool success = false;
+    std::string error;
+    try
+    {
+      success = miner_wlt->prepare_pos_zc_input_and_ring(stake_td, stake_out, stake_input, decoys, ring, secret_index);
+    }
+    catch (const std::exception& e)
+    {
+      error = e.what();
+    }
+    catch (...)
+    {
+      error = "non-std exception";
+    }
+    miner_wlt->set_core_proxy(m_core_proxy);
+
+    CHECK_AND_ASSERT_MES(trace_proxy->m_called, false, "wallet did not call getrandomouts4");
+    CHECK_AND_ASSERT_EQ(trace_proxy->m_request.look_up_strategy, std::string(LOOK_UP_STRATEGY_POS_COINBASE));
+    CHECK_AND_ASSERT_EQ(trace_proxy->m_request.height_upper_limit, current_top);
+    CHECK_AND_ASSERT_EQ(trace_proxy->m_request.batches.size(), 1);
+    CHECK_AND_ASSERT_EQ(trace_proxy->m_request.batches[0].input_amount, 0);
+    CHECK_AND_ASSERT_EQ(trace_proxy->m_request.batches[0].heights.size(), expected_height_count);
+    for (size_t i = 0; i < expected_height_count; ++i)
+      CHECK_AND_ASSERT_EQ(trace_proxy->m_request.batches[0].heights[i], HF4_TRANSITION_FIRST_HEIGHT + i);
+
+    CHECK_AND_ASSERT_EQ(trace_proxy->m_response.blocks_batches.size(), 1);
+    CHECK_AND_ASSERT_EQ(trace_proxy->m_response.blocks_batches[0].blocks.size(), expected_height_count);
+    CHECK_AND_ASSERT_EQ(count_response_outputs(trace_proxy->m_response), expected_response_outputs);
+    for (const auto& returned_block : trace_proxy->m_response.blocks_batches[0].blocks)
+    {
+      CHECK_AND_ASSERT_MES(returned_block.block_height >= HF4_TRANSITION_FIRST_HEIGHT, false, "getrandomouts4 returned a pre-HF4 block");
+      CHECK_AND_ASSERT_MES(returned_block.block_height <= HF4_TRANSITION_FIRST_HEIGHT + expected_height_count - 1, false, "getrandomouts4 returned an immature block");
+      for (const auto& output : returned_block.outs)
+      {
+        CHECK_AND_ASSERT_MES(output.flags & RANDOM_OUTPUTS_FOR_AMOUNTS_FLAGS_COINBASE, false, "fallback returned a non-coinbase output");
+        CHECK_AND_ASSERT_MES(!(output.flags & RANDOM_OUTPUTS_FOR_AMOUNTS_FLAGS_POS_COINBASE), false, "expected PoW coinbase output during transition");
+      }
+    }
+
+    LOG_PRINT_MAGENTA("[HF4 TRANSITION] getrandomouts4 for next height " << current_top + 1
+      << ": requested unique heights=" << expected_height_count
+      << " (" << HF4_TRANSITION_FIRST_HEIGHT << ".." << HF4_TRANSITION_FIRST_HEIGHT + expected_height_count - 1 << ")"
+      << ", real height=" << stake_td.m_ptx_wallet_info->m_block_height
+      << ", response outputs=" << expected_response_outputs
+      << ", usable decoys after real exclusion=" << expected_picked_decoys, LOG_LEVEL_0);
+    CHECK_AND_ASSERT_EQ(decoys.size(), expected_picked_decoys + (expect_success ? 1 : 0)); // successful storage also contains the real output
+    CHECK_AND_ASSERT_EQ(success, expect_success);
+    CHECK_AND_ASSERT_EQ(error.empty(), expect_success);
+    if (expect_success)
+    {
+      CHECK_AND_ASSERT_EQ(ring.size(), CURRENCY_HF4_MANDATORY_DECOY_SET_SIZE + 1);
+      CHECK_AND_ASSERT_EQ(stake_input.key_offsets.size(), CURRENCY_HF4_MANDATORY_DECOY_SET_SIZE + 1);
+      CHECK_AND_ASSERT_MES(secret_index < ring.size(), false, "real stake index is outside the ring");
+    }
+    else
+    {
+      CHECK_AND_ASSERT_MES(!error.empty(), false, "insufficient decoy pool was accepted");
+      LOG_PRINT_MAGENTA("[HF4 TRANSITION] expected ring failure at next height " << current_top + 1
+        << ": response outputs=" << expected_response_outputs
+        << ", real excluded -> decoys=" << expected_picked_decoys
+        << ", error=" << error, LOG_LEVEL_0);
+    }
+    return true;
+  };
+
+  CHECK_AND_ASSERT_MES(check_ring_attempt(1, 2, 1, false), false, "one-height maturity check failed");
+
+  // candidate block 37 sees heights 21..27: 7 PoW blocks, 14 outputs, and only 13 decoys after excluding the real stake
+  CHECK_AND_ASSERT_MES(mine_pow_until(HF4_TRANSITION_LAST_INSUFFICIENT_TOP), false, "cannot reach the 14-output boundary");
+  CHECK_AND_ASSERT_MES(check_ring_attempt(7, 14, 13, false), false, "14-output boundary check failed");
+
+  // one more PoW block makes height 28 mature for candidate block 38, 8 blocks * 2 outs = 16 ring members, including the real
+  CHECK_AND_ASSERT_MES(mine_pow_until(HF4_TRANSITION_FIRST_SUFFICIENT_TOP), false, "cannot reach the 16-output boundary");
+  CHECK_AND_ASSERT_MES(check_ring_attempt(8, 16, 15, true), false, "16-output boundary check failed");
+
+  const uint64_t top_before_pos = bcs.get_top_block_height();
+  CHECK_AND_ASSERT_MES(miner_wlt->try_mint_pos(m_accounts[MINER_ACC_IDX].get_public_address()), false, "first structurally possible HF4 PoS block was not minted");
+  CHECK_AND_ASSERT_EQ(bcs.get_top_block_height(), top_before_pos + 1);
+  block pos_block{};
+  CHECK_AND_ASSERT_MES(bcs.get_top_block(pos_block), false, "cannot get minted PoS block");
+  CHECK_AND_ASSERT_MES(is_pos_block(pos_block), false, "expected an HF4 PoS block");
+  CHECK_AND_ASSERT_MES(pos_block.miner_tx.vin.size() > 1 && pos_block.miner_tx.vin[1].type() == typeid(txin_zc_input), false, "PoS block has no Zarcanum stake input");
+  CHECK_AND_ASSERT_EQ(boost::get<txin_zc_input>(pos_block.miner_tx.vin[1]).key_offsets.size(), CURRENCY_HF4_MANDATORY_DECOY_SET_SIZE + 1);
+  LOG_PRINT_MAGENTA("[HF4 TRANSITION] PoS success: height=" << get_block_height(pos_block)
+    << ", ring size=" << boost::get<txin_zc_input>(pos_block.miner_tx.vin[1]).key_offsets.size(), LOG_LEVEL_0);
+
+  // The regular transaction path uses LOOK_UP_STRATEGY_REGULAR_TX first and
+  // must also be able to fall back to the mature PoW coinbase outputs.
+  miner_wlt->refresh();
+  transaction regular_tx{};
+  miner_wlt->transfer(TESTS_DEFAULT_FEE, m_accounts[ALICE_ACC_IDX].get_public_address(), regular_tx);
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 1);
+  size_t zc_inputs = 0;
+  for (const auto& input : regular_tx.vin)
+  {
+    if (input.type() != typeid(txin_zc_input))
+      continue;
+    ++zc_inputs;
+    CHECK_AND_ASSERT_EQ(boost::get<txin_zc_input>(input).key_offsets.size(), CURRENCY_HF4_MANDATORY_DECOY_SET_SIZE + 1);
+  }
+  CHECK_AND_ASSERT_MES(zc_inputs > 0, false, "regular HF4 transaction has no ZC inputs");
+  LOG_PRINT_MAGENTA("[HF4 TRANSITION] regular tx success: tx=" << get_transaction_hash(regular_tx)
+    << ", ZC inputs=" << zc_inputs << ", ring size=" << CURRENCY_HF4_MANDATORY_DECOY_SET_SIZE + 1, LOG_LEVEL_0);
+
+  CHECK_AND_ASSERT_MES(mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c), false, "cannot mine regular transition transaction");
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
+  return true;
+}

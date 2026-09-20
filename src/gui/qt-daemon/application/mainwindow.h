@@ -6,7 +6,6 @@
 
 #pragma once
 #include <QtWidgets>
-#include <QWebChannel>
 #include <boost/interprocess/ipc/message_queue.hpp>
 
 #include "wallet/view_iface.h"
@@ -23,32 +22,15 @@
 QT_BEGIN_NAMESPACE
 class QWebEngineView;
 class QLineEdit;
+class QWebChannel;
 QT_END_NAMESPACE
+
+class WebChannelBridge;
 
 
 #define  APP_DATA_FILE_BINARY_SIGNATURE   0x1000111101101021LL
 
 
-// class MediatorObject : public QObject
-// {
-//   Q_OBJECT
-// 
-// public:
-// 
-// signals :
-//   /*!
-//   This signal is emitted from the C++ side and the text displayed on the HTML client side.
-//   */
-//   void from_c_to_html(const QString &text);
-// 
-//   public slots:
-//         /*!
-//         This slot is invoked from the HTML client side and the text displayed on the server side.
-//         */
-//   void from_html_to_c(const QString &text);
-// };
-
-//
 class MainWindow : public QMainWindow, 
                    public currency::i_core_event_handler,
                    public view::i_view, 
@@ -58,7 +40,7 @@ class MainWindow : public QMainWindow,
 
 public:
   MainWindow();
-  ~MainWindow();
+  ~MainWindow() override;
 
   bool init_backend(int argc, char* argv[]);
   bool show_inital();
@@ -141,6 +123,8 @@ public:
   QString stop_pos_mining(const QString& param);
   QString set_log_level(const QString& param);
   QString get_log_level(const QString& param);
+  QString get_log_files_size(const QString& param);
+  QString clear_log_files(const QString& param);
   QString set_enable_tor(const QString& param);
 //  QString dump_all_offers();
   QString webkit_launched_script(const QString& param);
@@ -242,7 +226,7 @@ private:
   virtual bool set_options(const view::gui_options& opt);
   virtual bool update_tor_status(const view::current_action_status& opt);
   //--------- QAbstractNativeEventFilter ---------------------------
-  virtual bool nativeEventFilter(const QByteArray &eventType, void *message, long *result);
+  virtual bool nativeEventFilter(const QByteArray &eventType, void *message, qintptr *result);
   //----------------------------------------------
 
 
@@ -271,13 +255,14 @@ private:
   std::string get_wallet_log_prefix(size_t wallet_id) const { return m_backend.get_wallet_log_prefix(wallet_id); }
 
 
-  //MediatorObject mo;
   // UI
   QWebEngineView *m_view;
   QWebChannel* m_channel;
+  WebChannelBridge* m_web_channel_bridge; // owned by m_channel
 
   // DATA
   wallets_manager m_backend;
+  bool m_allow_weak_password = false;
   //std::atomic<bool> m_quit_requested;
   std::atomic<bool> m_gui_deinitialize_done_1;
   std::atomic<bool> m_backend_stopped_2;

@@ -70,7 +70,7 @@ public:
 
       const unsigned char ver = static_cast<unsigned char>(resp[0]);
       const unsigned char mth = static_cast<unsigned char>(resp[1]);
-      if (!(ver == 0x05 && mth == 0x00)) // 0x00 — "no authentication"
+      if (!(ver == 0x05 && mth == 0x00)) // 0x00 - "no authentication"
         return false; // unsupported auth
     }
 
@@ -229,7 +229,7 @@ namespace detail
   //   set_socks_proxy(std::string,uint16_t)
   //   set_use_remote_dns(bool)
   //   set_timeouts(unsigned,unsigned)
-  // Otherwise it’s a no-op.
+  // Otherwise it's a no-op.
   // Usage: apply_socks5_cfg(tr); before connect()/invoke().
   // Config: socks5_proxy_settings. To support a new transport, implement the setters.
 

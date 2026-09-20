@@ -209,6 +209,7 @@ namespace currency
     std::string m_voting_config_file;
     bool m_no_password_confirmations = false;
     bool m_no_whitelist = false;
+    bool m_allow_weak_password = false;
     std::string m_restore_ki_in_wo_wallet;
     std::string m_enable_tx_socks5_relay_proxy;
     std::string m_tx_relay_url;
