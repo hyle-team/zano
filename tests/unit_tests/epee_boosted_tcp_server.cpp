@@ -108,3 +108,21 @@ TEST(boosted_tcp_server, worker_threads_are_exception_resistant)
   ASSERT_TRUE(srv.timed_wait_server_stop(5 * 1000));
   ASSERT_TRUE(srv.deinit_server());
 }
+
+TEST(boosted_tcp_server, idle_handlers_are_exception_resistant)
+{
+  test_tcp_server srv;
+  size_t counter = 0;
+
+  ASSERT_TRUE(srv.add_idle_handler([&counter]()
+  {
+    ++counter;
+    if (counter == 1)
+      throw std::runtime_error("test");
+    return false;
+  }, 1));
+
+  EXPECT_EQ(1u, srv.get_io_service().run_one());
+  EXPECT_EQ(1u, srv.get_io_service().run_one());
+  EXPECT_EQ(2u, counter);
+}

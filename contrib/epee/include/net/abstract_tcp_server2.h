@@ -254,20 +254,18 @@ class boosted_tcp_server
 
   bool global_timer_handler(/*const boost::system::error_code& err, */ boost::shared_ptr<idle_callback_conext_base> ptr)
   {
-    //if handler return false - he don't want to be called anymore
+    // returning false explicitly unregisters the handler; exceptions are logged and retried
     try {
       if(!ptr->call_handler())
         return true;
     }
-    catch(std::exception& e)
+    catch(const std::exception& e)
     {
-      LOG_ERROR("exeption caught in boosted_tcp_server::global_timer_handler: " << e.what() << ENDL << "won't be called anymore");
-      return true;
+      LOG_ERROR("exception caught in boosted_tcp_server::global_timer_handler: " << e.what() << ENDL << "idle handler will be called again");
     }
     catch(...)
     {
-      LOG_ERROR("unknown exeption caught in boosted_tcp_server::global_timer_handler, it won't be called anymore");
-      return true;
+      LOG_ERROR("unknown exception caught in boosted_tcp_server::global_timer_handler, idle handler will be called again");
     }
 
     ptr->m_timer.expires_from_now(boost::posix_time::milliseconds(ptr->m_period));
