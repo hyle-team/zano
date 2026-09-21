@@ -1409,6 +1409,7 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY(zarcanum_basic_test);
 
     GENERATE_AND_PLAY_HF(multiassets_basic_test, "4-*");
+    GENERATE_AND_PLAY_HF(asset_registration_and_bad_amount_commitment, "5-*");
     GENERATE_AND_PLAY_HF(ionic_swap_basic_test, "4-*");
     GENERATE_AND_PLAY_HF(ionic_swap_exact_amounts_test, "4-*");
     GENERATE_AND_PLAY_HF(ionic_swap_overflow_check_test, "4-*");
