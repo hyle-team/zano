@@ -11,32 +11,32 @@ name: Build all platforms
 on:
   workflow_dispatch:
     inputs:
-      mainnet:
-        description: 'Build mainnet'
-        type: boolean
-        default: true
-      testnet:
-        description: 'Build testnet'
-        type: boolean
-        default: false
       increment:
         description: 'Increment build number'
         type: boolean
         default: true
-      upload:
-        description: 'Upload builds to the download server'
+      mainnet:
+        description: 'Mainnet'
         type: boolean
         default: true
+      testnet:
+        description: 'Testnet'
+        type: boolean
+        default: false
       windows:
-        description: 'Build Windows'
+        description: 'Windows'
         type: boolean
         default: true
       macos:
-        description: 'Build macOS'
+        description: 'macOS'
         type: boolean
         default: true
       linux:
-        description: 'Build Linux'
+        description: 'Linux'
+        type: boolean
+        default: true
+      upload:
+        description: 'Upload to build.zano.org'
         type: boolean
         default: true
 
