@@ -1147,7 +1147,7 @@ std::string wallets_manager::open_wallet(const std::wstring& path, const std::st
   w->set_use_deffered_global_outputs(m_use_deffered_global_outputs);
   owr.wallet_id = m_wallet_id_counter++;
 
-  std::shared_ptr<tools::i_wallet2_callback> w_cb{new i_wallet_to_i_backend_adapter(this, owr.wallet_id)};
+  std::shared_ptr<i_wallet_to_i_backend_adapter> w_cb{new i_wallet_to_i_backend_adapter(this, owr.wallet_id, w)};
   w->callback(w_cb);
   if (m_remote_node_mode)
   {
@@ -1285,7 +1285,7 @@ std::string wallets_manager::generate_wallet(const std::wstring& path, const std
   w->set_use_deffered_global_outputs(m_use_deffered_global_outputs);
   w->set_votes_config_path(m_data_dir + "/" + CURRENCY_VOTING_CONFIG_DEFAULT_FILENAME);
   owr.wallet_id = m_wallet_id_counter++;
-  std::shared_ptr<tools::i_wallet2_callback> w_cb{new i_wallet_to_i_backend_adapter(this, owr.wallet_id)};
+  std::shared_ptr<i_wallet_to_i_backend_adapter> w_cb{new i_wallet_to_i_backend_adapter(this, owr.wallet_id, w)};
   w->callback(w_cb);
   if (m_remote_node_mode)
   {
@@ -1402,7 +1402,7 @@ std::string wallets_manager::restore_wallet(const std::wstring& path, const std:
   w->set_use_deffered_global_outputs(m_use_deffered_global_outputs);
   w->set_votes_config_path(m_data_dir + "/" + CURRENCY_VOTING_CONFIG_DEFAULT_FILENAME);
   owr.wallet_id = m_wallet_id_counter++;
-  std::shared_ptr<tools::i_wallet2_callback> w_cb{new i_wallet_to_i_backend_adapter(this, owr.wallet_id)};
+  std::shared_ptr<i_wallet_to_i_backend_adapter> w_cb{new i_wallet_to_i_backend_adapter(this, owr.wallet_id, w)};
   w->callback(w_cb);
   if (m_remote_node_mode)
   {
@@ -1760,7 +1760,7 @@ std::string wallets_manager::get_wallet_status(uint64_t wallet_id)
 {
   GET_WALLET_OPT_BY_ID(wallet_id, wo);
   view::wallet_sync_status_info wsi = AUTO_VAL_INIT(wsi);
-  wsi.is_in_long_refresh = wo.long_refresh_in_progress;
+  wsi.is_in_long_refresh = wo.w_cb->long_refresh_in_progress;
   wsi.is_daemon_connected = wo.w.unlocked_get().get()->get_is_remote_daemon_connected();
   wsi.progress = wo.w.unlocked_get().get()->get_sync_progress();
   wsi.sync_speed = wo.w.unlocked_get().get()->get_sync_speed();
@@ -1775,7 +1775,7 @@ std::string wallets_manager::invoke(uint64_t wallet_id, std::string params)
   GET_WALLET_OPT_BY_ID(wallet_id, wo);
 
   CRITICAL_REGION_LOCAL1(wo.long_refresh_in_progress_lock);
-  if (wo.long_refresh_in_progress)
+  if (wo.w_cb->long_refresh_in_progress)
   {
     epee::json_rpc::response<epee::json_rpc::dummy_result, epee::json_rpc::error> error_response = AUTO_VAL_INIT(error_response);
     error_response.error.code = -1;
@@ -2018,7 +2018,7 @@ std::string wallets_manager::get_wallet_restore_info(uint64_t wallet_id, std::st
 
   seed_phrase = wo.w.unlocked_get()->get_account().get_seed_phrase(seed_password);
 
-  //if (wo.wallet_state != view::wallet_status_info::wallet_state_ready || wo.long_refresh_in_progress)
+  //if (wo.wallet_state != view::wallet_status_info::wallet_state_ready || wo.w_cb->long_refresh_in_progress)
   //  return API_RETURN_CODE_CORE_BUSY;
   //seed_phrase = wo.w->get()->get_account().get_seed_phrase(seed_password);
 
@@ -2156,7 +2156,7 @@ void wallets_manager::on_new_block(size_t wallet_id, uint64_t /*height*/, const 
 
 }
 
-void wallets_manager::on_transfer2(size_t wallet_id, const tools::wallet_public::wallet_transfer_info& wti, const std::list<tools::wallet_public::asset_balance_entry>& balances, uint64_t total_mined)
+void wallets_manager::on_transfer2(size_t wallet_id, const tools::wallet2& wallet, const tools::wallet_public::wallet_transfer_info& wti, const std::list<tools::wallet_public::asset_balance_entry>& balances, uint64_t total_mined, bool is_wallet_in_sync_process)
 {  
   view::transfer_event_info tei{};
   tei.ti = wti;
@@ -2164,9 +2164,8 @@ void wallets_manager::on_transfer2(size_t wallet_id, const tools::wallet_public:
   tei.total_mined = total_mined;
   tei.wallet_id = wallet_id;
 
-  GET_WALLET_OPTIONS_BY_ID_VOID_RET(wallet_id, w);
-  tei.is_wallet_in_sync_process = w.long_refresh_in_progress;
-  if (!(w.w->get()->is_watch_only()))
+  tei.is_wallet_in_sync_process = is_wallet_in_sync_process;
+  if (!wallet.is_watch_only())
   {
     m_pview->money_transfer(tei);
   }
@@ -2197,28 +2196,13 @@ void wallets_manager::on_sync_progress(size_t wallet_id, const uint64_t& percent
   m_pview->wallet_sync_progress(wspp);
 }
 
-void wallets_manager::on_transfer_canceled(size_t wallet_id, const tools::wallet_public::wallet_transfer_info& wti)
+void wallets_manager::on_transfer_canceled(size_t wallet_id, const tools::wallet2& wallet, const tools::wallet_public::wallet_transfer_info& wti)
 {
   view::transfer_event_info tei{};
   tei.ti = wti;
 
-  SHARED_CRITICAL_REGION_LOCAL(m_wallets_lock);
-  auto it = m_wallets.find(wallet_id);
-  if (it == m_wallets.end())
-  {
-    LOG_ERROR(get_wallet_log_prefix(wallet_id) + "on_transfer_canceled() wallet with id = " << wallet_id << " not found");
-    return;
-  }
-  auto& w = it->second.w;
-  if (w->get() != nullptr)
-  {
-    w->get()->balance(tei.balances, tei.total_mined);
-    tei.wallet_id = wallet_id;
-  }
-  else
-  {
-    LOG_ERROR(get_wallet_log_prefix(wallet_id) + "on_transfer_canceled() wallet with id = " << wallet_id << "  has nullptr");
-  }
+  wallet.balance(tei.balances, tei.total_mined);
+  tei.wallet_id = wallet_id;
   m_pview->money_transfer_cancel(tei);
 }
 
@@ -2312,7 +2296,7 @@ void wallets_manager::wallet_vs_options::worker_func()
   view::wallet_status_info wsi = AUTO_VAL_INIT(wsi);
   
   wsi.wallet_state = view::wallet_status_info::wallet_state_synchronizing;
-  long_refresh_in_progress = true;
+  w_cb->long_refresh_in_progress = true;
 
   while (!major_stop)
   {
@@ -2347,7 +2331,7 @@ void wallets_manager::wallet_vs_options::worker_func()
           if(*plast_daemon_height >= last_wallet_synch_height && *plast_daemon_height - last_wallet_synch_height > 10)
           {
             CRITICAL_REGION_LOCAL(long_refresh_in_progress_lock);
-            long_refresh_in_progress = true;
+            w_cb->long_refresh_in_progress = true;
           }
 
 
@@ -2369,7 +2353,7 @@ void wallets_manager::wallet_vs_options::worker_func()
             continue;
           }
 
-          long_refresh_in_progress = false;
+          w_cb->long_refresh_in_progress = false;
           w->get()->resend_unconfirmed();
 
           wallet_state = wsi.wallet_state = view::wallet_status_info::wallet_state_ready;
@@ -2379,7 +2363,7 @@ void wallets_manager::wallet_vs_options::worker_func()
         }
         else
         {
-          long_refresh_in_progress = false;
+          w_cb->long_refresh_in_progress = false;
         }
 
         scan_pool_interval.do_call([&](){
