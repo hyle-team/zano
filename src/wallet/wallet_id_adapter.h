@@ -6,16 +6,18 @@
 
 #pragma once
 
+#include <atomic>
+
 #include "wallet/wallet2.h"
 
 class i_backend_wallet_callback
 {
 public:
   virtual void on_new_block(size_t wallet_id, uint64_t /*height*/, const currency::block& /*block*/) {}
-	virtual void on_transfer2(size_t wallet_id, const tools::wallet_public::wallet_transfer_info& wti, const std::list<tools::wallet_public::asset_balance_entry>& balances, uint64_t total_mined) {}
+  virtual void on_transfer2(size_t wallet_id, const tools::wallet2& wallet, const tools::wallet_public::wallet_transfer_info& wti, const std::list<tools::wallet_public::asset_balance_entry>& balances, uint64_t total_mined, bool is_wallet_in_sync_process) {}
   virtual void on_pos_block_found(size_t wallet_id, const currency::block& /*block*/) {}
   virtual void on_sync_progress(size_t wallet_id, const uint64_t& /*percents*/) {}
-  virtual void on_transfer_canceled(size_t wallet_id, const tools::wallet_public::wallet_transfer_info& wti) {}
+  virtual void on_transfer_canceled(size_t wallet_id, const tools::wallet2& wallet, const tools::wallet_public::wallet_transfer_info& wti) {}
   virtual void on_tor_status_change(size_t wallet_id, const std::string& state) {}
 
   virtual void on_mw_get_wallets(std::vector<tools::wallet_public::wallet_entry_info>& wallets) {}
@@ -25,17 +27,19 @@ public:
 
 struct i_wallet_to_i_backend_adapter: public tools::i_wallet2_callback
 {
-  i_wallet_to_i_backend_adapter(i_backend_wallet_callback* pbackend, size_t wallet_id) :m_pbackend(pbackend),
-                                                                                        m_wallet_id(wallet_id)
+  std::atomic<bool> long_refresh_in_progress{false};
+
+  i_wallet_to_i_backend_adapter(i_backend_wallet_callback* pbackend, size_t wallet_id, const std::shared_ptr<tools::wallet2>& wallet)
+    : m_wallet(wallet), m_pbackend(pbackend), m_wallet_id(wallet_id)
   {}
 
   virtual void on_new_block(uint64_t height, const currency::block& block) override
   {
     m_pbackend->on_new_block(m_wallet_id, height, block);
   }
-	virtual void on_transfer2(const tools::wallet_public::wallet_transfer_info& wti, const std::list<tools::wallet_public::asset_balance_entry>& balances, uint64_t total_mined) override
+  virtual void on_transfer2(const tools::wallet_public::wallet_transfer_info& wti, const std::list<tools::wallet_public::asset_balance_entry>& balances, uint64_t total_mined) override
   {
-		m_pbackend->on_transfer2(m_wallet_id, wti, balances, total_mined);
+    m_pbackend->on_transfer2(m_wallet_id, *m_wallet, wti, balances, total_mined, long_refresh_in_progress.load());
   }
   virtual void on_pos_block_found(const currency::block& wti) override
   {
@@ -47,7 +51,7 @@ struct i_wallet_to_i_backend_adapter: public tools::i_wallet2_callback
   }
   virtual void on_transfer_canceled(const tools::wallet_public::wallet_transfer_info& wti) override
   {
-    m_pbackend->on_transfer_canceled(m_wallet_id, wti);
+    m_pbackend->on_transfer_canceled(m_wallet_id, *m_wallet, wti);
   }
   virtual void on_tor_status_change(const std::string& state) override
   {
@@ -65,6 +69,7 @@ struct i_wallet_to_i_backend_adapter: public tools::i_wallet2_callback
 
 
 private:
+  std::shared_ptr<tools::wallet2> m_wallet; // callbacks already run under the wallet lock
   i_backend_wallet_callback* m_pbackend;
   size_t m_wallet_id;
 };
