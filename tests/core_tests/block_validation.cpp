@@ -1350,3 +1350,384 @@ bool block_choice_rule_bigger_fee::c1(currency::core& c, size_t ev_index, const 
 
   return true;
 }
+
+namespace
+{
+bool corrupt_first_nlsag_signature(transaction& tx)
+{
+  if (tx.signatures.empty() || tx.signatures.front().type() != typeid(NLSAG_sig))
+    return false;
+  auto& ring_sigs = boost::get<NLSAG_sig>(tx.signatures.front()).s;
+  if (ring_sigs.empty())
+    return false;
+  ring_sigs.front().c.data[0] ^= 0x01;
+  ring_sigs.front().c.data[1] ^= 0x02;
+  return true;
+}
+}
+
+bool gen_block_sig_bad_poisons_block_hash::generate(std::vector<test_event_entry>& events) const
+{
+  // A damaged tx signature must make its block invalid
+  GENERATE_ACCOUNT(miner_acc);
+  GENERATE_ACCOUNT(alice_acc);
+  std::list<currency::account_base> coin_stake_sources;
+  coin_stake_sources.push_back(miner_acc);
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  DO_CALLBACK(events, "configure_core");
+  MAKE_NEXT_BLOCK(events, blk_1, blk_0, miner_acc);
+  REWIND_BLOCKS_N(events, blk_1r, blk_1, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  MAKE_TX(events, tx_1, miner_acc, alice_acc, MK_TEST_COINS(1), blk_1r);
+  events.pop_back();
+  transaction broken_tx = tx_1;
+  CHECK_AND_ASSERT_MES(corrupt_first_nlsag_signature(broken_tx), false, "tx_1 has no NLSAG signature to corrupt");
+  CHECK_AND_ASSERT_MES(get_transaction_hash(broken_tx) == get_transaction_hash(tx_1), false,
+    "broken_tx and tx_1 must share the same hash -- otherwise this test doesn't exercise the intended bug");
+
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, true));
+  events.push_back(broken_tx);
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, false));
+
+  DO_CALLBACK(events, "mark_invalid_block");
+  MAKE_NEXT_POS_BLOCK_TX1(events, blk_2, blk_1r, miner_acc, coin_stake_sources, broken_tx);
+
+  return true;
+}
+
+bool gen_block_hash_bad_orphans_honest_child::generate(std::vector<test_event_entry>& events) const
+{
+  // A child of the rejected block remains an orphan
+  GENERATE_ACCOUNT(miner_acc);
+  GENERATE_ACCOUNT(alice_acc);
+  std::list<currency::account_base> coin_stake_sources;
+  coin_stake_sources.push_back(miner_acc);
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  DO_CALLBACK(events, "configure_core");
+  MAKE_NEXT_BLOCK(events, blk_1, blk_0, miner_acc);
+  REWIND_BLOCKS_N(events, blk_1r, blk_1, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  MAKE_TX(events, tx_1, miner_acc, alice_acc, MK_TEST_COINS(1), blk_1r);
+  events.pop_back();
+  transaction broken_tx = tx_1;
+  CHECK_AND_ASSERT_MES(corrupt_first_nlsag_signature(broken_tx), false, "tx_1 has no NLSAG signature to corrupt");
+  CHECK_AND_ASSERT_MES(get_transaction_hash(broken_tx) == get_transaction_hash(tx_1), false,
+    "broken_tx and tx_1 must share the same hash");
+
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, true));
+  events.push_back(broken_tx);
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, false));
+
+  DO_CALLBACK(events, "mark_invalid_block");
+  MAKE_NEXT_POS_BLOCK_TX1(events, blk_2, blk_1r, miner_acc, coin_stake_sources, broken_tx);
+
+  DO_CALLBACK(events, "mark_orphan_block");
+  currency::block blk_3 = AUTO_VAL_INIT(blk_3);
+  // Construct directly because the event generator skips the rejected parent.
+  CHECK_AND_ASSERT_MES(generator.construct_block_manually(blk_3, blk_2, miner_acc), false, "failed to construct blk_3 manually");
+  events.push_back(blk_3);
+
+  return true;
+}
+
+gen_block_hash_bad_blocks_legit_resend::gen_block_hash_bad_blocks_legit_resend()
+  : m_poisoned_resend_block_index(std::numeric_limits<size_t>::max())
+{
+  REGISTER_CALLBACK_METHOD(gen_block_hash_bad_blocks_legit_resend, mark_poisoned_resend_block);
+}
+
+bool gen_block_hash_bad_blocks_legit_resend::mark_poisoned_resend_block(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  CHECK_AND_ASSERT_MES(ev_index + 1 < events.size(), false, "missing healthy block resend event");
+  const block* healthy_blk = boost::get<block>(&events[ev_index + 1]);
+  CHECK_AND_ASSERT_MES(healthy_blk && healthy_blk->tx_hashes.size() == 1, false, "healthy block must contain one transaction");
+  const crypto::hash tx_id = healthy_blk->tx_hashes.front();
+  transaction pooled_tx{};
+  CHECK_AND_ASSERT_MES(c.get_tx_pool().get_transaction(tx_id, pooled_tx), false,
+    "healthy transaction disappeared from the pool after the damaged onboard copy");
+  const transaction* expected_tx = nullptr;
+  for (const auto& event : events)
+  {
+    const transaction* candidate = boost::get<transaction>(&event);
+    if (candidate && get_transaction_hash(*candidate) == tx_id)
+    {
+      expected_tx = candidate;
+      break;
+    }
+  }
+  CHECK_AND_ASSERT_MES(expected_tx && get_object_hash(pooled_tx) == get_object_hash(*expected_tx), false,
+    "damaged onboard content replaced the healthy pooled transaction");
+  m_poisoned_resend_block_index = ev_index + 1;
+  return true;
+}
+
+bool gen_block_hash_bad_blocks_legit_resend::check_block_verification_context(const currency::block_verification_context& bvc, size_t event_idx, const currency::block& blk)
+{
+  if (event_idx == m_poisoned_resend_block_index)
+  {
+    CHECK_AND_ASSERT_MES(bvc.m_added_to_main_chain && !bvc.m_already_exists && !bvc.m_verification_failed, false,
+      ENDL << "event #" << event_idx << ": healthy blk_2 was not accepted after the damaged bundle: "
+      << "m_already_exists=" << bvc.m_already_exists << ", m_added_to_main_chain=" << bvc.m_added_to_main_chain
+      << ", m_verification_failed=" << bvc.m_verification_failed << ENDL);
+    LOG_PRINT_L0("Healthy block resend: m_already_exists=" << bvc.m_already_exists
+      << ", m_added_to_main_chain=" << bvc.m_added_to_main_chain);
+    return true;
+  }
+  return test_chain_unit_enchanced::check_block_verification_context(bvc, event_idx, blk);
+}
+
+bool gen_block_hash_bad_blocks_legit_resend::generate(std::vector<test_event_entry>& events) const
+{
+  // The damaged onboard tx must not block the healthy pooled tx or block
+  GENERATE_ACCOUNT(miner_acc);
+  GENERATE_ACCOUNT(alice_acc);
+  std::list<currency::account_base> coin_stake_sources;
+  coin_stake_sources.push_back(miner_acc);
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  DO_CALLBACK(events, "configure_core");
+  MAKE_NEXT_BLOCK(events, blk_1, blk_0, miner_acc);
+  REWIND_BLOCKS_N(events, blk_1r, blk_1, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  MAKE_TX(events, tx_1, miner_acc, alice_acc, MK_TEST_COINS(1), blk_1r);
+  events.pop_back();
+  transaction broken_tx = tx_1;
+  CHECK_AND_ASSERT_MES(corrupt_first_nlsag_signature(broken_tx), false, "tx_1 has no NLSAG signature to corrupt");
+  CHECK_AND_ASSERT_MES(get_transaction_hash(broken_tx) == get_transaction_hash(tx_1), false,
+    "broken_tx and tx_1 must share the same hash");
+
+  events.push_back(tx_1);
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, true));
+  events.push_back(broken_tx);
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, false));
+
+  DO_CALLBACK(events, "mark_invalid_block");
+  MAKE_NEXT_POS_BLOCK_TX1(events, blk_2, blk_1r, miner_acc, coin_stake_sources, broken_tx);
+
+  CHECK_AND_ASSERT_MES(blk_2.tx_hashes.size() == 1, false, "blk_2 must contain one transaction");
+  block healthy_blk_2 = blk_2;
+  healthy_blk_2.tx_hashes.front() = get_transaction_hash(tx_1);
+  CHECK_AND_ASSERT_MES(get_block_hash(healthy_blk_2) == get_block_hash(blk_2), false,
+    "healthy and damaged blocks must share the same hash");
+  CHECK_AND_ASSERT_MES(block_to_blob(healthy_blk_2) == block_to_blob(blk_2) &&
+    get_object_hash(tx_1) != get_object_hash(broken_tx), false,
+    "only the ordinary transaction's raw content must distinguish these block bundles");
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, true));
+  events.push_back(tx_1);
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, false));
+  DO_CALLBACK(events, "mark_poisoned_resend_block");
+  events.push_back(healthy_blk_2);
+
+  return true;
+}
+
+gen_pos_miner_sig_bad_then_legit::gen_pos_miner_sig_bad_then_legit()
+  : m_healthy_block_index(std::numeric_limits<size_t>::max())
+{
+  REGISTER_CALLBACK_METHOD(gen_pos_miner_sig_bad_then_legit, mark_healthy_pos_block);
+}
+
+bool gen_pos_miner_sig_bad_then_legit::mark_healthy_pos_block(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  CHECK_AND_ASSERT_MES(ev_index + 1 < events.size(), false, "missing healthy PoS block event");
+  const block* healthy_blk = boost::get<block>(&events[ev_index + 1]);
+  CHECK_AND_ASSERT_MES(healthy_blk, false, "healthy PoS block event is not a block");
+  const crypto::hash id = get_block_hash(*healthy_blk);
+  CHECK_AND_ASSERT_MES(!c.have_block(id), false,
+    "damaged PoS miner signature reserved block hash " << id << " before the healthy resend");
+  CHECK_AND_ASSERT_MES(c.get_tail_id() == healthy_blk->prev_id, false,
+    "damaged PoS block unexpectedly changed the chain tip");
+  LOG_PRINT_L0("After damaged PoS miner signature: block=" << id << ", have_block=0, tip_is_parent=1");
+  m_healthy_block_index = ev_index + 1;
+  return true;
+}
+
+bool gen_pos_miner_sig_bad_then_legit::check_block_verification_context(const currency::block_verification_context& bvc, size_t event_idx, const currency::block& blk)
+{
+  if (event_idx == m_invalid_block_index)
+  {
+    CHECK_AND_ASSERT_MES(bvc.m_verification_failed && !bvc.m_added_to_main_chain && !bvc.m_already_exists, false,
+      "damaged PoS block was not rejected: m_verification_failed=" << bvc.m_verification_failed
+      << ", m_added_to_main_chain=" << bvc.m_added_to_main_chain << ", m_already_exists=" << bvc.m_already_exists);
+    LOG_PRINT_L0("Damaged PoS miner signature: block=" << get_block_hash(blk)
+      << ", m_verification_failed=" << bvc.m_verification_failed
+      << ", m_added_to_main_chain=" << bvc.m_added_to_main_chain
+      << ", m_already_exists=" << bvc.m_already_exists);
+    return true;
+  }
+  if (event_idx == m_healthy_block_index)
+  {
+    CHECK_AND_ASSERT_MES(bvc.m_added_to_main_chain && !bvc.m_verification_failed && !bvc.m_already_exists, false,
+      "healthy PoS block was not accepted after the damaged copy: m_added_to_main_chain=" << bvc.m_added_to_main_chain
+      << ", m_verification_failed=" << bvc.m_verification_failed << ", m_already_exists=" << bvc.m_already_exists);
+    LOG_PRINT_L0("Healthy PoS block resend: block=" << get_block_hash(blk)
+      << ", m_added_to_main_chain=" << bvc.m_added_to_main_chain
+      << ", m_verification_failed=" << bvc.m_verification_failed
+      << ", m_already_exists=" << bvc.m_already_exists);
+    return true;
+  }
+  return test_chain_unit_enchanced::check_block_verification_context(bvc, event_idx, blk);
+}
+
+bool gen_pos_miner_sig_bad_then_legit::generate(std::vector<test_event_entry>& events) const
+{
+  // A damaged PoS miner signature must not reserve the healthy block id
+  GENERATE_ACCOUNT(miner_acc);
+  std::list<currency::account_base> coin_stake_sources{miner_acc};
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  DO_CALLBACK(events, "configure_core");
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 11);
+
+  MAKE_NEXT_POS_BLOCK(events, healthy_blk, blk_0r, miner_acc, coin_stake_sources);
+  events.pop_back();
+  CHECK_AND_ASSERT_MES(healthy_blk.miner_tx.signatures.size() == 1 &&
+    healthy_blk.miner_tx.signatures.front().type() == typeid(zarcanum_sig), false,
+    "expected an HF4 Zarcanum signature in the PoS miner transaction");
+
+  block damaged_blk = healthy_blk;
+  boost::get<zarcanum_sig>(damaged_blk.miner_tx.signatures.front()).y0 += crypto::scalar_t(1);
+  CHECK_AND_ASSERT_MES(get_block_hash(damaged_blk) == get_block_hash(healthy_blk), false,
+    "changing the miner signature must not change the block hash");
+  const blobdata damaged_blob = block_to_blob(damaged_blk);
+  const blobdata healthy_blob = block_to_blob(healthy_blk);
+  CHECK_AND_ASSERT_MES(damaged_blob.size() == healthy_blob.size() && damaged_blob != healthy_blob, false,
+    "damaged and healthy blocks must differ only in content, not serialized size");
+
+  DO_CALLBACK(events, "mark_invalid_block");
+  events.push_back(damaged_blk);
+  DO_CALLBACK(events, "mark_healthy_pos_block");
+  events.push_back(healthy_blk);
+
+  return true;
+}
+
+gen_pos_miner_proof_bad_reorg_invalidates_hash::gen_pos_miner_proof_bad_reorg_invalidates_hash()
+  : m_healthy_resend_index(std::numeric_limits<size_t>::max())
+  , m_healthy_child_index(std::numeric_limits<size_t>::max())
+  , m_tip_before_reorg(null_hash)
+{
+  REGISTER_CALLBACK_METHOD(gen_pos_miner_proof_bad_reorg_invalidates_hash, check_bad_alt_block);
+  REGISTER_CALLBACK_METHOD(gen_pos_miner_proof_bad_reorg_invalidates_hash, mark_healthy_resend);
+  REGISTER_CALLBACK_METHOD(gen_pos_miner_proof_bad_reorg_invalidates_hash, mark_healthy_child);
+}
+
+bool gen_pos_miner_proof_bad_reorg_invalidates_hash::check_bad_alt_block(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  CHECK_AND_ASSERT_MES(ev_index > 0, false, "missing damaged alternative PoS block event");
+  const block* bad_blk = boost::get<block>(&events[ev_index - 1]);
+  CHECK_AND_ASSERT_MES(bad_blk, false, "previous event is not the damaged alternative PoS block");
+  const crypto::hash id = get_block_hash(*bad_blk);
+  CHECK_AND_ASSERT_MES(c.get_blockchain_storage().have_block_alt(id), false,
+    "damaged PoS miner proof block was not accepted into the alternative chain");
+  m_tip_before_reorg = c.get_tail_id();
+  LOG_PRINT_L0("Damaged miner proof block on alt chain: block=" << id << ", have_block_alt=1");
+  return true;
+}
+
+bool gen_pos_miner_proof_bad_reorg_invalidates_hash::mark_healthy_resend(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  CHECK_AND_ASSERT_MES(ev_index + 1 < events.size(), false, "missing healthy PoS block resend event");
+  const block* healthy_blk = boost::get<block>(&events[ev_index + 1]);
+  CHECK_AND_ASSERT_MES(healthy_blk, false, "healthy PoS block resend event is not a block");
+  const crypto::hash id = get_block_hash(*healthy_blk);
+  block found_blk{};
+  CHECK_AND_ASSERT_MES(!c.have_block(id) && !c.get_blockchain_storage().get_block_by_hash(id, found_blk), false,
+    "damaged miner proof block still reserves consensus block id " << id);
+  CHECK_AND_ASSERT_MES(c.get_tail_id() == m_tip_before_reorg, false,
+    "failed alternative chain switch did not restore the original chain tip");
+  LOG_PRINT_L0("Damaged miner proof block rejected: block=" << id
+    << ", have_block=0, in_main_or_alt=0, tip_restored=1");
+  m_healthy_resend_index = ev_index + 1;
+  return true;
+}
+
+bool gen_pos_miner_proof_bad_reorg_invalidates_hash::mark_healthy_child(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  CHECK_AND_ASSERT_MES(ev_index + 1 < events.size(), false, "missing healthy child block event");
+  const block* healthy_child = boost::get<block>(&events[ev_index + 1]);
+  CHECK_AND_ASSERT_MES(healthy_child && c.get_blockchain_storage().have_block_alt(healthy_child->prev_id), false,
+    "healthy parent was not accepted into the alternative chain");
+  m_healthy_child_index = ev_index + 1;
+  return true;
+}
+
+bool gen_pos_miner_proof_bad_reorg_invalidates_hash::check_block_verification_context(const currency::block_verification_context& bvc, size_t event_idx, const currency::block& blk)
+{
+  if (event_idx == m_invalid_block_index)
+  {
+    CHECK_AND_ASSERT_MES(bvc.m_verification_failed && !bvc.m_added_to_main_chain && !bvc.m_already_exists, false,
+      "alternative chain switch with the damaged miner proof did not fail as expected");
+    LOG_PRINT_L0("Reorg rejected damaged miner proof block: block=" << get_block_hash(blk)
+      << ", m_verification_failed=" << bvc.m_verification_failed
+      << ", m_added_to_main_chain=" << bvc.m_added_to_main_chain);
+    return true;
+  }
+  if (event_idx == m_healthy_resend_index)
+  {
+    CHECK_AND_ASSERT_MES(!bvc.m_already_exists && bvc.m_added_to_altchain && !bvc.m_verification_failed, false,
+      "healthy PoS block was not accepted into the alternative chain: m_already_exists="
+      << bvc.m_already_exists << ", m_added_to_altchain=" << bvc.m_added_to_altchain
+      << ", m_verification_failed=" << bvc.m_verification_failed);
+    LOG_PRINT_L0("Healthy PoS block after invalidated proof: block=" << get_block_hash(blk)
+      << ", m_already_exists=" << bvc.m_already_exists
+      << ", m_added_to_altchain=" << bvc.m_added_to_altchain);
+    return true;
+  }
+  if (event_idx == m_healthy_child_index)
+  {
+    CHECK_AND_ASSERT_MES(bvc.m_added_to_main_chain && !bvc.m_already_exists && !bvc.m_verification_failed, false,
+      "healthy child was not accepted after the corrected parent: m_added_to_main_chain=" << bvc.m_added_to_main_chain
+      << ", m_already_exists=" << bvc.m_already_exists << ", m_verification_failed=" << bvc.m_verification_failed);
+    LOG_PRINT_L0("Healthy child after corrected PoS parent: block=" << get_block_hash(blk)
+      << ", m_added_to_main_chain=" << bvc.m_added_to_main_chain);
+    return true;
+  }
+  return test_chain_unit_enchanced::check_block_verification_context(bvc, event_idx, blk);
+}
+
+bool gen_pos_miner_proof_bad_reorg_invalidates_hash::generate(std::vector<test_event_entry>& events) const
+{
+  // A failed reorg must not reject the healthy parent or its child
+  GENERATE_ACCOUNT(miner_acc);
+  std::list<currency::account_base> coin_stake_sources{miner_acc};
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  DO_CALLBACK(events, "configure_core");
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 11);
+
+  MAKE_NEXT_BLOCK(events, main_pow, blk_0r, miner_acc);
+  MAKE_NEXT_POS_BLOCK(events, healthy_alt, blk_0r, miner_acc, coin_stake_sources);
+  const size_t alt_event_index = events.size() - 1;
+  CHECK_AND_ASSERT_MES(healthy_alt.miner_tx.proofs.size() == 3 &&
+    healthy_alt.miner_tx.proofs[2].type() == typeid(zc_balance_proof), false,
+    "expected an HF4 balance proof in the PoS miner transaction");
+
+  block bad_alt = healthy_alt;
+  boost::get<zc_balance_proof>(bad_alt.miner_tx.proofs[2]).dss.y0 += crypto::scalar_t(1);
+  CHECK_AND_ASSERT_MES(get_transaction_hash(bad_alt.miner_tx) == get_transaction_hash(healthy_alt.miner_tx) &&
+    get_block_hash(bad_alt) == get_block_hash(healthy_alt), false,
+    "changing the miner balance proof must not change the transaction or block hash");
+  const blobdata bad_blob = block_to_blob(bad_alt);
+  const blobdata healthy_blob = block_to_blob(healthy_alt);
+  CHECK_AND_ASSERT_MES(bad_blob.size() == healthy_blob.size() && bad_blob != healthy_blob, false,
+    "damaged and healthy PoS block blobs must have the same size but different content");
+
+  DO_CALLBACK(events, "check_bad_alt_block");
+  MAKE_NEXT_BLOCK(events, alt_pow_child, healthy_alt, miner_acc);
+  events.pop_back();
+  CHECK_AND_ASSERT_MES(alt_pow_child.prev_id == get_block_hash(bad_alt), false,
+    "alternative child does not point to the damaged PoS block's hash");
+  DO_CALLBACK(events, "mark_invalid_block");
+  events.push_back(alt_pow_child);
+  DO_CALLBACK(events, "mark_healthy_resend");
+  events.push_back(healthy_alt);
+  DO_CALLBACK(events, "mark_healthy_child");
+  events.push_back(alt_pow_child);
+  // Build the child from a valid template, then replay the damaged parent
+  events[alt_event_index] = bad_alt;
+
+  return true;
+}

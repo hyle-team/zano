@@ -619,7 +619,7 @@ namespace currency
 
 
     mutable epee::critical_section m_invalid_blocks_lock;
-    blocks_ext_by_hash m_invalid_blocks;     // crypto::hash -> block_extended_info
+    blocks_ext_by_hash m_invalid_blocks;     // block_raw_bundle_hash -> block_extended_info
     mutable epee::critical_section m_alternative_chains_lock;
     alt_chain_container m_alternative_chains; // crypto::hash -> alt_block_extended_info
     std::unordered_map<crypto::hash, size_t> m_alternative_chains_txs; // tx_id -> how many alt blocks it related to (always >= 1)
@@ -671,7 +671,7 @@ namespace currency
     bool purge_transaction_keyimages_from_blockchain(const transaction& tx, bool strict_check);
     wide_difficulty_type get_next_difficulty_for_alternative_chain(const alt_chain_type& alt_chain, block_extended_info& bei, bool pos) const;
     bool handle_block_to_main_chain(const block& bl, block_verification_context& bvc);
-    bool handle_block_to_main_chain(const block& bl, const crypto::hash& id, block_verification_context& bvc);
+    bool handle_block_to_main_chain(const block& bl, const crypto::hash& id, block_verification_context& bvc, const crypto::hash* block_raw_bundle_hash = nullptr);
     std::string print_alt_chain(alt_chain_type alt_chain);
     bool handle_alternative_block(const block& b, const crypto::hash& id, block_verification_context& bvc);
     bool is_reorganize_required(const block_extended_info& main_chain_bei, const alt_chain_type& alt_chain, const crypto::hash& proof_alt);
@@ -712,8 +712,9 @@ namespace currency
     bool add_out_to_get_random_outs(COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount& result_outs, uint64_t amount, size_t i, uint64_t mix_count, bool use_only_forced_to_mix = false, uint64_t height_upper_limit = 0) const;
     bool get_target_outs_for_amount_prezarcanum(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::request& req, const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::offsets_distribution& details, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount& result_outs, std::map<uint64_t, uint64_t>& amounts_to_up_index_limit_cache) const;
     bool get_target_outs_for_postzarcanum(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::request& req, const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::offsets_distribution& details, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount& result_outs, std::map<uint64_t, uint64_t>& amounts_to_up_index_limit_cache) const;
-    bool add_block_as_invalid(const block& bl, const crypto::hash& h);
-    bool add_block_as_invalid(const block_extended_info& bei, const crypto::hash& h);
+    bool get_block_raw_bundle_hash(const block& bl, const transactions_map& onboard_transactions, crypto::hash& block_raw_bundle_hash) const;
+    bool add_block_as_invalid(const block& bl, const crypto::hash& block_id, const crypto::hash& block_raw_bundle_hash);
+    bool add_block_as_invalid(const block_extended_info& bei, const crypto::hash& block_id, const crypto::hash& block_raw_bundle_hash);
     size_t find_end_of_allowed_index(uint64_t amount)const;
     bool check_block_timestamp_main(const block& b)const;
     bool check_block_timestamp(std::vector<uint64_t> timestamps, const block& b)const;
