@@ -1293,6 +1293,11 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY_HF(gen_block_is_too_big, "0,3");
     GENERATE_AND_PLAY_HF(gen_block_wrong_version_agains_hardfork, "0,3");
     GENERATE_AND_PLAY_HF(block_choice_rule_bigger_fee, "4-*"); 
+    GENERATE_AND_PLAY(gen_block_sig_bad_poisons_block_hash);
+    GENERATE_AND_PLAY(gen_block_hash_bad_orphans_honest_child);
+    GENERATE_AND_PLAY(gen_block_hash_bad_blocks_legit_resend);
+    GENERATE_AND_PLAY_HF(gen_pos_miner_sig_bad_then_legit, "4-*");
+    GENERATE_AND_PLAY_HF(gen_pos_miner_proof_bad_reorg_invalidates_hash, "4-*");
     //GENERATE_AND_PLAY(gen_block_invalid_binary_format); // Takes up to 3 hours, if CURRENCY_MINED_MONEY_UNLOCK_WINDOW == 500, up to 30 minutes, if CURRENCY_MINED_MONEY_UNLOCK_WINDOW == 10
 
 
@@ -1318,6 +1323,7 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY(gen_tx_output_with_zero_amount);
     GENERATE_AND_PLAY(gen_tx_output_is_not_txout_to_key);
     GENERATE_AND_PLAY(gen_tx_signatures_are_invalid);
+    GENERATE_AND_PLAY(gen_tx_hash_bad_standalone_then_legit);
     GENERATE_AND_PLAY(gen_tx_extra_double_entry);
     GENERATE_AND_PLAY(gen_tx_double_key_image);
     GENERATE_AND_PLAY(tx_expiration_time);
@@ -1330,6 +1336,7 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY_HF(tx_pool_semantic_validation, "3");
     GENERATE_AND_PLAY(input_refers_to_incompatible_by_type_output);
     GENERATE_AND_PLAY_HF(tx_pool_validation_and_chain_switch, "4-5");
+    GENERATE_AND_PLAY_HF(gen_tx_hash_bad_bypasses_pool_revalidation, "4-*");
     GENERATE_AND_PLAY_HF(tx_coinbase_separate_sig_flag, "4-*");
     GENERATE_AND_PLAY(tx_input_mixins);
 

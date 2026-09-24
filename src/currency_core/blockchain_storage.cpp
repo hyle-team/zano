@@ -926,7 +926,7 @@ bool blockchain_storage::clear()
 
   {
     CRITICAL_REGION_LOCAL(m_invalid_blocks_lock);
-    m_invalid_blocks.clear();     // crypto::hash -> block_extended_info
+    m_invalid_blocks.clear();     // block_raw_bundle_hash -> block_extended_info
   }
   {
     CRITICAL_REGION_LOCAL(m_alternative_chains_lock);
@@ -1464,9 +1464,13 @@ bool blockchain_storage::switch_to_alternative_blockchain(alt_chain_type& alt_ch
       rollback_blockchain_switching(disconnected_chain, split_height);
       LOG_PRINT_L0("The block was inserted as invalid while connecting new alternative chain,  block_id: " << get_block_hash(ch_ent->second.bl));
 
+      // descendants can be retried after a corrected copy of the failed block arrives
+      crypto::hash block_raw_bundle_hash = null_hash;
+      const auto& failed_alt_block = (*alt_ch_iter)->second;
+      if (get_block_raw_bundle_hash(failed_alt_block.bl, failed_alt_block.onboard_transactions, block_raw_bundle_hash))
+        add_block_as_invalid(failed_alt_block, (*alt_ch_iter)->first, block_raw_bundle_hash);
       for(; alt_ch_iter != alt_chain.end(); ++alt_ch_iter)
       {
-        add_block_as_invalid((*alt_ch_iter)->second, (*alt_ch_iter)->first);
         do_erase_altblock(*alt_ch_iter);
       }
       CHECK_AND_ASSERT_MES(validate_blockchain_prev_links(), false, "EPIC FAIL!");
@@ -2399,18 +2403,7 @@ bool blockchain_storage::handle_alternative_block(const block& b, const crypto::
     //block orphaned
     bvc.m_marked_as_orphaned = true;
 
-    if (m_invalid_blocks.count(id) != 0)
-    {
-      LOG_PRINT_RED_L0("Block recognized as blacklisted and rejected, id = " << id << "," << ENDL << "parent id = " << b.prev_id << ENDL << "height = " << coinbase_height);
-    }
-    else if (m_invalid_blocks.count(b.prev_id) != 0)
-    {
-      LOG_PRINT_RED_L0("Block recognized as orphaned (parent " << b.prev_id << " is in blacklist) and rejected, id = " << id << "," << ENDL << "parent id = " << b.prev_id << ENDL << "height = " << coinbase_height);
-    }
-    else
-    {
-      LOG_PRINT_RED_L0("Block recognized as orphaned and rejected, id = " << id << "," << ENDL << "parent id = " << b.prev_id << ENDL << "height = " << coinbase_height);
-    }
+    LOG_PRINT_RED_L0("Block recognized as orphaned and rejected, id = " << id << "," << ENDL << "parent id = " << b.prev_id << ENDL << "height = " << coinbase_height);
   }
   
   CHECK_AND_ASSERT_MES(validate_blockchain_prev_links(), false, "EPIC FAIL!");
@@ -4183,20 +4176,47 @@ bool blockchain_storage::find_blockchain_supplement(const std::list<crypto::hash
   return true;
 }
 //------------------------------------------------------------------
-bool blockchain_storage::add_block_as_invalid(const block& bl, const crypto::hash& h)
+bool blockchain_storage::get_block_raw_bundle_hash(const block& bl, const transactions_map& onboard_transactions, crypto::hash& block_raw_bundle_hash) const
+{
+  CRITICAL_REGION_LOCAL(m_read_lock);
+  blobdata bundle = block_to_blob(bl);
+  for (const crypto::hash& tx_id : bl.tx_hashes)
+  {
+    transaction tx = AUTO_VAL_INIT(tx);
+    auto onboard_it = onboard_transactions.find(tx_id);
+    if (onboard_it != onboard_transactions.end())
+      tx = onboard_it->second;
+    else if (!m_tx_pool.get_transaction(tx_id, tx))
+    {
+      auto tx_ptr = m_db_transactions.find(tx_id);
+      if (!tx_ptr)
+        return false; // the complete block content is not available yet
+      tx = tx_ptr->tx;
+    }
+    CHECK_AND_ASSERT_MES(get_transaction_hash(tx) == tx_id, false, "block contains a transaction with a mismatched id: " << tx_id);
+    const crypto::hash tx_raw_hash = get_object_hash(tx);
+    epst::append_pod_to_strbuff(tx_raw_hash, bundle);
+  }
+  block_raw_bundle_hash = get_blob_hash(bundle);
+  return true;
+}
+//------------------------------------------------------------------
+bool blockchain_storage::add_block_as_invalid(const block& bl, const crypto::hash& block_id, const crypto::hash& block_raw_bundle_hash)
 {
   block_extended_info bei = AUTO_VAL_INIT(bei);
   bei.bl = bl;
-  return add_block_as_invalid(bei, h);
+  return add_block_as_invalid(bei, block_id, block_raw_bundle_hash);
 }
 //------------------------------------------------------------------
-bool blockchain_storage::add_block_as_invalid(const block_extended_info& bei, const crypto::hash& h)
+bool blockchain_storage::add_block_as_invalid(const block_extended_info& bei, const crypto::hash& block_id, const crypto::hash& block_raw_bundle_hash)
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
   CRITICAL_REGION_LOCAL1(m_invalid_blocks_lock);
-  auto i_res = m_invalid_blocks.insert(std::map<crypto::hash, block_extended_info>::value_type(h, bei));
-  CHECK_AND_ASSERT_MES(i_res.second, false, "at insertion invalid by tx returned status existed");
-  LOG_PRINT_L0("BLOCK ADDED AS INVALID: " << h << ENDL << ", prev_id=" << bei.bl.prev_id << ", m_invalid_blocks count=" << m_invalid_blocks.size());
+  auto i_res = m_invalid_blocks.emplace(block_raw_bundle_hash, bei);
+  if (!i_res.second)
+    return true;
+  LOG_PRINT_L0("BLOCK ADDED AS INVALID: block_id=" << block_id << ", block_raw_bundle_hash=" << block_raw_bundle_hash
+    << ENDL << ", prev_id=" << bei.bl.prev_id << ", m_invalid_blocks count=" << m_invalid_blocks.size());
   CHECK_AND_ASSERT_MES(validate_blockchain_prev_links(), false, "EPIC FAIL!");
   return true;
 }
@@ -4234,12 +4254,6 @@ bool blockchain_storage::have_block(const crypto::hash& id)const
 
   /*if(m_orphaned_by_tx.count(id))
     return true;*/
-  {
-    CRITICAL_REGION_LOCAL1(m_invalid_blocks_lock);
-    if (m_invalid_blocks.count(id))
-      return true;
-  }
-
   return false;
 }
 //------------------------------------------------------------------
@@ -7809,11 +7823,14 @@ bool get_tx_from_cache(const crypto::hash& tx_id, transactions_map& tx_cache, tr
   return true;
 }
 //------------------------------------------------------------------
-bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypto::hash& id, block_verification_context& bvc)
+bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypto::hash& id, block_verification_context& bvc, const crypto::hash* known_block_raw_bundle_hash)
 {
   TIME_MEASURE_START_PD_MS(block_processing_time_0_ms);
   CRITICAL_REGION_LOCAL(m_read_lock);
   TIME_MEASURE_START_PD(block_processing_time_1);
+
+  crypto::hash block_raw_bundle_hash = known_block_raw_bundle_hash ? *known_block_raw_bundle_hash : null_hash;
+  const bool have_raw_bundle_hash = known_block_raw_bundle_hash || get_block_raw_bundle_hash(bl, bvc.m_onboard_transactions, block_raw_bundle_hash);
 
   uint64_t height = get_current_blockchain_size(); // height <-> block height correspondence is validated in prevalidate_miner_transaction()
 
@@ -7958,7 +7975,7 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
     uint64_t fee = 0;
 
     bool taken_from_cache = get_tx_from_cache(tx_id, bvc.m_onboard_transactions, tx, blob_size, fee);
-    bool taken_from_pool = m_tx_pool.take_tx(tx_id, tx, blob_size, fee);
+    bool taken_from_pool = !taken_from_cache && m_tx_pool.take_tx(tx_id, tx, blob_size, fee);
     if(!taken_from_cache && !taken_from_pool)
     {
       LOG_PRINT_L0("Block with id: " << id  << " has at least one unknown transaction with id: " << tx_id);
@@ -7991,7 +8008,8 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
     if (!m_is_in_checkpoint_zone)
     {
       auto cleanup = [&](){ 
-        m_tx_pool.add_tx(tx, tvc, true, true);
+        if (!m_tx_pool.have_tx(tx_id))
+          m_tx_pool.add_tx(tx, tvc, true, true);
         m_tx_pool.add_transaction_to_black_list(tx);
         purge_block_data_from_blockchain(bl, tx_processed_count); 
         bvc.m_verification_failed = true; 
@@ -8024,8 +8042,9 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
         CHECK_AND_ASSERT_MES_NO_RET(add_res, "handle_block_to_main_chain: failed to add transaction back to transaction pool");
       }
       purge_block_data_from_blockchain(bl, tx_processed_count);
-      add_block_as_invalid(bl, id);
-      LOG_PRINT_L0("Block with id " << id << " added as invalid because of wrong inputs in transactions");
+      if (have_raw_bundle_hash)
+        add_block_as_invalid(bl, id, block_raw_bundle_hash);
+      LOG_PRINT_L0("Block with id " << id << " rejected because of wrong inputs in transactions");
       bvc.m_verification_failed = true;
       return false;
     }
@@ -8052,6 +8071,13 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
        purge_block_data_from_blockchain(bl, tx_processed_count);
        bvc.m_verification_failed = true;
        return false;
+    }
+    if (taken_from_cache)
+    {
+      transaction pooled_tx = AUTO_VAL_INIT(pooled_tx);
+      size_t pooled_blob_size = 0;
+      uint64_t pooled_fee = 0;
+      m_tx_pool.take_tx(tx_id, pooled_tx, pooled_blob_size, pooled_fee);
     }
     TIME_MEASURE_FINISH_PD(tx_append_time);
     //LOG_PRINT_L0("APPEND_TX_TIME: " << m_performance_data.tx_append_time.get_last_val());
@@ -8084,8 +8110,9 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
     if (!r)
     {
       purge_block_data_from_blockchain(bl, tx_processed_count);
-      add_block_as_invalid(bl, id);
-      LOG_PRINT_RED_L0("Block with id " << id << " added as invalid because of missing etc_coinbase_block_cumulative_size in coinbase extra under ZANO_HARDFORK_06");
+      if (have_raw_bundle_hash)
+        add_block_as_invalid(bl, id, block_raw_bundle_hash);
+      LOG_PRINT_RED_L0("Block with id " << id << " rejected because of missing etc_coinbase_block_cumulative_size in coinbase extra under ZANO_HARDFORK_06");
       bvc.m_verification_failed = true;
       return false;
     }
@@ -8100,8 +8127,9 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
       if (cumulative_block_size != ecbs.v)
       {
         purge_block_data_from_blockchain(bl, tx_processed_count);
-        add_block_as_invalid(bl, id);
-        LOG_PRINT_RED_L0("Block with id " << id << " added as invalid because of missmatch of cumulative_block_size(" << cumulative_block_size << ") and etc_coinbase_block_cumulative_size(" << ecbs.v << ") in coinbase extra under ZANO_HARDFORK_06");
+        if (have_raw_bundle_hash)
+          add_block_as_invalid(bl, id, block_raw_bundle_hash);
+        LOG_PRINT_RED_L0("Block with id " << id << " rejected because of missmatch of cumulative_block_size(" << cumulative_block_size << ") and etc_coinbase_block_cumulative_size(" << ecbs.v << ") in coinbase extra under ZANO_HARDFORK_06");
         bvc.m_verification_failed = true;
         return false;
       }
@@ -8538,6 +8566,24 @@ bool blockchain_storage::add_new_block(const block& bl, block_verification_conte
       return false;
     }
 
+    crypto::hash block_raw_bundle_hash = null_hash;
+    const bool have_raw_bundle_hash = get_block_raw_bundle_hash(bl, bvc.m_onboard_transactions, block_raw_bundle_hash);
+    if (have_raw_bundle_hash)
+    {
+      bool already_invalid = false;
+      {
+        CRITICAL_REGION_LOCAL(m_invalid_blocks_lock);
+        already_invalid = m_invalid_blocks.count(block_raw_bundle_hash) != 0;
+      }
+      if (already_invalid)
+      {
+        LOG_PRINT_L3("block with block_raw_bundle_hash = " << block_raw_bundle_hash << " already marked invalid");
+        bvc.m_already_exists = true;
+        db_tx_ptr->commit_transaction();
+        return false;
+      }
+    }
+
     if (!prevalidate_block(bl))
     {
       LOG_PRINT_RED_L0("block with id = " << id << " failed to prevalidate");
@@ -8569,7 +8615,7 @@ bool blockchain_storage::add_new_block(const block& bl, block_verification_conte
     }
 
 
-    bool res = handle_block_to_main_chain(bl, id, bvc);
+    bool res = handle_block_to_main_chain(bl, id, bvc, have_raw_bundle_hash ? &block_raw_bundle_hash : nullptr);
     if (bvc.m_verification_failed || !res)
     {
       db_tx_ptr->abort_transaction();
