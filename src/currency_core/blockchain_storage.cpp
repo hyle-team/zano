@@ -317,6 +317,7 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
   remove_old_db(old_db_folder_path);
   remove_old_db(dbbs.get_db_folder_path_old_1());
   remove_old_db(dbbs.get_db_folder_path_old_2());
+  remove_old_db(dbbs.get_db_folder_path_old_3());
 
   const std::string db_folder_path = dbbs.get_db_folder_path();
   LOG_PRINT_L0("Loading blockchain from " << db_folder_path);
