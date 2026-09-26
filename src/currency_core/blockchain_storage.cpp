@@ -112,6 +112,7 @@ blockchain_storage::blockchain_storage(tx_memory_pool& tx_pool) :m_db(nullptr, m
                                                                  m_tx_pool(tx_pool), 
                                                                  m_is_in_checkpoint_zone(false), 
                                                                  m_is_blockchain_storing(false), 
+                                                                 m_is_irreverseble_prunning_on(false),
                                                                  m_core_runtime_config(get_default_core_runtime_config()),
                                                                  //m_bei_stub(AUTO_VAL_INIT(m_bei_stub)),
                                                                  m_event_handler(&m_event_handler_stub), 
@@ -317,6 +318,7 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
   remove_old_db(old_db_folder_path);
   remove_old_db(dbbs.get_db_folder_path_old_1());
   remove_old_db(dbbs.get_db_folder_path_old_2());
+  remove_old_db(dbbs.get_db_folder_path_old_3());
 
   const std::string db_folder_path = dbbs.get_db_folder_path();
   LOG_PRINT_L0("Loading blockchain from " << db_folder_path);
@@ -576,7 +578,13 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
           LOG_PRINT_L0("The most recent hardfork id in the DB is " << m_db_most_recent_hardfork_id << " while according to the code, the top block must belong to the hardfork " <<
             current_hardfork_id << ". Most likely recent blocks are alternative and invalid for the current hardfork, thus we truncate the blockchain, so that block " <<
             height_right_before_hardfork_activation << " becomes new top block...");
-          truncate_blockchain(height_right_before_hardfork_activation + 1);
+          
+          m_is_irreverseble_prunning_on = true;
+          {
+            auto a = epee::misc_utils::create_scope_leave_handler([&]()
+                 { m_is_irreverseble_prunning_on = false; });
+            truncate_blockchain(height_right_before_hardfork_activation + 1);
+          }
         }
       }
 
@@ -634,6 +642,25 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
     CHECK_AND_ASSERT_MES(!bvc.m_verification_failed, false, "Failed to add genesis block to blockchain");
     LOG_PRINT_MAGENTA("Storage initialized with genesis", LOG_LEVEL_0);
   } 
+
+  // check last hardfork activation compliance (in case of emergency hardfork)
+  if(m_db_blocks.size() > m_core_runtime_config.hard_forks.m_height_the_hardfork_n_active_after[ZANO_ACTIVE_HARDFORKS_TOTAL - 1] + 1)
+  {
+    auto block_ptr = m_db_blocks[m_core_runtime_config.hard_forks.m_height_the_hardfork_n_active_after[ZANO_ACTIVE_HARDFORKS_TOTAL - 1] + 1];
+    if(block_ptr->bl.miner_tx.hardfork_id != ZANO_ACTIVE_HARDFORKS_TOTAL - 1)
+    {
+      LOG_PRINT_RED_L0("The blockchain is not compliant with the most recent hardfork " << ZANO_ACTIVE_HARDFORKS_TOTAL - 1 << ", block " << m_core_runtime_config.hard_forks.m_height_the_hardfork_n_active_after[ZANO_ACTIVE_HARDFORKS_TOTAL - 1] + 1 << " has hardfork_id " << block_ptr->bl.miner_tx.hardfork_id);
+      LOG_PRINT_L0("Truncating blockchain to last compliant block " << m_core_runtime_config.hard_forks.m_height_the_hardfork_n_active_after[ZANO_ACTIVE_HARDFORKS_TOTAL - 1] << "...");
+      m_is_irreverseble_prunning_on = true;
+      {
+        auto a = epee::misc_utils::create_scope_leave_handler([&]()
+                                                              { m_is_irreverseble_prunning_on = false; });
+        truncate_blockchain(m_core_runtime_config.hard_forks.m_height_the_hardfork_n_active_after[ZANO_ACTIVE_HARDFORKS_TOTAL - 1] + 1);
+      }
+      LOG_PRINT_L0("Blockchain truncated to last compliant block " << m_core_runtime_config.hard_forks.m_height_the_hardfork_n_active_after[ZANO_ACTIVE_HARDFORKS_TOTAL - 1]);
+    }
+  }
+
 
   store_db_solo_options_values();
 
@@ -1090,7 +1117,7 @@ bool blockchain_storage::purge_transaction_from_blockchain(const crypto::hash& t
   CHECK_AND_ASSERT_MES(r, false, "failed to unprocess_blockchain_tx_extra for tx " << tx_id);
 
   bool added_to_the_pool = false;
-  if(!is_coinbase(tx))
+  if(!m_is_irreverseble_prunning_on && !is_coinbase(tx))
   {
     currency::tx_verification_context tvc = AUTO_VAL_INIT(tvc);
     added_to_the_pool = m_tx_pool.add_tx(tx, tvc, true, true);
@@ -8624,10 +8651,19 @@ bool blockchain_storage::truncate_blockchain(uint64_t to_blockchain_size)
 {
   auto db_tx_ptr = m_db.begin_transaction_obj();
   uint64_t inital_blockchain_size = get_current_blockchain_size();
+  uint64_t blocks_to_pop = inital_blockchain_size > to_blockchain_size ? inital_blockchain_size - to_blockchain_size : 0;
+  uint64_t ticks_last_print = epee::misc_utils::get_tick_count();
   while (get_current_blockchain_size() > to_blockchain_size)
   {
     transactions_map ot;
     pop_block_from_blockchain(ot);
+
+    if (epee::misc_utils::get_tick_count() - ticks_last_print > 1000)
+    {
+      ticks_last_print = epee::misc_utils::get_tick_count();
+      uint64_t blocks_popped = inital_blockchain_size - get_current_blockchain_size();
+      std::cout << "Truncating blockchain: " << blocks_popped << " of " << blocks_to_pop << " blocks (" << (blocks_popped * 100) / blocks_to_pop << "%)" << std::endl;
+    }
   }
   CRITICAL_REGION_LOCAL(m_alternative_chains_lock);
   m_alternative_chains.clear();
