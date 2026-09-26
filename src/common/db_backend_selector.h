@@ -36,6 +36,7 @@ namespace tools
 
       std::string get_db_folder_path_old_1() const;
       std::string get_db_folder_path_old_2() const;
+      std::string get_db_folder_path_old_3() const;
 
     private:
       db_engine_type m_engine_type;
