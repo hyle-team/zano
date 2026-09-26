@@ -650,7 +650,12 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
     {
       LOG_PRINT_RED_L0("The blockchain is not compliant with the most recent hardfork " << ZANO_ACTIVE_HARDFORKS_TOTAL - 1 << ", block " << m_core_runtime_config.hard_forks.m_height_the_hardfork_n_active_after[ZANO_ACTIVE_HARDFORKS_TOTAL - 1] + 1 << " has hardfork_id " << block_ptr->bl.miner_tx.hardfork_id);
       LOG_PRINT_L0("Truncating blockchain to last compliant block " << m_core_runtime_config.hard_forks.m_height_the_hardfork_n_active_after[ZANO_ACTIVE_HARDFORKS_TOTAL - 1] << "...");
-      truncate_blockchain(m_core_runtime_config.hard_forks.m_height_the_hardfork_n_active_after[ZANO_ACTIVE_HARDFORKS_TOTAL - 1]+1);
+      m_is_irreverseble_prunning_on = true;
+      {
+        auto a = epee::misc_utils::create_scope_leave_handler([&]()
+                                                              { m_is_irreverseble_prunning_on = false; });
+        truncate_blockchain(m_core_runtime_config.hard_forks.m_height_the_hardfork_n_active_after[ZANO_ACTIVE_HARDFORKS_TOTAL - 1] + 1);
+      }
       LOG_PRINT_L0("Blockchain truncated to last compliant block " << m_core_runtime_config.hard_forks.m_height_the_hardfork_n_active_after[ZANO_ACTIVE_HARDFORKS_TOTAL - 1]);
     }
   }
