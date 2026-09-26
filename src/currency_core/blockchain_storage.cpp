@@ -112,6 +112,7 @@ blockchain_storage::blockchain_storage(tx_memory_pool& tx_pool) :m_db(nullptr, m
                                                                  m_tx_pool(tx_pool), 
                                                                  m_is_in_checkpoint_zone(false), 
                                                                  m_is_blockchain_storing(false), 
+                                                                 m_is_irreverseble_prunning_on(false),
                                                                  m_core_runtime_config(get_default_core_runtime_config()),
                                                                  //m_bei_stub(AUTO_VAL_INIT(m_bei_stub)),
                                                                  m_event_handler(&m_event_handler_stub), 
