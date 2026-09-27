@@ -340,6 +340,13 @@ namespace currency
     CHECK_CORE_READY();
     CHECK_RPC_LIMITS(req.block_ids.size(), RPC_LIMIT_COMMAND_RPC_GET_BLOCKS_DIRECT_BLOCK_IDS);
 
+    if(!req.m_return_compact)
+    {
+      // if not compact than it's an old client, drop connection.
+      res.status = API_RETURN_CODE_FAIL;
+      return false;
+    }
+
     if (req.block_ids.empty())
     {
       res.status = API_RETURN_CODE_GENESIS_MISMATCH;
@@ -384,6 +391,13 @@ namespace currency
   {
     CHECK_CORE_READY();
     CHECK_RPC_LIMITS(req.block_ids.size(), RPC_LIMIT_COMMAND_RPC_GET_BLOCKS_DIRECT_BLOCK_IDS);
+    if (!req.m_return_compact)
+    {
+      // if not compact than it's an old client, drop connection.
+      res.status = API_RETURN_CODE_FAIL;
+      return false;
+    }
+
     LOG_PRINT_L2("[on_get_blocks]: Prevalidating....");
 
     res.current_height   = m_core.get_blockchain_storage().get_current_blockchain_size();
