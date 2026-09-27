@@ -372,6 +372,27 @@ namespace epee {
       LOG_PRINT("[HTTP/JSON][" << epee::string_tools::get_ip_string_from_int32(m_conn_context.m_remote_ip ) << "][" << query_info.m_URI << "] processed with " << ticks1-ticks << "/"<< ticks2-ticks1 << "/" << ticks3-ticks2 << "ms", LOG_LEVEL_2); \
     }
 
+/*
+#define MAP_URI_AUTO_BIN2_NO_ERROR_LOG(s_pattern, callback_f, command_type) \
+    else if(auto_doc<command_type, false>(s_pattern, "", false, docs) && query_info.m_URI == s_pattern) \
+    { \
+      call_found = true; \
+      uint64_t ticks = misc_utils::get_tick_count(); \
+      boost::value_initialized<command_type::request> req; \
+      bool res = epee::serialization::load_t_from_binary(static_cast<command_type::request&>(req), query_info.m_body); \
+      CHECK_AND_ASSERT_MES(res, false, "Failed to parse bin body data, body size=" << query_info.m_body.size()); \
+      uint64_t ticks1 = misc_utils::get_tick_count(); \
+      boost::value_initialized<command_type::response> resp;\
+      res = callback_f(static_cast<command_type::request&>(req), static_cast<command_type::response&>(resp), m_conn_context); \
+      if(!res) return false; \
+      uint64_t ticks2 = misc_utils::get_tick_count(); \
+      epee::serialization::store_t_to_binary(static_cast<command_type::response&>(resp), response_info.m_body); \
+      uint64_t ticks3 = epee::misc_utils::get_tick_count(); \
+      response_info.m_mime_tipe = " application/octet-stream"; \
+      response_info.m_header_info.m_content_type = " application/octet-stream"; \
+      LOG_PRINT( "[HTTP/BIN][" << epee::string_tools::get_ip_string_from_int32(m_conn_context.m_remote_ip ) << "][" << query_info.m_URI << "] processed with " << ticks1-ticks << "/"<< ticks2-ticks1 << "/" << ticks3-ticks2 << "ms", LOG_LEVEL_2); \
+    }
+*/
 
 #define MAP_URI_AUTO_BIN2(s_pattern, callback_f, command_type) \
     else if(auto_doc<command_type, false>(s_pattern, "", false, docs) && query_info.m_URI == s_pattern) \

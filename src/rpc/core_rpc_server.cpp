@@ -343,8 +343,8 @@ namespace currency
     if(!req.m_return_compact)
     {
       // if not compact than it's an old client, drop connection.
-      res.status = API_RETURN_CODE_FAIL;
-      return false;
+      res.status = API_RETURN_CODE_GENESIS_MISMATCH;
+      return true;
     }
 
     if (req.block_ids.empty())
@@ -394,8 +394,8 @@ namespace currency
     if (!req.m_return_compact)
     {
       // if not compact than it's an old client, drop connection.
-      res.status = API_RETURN_CODE_FAIL;
-      return false;
+      res.status = API_RETURN_CODE_GENESIS_MISMATCH;
+      return true;
     }
 
     LOG_PRINT_L2("[on_get_blocks]: Prevalidating....");
