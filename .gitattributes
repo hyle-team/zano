@@ -1,2 +1,7 @@
 .git* export-ignore
 /CMakeLists.txt export-subst
+
+# Line-ending normalization. Keep shell / CI files in LF so a CRLF working tree does not show them as wholesale-modified. Note: 'git add --renormalize .' to renormalize.
+*.yml   text eol=lf
+*.yaml  text eol=lf
+*.sh    text eol=lf

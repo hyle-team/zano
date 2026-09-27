@@ -282,6 +282,7 @@ jobs:
 
           {
             echo "PACKAGE_VERSION=$package_version"
+            echo "PKG_TAG=${GITHUB_REF_NAME//\//-}${network_suffix}-v${major}.${minor}.${revision}.${build_no}[${commit}]"
             echo "NETWORK_NAME=$network_name"
             echo "CLI_BASENAME=zano-linux-${{ matrix.arch }}-cli${network_suffix}-${package_version}"
             echo "GUI_BASENAME=zano-linux-${{ matrix.arch }}-gui${network_suffix}-${package_version}"
@@ -576,7 +577,7 @@ jobs:
       - name: Upload CLI package
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: zano-linux-${{ matrix.arch }}-cli${{ inputs.testnet == true && '-testnet' || '' }}
+          name: zano-linux-${{ matrix.arch }}-cli-${{ env.PKG_TAG }}
           path: dist-linux/zano-linux-${{ matrix.arch }}-cli*.tar.bz2
           if-no-files-found: error
           compression-level: 0
@@ -584,7 +585,7 @@ jobs:
       - name: Upload GUI AppImage
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: zano-linux-${{ matrix.arch }}-gui${{ inputs.testnet == true && '-testnet' || '' }}
+          name: zano-linux-${{ matrix.arch }}-gui-${{ env.PKG_TAG }}
           path: dist-linux/zano-linux-${{ matrix.arch }}-gui*.AppImage
           if-no-files-found: error
           compression-level: 0

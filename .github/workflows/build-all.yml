@@ -11,16 +11,32 @@ name: Build all platforms
 on:
   workflow_dispatch:
     inputs:
+      increment:
+        description: 'Increment build number'
+        type: boolean
+        default: true
       mainnet:
-        description: 'Build mainnet'
+        description: 'Mainnet'
         type: boolean
         default: true
       testnet:
-        description: 'Build testnet'
+        description: 'Testnet'
         type: boolean
         default: false
-      increment:
-        description: 'Increment build number'
+      windows:
+        description: 'Windows'
+        type: boolean
+        default: true
+      macos:
+        description: 'macOS'
+        type: boolean
+        default: true
+      linux:
+        description: 'Linux'
+        type: boolean
+        default: true
+      upload:
+        description: 'Upload to build.zano.org'
         type: boolean
         default: true
 
@@ -37,9 +53,16 @@ jobs:
         run: |
           mainnet='${{ inputs.mainnet }}'
           testnet='${{ inputs.testnet }}'
+          win='${{ inputs.windows }}'
+          mac='${{ inputs.macos }}'
+          lin='${{ inputs.linux }}'
 
           if [ "$mainnet" != "true" ] && [ "$testnet" != "true" ]; then
-            echo "::error title=Nothing to build::Tick 'Build mainnet', 'Build testnet', or both."
+            echo "::error title=No network selected::Tick 'Build mainnet', 'Build testnet', or both."
+            exit 1
+          fi
+          if [ "$win" != "true" ] && [ "$mac" != "true" ] && [ "$lin" != "true" ]; then
+            echo "::error title=No platform selected::Tick at least one of Windows, macOS, Linux."
             exit 1
           fi
 
@@ -52,8 +75,11 @@ jobs:
             echo
             echo "| Platform | mainnet | testnet |"
             echo "| --- | --- | --- |"
-            for platform in Linux macOS Windows; do
-              echo "| $platform | $([ "$mainnet" = "true" ] && echo 'yes' || echo '-') | $([ "$testnet" = "true" ] && echo 'yes' || echo '-') |"
+            for row in "Linux:$lin" "macOS:$mac" "Windows:$win"; do
+              name=${row%%:*}; sel=${row##*:}
+              mcell=$([ "$sel" = "true" ] && [ "$mainnet" = "true" ] && echo 'yes' || echo '-')
+              tcell=$([ "$sel" = "true" ] && [ "$testnet" = "true" ] && echo 'yes' || echo '-')
+              echo "| $name | $mcell | $tcell |"
             done
             echo
             if [ "${{ inputs.increment }}" = "true" ]; then
@@ -121,7 +147,7 @@ jobs:
   linux-mainnet:
     name: Linux (mainnet)
     needs: resolve-ref
-    if: ${{ !cancelled() && needs.resolve-ref.result == 'success' && inputs.mainnet == true }}
+    if: ${{ !cancelled() && needs.resolve-ref.result == 'success' && inputs.mainnet == true && inputs.linux == true }}
     uses: ./.github/workflows/build-linux.yml
     with:
       testnet: false
@@ -133,7 +159,7 @@ jobs:
   macos-mainnet:
     name: macOS (mainnet)
     needs: resolve-ref
-    if: ${{ !cancelled() && needs.resolve-ref.result == 'success' && inputs.mainnet == true }}
+    if: ${{ !cancelled() && needs.resolve-ref.result == 'success' && inputs.mainnet == true && inputs.macos == true }}
     uses: ./.github/workflows/build-macos.yml
     with:
       testnet: false
@@ -145,7 +171,7 @@ jobs:
   windows-mainnet:
     name: Windows (mainnet)
     needs: resolve-ref
-    if: ${{ !cancelled() && needs.resolve-ref.result == 'success' && inputs.mainnet == true }}
+    if: ${{ !cancelled() && needs.resolve-ref.result == 'success' && inputs.mainnet == true && inputs.windows == true }}
     uses: ./.github/workflows/build-windows.yml
     with:
       testnet: false
@@ -163,7 +189,7 @@ jobs:
   linux-testnet:
     name: Linux (testnet)
     needs: resolve-ref
-    if: ${{ !cancelled() && needs.resolve-ref.result == 'success' && inputs.testnet == true }}
+    if: ${{ !cancelled() && needs.resolve-ref.result == 'success' && inputs.testnet == true && inputs.linux == true }}
     uses: ./.github/workflows/build-linux.yml
     with:
       testnet: true
@@ -175,7 +201,7 @@ jobs:
   macos-testnet:
     name: macOS (testnet)
     needs: resolve-ref
-    if: ${{ !cancelled() && needs.resolve-ref.result == 'success' && inputs.testnet == true }}
+    if: ${{ !cancelled() && needs.resolve-ref.result == 'success' && inputs.testnet == true && inputs.macos == true }}
     uses: ./.github/workflows/build-macos.yml
     with:
       testnet: true
@@ -187,7 +213,7 @@ jobs:
   windows-testnet:
     name: Windows (testnet)
     needs: resolve-ref
-    if: ${{ !cancelled() && needs.resolve-ref.result == 'success' && inputs.testnet == true }}
+    if: ${{ !cancelled() && needs.resolve-ref.result == 'success' && inputs.testnet == true && inputs.windows == true }}
     uses: ./.github/workflows/build-windows.yml
     with:
       testnet: true
@@ -196,3 +222,91 @@ jobs:
       contents: read
       id-token: write
     secrets: inherit
+
+  # ---------------------------------------------------------------- publish ---
+  #
+  # Once the selected builds have succeeded, repackage their artifacts under
+  # Zano's public download names, upload them to the builds server, and print a
+  # manifest for a human to sign. One job per network, each depending only on
+  # its own builds, so a testnet failure never blocks the mainnet release and
+  # vice versa. resolve-ref is in `needs` only to read the built commit; the
+  # gate inspects the build jobs, and !cancelled() keeps the job from inheriting
+  # the skip when a network was not selected (the same trap the build gates avoid).
+
+  publish-mainnet:
+    name: Publish mainnet
+    needs: [resolve-ref, linux-mainnet, macos-mainnet, windows-mainnet]
+    if: ${{ !cancelled() && inputs.upload == true
+            && (needs.linux-mainnet.result == 'success' || needs.macos-mainnet.result == 'success' || needs.windows-mainnet.result == 'success')
+            && needs.linux-mainnet.result != 'failure'
+            && needs.macos-mainnet.result != 'failure'
+            && needs.windows-mainnet.result != 'failure' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    continue-on-error: true   # a server hiccup must not red-flag an otherwise good build
+    permissions:
+      contents: read
+      actions: read   # download-artifact needs to read this run's artifacts
+    steps:
+      - name: Checkout the built commit (publish script + version)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.resolve-ref.outputs.ref }}
+          submodules: false
+          fetch-depth: 1
+      - name: Resolve this network's artifact pattern
+        id: meta
+        run: echo "branch=${GITHUB_REF_NAME//\//-}" >> "$GITHUB_OUTPUT"
+      - name: Download mainnet artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          path: dl
+          pattern: '*-${{ steps.meta.outputs.branch }}-v*'
+      - name: Repackage, upload, and print the signing manifest
+        env:
+          NETWORK: mainnet
+          DL_DIR: dl
+          SSH_TARGET: ${{ secrets.ZANO_BUILDS_SSH_TARGET }}
+          SSH_KEY: ${{ secrets.ZANO_BUILDS_OPENSSH_KEY }}
+          SSH_PORT: ${{ secrets.ZANO_BUILDS_SSH_PORT }}
+          KNOWN_HOSTS: ${{ secrets.ZANO_BUILDS_KNOWN_HOSTS }}
+        run: bash utils/ci_upload_builds.sh
+
+  publish-testnet:
+    name: Publish testnet
+    needs: [resolve-ref, linux-testnet, macos-testnet, windows-testnet]
+    if: ${{ !cancelled() && inputs.upload == true
+            && (needs.linux-testnet.result == 'success' || needs.macos-testnet.result == 'success' || needs.windows-testnet.result == 'success')
+            && needs.linux-testnet.result != 'failure'
+            && needs.macos-testnet.result != 'failure'
+            && needs.windows-testnet.result != 'failure' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    continue-on-error: true   # a server hiccup must not red-flag an otherwise good build
+    permissions:
+      contents: read
+      actions: read   # download-artifact needs to read this run's artifacts
+    steps:
+      - name: Checkout the built commit (publish script + version)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.resolve-ref.outputs.ref }}
+          submodules: false
+          fetch-depth: 1
+      - name: Resolve this network's artifact pattern
+        id: meta
+        run: echo "branch=${GITHUB_REF_NAME//\//-}" >> "$GITHUB_OUTPUT"
+      - name: Download testnet artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          path: dl
+          pattern: '*-${{ steps.meta.outputs.branch }}-testnet-v*'
+      - name: Repackage, upload, and print the signing manifest
+        env:
+          NETWORK: testnet
+          DL_DIR: dl
+          SSH_TARGET: ${{ secrets.ZANO_BUILDS_SSH_TARGET }}
+          SSH_KEY: ${{ secrets.ZANO_BUILDS_OPENSSH_KEY }}
+          SSH_PORT: ${{ secrets.ZANO_BUILDS_SSH_PORT }}
+          KNOWN_HOSTS: ${{ secrets.ZANO_BUILDS_KNOWN_HOSTS }}
+        run: bash utils/ci_upload_builds.sh
