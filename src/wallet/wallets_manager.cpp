@@ -336,7 +336,9 @@ bool wallets_manager::init(view::i_view* pview_handler)
   }
   if(command_line::has_arg(m_vm, arg_unsecure_disable_extension_id_check) && command_line::get_arg(m_vm, arg_unsecure_disable_extension_id_check))
   {
+#ifndef MOBILE_WALLET_BUILD
     m_wallet_rpc_server.get_origin_verifier().set_enabled(false);
+#endif
   }
 
   //if (command_line::has_arg(m_vm, command_line::arg_allow_legacy_payment_id_size))
@@ -933,6 +935,7 @@ void wallets_manager::init_wallet_entry(wallet_vs_options& wo, uint64_t id)
   wo.rpc_wrapper->set_flag_allow_legacy_payment_id_size(true); // always treas as --allow-legacy-payment-id-size
   if (m_remote_node_mode)
   {
+    wo.w.unlocked_get()->set_compact_sync(true);
     wo.core_conf = currency::get_default_core_runtime_config();
   }
   else
