@@ -1,8 +1,8 @@
 name: Increment build number
 
-# Bumps PROJECT_VERSION_BUILD_NO in src/version.h.in by one and pushes the
-# commit, following the repository's existing convention for those commits
-# ("=== build number: 507 -> 508 ===").
+# Bumps PROJECT_VERSION_BUILD_NO in src/version.h.in by one and merges the
+# change through a pull request, following the repository's existing commit
+# convention ("=== build number: 507 -> 508 ===").
 #
 # Callable on its own, or from build-all.yml, which passes the resulting commit
 # SHA down to the platform builds so they all compile the bumped number.
@@ -33,8 +33,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
-      # Needed to push the bump commit.
+      # Needed to push the bump branch and create its pull request.
       contents: write
+      pull-requests: write
     # Two runs bumping at once would race on the push; serialise per branch.
     concurrency:
       group: increment-build-number-${{ github.ref }}
@@ -73,24 +74,24 @@ jobs:
           fi
           echo "bump app id resolved"
 
-      # GITHUB_TOKEN authenticates as the GitHub Actions app, which rulesets
-      # cannot grant bypass to - no repository setting makes that push work.
-      # A GitHub App IS an eligible bypass actor, so the push is made as one.
+      # Use a GitHub App token to push the bump branch and create its pull
+      # request.
       - name: Mint a token for the bump app
         id: app-token
         uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
         with:
           app-id: ${{ vars.CI_BUMP_APP_ID || secrets.CI_BUMP_APP_ID }}
           private-key: ${{ secrets.CI_BUMP_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
 
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           submodules: false
           fetch-depth: 1
-          # Unlike the build workflows, this one has to push, so the token must
-          # stay configured on the remote - and it must be the app's token, not
-          # the default GITHUB_TOKEN.
+          # Unlike the build workflows, this one has to push a bump branch and
+          # create a pull request, so use the app token rather than GITHUB_TOKEN.
           persist-credentials: true
           token: ${{ steps.app-token.outputs.token }}
 
@@ -98,6 +99,9 @@ jobs:
         id: bump
         env:
           APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          BASE_BRANCH: ${{ github.ref_name }}
+          REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
           file=src/version.h.in
@@ -133,14 +137,39 @@ jobs:
           git config user.name "${APP_SLUG}[bot]"
           git config user.email "${APP_SLUG}[bot]@users.noreply.github.com"
           git add "$file"
-          git commit -m "=== build number: ${previous} -> ${next} ==="
+          commit_title="=== build number: ${previous} -> ${next} ==="
+          git commit -m "$commit_title"
 
-          if ! git push origin "HEAD:${{ github.ref_name }}"; then
-            echo "::error title=Push rejected::Could not push the bump to '${{ github.ref_name }}'. If this is a rule violation, add the '${APP_SLUG}' app to the bypass list of EVERY ruleset targeting that branch - repository and organization level both - with the mode set to 'Always allow'. Rules in effect: https://github.com/${{ github.repository }}/rules?ref=refs%2Fheads%2F${{ github.ref_name }}"
+          bump_branch="ci/build-number-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          git push origin "HEAD:$bump_branch"
+          pr_url=$(gh pr create \
+            --repo "$REPOSITORY" \
+            --base "$BASE_BRANCH" \
+            --head "$bump_branch" \
+            --title "$commit_title" \
+            --body "Automated build-number increment: ${previous} -> ${next}.")
+          gh pr merge "$pr_url" --auto --delete-branch --repo "$REPOSITORY"
+
+          sha=""
+          for attempt in {1..30}; do
+            pr_state=$(gh pr view "$pr_url" --repo "$REPOSITORY" \
+              --json state,mergeCommit \
+              --jq '[.state, (.mergeCommit.oid // "")] | @tsv')
+            IFS=$'\t' read -r state sha <<< "$pr_state"
+            if [ "$state" = "MERGED" ] && [ -n "$sha" ]; then
+              break
+            fi
+            if [ "$state" = "CLOSED" ]; then
+              echo "::error title=Pull request closed::The build-number pull request was closed without being merged."
+              exit 1
+            fi
+            sleep 10
+          done
+          if [ -z "$sha" ]; then
+            echo "::error title=Pull request not merged::The build-number pull request was not merged within five minutes."
             exit 1
           fi
 
-          sha=$(git rev-parse HEAD)
           {
             echo "previous_build_number=$previous"
             echo "build_number=$next"
@@ -154,7 +183,7 @@ jobs:
             echo "| | |"
             echo "| --- | --- |"
             echo "| Version | \`$version\` |"
-            echo "| Branch | \`${{ github.ref_name }}\` |"
+            echo "| Branch | \`$BASE_BRANCH\` |"
             echo "| Commit | \`$sha\` |"
           } >> "$GITHUB_STEP_SUMMARY"
 
