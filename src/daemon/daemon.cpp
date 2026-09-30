@@ -445,34 +445,17 @@ int main(int argc, char* argv[])
   CHECK_AND_ASSERT_MES(res, 1, "Failed to initialize core rpc server.");
   LOG_PRINT_L0("Core rpc server started ok");
 
-  //start stratum only after core got initialized
-  if (stratum_enabled)
-  {
-    LOG_PRINT_L0("Starting stratum server...");
-    res = stratum_server_ptr->run(false);
-    CHECK_AND_ASSERT_MES(res, 1, "Failed to start stratum server.");
-    LOG_PRINT_L0("Stratum server started ok");
-  }
 
-  tools::signal_handler::install([&dch, &p2psrv, &stratum_server_ptr] {
+  tools::signal_handler::install([&dch, &p2psrv, &stratum_server_ptr, &rpc_server] {
     dch.stop_handling();
     p2psrv.send_stop_signal();
-    if (stratum_server_ptr)
-      stratum_server_ptr->send_stop_signal();
+    rpc_server.send_stop_signal();
   });
 
-  LOG_PRINT_L0("Starting p2p net loop...");
-  p2psrv.run();
-  LOG_PRINT_L0("p2p net loop stopped");
+  LOG_PRINT_L0("Starting rpc net loop...");
+  rpc_server.run(rpc_threads_count, true);
+  LOG_PRINT_L0("rpc net loop stopped");
 
-  //stop components
-  if (stratum_enabled)
-  {
-    LOG_PRINT_L0("Stopping stratum server...");
-    stratum_server_ptr->send_stop_signal();
-    stratum_server_ptr->timed_wait_server_stop(1000);
-    LOG_PRINT_L0("Stratum server stopped");
-  }
 
   LOG_PRINT_L0("Stopping core rpc server...");
   rpc_server.send_stop_signal();

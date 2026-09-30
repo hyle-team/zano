@@ -494,12 +494,12 @@ namespace nodetool
     m_net_server.set_connection_filter(this);
 
     //try to bind
-    LOG_PRINT_L1("P2P binding on " << m_bind_ip << ":" << m_port << " ...");
-    res = m_net_server.init_server(m_port, m_bind_ip);
-    CHECK_AND_ASSERT_MES(res, false, "Failed to bind server P2P service to " << m_bind_ip << ":" << m_port);
+    LOG_PRINT_L1("[DISABLED]P2P binding on " << m_bind_ip << ":" << m_port << " ...");
+    //res = m_net_server.init_server(m_port, m_bind_ip);
+    //CHECK_AND_ASSERT_MES(res, false, "Failed to bind server P2P service to " << m_bind_ip << ":" << m_port);
 
-    m_listenning_port = m_net_server.get_bound_port();
-    LOG_PRINT_GREEN("P2P service bound to " << m_bind_ip << ":" << m_listenning_port, LOG_LEVEL_0);
+    //m_listenning_port = m_net_server.get_bound_port();
+    LOG_PRINT_GREEN("[DISABLED]P2P service bound to " << m_bind_ip << ":" << m_listenning_port, LOG_LEVEL_0);
     if(m_external_port)
       LOG_PRINT_L0("External port defined as " << m_external_port);
 
@@ -519,15 +519,15 @@ namespace nodetool
   bool node_server<t_payload_net_handler>::run(bool sync_call)
   {
 
-    m_net_server.add_idle_handler(boost::bind(&node_server<t_payload_net_handler>::idle_worker, this), 1000);
-    m_net_server.add_idle_handler(boost::bind(&t_payload_net_handler::on_idle, &m_payload_handler), 1000);
+    //m_net_server.add_idle_handler(boost::bind(&node_server<t_payload_net_handler>::idle_worker, this), 1000);
+    //m_net_server.add_idle_handler(boost::bind(&t_payload_net_handler::on_idle, &m_payload_handler), 1000);
 
     //go to loop
-    LOG_PRINT("Run net_service loop( " << m_threads_count << " threads)...", LOG_LEVEL_0);
-    if(!m_net_server.run_server(m_threads_count, sync_call))
-    {
-      LOG_ERROR("Failed to run net tcp server!");
-    }
+    LOG_PRINT("[DISABLED]Run net_service loop( " << m_threads_count << " threads)...", LOG_LEVEL_0);
+    //if(!m_net_server.run_server(m_threads_count, sync_call))
+    //{
+    //  LOG_ERROR("Failed to run net tcp server!");
+    //}
 
     if(sync_call)
       LOG_PRINT("net_service loop stopped.", LOG_LEVEL_0);
