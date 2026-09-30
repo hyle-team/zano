@@ -1043,7 +1043,7 @@ private:
     tools::wallet_public::wallet_vote_config m_votes_config;
 
     std::atomic<bool> m_concise_mode = true; //in this mode the wallet don't keep spent entries in m_transfers as well as m_recent_transfers longer then 100 entries
-    std::atomic<bool> m_compact_sync = false;
+    std::atomic<bool> m_compact_sync = true;
     uint64_t m_last_known_daemon_height = 0;
     uint64_t m_wallet_concise_mode_max_reorg_blocks = WALLET_CONCISE_MODE_MAX_REORG_BLOCKS;
     uint64_t m_full_resync_requested_at_h = 0;
