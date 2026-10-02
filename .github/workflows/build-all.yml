@@ -11,20 +11,32 @@ name: Build all platforms
 on:
   workflow_dispatch:
     inputs:
-      mainnet:
-        description: 'Build mainnet'
-        type: boolean
-        default: true
-      testnet:
-        description: 'Build testnet'
-        type: boolean
-        default: false
       increment:
         description: 'Increment build number'
         type: boolean
         default: true
+      mainnet:
+        description: 'Mainnet'
+        type: boolean
+        default: true
+      testnet:
+        description: 'Testnet'
+        type: boolean
+        default: false
+      windows:
+        description: 'Windows'
+        type: boolean
+        default: true
+      macos:
+        description: 'macOS'
+        type: boolean
+        default: true
+      linux:
+        description: 'Linux'
+        type: boolean
+        default: true
       upload:
-        description: 'Upload builds to the download server'
+        description: 'Upload to build.zano.org'
         type: boolean
         default: true
 
@@ -41,9 +53,16 @@ jobs:
         run: |
           mainnet='${{ inputs.mainnet }}'
           testnet='${{ inputs.testnet }}'
+          win='${{ inputs.windows }}'
+          mac='${{ inputs.macos }}'
+          lin='${{ inputs.linux }}'
 
           if [ "$mainnet" != "true" ] && [ "$testnet" != "true" ]; then
-            echo "::error title=Nothing to build::Tick 'Build mainnet', 'Build testnet', or both."
+            echo "::error title=No network selected::Tick 'Build mainnet', 'Build testnet', or both."
+            exit 1
+          fi
+          if [ "$win" != "true" ] && [ "$mac" != "true" ] && [ "$lin" != "true" ]; then
+            echo "::error title=No platform selected::Tick at least one of Windows, macOS, Linux."
             exit 1
           fi
 
@@ -56,8 +75,11 @@ jobs:
             echo
             echo "| Platform | mainnet | testnet |"
             echo "| --- | --- | --- |"
-            for platform in Linux macOS Windows; do
-              echo "| $platform | $([ "$mainnet" = "true" ] && echo 'yes' || echo '-') | $([ "$testnet" = "true" ] && echo 'yes' || echo '-') |"
+            for row in "Linux:$lin" "macOS:$mac" "Windows:$win"; do
+              name=${row%%:*}; sel=${row##*:}
+              mcell=$([ "$sel" = "true" ] && [ "$mainnet" = "true" ] && echo 'yes' || echo '-')
+              tcell=$([ "$sel" = "true" ] && [ "$testnet" = "true" ] && echo 'yes' || echo '-')
+              echo "| $name | $mcell | $tcell |"
             done
             echo
             if [ "${{ inputs.increment }}" = "true" ]; then
@@ -125,7 +147,7 @@ jobs:
   linux-mainnet:
     name: Linux (mainnet)
     needs: resolve-ref
-    if: ${{ !cancelled() && needs.resolve-ref.result == 'success' && inputs.mainnet == true }}
+    if: ${{ !cancelled() && needs.resolve-ref.result == 'success' && inputs.mainnet == true && inputs.linux == true }}
     uses: ./.github/workflows/build-linux.yml
     with:
       testnet: false
@@ -137,7 +159,7 @@ jobs:
   macos-mainnet:
     name: macOS (mainnet)
     needs: resolve-ref
-    if: ${{ !cancelled() && needs.resolve-ref.result == 'success' && inputs.mainnet == true }}
+    if: ${{ !cancelled() && needs.resolve-ref.result == 'success' && inputs.mainnet == true && inputs.macos == true }}
     uses: ./.github/workflows/build-macos.yml
     with:
       testnet: false
@@ -149,7 +171,7 @@ jobs:
   windows-mainnet:
     name: Windows (mainnet)
     needs: resolve-ref
-    if: ${{ !cancelled() && needs.resolve-ref.result == 'success' && inputs.mainnet == true }}
+    if: ${{ !cancelled() && needs.resolve-ref.result == 'success' && inputs.mainnet == true && inputs.windows == true }}
     uses: ./.github/workflows/build-windows.yml
     with:
       testnet: false
@@ -167,7 +189,7 @@ jobs:
   linux-testnet:
     name: Linux (testnet)
     needs: resolve-ref
-    if: ${{ !cancelled() && needs.resolve-ref.result == 'success' && inputs.testnet == true }}
+    if: ${{ !cancelled() && needs.resolve-ref.result == 'success' && inputs.testnet == true && inputs.linux == true }}
     uses: ./.github/workflows/build-linux.yml
     with:
       testnet: true
@@ -179,7 +201,7 @@ jobs:
   macos-testnet:
     name: macOS (testnet)
     needs: resolve-ref
-    if: ${{ !cancelled() && needs.resolve-ref.result == 'success' && inputs.testnet == true }}
+    if: ${{ !cancelled() && needs.resolve-ref.result == 'success' && inputs.testnet == true && inputs.macos == true }}
     uses: ./.github/workflows/build-macos.yml
     with:
       testnet: true
@@ -191,7 +213,7 @@ jobs:
   windows-testnet:
     name: Windows (testnet)
     needs: resolve-ref
-    if: ${{ !cancelled() && needs.resolve-ref.result == 'success' && inputs.testnet == true }}
+    if: ${{ !cancelled() && needs.resolve-ref.result == 'success' && inputs.testnet == true && inputs.windows == true }}
     uses: ./.github/workflows/build-windows.yml
     with:
       testnet: true

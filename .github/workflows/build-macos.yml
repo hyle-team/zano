@@ -553,11 +553,31 @@ jobs:
           # Make an unsigned build obvious from the file name alone, so a run
           # with missing secrets cannot be mistaken for a shippable one.
           if [ "$SIGNED" != "true" ]; then suffix="${suffix}-unsigned"; fi
-          mkdir package_folder
-          mv Zano.app package_folder/
-          ln -s /Applications package_folder/Applications
           dmg="zano-macos-x64-gui${suffix}-${ZANO_VERSION}.dmg"
-          hdiutil create -volname "Zano" -srcfolder package_folder -ov -format UDZO "$dmg"
+          rm -f "$dmg"
+          rm -rf dmg_src && mkdir dmg_src
+          mv Zano.app dmg_src/
+          chmod +x "$GITHUB_WORKSPACE"/utils/contrib/create-dmg/create-dmg 2>/dev/null || true
+
+          # Branded dmg (volname/background/icon layout) via create-dmg. It scripts
+          # Finder, which is flaky on CI, so retry; fall back to a plain but valid
+          # dmg if it keeps failing.
+          make_fancy() (
+            source "$GITHUB_WORKSPACE/utils/macosx_dmg_builder.sh"
+            build_fancy_dmg "$PWD/dmg_src" "$PWD/$dmg"
+          )
+          make_plain() {
+            rm -f "$dmg"
+            ln -sf /Applications dmg_src/Applications
+            hdiutil create -volname "Zano installer" -srcfolder dmg_src -ov -format UDZO "$dmg"
+          }
+          ok=0
+          for n in 1 2 3; do
+            if make_fancy; then ok=1; break; fi
+            echo "::warning::create-dmg attempt $n/3 failed; retrying in 20s" >&2
+            rm -f "$dmg"; sleep 20
+          done
+          [ "$ok" -eq 1 ] || { echo "::warning::create-dmg failed 3x; using plain dmg"; make_plain; }
           ls -lh "$dmg"
           echo "ZANO_DMG=build/src/$dmg" >> "$GITHUB_ENV"
 
@@ -804,11 +824,31 @@ jobs:
           # Make an unsigned build obvious from the file name alone, so a run
           # with missing secrets cannot be mistaken for a shippable one.
           if [ "$SIGNED" != "true" ]; then suffix="${suffix}-unsigned"; fi
-          mkdir package_folder
-          mv Zano.app package_folder/
-          ln -s /Applications package_folder/Applications
           dmg="zano-macos-arm64-gui${suffix}-${ZANO_VERSION}.dmg"
-          hdiutil create -volname "Zano" -srcfolder package_folder -ov -format UDZO "$dmg"
+          rm -f "$dmg"
+          rm -rf dmg_src && mkdir dmg_src
+          mv Zano.app dmg_src/
+          chmod +x "$GITHUB_WORKSPACE"/utils/contrib/create-dmg/create-dmg 2>/dev/null || true
+
+          # Branded dmg (volname/background/icon layout) via create-dmg. It scripts
+          # Finder, which is flaky on CI, so retry; fall back to a plain but valid
+          # dmg if it keeps failing.
+          make_fancy() (
+            source "$GITHUB_WORKSPACE/utils/macosx_dmg_builder.sh"
+            build_fancy_dmg "$PWD/dmg_src" "$PWD/$dmg"
+          )
+          make_plain() {
+            rm -f "$dmg"
+            ln -sf /Applications dmg_src/Applications
+            hdiutil create -volname "Zano installer" -srcfolder dmg_src -ov -format UDZO "$dmg"
+          }
+          ok=0
+          for n in 1 2 3; do
+            if make_fancy; then ok=1; break; fi
+            echo "::warning::create-dmg attempt $n/3 failed; retrying in 20s" >&2
+            rm -f "$dmg"; sleep 20
+          done
+          [ "$ok" -eq 1 ] || { echo "::warning::create-dmg failed 3x; using plain dmg"; make_plain; }
           ls -lh "$dmg"
           echo "ZANO_DMG=build/src/$dmg" >> "$GITHUB_ENV"
 

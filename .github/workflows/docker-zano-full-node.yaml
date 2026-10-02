@@ -8,9 +8,13 @@ on:
         required: true
         default: master
       image_tag: 
-        description: Docker Hub tag to publish
+        description: Docker Hub tag to publish (e.g. a version like 2.2.2.513)
         required: true
         default: latest
+      update_latest:
+        description: Also update the :latest tag to point at this build
+        type: boolean
+        default: true
 
 jobs:
   build-push:
@@ -38,5 +42,6 @@ jobs:
           tags: |
             zanoproject/zano-full-node:${{ github.event.inputs.image_tag }}
             zanoproject/zano-full-node:${{ github.event.inputs.branch }}
+            ${{ (inputs.update_latest == true || inputs.update_latest == 'true') && 'zanoproject/zano-full-node:latest' || '' }}
           cache-from: type=registry,ref=zanoproject/zano-full-node:buildcache
           cache-to:   type=registry,ref=zanoproject/zano-full-node:buildcache,mode=max
