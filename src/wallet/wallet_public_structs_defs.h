@@ -6,6 +6,7 @@
 
 #pragma once
 #include <vector>
+#include <unordered_map>
 #include "serialization/keyvalue_helper_structs.h"
 #include "currency_protocol/currency_protocol_defs.h"
 #include "currency_core/currency_basic.h"
@@ -2370,6 +2371,94 @@ namespace tools::wallet_public
       END_KV_SERIALIZE_MAP()
     };
   };
+
+
+  //
+  // wallet HF6 snapshot
+  //
+  struct wh6s_output_t
+  {
+    uint64_t                      bare_amount; // 0 for ZC
+    uint64_t                      gindex;
+    uint64_t                      index;
+    crypto::key_image             ki;
+    crypto::generic_schnorr_sig_s kiss;  // proof of knowing DL {x : ki - P = x * (Hp(P) - G)}, to tie P and ki
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(bare_amount)
+      KV_SERIALIZE(gindex)
+      KV_SERIALIZE(index)
+      KV_SERIALIZE_POD_AS_HEX_STRING(ki)
+      KV_SERIALIZE_CUSTOM(kiss, std::string, crypto::generic_schnorr_sig_s_to_hex_string, crypto::generic_schnorr_sig_s_from_hex_string)
+    END_KV_SERIALIZE_MAP()
+  };
+
+  struct wallet_hf6_snapshot_t
+  {
+    static constexpr uint64_t   c_height_min = ZANO_HARDFORK_06_AFTER_HEIGHT; // 3833001
+    static constexpr uint64_t   c_height_max = 3878977;
+
+    //std::string                 filename;
+    std::string                 address;
+    crypto::secret_key          view_secret_key;
+    std::vector<wh6s_output_t>  outputs;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      //KV_SERIALIZE(filename)
+      KV_SERIALIZE(address)
+      KV_SERIALIZE_POD_AS_HEX_STRING(view_secret_key)
+      KV_SERIALIZE(outputs)
+    END_KV_SERIALIZE_MAP()
+
+  };
+
+
+  // One received/spent movement of wallet funds (for the report's transaction list).
+  struct wh6s_movement_t
+  {
+    uint64_t           timestamp = 0;    // block timestamp of the creation (received) or spend (spent)
+    uint64_t           height = 0;
+    bool               received = false; // true: funds received; false: funds spent
+    crypto::public_key asset_id{};
+    uint64_t           amount = 0;
+    crypto::hash       tx_id{};          // creation tx (received) or spending tx (spent)
+  };
+
+  struct wh6s_asset_meta_t
+  {
+    uint64_t    decimal_point = 0; // for formatting amounts of this asset
+    std::string ticker;            // not unique across assets, so always pair it with the asset_id
+  };
+
+  // Result of blockchain_storage::process_wallet_hf6_snapshot(); shaped to be asserted on in coretests.
+  struct wallet_hf6_snapshot_check_result_t
+  {
+    bool         valid = false;            // on any failure: false, with the reason in `error`
+    std::string  error;
+    uint64_t     outputs_matched = 0;      // owned outputs cross-checked against the snapshot and kiss-verified
+
+    // per-asset (asset_id -> summed amount):
+    std::unordered_map<crypto::public_key, uint64_t> balance_at_min;      // unspent as of c_height_min
+    std::unordered_map<crypto::public_key, uint64_t> balance_at_max;      // unspent as of c_height_max
+    std::unordered_map<crypto::public_key, uint64_t> received_in_window;  // outputs created in [c_height_min, c_height_max]
+    std::unordered_map<crypto::public_key, uint64_t> spent_in_window;     // outputs whose ki was spent in [c_height_min, c_height_max]
+
+    std::vector<wh6s_movement_t> movements;                              // every received/spent movement, sorted by timestamp
+    std::unordered_map<crypto::public_key, wh6s_asset_meta_t> asset_meta; // decimal_point/ticker per asset seen (resolved once)
+  };
+
+  // Result of a make_hf6_snapshot long-op (wallets_manager / GUI / light-wallet path).
+  struct hf6_snapshot_result
+  {
+    std::string  status;  // API_RETURN_CODE_OK, or an error code/message
+    std::string  file;    // path to the written <address>.snapshot-json (on status == OK)
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(status)
+      KV_SERIALIZE(file)
+    END_KV_SERIALIZE_MAP()
+  };
+
 
 } // namespace tools::wallet_public
 

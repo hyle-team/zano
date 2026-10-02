@@ -80,6 +80,8 @@ public:
   QString generate_wallet(const QString& param);
   QString run_wallet(const QString& param);
   QString close_wallet(const QString& wallet_id);
+  QString make_hf6_snapshot(const QString& param); // drive via async_call; progress via wallet_sync_progress
+  QString cancel_make_hf6_snapshot(const QString& param); // cancels an in-progress snapshot
   QString get_contracts(const QString& wallet_id);
   QString create_proposal(const QString& param);
   QString accept_proposal(const QString& param);
@@ -216,6 +218,7 @@ private:
   virtual bool update_daemon_status(const view::daemon_status_info& info);
   virtual bool on_backend_stopped();
   virtual bool show_msg_box(const std::string& message);
+  bool show_msg_box(const std::string& message, const std::string& title); // titled; long text -> resizable scrollable dialog
   virtual bool update_wallet_status(const view::wallet_status_info& wsi);
   virtual bool update_wallets_info(const view::wallets_summary_info& wsi);
   virtual bool money_transfer(const view::transfer_event_info& tei);

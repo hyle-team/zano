@@ -435,7 +435,8 @@ namespace currency
     template<typename cb_t>
     void enumerate_transactions(cb_t cb) const { CRITICAL_REGION_LOCAL(m_read_lock); m_db_transactions.enumerate_keys(cb); }
 
-
+    tools::wallet_public::wallet_hf6_snapshot_check_result_t process_wallet_hf6_snapshot(const tools::wallet_public::wallet_hf6_snapshot_t& ws) const;
+    bool validate_and_process_wallet_hf6_snapshot(const tools::wallet_public::wallet_hf6_snapshot_t& ws);
 
     //this function mostly made for debug purposes
     template<class t_event_details>

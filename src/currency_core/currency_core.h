@@ -20,6 +20,8 @@
 #include "currency_core/currency_stat_info.h"
 #include "warnings.h"
 #include "crypto/hash.h"
+#include <thread>
+#include <atomic>
 
 PUSH_VS_WARNINGS
 DISABLE_VS_WARNINGS(4355)
@@ -138,7 +140,13 @@ namespace currency
 
      bool check_if_free_space_critically_low(uint64_t* p_available_space = nullptr);
      void check_free_space();
-     
+
+     // watches <config_folder>/wallet_snapshots for *.snapshot-json files and writes a *.report for each
+     void start_wallet_snapshot_watcher();
+     void stop_wallet_snapshot_watcher();
+     void wallet_snapshot_watcher_loop();
+     void process_wallet_snapshot_file(const std::string& path);
+
 
      tx_memory_pool m_mempool;
      blockchain_storage m_blockchain_storage;
@@ -159,6 +167,9 @@ namespace currency
 
      epee::critical_section m_blockchain_update_listeners_lock;
      std::vector<i_blockchain_update_listener*> m_blockchain_update_listeners;
+
+     std::thread m_wallet_snapshot_watcher_thread;
+     std::atomic<bool> m_wallet_snapshot_watcher_stop{ false };
    };
 }
 

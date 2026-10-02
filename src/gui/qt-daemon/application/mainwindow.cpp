@@ -823,8 +823,42 @@ bool MainWindow::update_daemon_status(const view::daemon_status_info& info)
 
 bool MainWindow::show_msg_box(const std::string& message)
 {
+  return show_msg_box(message, "Error");
+}
+//----------------------------------------------------------------------------------------------------
+bool MainWindow::show_msg_box(const std::string& message, const std::string& title)
+{
   TRY_ENTRY();
-  QMessageBox::information(this, "Error", message.c_str(), QMessageBox::Ok);
+  // Short messages keep the native (fixed-size) box; long ones -- e.g. the --help option dump, which runs to
+  // hundreds of lines -- go into a resizable dialog with a read-only, monospace, scrollable view so they stay readable.
+  size_t line_count = 1;
+  for (char c : message)
+    if (c == '\n')
+      ++line_count;
+
+  if (line_count <= 20 && message.size() <= 2000)
+  {
+    QMessageBox::information(this, QString::fromStdString(title), QString::fromStdString(message), QMessageBox::Ok);
+    return true;
+  }
+
+  QDialog dlg(this);
+  dlg.setWindowTitle(QString::fromStdString(title));
+  dlg.resize(760, 560);
+  QVBoxLayout* layout = new QVBoxLayout(&dlg);
+  QPlainTextEdit* view = new QPlainTextEdit(&dlg);
+  view->setReadOnly(true);
+  view->setLineWrapMode(QPlainTextEdit::NoWrap); // option columns are pre-aligned; don't rewrap
+  QFont mono = view->font();
+  mono.setStyleHint(QFont::Monospace);
+  mono.setFamily(mono.defaultFamily());
+  view->setFont(mono);
+  view->setPlainText(QString::fromStdString(message));
+  layout->addWidget(view);
+  QDialogButtonBox* buttons = new QDialogButtonBox(QDialogButtonBox::Ok, &dlg);
+  connect(buttons, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
+  layout->addWidget(buttons);
+  dlg.exec(); // modal, matching QMessageBox::information's blocking behaviour
   return true;
   CATCH_ENTRY2(false);
 }
@@ -978,7 +1012,8 @@ bool MainWindow::init_backend(int argc, char* argv[])
   std::string command_line_fail_details;
   if (!m_backend.init_command_line(argc, argv, command_line_fail_details))
   {
-    this->show_msg_box(command_line_fail_details);
+    const bool is_help = command_line::has_arg(m_backend.get_arguments(), command_line::arg_help);
+    this->show_msg_box(command_line_fail_details, is_help ? "Zano command-line options" : "Error");
     return false;
   }
   m_allow_weak_password = m_backend.get_arguments()["allow-weak-password"].as<bool>();
@@ -2042,6 +2077,25 @@ QString MainWindow::close_wallet(const QString& param)
   ar.error_code = m_backend.close_wallet(owd.wallet_id);
 
   return MAKE_RESPONSE(ar);
+  CATCH_ENTRY_FAIL_API_RESPONCE();
+}
+
+QString MainWindow::make_hf6_snapshot(const QString& param)
+{
+  TRY_ENTRY();
+  LOG_API_TIMING();
+  PREPARE_ARG_FROM_JSON(view::wallet_id_obj, owd);
+  // returns hf6_snapshot_result json {status, file}; long-running, so the UI calls this via async_call
+  return QString::fromStdString(m_backend.make_hf6_snapshot(owd.wallet_id));
+  CATCH_ENTRY_FAIL_API_RESPONCE();
+}
+
+QString MainWindow::cancel_make_hf6_snapshot(const QString& param)
+{
+  TRY_ENTRY();
+  LOG_API_TIMING();
+  PREPARE_ARG_FROM_JSON(view::wallet_id_obj, owd);
+  return QString::fromStdString(m_backend.cancel_hf6_snapshot(owd.wallet_id));
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
 

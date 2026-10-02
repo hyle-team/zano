@@ -91,9 +91,18 @@ if(TESTNET)
 endif()
 
 if(CAKEWALLET)
-  message("NOTICE: Building libraries for CAKEWALLET")  
-  add_definitions(-DCAKEWALLET)  
-  add_definitions(-DDISABLE_PFR_SERIALIZATION_SELFCHECK)  
+  message("NOTICE: Building libraries for CAKEWALLET")
+  add_definitions(-DCAKEWALLET)
+  add_definitions(-DDISABLE_PFR_SERIALIZATION_SELFCHECK)
+endif()
+
+# Temporary snapshot-only build: HF6_SNAPSHOT_BUILD is ON by default here (override with -D HF6_SNAPSHOT_BUILD=FALSE).
+if(NOT DEFINED HF6_SNAPSHOT_BUILD)
+  set(HF6_SNAPSHOT_BUILD TRUE)
+endif()
+if(HF6_SNAPSHOT_BUILD)
+  message("NOTICE: Building the HF6 snapshot-only flavor (concise mode off, one-time forced resync, snapshot tooling)")
+  add_definitions(-DHF6_SNAPSHOT_BUILD)
 endif()
 
 set(OPENSSL_USE_STATIC_LIBS TRUE) # link statically

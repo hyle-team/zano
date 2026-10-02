@@ -817,6 +817,18 @@ namespace tools
     bool get_concise_mode() const { return m_concise_mode; }
     bool find_unconfirmed_tx(const crypto::hash& tx_id, wallet_public::wallet_transfer_info& res) const;
 
+    // builds an HF6 snapshot (for fully synced with concise mode off)
+    bool make_hf6_snapshot(wallet_public::wallet_hf6_snapshot_t& ws, std::atomic<bool>& stop);
+    bool make_hf6_snapshot(wallet_public::wallet_hf6_snapshot_t& ws) { return make_hf6_snapshot(ws, m_stop); }
+    // builds the snapshot and writes it next to the wallet file as <address>.snapshot-json (tmp file + rename);
+    // the written path is returned in out_file_path.
+    void cancel_hf6_snapshot() { m_hf6_snapshot_stop.store(true, std::memory_order_relaxed); } // cancels a snapshot started via the cancellable overload
+    bool make_hf6_snapshot_to_file(std::atomic<bool>& stop, std::string& out_file_path);
+    // CLI path: cancellable via stop()/m_stop (Ctrl-C)
+    bool make_hf6_snapshot_to_file(std::string& out_file_path) { return make_hf6_snapshot_to_file(m_stop, out_file_path); }
+    // GUI/manager path: cancellable via cancel_hf6_snapshot() (dedicated flag, reset here so a prior cancel doesn't abort instantly)
+    bool make_hf6_snapshot_to_file_cancellable(std::string& out_file_path) { m_hf6_snapshot_stop.store(false, std::memory_order_relaxed); return make_hf6_snapshot_to_file(m_hf6_snapshot_stop, out_file_path); }
+
     construct_tx_param get_default_construct_tx_param();
     uint64_t get_current_pos_attempts() const { return m_pos_attempts_count; }
 
@@ -852,6 +864,7 @@ private:
     void unserialize_block_complete_entry(const currency::COMMAND_RPC_GET_BLOCKS_FAST::response& serialized,
       currency::COMMAND_RPC_GET_BLOCKS_DIRECT::response& unserialized);
     void pull_blocks(size_t& blocks_added, std::atomic<bool>& stop, bool& full_reset_needed);
+    bool extract_hf6_snapshot(wallet_public::wallet_hf6_snapshot_t& ws, std::atomic<bool>& stop);   // scans m_transfers; requires *this fully synced in non-concise mode
     bool prepare_free_transfers_cache(uint64_t fake_outputs_count);
     bool select_transfers(assets_selection_context& needed_money_map, size_t fake_outputs_count, uint64_t dust, std::vector<uint64_t>& selected_indicies);
     void add_transfers_to_transfers_cache(const std::vector<uint64_t>& indexs);
@@ -1021,6 +1034,7 @@ private:
     pending_ki_file_container_t m_pending_key_images_file_container;
 
     std::atomic<bool> m_stop;
+    std::atomic<bool> m_hf6_snapshot_stop{ false }; // dedicated cancel flag for a GUI/manager-driven make_hf6_snapshot
     std::shared_ptr<i_core_proxy> m_core_proxy;
     std::weak_ptr<i_wallet2_callback> m_wcallback;
 
@@ -1039,7 +1053,12 @@ private:
     std::string m_votes_config_path;
     tools::wallet_public::wallet_vote_config m_votes_config;
 
+#ifdef HF6_SNAPSHOT_BUILD
+    std::atomic<bool> m_concise_mode = false; // snapshot-only build: keep full history (all m_transfers) so a snapshot is a complete scan
+#else
     std::atomic<bool> m_concise_mode = true; //in this mode the wallet don't keep spent entries in m_transfers as well as m_recent_transfers longer then 100 entries
+#endif
+    std::atomic<bool> m_compact_sync = false;
     uint64_t m_last_known_daemon_height = 0;
     uint64_t m_wallet_concise_mode_max_reorg_blocks = WALLET_CONCISE_MODE_MAX_REORG_BLOCKS;
     uint64_t m_full_resync_requested_at_h = 0;

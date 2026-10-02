@@ -359,6 +359,7 @@ simple_wallet::simple_wallet()
   m_cmd_binder.set_handler("print_utxo_distribution", boost::bind(&simple_wallet::print_utxo_distribution, this,ph::_1), "Prints utxo distribution");
   m_cmd_binder.set_handler("sweep_below", boost::bind(&simple_wallet::sweep_below, this,ph::_1), "sweep_below <mixin_count | asset_id> <address|self> <amount_lower_limit> [max_inputs [min_outputs]] - Sweep UTXOs of an asset with amount below the limit to the given address. First arg: integer mixin count (= sweep native coin) or asset_id (= sweep that asset with default mixin). Asset sweeps also consume one native UTXO >= fee to pay the fee. max_inputs and min_outputs can override defaults (~88 and 2 resp.)");
   m_cmd_binder.set_handler("sweep_bare_outs", boost::bind(&simple_wallet::sweep_bare_outs, this,ph::_1), "sweep_bare_outs - Transfers all bare unspent outputs to itself. Uses several txs if necessary.");
+  m_cmd_binder.set_handler("make_hf6_snapshot", boost::bind(&simple_wallet::make_hf6_snapshot, this,ph::_1), "make_hf6_snapshot - Build an HF6 wallet snapshot by scanning wallet outputs (Ctrl-C to abort). Requires a fully synced, non-concise wallet (this build). Written next to the wallet file as <address>.snapshot-json.");
   
   m_cmd_binder.set_handler("address", boost::bind(&simple_wallet::print_address, this,ph::_1), "Show current wallet public address");
   m_cmd_binder.set_handler("integrated_address", boost::bind(&simple_wallet::integrated_address, this,ph::_1), "integrated_address [<payment_id>|<integrated_address] - encodes given payment_id along with wallet's address into an integrated address (random payment_id will be used if none is provided). Decodes given integrated_address into standard address");
@@ -2213,6 +2214,31 @@ void simple_wallet::stop()
 {
   m_cmd_binder.stop_handling();
   m_wallet->stop();
+}
+//----------------------------------------------------------------------------------------------------
+bool simple_wallet::make_hf6_snapshot(const std::vector<std::string>& args)
+{
+  if (!m_wallet->check_connection())
+  {
+    fail_msg_writer() << "no connection to the daemon";
+    return true;
+  }
+  try
+  {
+    message_writer() << "Building HF6 snapshot (scanning wallet outputs). Press Ctrl-C to abort.";
+    std::string out_path;
+    if (!m_wallet->make_hf6_snapshot_to_file(out_path)) // Ctrl-C -> stop() -> m_wallet->stop() cancels the scan
+    {
+      fail_msg_writer() << "make_hf6_snapshot failed or was cancelled";
+      return true;
+    }
+    success_msg_writer() << "HF6 snapshot written to " << out_path;
+  }
+  catch (const std::exception& e)
+  {
+    fail_msg_writer() << "make_hf6_snapshot error: " << e.what();
+  }
+  return true;
 }
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::print_address(const std::vector<std::string> &args/* = std::vector<std::string>()*/)

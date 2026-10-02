@@ -9191,5 +9191,100 @@ const socks5::socks5_proxy_settings& wallet2::get_socks5_relay_config() const
 {
   return m_socks5_relay_cfg;
 }
+//----------------------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------------------
+bool wallet2::make_hf6_snapshot(wallet_public::wallet_hf6_snapshot_t& ws, std::atomic<bool>& stop)
+{
+  // In the HF6_SNAPSHOT_BUILD flavor the wallet is always fully synced with concise mode off (a one-time
+  // full resync is forced on load via the wallet-file version bump in currency_config.h), so a snapshot is
+  // simply a scan of m_transfers -- no detached copy, no resync. We only verify the preconditions here.
+  WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(!m_watch_only, "make_hf6_snapshot needs a spendable wallet (kiss proofs require the spend secret key)");
+  WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(!m_concise_mode, "make_hf6_snapshot requires a non-concise wallet (build with HF6_SNAPSHOT_BUILD)");
+  // The chain is frozen at c_height_max, so caught-up-to-tip means the whole snapshot window is present;
+  // hence we gate on "synced to the daemon tip" rather than ">= c_height_max".
+  WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(m_last_known_daemon_height != 0 && get_blockchain_current_size() >= m_last_known_daemon_height,
+    "make_hf6_snapshot requires a fully synced wallet (synced " << get_blockchain_current_size() << " of " << m_last_known_daemon_height << ")");
+  return extract_hf6_snapshot(ws, stop);
+}
+//----------------------------------------------------------------------------------------------------
+bool wallet2::make_hf6_snapshot_to_file(std::atomic<bool>& stop, std::string& out_file_path)
+{
+  wallet_public::wallet_hf6_snapshot_t ws{};
+  if (!make_hf6_snapshot(ws, stop))
+    return false;
+
+  // canonical location: next to the wallet file, named <address>.snapshot-json
+  const boost::filesystem::path file = boost::filesystem::path(m_wallet_file).parent_path() / (m_account.get_public_address_str() + ".snapshot-json");
+  const std::string json = epee::serialization::store_t_to_json(ws);
+  const std::string tmp_path = file.string() + ".tmp";
+  WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(epee::file_io_utils::save_string_to_file(tmp_path, json), "failed to write snapshot tmp file: " << tmp_path);
+  boost::system::error_code ec;
+  boost::filesystem::rename(tmp_path, file, ec); // atomic: a reader only sees the complete .snapshot-json
+  WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(!ec, "failed to rename snapshot " << tmp_path << " -> " << file.string() << ": " << ec.message());
+  out_file_path = file.string();
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
+bool wallet2::extract_hf6_snapshot(wallet_public::wallet_hf6_snapshot_t& ws, std::atomic<bool>& stop)
+{
+  WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(!m_watch_only && !m_concise_mode, "extract_hf6_snapshot requires a non-concise spendable wallet");
+  const account_keys& keys = m_account.get_keys();
+
+  ws.address = m_account.get_public_address_str();
+  ws.view_secret_key = keys.view_secret_key;
+  ws.outputs.clear();
+  ws.outputs.reserve(m_transfers.size());
+  //ws.filename = string_encoding::convert_to_ansii(m_wallet_file));
+
+  const size_t total = m_transfers.size();
+  size_t done = 0;
+  uint64_t last_percent = UINT64_MAX;
+  for (const auto& [transfer_index, td] : m_transfers)
+  {
+    if (stop.load(std::memory_order_relaxed))
+      return false;
+    // recompute the one-time secret x for this output:  P = x*G,  ki = x*Hp(P)
+    const crypto::public_key tx_pub_key = currency::get_tx_pub_key_from_extra(td.m_ptx_wallet_info->m_tx);
+    currency::keypair ephemeral{};
+    crypto::key_image ki{};
+    bool r = currency::generate_key_image_helper(keys, tx_pub_key, td.m_internal_output_index, ephemeral, ki);
+    WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(r, "generate_key_image_helper failed for transfer " << transfer_index);
+    const crypto::public_key P = out_get_pub_key(td.output());
+    WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(ephemeral.pub == P && ki == td.m_key_image, "ephemeral/key image mismatch for transfer " << transfer_index);
+
+    wallet_public::wh6s_output_t o{};
+    o.gindex      = td.m_global_output_index;
+    o.index       = td.m_internal_output_index;
+    o.ki          = ki;
+    o.bare_amount = td.amount_for_global_output_index(); // plaintext amount for bare, 0 for ZC
+
+    // kiss: prove knowledge of x with  ki - P = x*(Hp(P) - G).  m = Hs(spend_pub | view_pub | P | ki)
+    const crypto::point_t G_gen = crypto::hash_helper_t::hp(P) - crypto::c_point_G;
+    const crypto::point_t A     = crypto::point_t(ki) - crypto::point_t(P);
+    crypto::hash_helper_t::hs_t hsc(4);
+    hsc.add_pub_key(keys.account_address.spend_public_key);
+    hsc.add_pub_key(keys.account_address.view_public_key);
+    hsc.add_pub_key(P);
+    hsc.add_key_image(ki);
+    const crypto::hash m = hsc.calc_hash_no_reduce();
+    r = crypto::generate_schnorr_sig_custom_generator(m, A, crypto::scalar_t(ephemeral.sec), o.kiss, G_gen);
+    WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(r, "generate_schnorr_sig_custom_generator failed for transfer " << transfer_index);
+
+    ws.outputs.push_back(o);
+
+    const uint64_t percent = total ? (100 * ++done) / total : 100;
+    if (percent != last_percent)
+    {
+      last_percent = percent;
+      if (auto wcb = m_wcallback.lock())
+        wcb->on_sync_progress(percent); // drives the GUI popup's % bar (and the CLI progress line)
+    }
+  }
+  if (total == 0)
+    if (auto wcb = m_wcallback.lock())
+      wcb->on_sync_progress(100);
+
+  return true;
+}
 
 } // namespace tools

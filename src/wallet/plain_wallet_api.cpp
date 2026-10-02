@@ -754,6 +754,15 @@ namespace plain_wallet
     PLAIN_WALLET_CATCH();
   }
 
+  std::string handle_make_hf6_snapshot(uint64_t instance_id)
+  {
+    PLAIN_WALLET_BEGIN_TRY_ENTRY();
+    GET_INSTANCE_PTR(inst_ptr);
+    // long-op: safe to drive via async_call (runs on its own thread; poll try_pull_result for the result)
+    return inst_ptr->gwm.make_hf6_snapshot(instance_id);
+    PLAIN_WALLET_CATCH();
+  }
+
   std::string handle_configure(const std::string& settings_json)
   {
     PLAIN_WALLET_BEGIN_TRY_ENTRY();
@@ -861,6 +870,10 @@ namespace plain_wallet
       else if (method_name == "run_wallet")
       {
         res = handle_run_wallet(instance_id);
+      }
+      else if (method_name == "make_hf6_snapshot")
+      {
+        res = handle_make_hf6_snapshot(instance_id);
       }
       else if (method_name == "proxy_to_daemon")
       {

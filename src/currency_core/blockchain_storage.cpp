@@ -23,6 +23,7 @@
 
 #include "blockchain_storage.h"
 #include "currency_format_utils.h"
+#include "crypto/zarcanum.h" // verify_schnorr_sig_custom_generator, hash_helper_t::hp
 #include "currency_boost_serialization.h"
 #include "currency_core/currency_config.h"
 #include "miner.h"
@@ -9710,3 +9711,291 @@ bool blockchain_storage::collect_all_outs_in_block(uint64_t input_amount, const 
 
   return true; // even if 0 outs
 }
+//------------------------------------------------------------------
+tools::wallet_public::wallet_hf6_snapshot_check_result_t blockchain_storage::process_wallet_hf6_snapshot(const tools::wallet_public::wallet_hf6_snapshot_t& ws) const
+{
+  // Independently re-scans the whole chain from genesis for outputs owned by the snapshot's
+  // (address, view_secret_key), cross-checks that set against ws.outputs (detects hidden/fabricated
+  // outputs), verifies each key-image proof (kiss), then computes per-asset balances/flows using the
+  // node's own spent-key-image index. Read-only. See wallet_hf6_snapshot_check_result_t.
+  using namespace tools::wallet_public;
+  CRITICAL_REGION_LOCAL(m_read_lock);
+
+  wallet_hf6_snapshot_check_result_t res;
+  auto fail = [&res](const std::string& msg) -> wallet_hf6_snapshot_check_result_t
+  {
+    res.valid = false;
+    res.error = msg;
+    return res;
+  };
+
+  account_public_address addr{};
+  if (!get_account_address_from_str(addr, ws.address))
+    return fail("invalid address string");
+  crypto::public_key view_pub{};
+  if (!(crypto::secret_key_to_public_key(ws.view_secret_key, view_pub) && view_pub == addr.view_public_key))
+    return fail("view secret key does not match the address");
+  account_keys ak{};
+  ak.account_address = addr;
+  ak.view_secret_key = ws.view_secret_key;
+
+  std::unordered_map<uint64_t, const wh6s_output_t*> snap_by_gindex;
+  snap_by_gindex.reserve(ws.outputs.size());
+  for (const wh6s_output_t& o : ws.outputs)
+  {
+    if (!snap_by_gindex.emplace(o.gindex, &o).second)
+      return fail("duplicate gindex in snapshot outputs: " + std::to_string(o.gindex));
+  }
+
+  // scan every tx from genesis (no trusted wallet-provided start height)
+  std::unordered_set<uint64_t> owned_gindexes;
+  bool scan_ok = true;
+  std::string scan_err;
+
+  const uint64_t total_txs = m_db_transactions.size();
+  uint64_t next_decile = 1; // progress is logged per 10% -> at most 10 messages for the whole scan
+  auto block_ts = [this](uint64_t h) -> uint64_t { return h < m_db_blocks.size() ? m_db_blocks[h]->bl.timestamp : 0; };
+
+  m_db_transactions.enumerate_items([&](uint64_t i, const crypto::hash& tx_id, const transaction_chain_entry& tce) -> bool
+  {
+    while (total_txs && next_decile <= 10 && (i + 1) * 10 >= next_decile * total_txs)
+    {
+      LOG_PRINT_L0("hf6 snapshot scan progress: " << (next_decile * 10) << "% (" << (i + 1) << "/" << total_txs << " txs)");
+      ++next_decile;
+    }
+    std::vector<wallet_out_info> outs;
+    crypto::key_derivation derivation{};
+    if (!lookup_acc_outs(ak, tce.tx, outs, derivation))
+    {
+      scan_ok = false;
+      scan_err = "lookup_acc_outs failed on tx " + epee::string_tools::pod_to_hex(tx_id);
+      return false; // stop enumeration
+    }
+
+    for (const wallet_out_info& wo : outs)
+    {
+      const size_t out_index = wo.index;
+      if (out_index >= tce.m_global_output_indexes.size() || out_index >= tce.tx.vout.size())
+      {
+        scan_ok = false;
+        scan_err = "output index out of range in tx " + epee::string_tools::pod_to_hex(tx_id);
+        return false;
+      }
+      const uint64_t gindex = tce.m_global_output_indexes[out_index];
+
+      crypto::public_key P{};
+      bool is_bare = false;
+      const tx_out_v& ov = tce.tx.vout[out_index];
+      if (ov.type() == typeid(tx_out_bare))
+      {
+        const tx_out_bare& ob = boost::get<tx_out_bare>(ov);
+        if (ob.target.type() != typeid(txout_to_key))
+        {
+          scan_ok = false;
+          scan_err = "owned bare output is not txout_to_key (e.g. multisig), unsupported, gindex=" + std::to_string(gindex);
+          return false;
+        }
+        P = boost::get<txout_to_key>(ob.target).key;
+        is_bare = true;
+      }
+      else if (ov.type() == typeid(tx_out_zarcanum))
+      {
+        P = boost::get<tx_out_zarcanum>(ov).stealth_address;
+      }
+      else
+      {
+        scan_ok = false;
+        scan_err = "owned output of unsupported type, gindex=" + std::to_string(gindex);
+        return false;
+      }
+
+      owned_gindexes.insert(gindex);
+
+      // owned output must be present in the snapshot (else it was hidden)
+      auto it = snap_by_gindex.find(gindex);
+      if (it == snap_by_gindex.end())
+      {
+        scan_ok = false;
+        scan_err = "wallet hid an owned output (missing from snapshot), gindex=" + std::to_string(gindex);
+        return false;
+      }
+      const wh6s_output_t& so = *it->second;
+      if (so.index != out_index)
+      {
+        scan_ok = false;
+        scan_err = "snapshot output in-tx index mismatch at gindex=" + std::to_string(gindex);
+        return false;
+      }
+      if (is_bare && so.bare_amount != wo.amount) // bare amounts are public: cross-check them too
+      {
+        scan_ok = false;
+        scan_err = "snapshot bare_amount mismatch at gindex=" + std::to_string(gindex);
+        return false;
+      }
+
+      // kiss proves knowledge of x:  ki - P = x*(Hp(P) - G)  =>  ki is the genuine key image of P.
+      // Hp = 8*fromfe(cn_fast_hash(P)); same base for bare and ZC key images (hash_helper_t::hp == hash_to_ec).
+      const crypto::key_image& ki = so.ki;
+      crypto::point_t P_pt;
+      crypto::point_t ki_pt;
+      if (!P_pt.from_public_key(P) || !ki_pt.from_key_image(ki))
+      {
+        scan_ok = false;
+        scan_err = "invalid P or ki point at gindex=" + std::to_string(gindex);
+        return false;
+      }
+      const crypto::point_t G_gen = crypto::hash_helper_t::hp(P) - crypto::c_point_G;
+      const crypto::public_key A  = (ki_pt - P_pt).to_public_key();
+      crypto::hash_helper_t::hs_t hsc_m(4);
+      hsc_m.add_pub_key(addr.spend_public_key);
+      hsc_m.add_pub_key(addr.view_public_key);
+      hsc_m.add_pub_key(P);
+      hsc_m.add_key_image(ki);
+      const crypto::hash m = hsc_m.calc_hash_no_reduce();   // m = Hs(spend_pub | view_pub | P | ki)
+      if (!crypto::verify_schnorr_sig_custom_generator(m, A, G_gen, so.kiss))
+      {
+        scan_ok = false;
+        scan_err = "kiss key-image proof verification failed at gindex=" + std::to_string(gindex);
+        return false;
+      }
+
+      const crypto::public_key& asset_id = wo.asset_id;
+      const uint64_t amount = wo.amount;
+      const uint64_t created_h = tce.m_keeper_block_height;
+
+      // resolve this asset's decimal_point/ticker once (amounts are per-asset scaled; tickers aren't unique)
+      if (res.asset_meta.find(asset_id) == res.asset_meta.end())
+      {
+        wh6s_asset_meta_t meta;
+        if (asset_id == native_coin_asset_id)
+        {
+          meta.decimal_point = CURRENCY_DISPLAY_DECIMAL_POINT;
+          meta.ticker = "ZANO";
+        }
+        else
+        {
+          asset_descriptor_base adb{};
+          if (get_asset_info(asset_id, adb))
+          {
+            meta.decimal_point = adb.decimal_point;
+            meta.ticker = adb.ticker;
+          }
+          else
+          {
+            meta.decimal_point = CURRENCY_DISPLAY_DECIMAL_POINT; // unknown asset: fall back to native scale
+          }
+        }
+        res.asset_meta[asset_id] = meta;
+      }
+
+      // ki is this output's verified key image: resolve its spend (if any) to the exact spending tx,
+      // which also cross-checks the spent-key index against the block's actual inputs.
+      uint64_t spent_h = UINT64_MAX;
+      crypto::hash spend_tx_id{};
+      {
+        auto spend_tce = find_key_image_and_related_tx(ki, spend_tx_id);
+        if (spend_tce)
+        {
+          spent_h = spend_tce->m_keeper_block_height;
+          if (spent_h <= created_h)
+          {
+            scan_ok = false;
+            scan_err = "spend height (" + std::to_string(spent_h) + ") not after creation height (" + std::to_string(created_h) + "), gindex=" + std::to_string(gindex);
+            return false;
+          }
+        }
+        else if (m_db_spent_keys.get(ki))
+        {
+          scan_ok = false;
+          scan_err = "spent key image not found in its block (spent-key index inconsistency), gindex=" + std::to_string(gindex);
+          return false;
+        }
+      }
+
+      // balances: created by height H and still unspent at H (spent_h > H)
+      if (created_h <= wallet_hf6_snapshot_t::c_height_min && spent_h > wallet_hf6_snapshot_t::c_height_min)
+        res.balance_at_min[asset_id] += amount;
+      if (created_h <= wallet_hf6_snapshot_t::c_height_max && spent_h > wallet_hf6_snapshot_t::c_height_max)
+        res.balance_at_max[asset_id] += amount;
+
+      // flows in [c_height_min, c_height_max] inclusive: received by creation height, spent by spend height
+      if (created_h >= wallet_hf6_snapshot_t::c_height_min && created_h <= wallet_hf6_snapshot_t::c_height_max)
+        res.received_in_window[asset_id] += amount;
+      if (spent_h >= wallet_hf6_snapshot_t::c_height_min && spent_h <= wallet_hf6_snapshot_t::c_height_max)
+        res.spent_in_window[asset_id] += amount;
+
+      {
+        wh6s_movement_t mv{};
+        mv.received  = true;
+        mv.height    = created_h;
+        mv.timestamp = block_ts(created_h);
+        mv.asset_id  = asset_id;
+        mv.amount    = amount;
+        mv.tx_id     = tx_id;
+        res.movements.push_back(mv);
+      }
+      if (spent_h != UINT64_MAX)
+      {
+        wh6s_movement_t mv{};
+        mv.received  = false;
+        mv.height    = spent_h;
+        mv.timestamp = block_ts(spent_h);
+        mv.asset_id  = asset_id;
+        mv.amount    = amount;
+        mv.tx_id     = spend_tx_id;
+        res.movements.push_back(mv);
+      }
+
+      ++res.outputs_matched;
+    }
+    return true;
+  });
+
+  if (!scan_ok)
+    return fail(scan_err);
+
+  // reverse cross-check: every snapshot output must be one we own
+  for (const wh6s_output_t& o : ws.outputs)
+  {
+    if (owned_gindexes.find(o.gindex) == owned_gindexes.end())
+      return fail("snapshot lists an output the wallet does not own, gindex=" + std::to_string(o.gindex));
+  }
+
+  std::sort(res.movements.begin(), res.movements.end(), [](const wh6s_movement_t& a, const wh6s_movement_t& b)
+  {
+    if (a.timestamp != b.timestamp) return a.timestamp < b.timestamp;
+    if (a.height != b.height)       return a.height < b.height;
+    return a.received && !b.received; // at the same height, list a receipt before a spend
+  });
+
+  res.valid = true;
+  return res;
+}
+//------------------------------------------------------------------
+bool blockchain_storage::validate_and_process_wallet_hf6_snapshot(const tools::wallet_public::wallet_hf6_snapshot_t& ws)
+{
+  tools::wallet_public::wallet_hf6_snapshot_check_result_t res = process_wallet_hf6_snapshot(ws);
+
+  if (!res.valid)
+  {
+    LOG_PRINT_L0("wallet hf6 snapshot INVALID: " << res.error);
+    return false;
+  }
+
+  auto log_map = [](const std::string& title, const std::unordered_map<crypto::public_key, uint64_t>& m)
+  {
+    std::stringstream ss;
+    ss << title << ":";
+    for (const auto& kv : m)
+      ss << ENDL << "  " << kv.first << " : " << kv.second;
+    LOG_PRINT_L0(ss.str());
+  };
+
+  LOG_PRINT_L0("wallet hf6 snapshot VALID, address " << ws.address << ", outputs matched: " << res.outputs_matched);
+  log_map("balance at min (h <= " + std::to_string(tools::wallet_public::wallet_hf6_snapshot_t::c_height_min) + ")", res.balance_at_min);
+  log_map("balance at max (h <= " + std::to_string(tools::wallet_public::wallet_hf6_snapshot_t::c_height_max) + ")", res.balance_at_max);
+  log_map("received in [" + std::to_string(tools::wallet_public::wallet_hf6_snapshot_t::c_height_min) + ", " + std::to_string(tools::wallet_public::wallet_hf6_snapshot_t::c_height_max) + "]", res.received_in_window);
+  log_map("spent in [" + std::to_string(tools::wallet_public::wallet_hf6_snapshot_t::c_height_min) + ", " + std::to_string(tools::wallet_public::wallet_hf6_snapshot_t::c_height_max) + "]", res.spent_in_window);
+  return true;
+}
+

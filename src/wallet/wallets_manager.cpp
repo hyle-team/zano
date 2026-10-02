@@ -262,6 +262,18 @@ bool wallets_manager::init_command_line(int argc, char* argv[], std::string& fai
 
   if (!command_line_parsed)
   {
+    std::stringstream s;
+    desc_options.print(s);
+
+    if (command_line::get_arg(m_vm, command_line::arg_help))
+    {
+      // --help: a clean listing, no error framing (the GUI titles the box as help accordingly)
+      std::stringstream hdr;
+      hdr << CURRENCY_NAME << " v" << PROJECT_VERSION_LONG << ENDL << ENDL << s.str();
+      fail_message = hdr.str();
+      return false;
+    }
+
     std::stringstream ss;
     ss << "Command line has wrong arguments: " << std::endl;
     for (int i = 0; i != argc; i++)
@@ -270,8 +282,6 @@ bool wallets_manager::init_command_line(int argc, char* argv[], std::string& fai
 
     fail_message = "Error parsing arguments.\n";
     fail_message += err_str + "\n";
-    std::stringstream s;
-    desc_options.print(s);
     fail_message += s.str();
     return false;
   }
@@ -1794,6 +1804,37 @@ std::string wallets_manager::invoke(uint64_t wallet_id, std::string params)
   query_info.m_body = params;
   wo.rpc_wrapper->handle_http_request_map(query_info, response_info, stub_conn_context, call_found);
   return response_info.m_body;
+}
+//------------------------------------------------------------------------------------------------------------------
+std::string wallets_manager::make_hf6_snapshot(uint64_t wallet_id)
+{
+  std::shared_ptr<tools::wallet2> wptr;
+  {
+    GET_WALLET_OPT_BY_ID(wallet_id, wo);
+    wptr = wo.w.unlocked_get();
+  }
+
+  tools::wallet_public::hf6_snapshot_result result{};
+  try
+  {
+    if (wptr->make_hf6_snapshot_to_file_cancellable(result.file)) // cancellable via cancel_hf6_snapshot(); writes <wallet-dir>/<address>.snapshot-json
+      result.status = API_RETURN_CODE_OK;
+    else
+      result.status = API_RETURN_CODE_INTERNAL_ERROR;
+  }
+  catch (const std::exception& e)
+  {
+    result.file.clear();
+    result.status = std::string(API_RETURN_CODE_INTERNAL_ERROR) + ": " + e.what();
+  }
+  return epee::serialization::store_t_to_json(result);
+}
+//------------------------------------------------------------------------------------------------------------------
+std::string wallets_manager::cancel_hf6_snapshot(uint64_t wallet_id)
+{
+  GET_WALLET_OPT_BY_ID(wallet_id, wo);
+  wo.w.unlocked_get()->cancel_hf6_snapshot(); // sets the dedicated flag the running snapshot polls
+  return API_RETURN_CODE_OK;
 }
 
 std::string wallets_manager::get_wallet_info(uint64_t wallet_id, view::wallet_info& wi)

@@ -9,8 +9,14 @@
 using namespace epee;
 
 #include <boost/foreach.hpp>
+#include <boost/filesystem.hpp>
 #include <unordered_set>
+#include <set>
+#include <thread>
+#include <chrono>
+#include <sstream>
 #include "currency_core.h"
+#include "file_io_utils.h"
 #include "common/command_line.h"
 #include "common/util.h"
 #include "warnings.h"
@@ -172,6 +178,8 @@ namespace currency
 
     m_mempool.remove_incompatible_txs();
 
+    start_wallet_snapshot_watcher();
+
 #ifdef CPU_MINING_ENABLED
     r = m_miner.init(vm);
     CHECK_AND_ASSERT_MES(r, false, "Failed to initialize miner");
@@ -200,6 +208,7 @@ namespace currency
   //-----------------------------------------------------------------------------------------------
   bool core::deinit()
   {
+    stop_wallet_snapshot_watcher();
     //m_mempool.set_last_core_hash(m_blockchain_storage.get_top_block_id());
 
 #ifdef CPU_MINING_ENABLED
@@ -209,6 +218,183 @@ namespace currency
     m_mempool.deinit();
     m_blockchain_storage.deinit();
     return true;
+  }
+  //-----------------------------------------------------------------------------------------------
+  namespace
+  {
+    typedef std::unordered_map<crypto::public_key, tools::wallet_public::wh6s_asset_meta_t> hf6_asset_meta_map_t;
+
+    uint64_t hf6_asset_decimals(const hf6_asset_meta_map_t& meta, const crypto::public_key& asset_id)
+    {
+      auto it = meta.find(asset_id);
+      return it != meta.end() ? it->second.decimal_point : CURRENCY_DISPLAY_DECIMAL_POINT;
+    }
+    // "<ticker> <asset_id>": the full asset_id is always shown because tickers are not unique across assets
+    std::string hf6_asset_label(const hf6_asset_meta_map_t& meta, const crypto::public_key& asset_id)
+    {
+      auto it = meta.find(asset_id);
+      std::string ticker = it != meta.end() ? it->second.ticker : std::string();
+      if (ticker.empty() && asset_id == native_coin_asset_id)
+        ticker = "ZANO";
+      const std::string id = epee::string_tools::pod_to_hex(asset_id);
+      return ticker.empty() ? id : ticker + " " + id;
+    }
+    std::string fmt_hf6_asset_map(const std::string& title, const std::unordered_map<crypto::public_key, uint64_t>& m, const hf6_asset_meta_map_t& meta)
+    {
+      std::stringstream ss;
+      ss << title << ":\n";
+      if (m.empty())
+        ss << "  (none)\n";
+      for (const auto& kv : m)
+        ss << "  " << hf6_asset_label(meta, kv.first) << " : " << print_money(kv.second, hf6_asset_decimals(meta, kv.first)) << " (atomic " << kv.second << ")\n";
+      return ss.str();
+    }
+    // the "write the final report" half of the processing (text form); analysis is process_wallet_hf6_snapshot()
+    std::string format_wallet_hf6_snapshot_report(const tools::wallet_public::wallet_hf6_snapshot_t& ws, const tools::wallet_public::wallet_hf6_snapshot_check_result_t& r)
+    {
+      std::stringstream ss;
+      ss << "Zano HF6 wallet snapshot report\n";
+      ss << "address             : " << ws.address << "\n";
+      ss << "outputs in snapshot : " << ws.outputs.size() << "\n";
+      ss << "window heights      : [" << tools::wallet_public::wallet_hf6_snapshot_t::c_height_min << ", "
+         << tools::wallet_public::wallet_hf6_snapshot_t::c_height_max << "]\n\n";
+      if (!r.valid)
+      {
+        ss << "RESULT: INVALID\n";
+        ss << "reason: " << r.error << "\n";
+        return ss.str();
+      }
+      ss << "RESULT: VALID\n";
+      ss << "outputs matched     : " << r.outputs_matched << "\n\n";
+      ss << fmt_hf6_asset_map("balance as of height " + std::to_string(tools::wallet_public::wallet_hf6_snapshot_t::c_height_min), r.balance_at_min, r.asset_meta) << "\n";
+      ss << fmt_hf6_asset_map("balance as of height " + std::to_string(tools::wallet_public::wallet_hf6_snapshot_t::c_height_max), r.balance_at_max, r.asset_meta) << "\n";
+      ss << fmt_hf6_asset_map("received in window", r.received_in_window, r.asset_meta) << "\n";
+      ss << fmt_hf6_asset_map("spent in window", r.spent_in_window, r.asset_meta);
+
+      ss << "\ntransactions (" << r.movements.size() << "):\n";
+      if (r.movements.empty())
+        ss << "  (none)\n";
+      for (const auto& mv : r.movements)
+      {
+        ss << "  " << epee::misc_utils::get_time_str(static_cast<time_t>(mv.timestamp))
+           << " | h " << mv.height
+           << " | " << (mv.received ? "RECEIVED" : "SPENT   ")
+           << " | " << print_money(mv.amount, hf6_asset_decimals(r.asset_meta, mv.asset_id))
+           << " | " << hf6_asset_label(r.asset_meta, mv.asset_id)
+           << " | tx " << epee::string_tools::pod_to_hex(mv.tx_id)
+           << "\n";
+      }
+      return ss.str();
+    }
+  }
+  //-----------------------------------------------------------------------------------------------
+  void core::start_wallet_snapshot_watcher()
+  {
+#ifndef MOBILE_WALLET_BUILD
+    m_wallet_snapshot_watcher_stop = false;
+    m_wallet_snapshot_watcher_thread = std::thread([this]() { wallet_snapshot_watcher_loop(); });
+#endif
+  }
+  //-----------------------------------------------------------------------------------------------
+  void core::stop_wallet_snapshot_watcher()
+  {
+    m_wallet_snapshot_watcher_stop = true;
+    if (m_wallet_snapshot_watcher_thread.joinable())
+      m_wallet_snapshot_watcher_thread.join();
+  }
+  //-----------------------------------------------------------------------------------------------
+  void core::wallet_snapshot_watcher_loop()
+  {
+    namespace fs = boost::filesystem;
+    const fs::path dir = fs::path(m_config_folder) / "wallet_snapshots";
+    const int c_poll_interval_sec = 3;
+    std::set<std::string> handled; // input files already handled this session
+
+    LOG_PRINT_L0("wallet snapshot watcher started, dir: " << dir.string());
+    while (!m_wallet_snapshot_watcher_stop.load(std::memory_order_relaxed))
+    {
+      try
+      {
+        if (fs::is_directory(dir))
+        {
+          for (fs::directory_iterator it(dir), end; it != end && !m_wallet_snapshot_watcher_stop.load(std::memory_order_relaxed); ++it)
+          {
+            const fs::path p = it->path();
+            if (!fs::is_regular_file(p) || p.extension() != ".snapshot-json")
+              continue;
+            const std::string key = p.filename().string();
+            if (handled.count(key))
+              continue;
+            // already reported (e.g. during a previous daemon run) -> skip, don't redo
+            if (fs::exists(fs::path(p).replace_extension(".report")))
+            {
+              handled.insert(key);
+              continue;
+            }
+            handled.insert(key);
+            process_wallet_snapshot_file(p.string());
+          }
+        }
+      }
+      catch (const std::exception& e)
+      {
+        LOG_ERROR("wallet snapshot watcher: " << e.what());
+      }
+      for (int i = 0; i < c_poll_interval_sec * 10 && !m_wallet_snapshot_watcher_stop.load(std::memory_order_relaxed); ++i)
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+    LOG_PRINT_L0("wallet snapshot watcher stopped");
+  }
+  //-----------------------------------------------------------------------------------------------
+  void core::process_wallet_snapshot_file(const std::string& path)
+  {
+    namespace fs = boost::filesystem;
+    const int c_settle_sec = 5; // give the writer time to finish before we open the file
+
+    LOG_PRINT_L0("wallet snapshot detected: " << path << ", processing in " << c_settle_sec << "s");
+    for (int i = 0; i < c_settle_sec * 10 && !m_wallet_snapshot_watcher_stop.load(std::memory_order_relaxed); ++i)
+      std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    if (m_wallet_snapshot_watcher_stop.load(std::memory_order_relaxed))
+      return;
+
+    // marker other tools can poll: present while this report is being generated, gone when it's done
+    const fs::path processing_path = fs::path(path).replace_extension(".processing");
+    epee::file_io_utils::save_string_to_file(processing_path.string(), "processing\n");
+    struct marker_remover { boost::filesystem::path p; ~marker_remover() { boost::system::error_code ec; boost::filesystem::remove(p, ec); } } marker{ processing_path };
+    LOG_PRINT_L0("wallet snapshot processing started: " << path);
+
+    std::string report;
+    try
+    {
+      std::string json;
+      CHECK_AND_ASSERT_THROW_MES(epee::file_io_utils::load_file_to_string(path, json), "failed to read snapshot file");
+      tools::wallet_public::wallet_hf6_snapshot_t ws{};
+      CHECK_AND_ASSERT_THROW_MES(epee::serialization::load_t_from_json(ws, json), "failed to parse snapshot json");
+      const tools::wallet_public::wallet_hf6_snapshot_check_result_t result = m_blockchain_storage.process_wallet_hf6_snapshot(ws);
+      report = format_wallet_hf6_snapshot_report(ws, result);
+    }
+    catch (const std::exception& e)
+    {
+      report = std::string("Zano HF6 wallet snapshot report\n\nRESULT: ERROR\nreason: ") + e.what() + "\n";
+      LOG_ERROR("wallet snapshot processing failed for " << path << ": " << e.what());
+    }
+
+    // write to a tmp file first, then rename -> the other party only sees a complete .report
+    const fs::path report_path = fs::path(path).replace_extension(".report");
+    const std::string tmp_path = report_path.string() + ".tmp";
+    if (!epee::file_io_utils::save_string_to_file(tmp_path, report))
+    {
+      LOG_ERROR("failed to write snapshot report tmp file: " << tmp_path);
+      return;
+    }
+    boost::system::error_code ec;
+    fs::rename(tmp_path, report_path, ec);
+    if (ec)
+    {
+      LOG_ERROR("failed to rename snapshot report " << tmp_path << " -> " << report_path.string() << ": " << ec.message());
+      return;
+    }
+    LOG_PRINT_L0("wallet snapshot report written: " << report_path.string());
   }
   //-----------------------------------------------------------------------------------------------
   bool core::handle_incoming_tx(const transaction& tx, tx_verification_context& tvc, bool kept_by_block, const crypto::hash& tx_hash_ /* = null_hash */)
