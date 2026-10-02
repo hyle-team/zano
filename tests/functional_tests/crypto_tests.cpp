@@ -1693,6 +1693,61 @@ TEST(crypto, schnorr_sig)
 }
 
 
+TEST(crypto, schnorr_sig_custom_generator)
+{
+  // generalized Schnorr proof over an arbitrary, verifier-derived generator G: knowledge of a s.t. A = a*G
+  scalar_t s_rnd = scalar_t::random();
+  hash m = *(crypto::hash*)(&s_rnd);
+  for (size_t i = 0; i < 100; ++i)
+  {
+    const point_t G = scalar_t::random() * c_point_G; // a generator that is neither c_point_G nor c_point_X
+    const scalar_t a = scalar_t::random();
+    const point_t A_pt = a * G;
+    const public_key A = A_pt.to_public_key();
+
+    generic_schnorr_sig_s ss{};
+    ASSERT_TRUE(generate_schnorr_sig_custom_generator(m, A_pt, a, ss, G));
+    ASSERT_TRUE(verify_schnorr_sig_custom_generator(m, A, G, ss));
+
+    // wrong generator / message / statement must all be rejected
+    ASSERT_FALSE(verify_schnorr_sig_custom_generator(m, A, scalar_t::random() * c_point_G, ss));
+    ASSERT_FALSE(verify_schnorr_sig_custom_generator(currency::null_hash, A, G, ss));
+    ASSERT_FALSE(verify_schnorr_sig_custom_generator(m, ((a + a) * G).to_public_key(), G, ss));
+
+    // non-reduced or altered sig scalars must be rejected
+    generic_schnorr_sig_s bad = ss;
+    bad.c = c_scalar_Pm1; ASSERT_FALSE(bad.c.is_reduced());
+    ASSERT_FALSE(verify_schnorr_sig_custom_generator(m, A, G, bad));
+    bad = ss; bad.y = c_scalar_Pm1; ASSERT_FALSE(bad.y.is_reduced());
+    ASSERT_FALSE(verify_schnorr_sig_custom_generator(m, A, G, bad));
+    bad = ss; bad.c = scalar_t::random();
+    ASSERT_FALSE(verify_schnorr_sig_custom_generator(m, A, G, bad));
+
+    // the generalization must agree with the fixed-generator specializations in both directions
+    const point_t Ag = a * c_point_G;
+    ASSERT_TRUE(generate_schnorr_sig<gt_G>(m, Ag, a, ss));
+    ASSERT_TRUE(verify_schnorr_sig_custom_generator(m, Ag.to_public_key(), c_point_G, ss));
+    ASSERT_TRUE(generate_schnorr_sig_custom_generator(m, Ag, a, ss, c_point_G));
+    ASSERT_TRUE(verify_schnorr_sig<gt_G>(m, Ag.to_public_key(), ss));
+    const point_t Ax = a * c_point_X;
+    ASSERT_TRUE(generate_schnorr_sig<gt_X>(m, Ax, a, ss));
+    ASSERT_TRUE(verify_schnorr_sig_custom_generator(m, Ax.to_public_key(), c_point_X, ss));
+
+    const scalar_t x = scalar_t::random();
+    const point_t P = x * c_point_G;
+    const point_t G_kiss = hash_helper_t::hp(P) - c_point_G;
+    const point_t A_kiss = x * hash_helper_t::hp(P) - P; // == ki - P == x*G_kiss
+    ASSERT_TRUE(A_kiss == x * G_kiss);
+    generic_schnorr_sig_s kiss{};
+    ASSERT_TRUE(generate_schnorr_sig_custom_generator(m, A_kiss, x, kiss, G_kiss));
+    ASSERT_TRUE(verify_schnorr_sig_custom_generator(m, A_kiss.to_public_key(), G_kiss, kiss));
+    ASSERT_FALSE(verify_schnorr_sig_custom_generator(m, (A_kiss + c_point_G).to_public_key(), G_kiss, kiss));
+  }
+
+  return true;
+}
+
+
 TEST(crypto, double_schnorr_sig)
 {
   public_key invalid_pk = parse_tpod_from_hex_string<public_key>("000000000000000000000000000000000000000000000000000000000000000c");

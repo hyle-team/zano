@@ -158,8 +158,9 @@ namespace crypto
     }
   }
 
-  template<>
-  inline bool verify_schnorr_sig<gt_X>(const hash& m, const public_key& A, const generic_schnorr_sig& sig) noexcept
+  // note: G must be verifier-derived, never prover-provided
+  template<typename generator_t>
+  inline bool verify_schnorr_sig_custom_generator(const hash& m, const public_key& A, const generator_t& G, const generic_schnorr_sig& sig) noexcept
   {
     try
     {
@@ -168,13 +169,19 @@ namespace crypto
       hash_helper_t::hs_t hsc(3);
       hsc.add_hash(m);
       hsc.add_pub_key(A);
-      hsc.add_point(sig.y * c_point_X + sig.c * point_t(A));
+      hsc.add_point(sig.y * G + sig.c * point_t(A));
       return sig.c == hsc.calc_hash();
     }
     catch(...)
     {
       return false;
     }
+  }
+
+  template<>
+  inline bool verify_schnorr_sig<gt_X>(const hash& m, const public_key& A, const generic_schnorr_sig& sig) noexcept
+  {
+    return verify_schnorr_sig_custom_generator(m, A, c_point_X, sig);
   }
 
   // --------------------------------------------
