@@ -44,6 +44,7 @@ using namespace epee;
 #include "wallet_debug_events_definitions.h"
 #include "decoy_selection.h"
 #include "wallet_helpers.h"
+#include "currency_core/out_back_refs_hop1.h"
 
 #include "net/levin_socks5.h"
 
@@ -3376,7 +3377,23 @@ void wallet2::load_votes_config()
 void wallet2::load(const std::wstring& wallet_, const std::string& password, bool skip_pending_ki_load /* = false */)
 {
   clear();
+#ifdef HF6_SNAPSHOT_BUILD
+  // keep the original wallet file completely untouched
+  std::wstring wallet_to_open = wallet_ + L".hf6-pre-rollback";
+  {
+    boost::system::error_code ec;
+    if (!boost::filesystem::exists(wallet_to_open, ec))
+    {
+      WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(boost::filesystem::exists(wallet_, ec), "wallet file not found: " << epee::string_encoding::convert_to_ansii(wallet_));
+      boost::filesystem::copy_file(wallet_, wallet_to_open, ec);
+      WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(!ec, "failed to copy wallet to pre-rollback file " << epee::string_encoding::convert_to_ansii(wallet_to_open) << ": " << ec.message());
+    }
+  }
+  prepare_file_names(wallet_to_open);
+  m_pending_ki_file = m_wallet_file + L".outkey2ki";
+#else
   prepare_file_names(wallet_);
+#endif
 
   m_password = password;
 
@@ -9207,14 +9224,17 @@ bool wallet2::make_hf6_snapshot(wallet_public::wallet_hf6_snapshot_t& ws, std::a
   return extract_hf6_snapshot(ws, stop);
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::make_hf6_snapshot_to_file(std::atomic<bool>& stop, std::string& out_file_path)
+bool wallet2::make_hf6_snapshot_to_file(std::atomic<bool>& stop, const std::string& chosen_location, std::string& out_file_path)
 {
   wallet_public::wallet_hf6_snapshot_t ws{};
   if (!make_hf6_snapshot(ws, stop))
     return false;
 
-  // canonical location: next to the wallet file, named <address>.snapshot-json
-  const boost::filesystem::path file = boost::filesystem::path(m_wallet_file).parent_path() / (m_account.get_public_address_str() + ".snapshot-json");
+  // the filename is fixed (<address>.snapshot-json); only the directory is user-selectable.
+  const boost::filesystem::path dir = chosen_location.empty()
+    ? boost::filesystem::path(m_wallet_file).parent_path()
+    : boost::filesystem::path(chosen_location).parent_path();
+  const boost::filesystem::path file = dir / (m_account.get_public_address_str() + ".snapshot-json");
   const std::string json = epee::serialization::store_t_to_json(ws);
   const std::string tmp_path = file.string() + ".tmp";
   WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(epee::file_io_utils::save_string_to_file(tmp_path, json), "failed to write snapshot tmp file: " << tmp_path);
@@ -9243,6 +9263,17 @@ bool wallet2::extract_hf6_snapshot(wallet_public::wallet_hf6_snapshot_t& ws, std
   {
     if (stop.load(std::memory_order_relaxed))
       return false;
+
+    bool keep = false;
+    // keep all outs in [3833001, 3878977] range
+    if (c_hf6_rollback_min_height <= td.m_ptx_wallet_info->m_block_height && td.m_ptx_wallet_info->m_block_height <= c_hf6_rollback_max_height)
+      keep = true;
+    // keep back refs hop1 with regard to [3833001, 3878977] txs
+    if (currency::is_out_in_back_refs_hop1(td.amount_for_global_output_index(), td.m_global_output_index))
+      keep = true;
+    if (!keep)
+      continue;
+
     // recompute the one-time secret x for this output:  P = x*G,  ki = x*Hp(P)
     const crypto::public_key tx_pub_key = currency::get_tx_pub_key_from_extra(td.m_ptx_wallet_info->m_tx);
     currency::keypair ephemeral{};

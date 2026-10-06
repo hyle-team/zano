@@ -759,7 +759,7 @@ namespace plain_wallet
     PLAIN_WALLET_BEGIN_TRY_ENTRY();
     GET_INSTANCE_PTR(inst_ptr);
     // long-op: safe to drive via async_call (runs on its own thread; poll try_pull_result for the result)
-    return inst_ptr->gwm.make_hf6_snapshot(instance_id);
+    return inst_ptr->gwm.make_hf6_snapshot(instance_id, std::string()); // no Save-As dialog here: default location (next to the wallet file)
     PLAIN_WALLET_CATCH();
   }
 

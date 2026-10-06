@@ -389,9 +389,20 @@ bool wallets_manager::init(view::i_view* pview_handler)
     path_to_html = "qrc:/html";
   }
 
-  if (command_line::has_arg(m_vm, arg_remote_node))
-  {
+#define REMOTE_NODE_DEFAULT "157.180.54.169:4499"
+
+#ifdef HF6_SNAPSHOT_BUILD
+  // hf6 snapshot build: remote-node mode is the default working mode (the pre-rollback node);
+  // an explicit --remote-node still overrides the address.
+  const bool enable_remote_node = true;
+  m_daemon_address = command_line::has_arg(m_vm, arg_remote_node) ? command_line::get_arg(m_vm, arg_remote_node) : std::string(REMOTE_NODE_DEFAULT);
+#else
+  const bool enable_remote_node = command_line::has_arg(m_vm, arg_remote_node);
+  if (enable_remote_node)
     m_daemon_address = command_line::get_arg(m_vm, arg_remote_node);
+#endif
+  if (enable_remote_node)
+  {
     m_remote_node_mode = true;
     auto proxy_ptr = new tools::default_http_core_proxy();
     proxy_ptr->set_connectivity(HTTP_PROXY_TIMEOUT,  HTTP_PROXY_ATTEMPTS_COUNT);
@@ -1806,7 +1817,7 @@ std::string wallets_manager::invoke(uint64_t wallet_id, std::string params)
   return response_info.m_body;
 }
 //------------------------------------------------------------------------------------------------------------------
-std::string wallets_manager::make_hf6_snapshot(uint64_t wallet_id)
+std::string wallets_manager::make_hf6_snapshot(uint64_t wallet_id, const std::string& chosen_location)
 {
   std::shared_ptr<tools::wallet2> wptr;
   {
@@ -1817,7 +1828,7 @@ std::string wallets_manager::make_hf6_snapshot(uint64_t wallet_id)
   tools::wallet_public::hf6_snapshot_result result{};
   try
   {
-    if (wptr->make_hf6_snapshot_to_file_cancellable(result.file)) // cancellable via cancel_hf6_snapshot(); writes <wallet-dir>/<address>.snapshot-json
+    if (wptr->make_hf6_snapshot_to_file_cancellable(chosen_location, result.file)) // cancellable via cancel_hf6_snapshot(); writes <address>.snapshot-json into chosen_location's dir
       result.status = API_RETURN_CODE_OK;
     else
       result.status = API_RETURN_CODE_INTERNAL_ERROR;

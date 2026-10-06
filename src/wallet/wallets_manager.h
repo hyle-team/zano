@@ -106,7 +106,7 @@ public:
   std::string invoke(uint64_t wallet_id, std::string params);
   std::string get_wallet_status(uint64_t wallet_id);
   std::string run_wallet(uint64_t wallet_id);
-  std::string make_hf6_snapshot(uint64_t wallet_id); // scans the (already fully synced, non-concise) wallet and writes the snapshot file; returns hf6_snapshot_result json
+  std::string make_hf6_snapshot(uint64_t wallet_id, const std::string& chosen_location); // scans the wallet and writes <address>.snapshot-json into chosen_location's dir (empty -> next to the wallet file); returns hf6_snapshot_result json
   std::string cancel_hf6_snapshot(uint64_t wallet_id); // cancels an in-progress make_hf6_snapshot for the wallet
   std::string get_recent_transfers(size_t wallet_id, uint64_t offset, uint64_t count, view::transfers_array& tr_hist, bool exclude_mining_txs = false);
   std::string get_wallet_info(uint64_t wallet_id, view::wallet_info& wi);

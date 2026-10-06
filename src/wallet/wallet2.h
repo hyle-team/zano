@@ -823,11 +823,12 @@ namespace tools
     // builds the snapshot and writes it next to the wallet file as <address>.snapshot-json (tmp file + rename);
     // the written path is returned in out_file_path.
     void cancel_hf6_snapshot() { m_hf6_snapshot_stop.store(true, std::memory_order_relaxed); } // cancels a snapshot started via the cancellable overload
-    bool make_hf6_snapshot_to_file(std::atomic<bool>& stop, std::string& out_file_path);
-    // CLI path: cancellable via stop()/m_stop (Ctrl-C)
-    bool make_hf6_snapshot_to_file(std::string& out_file_path) { return make_hf6_snapshot_to_file(m_stop, out_file_path); }
+    // the file is always named <address>.snapshot-json; chosen_location (if non-empty) selects only its directory (a file path's dir is taken), empty -> next to the wallet file.
+    bool make_hf6_snapshot_to_file(std::atomic<bool>& stop, const std::string& chosen_location, std::string& out_file_path);
+    // CLI path: default location, cancellable via stop()/m_stop (Ctrl-C)
+    bool make_hf6_snapshot_to_file(std::string& out_file_path) { return make_hf6_snapshot_to_file(m_stop, std::string(), out_file_path); }
     // GUI/manager path: cancellable via cancel_hf6_snapshot() (dedicated flag, reset here so a prior cancel doesn't abort instantly)
-    bool make_hf6_snapshot_to_file_cancellable(std::string& out_file_path) { m_hf6_snapshot_stop.store(false, std::memory_order_relaxed); return make_hf6_snapshot_to_file(m_hf6_snapshot_stop, out_file_path); }
+    bool make_hf6_snapshot_to_file_cancellable(const std::string& chosen_location, std::string& out_file_path) { m_hf6_snapshot_stop.store(false, std::memory_order_relaxed); return make_hf6_snapshot_to_file(m_hf6_snapshot_stop, chosen_location, out_file_path); }
 
     construct_tx_param get_default_construct_tx_param();
     uint64_t get_current_pos_attempts() const { return m_pos_attempts_count; }

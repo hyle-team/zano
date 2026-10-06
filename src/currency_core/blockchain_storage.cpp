@@ -42,6 +42,7 @@
 #include "crypto/bitcoin/sha256_helper.h"
 #include "crypto_config.h"
 #include "hardfork_specific_terms.h"
+#include "out_back_refs_hop1.h"
 
 
 #undef LOG_DEFAULT_CHANNEL 
@@ -9783,6 +9784,7 @@ tools::wallet_public::wallet_hf6_snapshot_check_result_t blockchain_storage::pro
       }
       const uint64_t gindex = tce.m_global_output_indexes[out_index];
 
+      uint64_t amount_for_gindex = UINT64_MAX;
       crypto::public_key P{};
       bool is_bare = false;
       const tx_out_v& ov = tce.tx.vout[out_index];
@@ -9797,10 +9799,12 @@ tools::wallet_public::wallet_hf6_snapshot_check_result_t blockchain_storage::pro
         }
         P = boost::get<txout_to_key>(ob.target).key;
         is_bare = true;
+        amount_for_gindex = ob.amount;
       }
       else if (ov.type() == typeid(tx_out_zarcanum))
       {
         P = boost::get<tx_out_zarcanum>(ov).stealth_address;
+        amount_for_gindex = 0;
       }
       else
       {
@@ -9808,6 +9812,17 @@ tools::wallet_public::wallet_hf6_snapshot_check_result_t blockchain_storage::pro
         scan_err = "owned output of unsupported type, gindex=" + std::to_string(gindex);
         return false;
       }
+
+      bool keep = false;
+      // keep all outs in [3833001, 3878977] range
+      if (c_hf6_rollback_min_height <= tce.m_keeper_block_height && tce.m_keeper_block_height <= c_hf6_rollback_max_height)
+        keep = true;
+      // keep back refs hop1 with regard to [3833001, 3878977] txs
+      if (currency::is_out_in_back_refs_hop1(amount_for_gindex, gindex))
+        keep = true;
+      if (!keep)
+        continue;
+
 
       owned_gindexes.insert(gindex);
 

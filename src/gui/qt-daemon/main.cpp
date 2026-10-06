@@ -72,7 +72,7 @@ int main(int argc, char *argv[])
 #endif
 
   app.installNativeEventFilter(&viewer);
-  viewer.setWindowTitle(CURRENCY_NAME_BASE);
+  viewer.setWindowTitle("Zano Pre-Rollback Snapshot");
   viewer.show_inital();
 
   int res = app.exec();

@@ -216,9 +216,20 @@ public:
   struct wallet_id_obj
   {
     uint64_t wallet_id;
-    
+
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(wallet_id)
+    END_KV_SERIALIZE_MAP()
+  };
+
+  struct make_hf6_snapshot_request
+  {
+    uint64_t    wallet_id;
+    std::string out_path; // user-chosen Save-As path; only its directory is used (filename is fixed)
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(wallet_id)
+      KV_SERIALIZE(out_path)
     END_KV_SERIALIZE_MAP()
   };
 
