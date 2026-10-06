@@ -55,7 +55,6 @@ const command_line::arg_descriptor<bool> arg_disable_logs_init("disable-logs-ini
 const command_line::arg_descriptor<std::string> arg_qt_dev_tools  ( "qt-dev-tools", "Enable main web page inspection with Chromium DevTools, <vertical|horizontal>[,scale], e.g. \"horizontal,1.3\"", "");
 const command_line::arg_descriptor<bool> arg_disable_price_fetch("gui-disable-price-fetch", "Disable price fetching in UI(for privacy matter)");
 const command_line::arg_descriptor<bool> arg_allow_weak_password("allow-weak-password", "Allow setting a wallet password that doesn't meet the password policy");
-const command_line::arg_descriptor<bool> arg_unsecure_disable_extension_id_check("unsecure-disable-extension-id-check", "Disable official extension ID check for HTTP requests");
 
 
 const command_line::arg_descriptor<std::string> arg_xcode_stub("-NSDocumentRevisionsDebugMode", "Substitute for xcode bug");
@@ -204,7 +203,7 @@ bool wallets_manager::init_command_line(int argc, char* argv[], std::string& fai
   command_line::add_arg(desc_cmd_sett, arg_qt_dev_tools);
   command_line::add_arg(desc_cmd_sett, arg_disable_price_fetch);
   command_line::add_arg(desc_cmd_only, arg_allow_weak_password);
-  command_line::add_arg(desc_cmd_sett, arg_unsecure_disable_extension_id_check);
+  command_line::add_arg(desc_cmd_sett, command_line::arg_unsecure_disable_extension_id_check);
   
   command_line::add_arg(desc_cmd_sett, command_line::arg_enable_tx_socks5_relay_proxy);
   command_line::add_arg(desc_cmd_sett, command_line::arg_tx_relay_url);
@@ -334,9 +333,11 @@ bool wallets_manager::init(view::i_view* pview_handler)
   {
     m_ui_opt.disable_price_fetch = true;
   }
-  if(command_line::has_arg(m_vm, arg_unsecure_disable_extension_id_check) && command_line::get_arg(m_vm, arg_unsecure_disable_extension_id_check))
+  if(command_line::has_arg(m_vm, command_line::arg_unsecure_disable_extension_id_check) && command_line::get_arg(m_vm, command_line::arg_unsecure_disable_extension_id_check))
   {
+#ifndef MOBILE_WALLET_BUILD
     m_wallet_rpc_server.get_origin_verifier().set_enabled(false);
+#endif
   }
 
   //if (command_line::has_arg(m_vm, command_line::arg_allow_legacy_payment_id_size))
@@ -933,6 +934,7 @@ void wallets_manager::init_wallet_entry(wallet_vs_options& wo, uint64_t id)
   wo.rpc_wrapper->set_flag_allow_legacy_payment_id_size(true); // always treas as --allow-legacy-payment-id-size
   if (m_remote_node_mode)
   {
+    wo.w.unlocked_get()->set_compact_sync(true);
     wo.core_conf = currency::get_default_core_runtime_config();
   }
   else

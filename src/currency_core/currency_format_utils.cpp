@@ -4,6 +4,7 @@
 // Copyright (c) 2012-2013 The Boolberry developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
+#include <limits>
 #include <regex>
 #include "include_base_utils.h"
 #include <boost/foreach.hpp>
@@ -4051,6 +4052,7 @@ namespace currency
       auto blextin_ptr = std::make_shared<currency::block_extended_info>();
       bool r = currency::parse_and_validate_block_from_blob(bl_entry.block, blextin_ptr->bl);
       bdde.block_ptr = blextin_ptr;
+      bdde.compact = bl_entry.compact;
       CHECK_AND_ASSERT_MES(r, false, "failed to parse block from blob: " << string_tools::buff_to_hex_nodelimer(bl_entry.block));
       size_t i = 0;
       if (bl_entry.tx_global_outs.size())
@@ -4079,7 +4081,6 @@ namespace currency
     }
     return true;
   }
-
   //---------------------------------------------------------------
   uint64_t get_alias_coast_from_fee(const std::string& alias, uint64_t median_fee)
   {
