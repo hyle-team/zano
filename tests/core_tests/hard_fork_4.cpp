@@ -4,6 +4,8 @@
 #include "chaingen.h"
 #include "hard_fork_4.h"
 #include "random_helper.h"
+#include "storages/portable_storage_template_helper.h"
+#include "wallet/bare_outputs_snapshot.h"
 
 using namespace currency;
 
@@ -398,6 +400,601 @@ bool hardfork_4_wallet_sweep_bare_outs::c1(currency::core& c, size_t ev_index, c
   bob_wlt->refresh();
   CHECK_AND_ASSERT_MES(check_balance_via_wallet(*bob_wlt.get(), "Bob", MK_TEST_COINS(23 + 55) - TESTS_DEFAULT_FEE, UINT64_MAX, MK_TEST_COINS(23 + 55) - TESTS_DEFAULT_FEE, 0, 0), false, "");
 
+  return true;
+}
+
+//------------------------------------------------------------------------------
+
+hardfork_4_bare_decoy_indices::hardfork_4_bare_decoy_indices()
+{
+  REGISTER_CALLBACK_METHOD(hardfork_4_bare_decoy_indices, configure_core);
+  REGISTER_CALLBACK_METHOD(hardfork_4_bare_decoy_indices, c1);
+
+  m_hardforks.clear();
+  m_hardforks.set_hardfork_height(ZANO_HARDFORK_01, 0);
+  m_hardforks.set_hardfork_height(ZANO_HARDFORK_02, 0);
+  m_hardforks.set_hardfork_height(ZANO_HARDFORK_03, 0);
+  m_hardforks.set_hardfork_height(ZANO_HARDFORK_04_ZARCANUM, HF4_ACTIVE_AFTER);
+}
+
+bool hardfork_4_bare_decoy_indices::configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  CHECK_AND_ASSERT_MES(test_chain_unit_enchanced::configure_core(c, ev_index, events), false, "default configure_core failed");
+  core_runtime_config config = c.get_blockchain_storage().get_core_runtime_config();
+  config.hf4_minimum_mixins = CURRENCY_HF4_MANDATORY_DECOY_SET_SIZE;
+  c.get_blockchain_storage().set_core_runtime_config(config);
+  return true;
+}
+
+bool hardfork_4_bare_decoy_indices::generate(std::vector<test_event_entry>& events) const
+{
+  // A short chain with seventeen bare outputs of the same amount.
+  const uint64_t ts = test_core_time::get_time();
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
+  account_base& bob_acc = m_accounts[BOB_ACC_IDX]; bob_acc.generate(); bob_acc.set_createtime(ts);
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
+  const uint64_t bare_amount = 6 * COIN / 10;
+  std::vector<tx_destination_entry> destinations{
+    tx_destination_entry(bare_amount, alice_acc.get_public_address()),
+    tx_destination_entry(COIN, miner_acc.get_public_address())
+  };
+  CHECK_AND_ASSERT_MES(replace_coinbase_in_genesis_block(destinations, generator, events, blk_0), false, "cannot fund the bare input");
+  DO_CALLBACK(events, "configure_core");
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  transaction decoy_tx{};
+  CHECK_AND_ASSERT_MES(construct_tx_with_many_outputs(m_hardforks, events, blk_0r, miner_acc.get_keys(), bob_acc.get_public_address(),
+    DECOYS_COUNT * bare_amount, DECOYS_COUNT, TESTS_DEFAULT_FEE, decoy_tx), false, "cannot create the bare decoys");
+  ADD_CUSTOM_EVENT(events, decoy_tx);
+  MAKE_NEXT_BLOCK_TX1(events, decoy_block, blk_0r, miner_acc, decoy_tx);
+  CHECK_AND_ASSERT_EQ(get_block_height(decoy_block), DECOY_BLOCK_HEIGHT);
+  REWIND_BLOCKS_N_WITH_TIME(events, final_block, decoy_block, miner_acc, FINAL_TOP_HEIGHT - DECOY_BLOCK_HEIGHT);
+  DO_CALLBACK(events, "c1");
+  return true;
+}
+
+bool hardfork_4_bare_decoy_indices::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  struct core_proxy : public tools::i_core_proxy
+  {
+    enum mutation { NONE, MISSING, DUPLICATE, OWN_KEY, OLD_NODE, NOT_ALLOWED, HEIGHT_LIMIT, EMPTY_POOL, OWN_ABSENT };
+
+    core_proxy(std::shared_ptr<tools::i_core_proxy> delegate, mutation change)
+      : m_delegate(std::move(delegate)), m_change(change)
+    {}
+
+    bool call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request& req,
+      COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::response& rsp) override
+    {
+      ++m_calls;
+      m_request = req;
+      CHECK_AND_ASSERT_MES(req.batches.size() == 1 && req.batches[0].heights.empty()
+        && req.batches[0].ring_size == CURRENCY_HF4_MANDATORY_DECOY_SET_SIZE + 1,
+        false, "wallet did not request bare candidates");
+      if (m_change == OLD_NODE)
+      {
+        auto legacy_req = req;
+        legacy_req.batches[0].global_offsets.clear();
+        legacy_req.batches[0].ring_size = 0;
+        CHECK_AND_ASSERT_MES(m_delegate->call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4(legacy_req, rsp), false, "legacy output RPC failed");
+        m_response = rsp;
+        return true;
+      }
+      auto forwarded = req;
+      if (m_change == HEIGHT_LIMIT)
+        forwarded.height_upper_limit = 1; // bare candidates must ignore the height limit
+      else if (m_change == OWN_ABSENT)
+        for (size_t i = 0; i < forwarded.batches[0].global_offsets.size(); ++i)
+          forwarded.batches[0].global_offsets[i] = i + 1; // all sixteen Bob outputs, Alice adds her own index locally
+      CHECK_AND_ASSERT_MES(m_delegate->call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4(forwarded, rsp), false, "candidate output RPC failed");
+      CHECK_AND_ASSERT_MES(rsp.status == API_RETURN_CODE_OK && rsp.blocks_batches.size() == 1
+        && !rsp.blocks_batches[0].blocks.empty() && !rsp.blocks_batches[0].blocks[0].outs.empty(), false, "invalid genuine candidate response");
+      auto& blocks = rsp.blocks_batches[0].blocks;
+      auto& outs = blocks[0].outs;
+      if (m_change == MISSING)
+      {
+        // a truncated pool must not reduce the requested number of decoys
+        size_t remaining = CURRENCY_HF4_MANDATORY_DECOY_SET_SIZE - 1;
+        for (auto& block : blocks)
+        {
+          const size_t keep = std::min(remaining, block.outs.size());
+          block.outs.resize(keep);
+          remaining -= keep;
+        }
+      }
+      else if (m_change == DUPLICATE)
+      {
+        blocks.back().outs.back().global_amount_index = outs[0].global_amount_index;
+      }
+      else if (m_change == OWN_KEY || m_change == NOT_ALLOWED)
+      {
+        for (auto& block : blocks)
+          for (auto& output : block.outs)
+          {
+            // index 0 belongs to Alice; all other matching outputs belong to Bob
+            if (output.global_amount_index == 0)
+              continue;
+            if (m_change == OWN_KEY)
+              output.stealth_address = null_pkey;
+            else
+              output.flags |= RANDOM_OUTPUTS_FOR_AMOUNTS_FLAGS_NOT_ALLOWED;
+          }
+      }
+      else if (m_change == EMPTY_POOL)
+        blocks.clear();
+      m_response = rsp;
+      return true;
+    }
+
+    bool call_COMMAND_RPC_SEND_RAW_TX(const COMMAND_RPC_SEND_RAW_TX::request& req, COMMAND_RPC_SEND_RAW_TX::response& rsp) override
+    {
+      ++m_sends;
+      return m_delegate->call_COMMAND_RPC_SEND_RAW_TX(req, rsp);
+    }
+
+    std::shared_ptr<tools::i_core_proxy> m_delegate;
+    mutation m_change;
+    size_t m_calls = 0;
+    size_t m_sends = 0;
+    COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request m_request{};
+    COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::response m_response{};
+  };
+
+  const uint64_t bare_amount = 6 * COIN / 10;
+  const size_t decoys_count = CURRENCY_HF4_MANDATORY_DECOY_SET_SIZE;
+  auto& bcs = c.get_blockchain_storage();
+  CHECK_AND_ASSERT_EQ(bcs.get_top_block_height(), FINAL_TOP_HEIGHT);
+  CHECK_AND_ASSERT_EQ(bcs.get_outputs_container().get_item_size(bare_amount), DECOYS_COUNT + 1);
+  CHECK_AND_ASSERT_EQ(bcs.get_core_runtime_config().hf4_minimum_mixins, decoys_count);
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
+
+  const auto count_it = currency::bare_outputs_snapshot::bare_output_count_by_amount.find(bare_amount);
+  CHECK_AND_ASSERT_MES(count_it != currency::bare_outputs_snapshot::bare_output_count_by_amount.end()
+    && count_it->second > DECOYS_COUNT + 1, false, "embedded count does not exceed the test chain's amount range");
+
+  // released binary RPC messages omit the additive fields, decode through the actual KV path
+  epee::serialization::portable_storage legacy_request_storage;
+  const std::string legacy_request_json = "{\"batches\":[{\"input_amount\":" + std::to_string(bare_amount)
+    + ",\"heights\":[0]}],\"height_upper_limit\":0,\"look_up_strategy\":\"" + std::string(LOOK_UP_STRATEGY_REGULAR_TX) + "\"}";
+  CHECK_AND_ASSERT_MES(legacy_request_storage.load_from_json(legacy_request_json), false, "cannot parse legacy request fixture");
+  std::string legacy_request_binary;
+  CHECK_AND_ASSERT_MES(legacy_request_storage.store_to_binary(legacy_request_binary), false, "cannot encode legacy request fixture");
+  COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request decoded_request{};
+  decoded_request.batches.resize(1);
+  decoded_request.batches[0].global_offsets = {99};
+  decoded_request.batches[0].ring_size = 99;
+  CHECK_AND_ASSERT_MES(epee::serialization::load_t_from_binary(decoded_request, legacy_request_binary), false, "cannot decode legacy request fixture");
+  CHECK_AND_ASSERT_EQ(decoded_request.batches.size(), 1);
+  CHECK_AND_ASSERT_EQ(decoded_request.batches[0].input_amount, bare_amount);
+  CHECK_AND_ASSERT_EQ(decoded_request.batches[0].heights.size(), 1);
+  CHECK_AND_ASSERT_EQ(decoded_request.batches[0].heights[0], 0);
+  CHECK_AND_ASSERT_MES(decoded_request.batches[0].global_offsets.empty(), false, "missing candidates did not default to empty");
+  CHECK_AND_ASSERT_EQ(decoded_request.batches[0].ring_size, 0);
+
+  epee::serialization::portable_storage legacy_response_storage;
+  CHECK_AND_ASSERT_MES(legacy_response_storage.load_from_json("{\"blocks_batches\":[{\"blocks\":[]}],\"status\":\"OK\"}"),
+    false, "cannot parse legacy response fixture");
+  std::string legacy_response_binary;
+  CHECK_AND_ASSERT_MES(legacy_response_storage.store_to_binary(legacy_response_binary), false, "cannot encode legacy response fixture");
+  COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::response decoded_response{};
+  CHECK_AND_ASSERT_MES(epee::serialization::load_t_from_binary(decoded_response, legacy_response_binary), false, "cannot decode legacy response fixture");
+  CHECK_AND_ASSERT_EQ(decoded_response.status, std::string(API_RETURN_CODE_OK));
+  CHECK_AND_ASSERT_EQ(decoded_response.blocks_batches.size(), 1);
+  CHECK_AND_ASSERT_MES(decoded_response.blocks_batches[0].blocks.empty(), false, "legacy response unexpectedly contains blocks");
+
+  COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request candidate_req{};
+  candidate_req.look_up_strategy = LOOK_UP_STRATEGY_REGULAR_TX;
+  candidate_req.batches.resize(1);
+  candidate_req.batches[0].input_amount = bare_amount;
+  candidate_req.batches[0].global_offsets = {0, 1};
+  candidate_req.batches[0].ring_size = 2;
+  auto check_candidate_response = [&](const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request& req, size_t expected_count, std::unordered_set<uint64_t>& indices) -> bool
+  {
+    COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::response rsp{};
+    CHECK_AND_ASSERT_MES(m_core_proxy->call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4(req, rsp), false, "candidate output RPC failed");
+    CHECK_AND_ASSERT_EQ(rsp.status, std::string(API_RETURN_CODE_OK));
+    CHECK_AND_ASSERT_EQ(rsp.blocks_batches.size(), 1);
+    const auto& batch = rsp.blocks_batches[0];
+    const uint64_t indexed_output_count = bcs.get_outputs_container().get_item_size(req.batches[0].input_amount);
+    indices.clear();
+    for (const auto& block : batch.blocks)
+      for (const auto& output : block.outs)
+      {
+        CHECK_AND_ASSERT_MES(indices.insert(output.global_amount_index).second, false, "duplicate candidate response identity");
+        CHECK_AND_ASSERT_MES(output.global_amount_index < indexed_output_count, false, "out-of-range candidate response identity");
+        CHECK_AND_ASSERT_EQ(block.block_height, (output.global_amount_index == 0 ? 0 : DECOY_BLOCK_HEIGHT));
+        CHECK_AND_ASSERT_EQ(output.flags, 0);
+      }
+    CHECK_AND_ASSERT_EQ(indices.size(), expected_count);
+    return true;
+  };
+  std::unordered_set<uint64_t> response_indices;
+  decoded_request.height_upper_limit = 1;
+  CHECK_AND_ASSERT_MES(check_candidate_response(decoded_request, 1, response_indices), false, "legacy height lookup ignored its height limit");
+  CHECK_AND_ASSERT_MES(response_indices.count(0), false, "legacy height lookup omitted the genesis output");
+  CHECK_AND_ASSERT_MES(check_candidate_response(candidate_req, 2, response_indices), false, "valid candidates failed");
+  CHECK_AND_ASSERT_MES(response_indices.count(0) && response_indices.count(1), false, "valid candidate indices were remapped");
+  candidate_req.batches[0].global_offsets = {DECOYS_COUNT + 1, 1}; // index == N must wrap to 0.
+  CHECK_AND_ASSERT_MES(check_candidate_response(candidate_req, 2, response_indices), false, "boundary modulo failed");
+  CHECK_AND_ASSERT_MES(response_indices.count(0) && response_indices.count(1), false, "boundary index did not map to zero");
+  candidate_req.batches[0].global_offsets = {DECOYS_COUNT, DECOYS_COUNT};
+  CHECK_AND_ASSERT_MES(check_candidate_response(candidate_req, 2, response_indices), false, "collision wrap failed");
+  CHECK_AND_ASSERT_MES(response_indices.count(DECOYS_COUNT) && response_indices.count(0), false, "collision did not wrap from the last index to zero");
+  candidate_req.batches[0].global_offsets = {2 * DECOYS_COUNT + 1, 2 * DECOYS_COUNT + 1}; // Both seeds map to the last index.
+  CHECK_AND_ASSERT_MES(check_candidate_response(candidate_req, 2, response_indices), false, "modulo collision wrap failed");
+  CHECK_AND_ASSERT_MES(response_indices.count(DECOYS_COUNT) && response_indices.count(0), false, "modulo collision did not wrap to zero");
+  candidate_req.batches[0].ring_size = 4;
+  candidate_req.batches[0].global_offsets = {0, 0, 8, 8};
+  CHECK_AND_ASSERT_MES(check_candidate_response(candidate_req, 4, response_indices), false, "per-candidate collision fill failed");
+  CHECK_AND_ASSERT_MES(response_indices.count(0) && response_indices.count(1) && response_indices.count(8) && response_indices.count(9),
+    false, "collisions were not resolved from their own candidate indices");
+  candidate_req.batches[0].ring_size = 2;
+  candidate_req.batches[0].global_offsets = {DECOYS_COUNT, DECOYS_COUNT};
+  candidate_req.height_upper_limit = 1;
+  CHECK_AND_ASSERT_MES(check_candidate_response(candidate_req, 2, response_indices), false, "bare candidates used the height limit");
+  CHECK_AND_ASSERT_MES(response_indices.count(DECOYS_COUNT) && response_indices.count(0), false, "height limit changed bare collision resolution");
+  candidate_req.height_upper_limit = 0;
+  candidate_req.batches[0].ring_size = decoys_count + 1;
+  candidate_req.batches[0].global_offsets.assign(decoys_count + 1, 2 * (DECOYS_COUNT + 1));
+  CHECK_AND_ASSERT_MES(check_candidate_response(candidate_req, decoys_count + 1, response_indices), false, "collision fill failed");
+  for (uint64_t index = 0; index < decoys_count + 1; ++index)
+    CHECK_AND_ASSERT_MES(response_indices.count(index), false, "linear collision fill omitted index " << index);
+  candidate_req.batches[0].global_offsets.assign(2 * (decoys_count + 1), 0);
+  CHECK_AND_ASSERT_MES(check_candidate_response(candidate_req, DECOYS_COUNT + 1, response_indices), false, "full bucket lookup omitted eligible outputs");
+  candidate_req.height_upper_limit = 1;
+  CHECK_AND_ASSERT_MES(check_candidate_response(candidate_req, DECOYS_COUNT + 1, response_indices), false, "height limit reduced the bare pool");
+  candidate_req.height_upper_limit = 0;
+  candidate_req.batches[0].input_amount = bare_amount + 1;
+  CHECK_AND_ASSERT_MES(check_candidate_response(candidate_req, 0, response_indices), false, "empty bucket was not handled");
+  candidate_req.batches[0].input_amount = bare_amount;
+
+  auto check_rejected_request = [&](const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request& req, const std::string& status) -> bool
+  {
+    COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::response rsp{};
+    CHECK_AND_ASSERT_MES(m_core_proxy->call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4(req, rsp), false, "request failed before reaching the handler");
+    CHECK_AND_ASSERT_EQ(rsp.status, status);
+    return true;
+  };
+  auto bad_req = candidate_req;
+  bad_req.batches[0].input_amount = 0;
+  CHECK_AND_ASSERT_MES(check_rejected_request(bad_req, API_RETURN_CODE_FAIL), false, "ZC amount accepted in bare mode");
+  bad_req = candidate_req;
+  bad_req.batches[0].heights = {0};
+  CHECK_AND_ASSERT_MES(check_rejected_request(bad_req, API_RETURN_CODE_FAIL), false, "mixed index and height modes accepted");
+  bad_req = candidate_req;
+  bad_req.batches[0].ring_size = 1;
+  CHECK_AND_ASSERT_MES(check_rejected_request(bad_req, API_RETURN_CODE_FAIL), false, "invalid ring size accepted");
+  bad_req = candidate_req;
+  bad_req.batches[0].global_offsets = {0};
+  CHECK_AND_ASSERT_MES(check_rejected_request(bad_req, API_RETURN_CODE_FAIL), false, "candidate target smaller than ring accepted");
+  bad_req = candidate_req;
+  bad_req.batches[0].global_offsets.assign(CURRENCY_TX_MAX_ALLOWED_INPUTS * (CURRENCY_HF4_MANDATORY_DECOY_SET_SIZE + 1) * 2 + 1, 0);
+  CHECK_AND_ASSERT_MES(check_rejected_request(bad_req, API_RETURN_CODE_ARG_OUT_OF_LIMITS), false, "candidate request exceeded the RPC limit");
+
+  auto attempt_transfer = [&](core_proxy::mutation change, size_t account, uint64_t amount,
+    bool expect_success, bool keep_in_pool = false) -> bool
+  {
+    // Fresh wallets and a purged pool let every positive case reach actual core validation.
+    const size_t pool_before = c.get_pool_transactions_count();
+    auto wallet = init_playtime_test_wallet(events, c, account);
+    wallet->refresh();
+    std::vector<tools::transfer_details> own_outputs;
+    wallet->enumerate_transfers([&](uint64_t, const tools::transfer_details& td) -> bool
+    {
+      CHECK_AND_ASSERT_MES(!td.is_zc() && !td.is_spent() && td.amount() == bare_amount, false, "unexpected owned output");
+      own_outputs.push_back(td);
+      return true;
+    });
+    CHECK_AND_ASSERT_EQ(own_outputs.size(), (account == ALICE_ACC_IDX ? 1 : DECOYS_COUNT));
+    auto proxy = std::make_shared<core_proxy>(m_core_proxy, change);
+    wallet->set_core_proxy(proxy);
+    transaction tx{};
+    bool rejected = false;
+    bool not_enough_decoys = false;
+    try
+    {
+      std::vector<tx_destination_entry> destinations{tx_destination_entry(amount, m_accounts[MINER_ACC_IDX].get_public_address())};
+      wallet->transfer(destinations, decoys_count, 0, TESTS_DEFAULT_FEE, empty_extra, empty_attachment, tx);
+    }
+    catch (const tools::error::not_enough_outs_to_mix& e)
+    {
+      rejected = true;
+      not_enough_decoys = true;
+      LOG_PRINT_MAGENTA("[BARE DECOY INDICES] wallet rejected transfer: " << e.what(), LOG_LEVEL_0);
+    }
+    catch (const tools::error::wallet_common_error& e)
+    {
+      rejected = true;
+      LOG_PRINT_MAGENTA("[BARE DECOY INDICES] wallet rejected transfer: " << e.what(), LOG_LEVEL_0);
+    }
+    wallet->set_core_proxy(m_core_proxy);
+    CHECK_AND_ASSERT_EQ(rejected, !expect_success);
+    CHECK_AND_ASSERT_EQ(proxy->m_calls, 1);
+    CHECK_AND_ASSERT_EQ(proxy->m_sends, (expect_success ? 1 : 0));
+    CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), pool_before + (expect_success ? 1 : 0));
+    CHECK_AND_ASSERT_EQ(proxy->m_request.batches.size(), 1);
+    const auto& batch = proxy->m_request.batches[0];
+    CHECK_AND_ASSERT_EQ(batch.input_amount, bare_amount);
+    CHECK_AND_ASSERT_EQ(batch.ring_size, decoys_count + 1);
+    CHECK_AND_ASSERT_MES(batch.heights.empty(), false, "candidate lookup used block heights");
+    const size_t inputs_count = account == ALICE_ACC_IDX ? 1 : 2;
+    CHECK_AND_ASSERT_EQ(batch.global_offsets.size(), inputs_count * (decoys_count + 1));
+    for (uint64_t index : batch.global_offsets)
+      CHECK_AND_ASSERT_MES(index < count_it->second, false, "wallet candidate exceeded the embedded amount range");
+    if (!expect_success)
+    {
+      if (change == core_proxy::MISSING || change == core_proxy::EMPTY_POOL || change == core_proxy::OLD_NODE)
+        CHECK_AND_ASSERT_MES(not_enough_decoys, false, "short or empty pool did not report insufficient decoys");
+      return true;
+    }
+
+    CHECK_AND_ASSERT_MES(!not_enough_decoys, false, "successful transfer reported insufficient decoys");
+    CHECK_AND_ASSERT_EQ(tx.vin.size(), inputs_count);
+    const auto& response_batch = proxy->m_response.blocks_batches[0];
+    std::unordered_set<uint64_t> available;
+    for (const auto& block : response_batch.blocks)
+      for (const auto& output : block.outs)
+        available.insert(output.global_amount_index);
+    if (account == BOB_ACC_IDX)
+      CHECK_AND_ASSERT_EQ(available.size(), DECOYS_COUNT + 1);
+    if (change == core_proxy::OWN_ABSENT)
+      CHECK_AND_ASSERT_MES(!available.count(0), false, "own-absent control returned Alice's output");
+    if (change == core_proxy::HEIGHT_LIMIT)
+      CHECK_AND_ASSERT_MES(std::any_of(response_batch.blocks.begin(), response_batch.blocks.end(), [](const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::outputs_in_block& block)
+        { return block.block_height > 1 && !block.outs.empty(); }), false, "height-limit control returned no later bare outputs");
+    std::unordered_set<uint64_t> real_indices;
+    for (const auto& input_variant : tx.vin)
+    {
+      CHECK_AND_ASSERT_MES(input_variant.type() == typeid(txin_to_key), false, "expected a bare input");
+      const auto& input = boost::get<txin_to_key>(input_variant);
+      auto real = std::find_if(own_outputs.begin(), own_outputs.end(), [&](const tools::transfer_details& td) { return td.m_key_image == input.k_image; });
+      CHECK_AND_ASSERT_MES(real != own_outputs.end(), false, "wallet selected an unknown input");
+      CHECK_AND_ASSERT_MES(real_indices.insert(real->m_global_output_index).second, false, "wallet reused a real input");
+      CHECK_AND_ASSERT_EQ(input.key_offsets.size(), decoys_count + 1);
+      const auto absolute = relative_output_offsets_to_absolute(input.key_offsets);
+      std::unordered_set<uint64_t> ring_indices;
+      for (const auto& reference : absolute)
+      {
+        CHECK_AND_ASSERT_MES(reference.type() == typeid(uint64_t), false, "unexpected output reference");
+        const uint64_t index = boost::get<uint64_t>(reference);
+        CHECK_AND_ASSERT_MES((index == real->m_global_output_index || available.count(index)) && ring_indices.insert(index).second, false, "invalid or duplicate ring output");
+      }
+      CHECK_AND_ASSERT_MES(ring_indices.count(real->m_global_output_index), false, "ring omitted its real output");
+    }
+    LOG_PRINT_MAGENTA("[BARE DECOY COUNTS] " << tx.vin.size() << " bare inputs, " << batch.global_offsets.size()
+      << " candidates, " << available.size() << " available outputs", LOG_LEVEL_0);
+    if (!keep_in_pool)
+      c.get_tx_pool().purge_transactions();
+    return true;
+  };
+
+  for (const auto change : {core_proxy::MISSING, core_proxy::DUPLICATE, core_proxy::OWN_KEY, core_proxy::OLD_NODE, core_proxy::NOT_ALLOWED, core_proxy::EMPTY_POOL})
+    CHECK_AND_ASSERT_MES(attempt_transfer(change, BOB_ACC_IDX, COIN, false), false, "malformed or unavailable response was accepted");
+  CHECK_AND_ASSERT_MES(attempt_transfer(core_proxy::OWN_ABSENT, ALICE_ACC_IDX, COIN / 2, true), false, "full pool without the own output could not be spent");
+  CHECK_AND_ASSERT_MES(attempt_transfer(core_proxy::NONE, ALICE_ACC_IDX, COIN / 2, true), false, "old genesis input could not be spent");
+  CHECK_AND_ASSERT_MES(attempt_transfer(core_proxy::HEIGHT_LIMIT, ALICE_ACC_IDX, COIN / 2, true), false, "height limit prevented a bare transfer");
+  CHECK_AND_ASSERT_MES(attempt_transfer(core_proxy::NONE, BOB_ACC_IDX, COIN, true, true), false, "aggregated bare candidate lookup failed");
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 1);
+  return true;
+}
+
+//------------------------------------------------------------------------------
+
+hardfork_4_bare_decoy_forced_mix::hardfork_4_bare_decoy_forced_mix()
+{
+  REGISTER_CALLBACK_METHOD(hardfork_4_bare_decoy_forced_mix, c1);
+}
+
+bool hardfork_4_bare_decoy_forced_mix::generate(std::vector<test_event_entry>& events) const
+{
+  const uint64_t ts = test_core_time::get_time();
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
+  account_base& bob_acc = m_accounts[BOB_ACC_IDX]; bob_acc.generate(); bob_acc.set_createtime(ts);
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
+  const uint64_t bare_amount = 6 * COIN / 10;
+  std::vector<tx_destination_entry> destinations{
+    tx_destination_entry(bare_amount, alice_acc.get_public_address()),
+    tx_destination_entry(COIN, miner_acc.get_public_address())
+  };
+  CHECK_AND_ASSERT_MES(replace_coinbase_in_genesis_block(destinations, generator, events, blk_0), false, "cannot fund the relaxed bare input");
+  DO_CALLBACK(events, "configure_core");
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  // all sixteen Bob outputs require a ring of eighteen, but this amount has only seventeen outputs in total.
+  std::vector<tx_destination_entry> forced_destinations(DECOYS_COUNT, tx_destination_entry(bare_amount, bob_acc.get_public_address()));
+  transaction decoy_tx{};
+  CHECK_AND_ASSERT_MES(construct_tx_to_key(m_hardforks, events, decoy_tx, blk_0r, miner_acc, forced_destinations,
+    TESTS_DEFAULT_FEE, 0, DECOYS_COUNT + 2), false, "cannot create forced-mix bare outputs");
+  ADD_CUSTOM_EVENT(events, decoy_tx);
+  MAKE_NEXT_BLOCK_TX1(events, decoy_block, blk_0r, miner_acc, decoy_tx);
+  CHECK_AND_ASSERT_EQ(get_block_height(decoy_block), DECOY_BLOCK_HEIGHT);
+  REWIND_BLOCKS_N_WITH_TIME(events, final_block, decoy_block, miner_acc, FINAL_TOP_HEIGHT - DECOY_BLOCK_HEIGHT);
+  DO_CALLBACK(events, "c1");
+  return true;
+}
+
+bool hardfork_4_bare_decoy_forced_mix::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  struct core_proxy : public tools::i_core_proxy
+  {
+    explicit core_proxy(std::shared_ptr<tools::i_core_proxy> delegate) : m_delegate(std::move(delegate)) {}
+
+    bool call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request& req, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::response& rsp) override
+    {
+      return m_delegate->call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4(req, rsp);
+    }
+
+    bool call_COMMAND_RPC_SEND_RAW_TX(const COMMAND_RPC_SEND_RAW_TX::request& req, COMMAND_RPC_SEND_RAW_TX::response& rsp) override
+    {
+      ++m_sends;
+      return m_delegate->call_COMMAND_RPC_SEND_RAW_TX(req, rsp);
+    }
+
+    std::shared_ptr<tools::i_core_proxy> m_delegate;
+    size_t m_sends = 0;
+  };
+
+  const uint64_t bare_amount = 6 * COIN / 10;
+  const size_t ring_size = DECOYS_COUNT + 2;
+  CHECK_AND_ASSERT_EQ(c.get_blockchain_storage().get_outputs_container().get_item_size(bare_amount), DECOYS_COUNT + 1);
+  COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request req{};
+  req.look_up_strategy = LOOK_UP_STRATEGY_REGULAR_TX;
+  req.batches.resize(1);
+  req.batches[0].input_amount = bare_amount;
+  auto check_forced_pool = [&](size_t requested_ring_size, size_t expected_count) -> bool
+  {
+    req.batches[0].ring_size = requested_ring_size;
+    req.batches[0].global_offsets.assign(requested_ring_size, 0);
+    COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::response rsp{};
+    CHECK_AND_ASSERT_MES(m_core_proxy->call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4(req, rsp), false, "forced-mix output RPC failed");
+    CHECK_AND_ASSERT_EQ(rsp.status, std::string(API_RETURN_CODE_OK));
+    CHECK_AND_ASSERT_EQ(rsp.blocks_batches.size(), 1);
+    std::unordered_set<uint64_t> returned_indices;
+    for (const auto& block : rsp.blocks_batches[0].blocks)
+      for (const auto& output : block.outs)
+      {
+        CHECK_AND_ASSERT_MES(output.global_amount_index < DECOYS_COUNT + 1 && returned_indices.insert(output.global_amount_index).second, false, "invalid or duplicate forced-mix output");
+        if (requested_ring_size < ring_size)
+          CHECK_AND_ASSERT_EQ(output.global_amount_index, 0);
+        CHECK_AND_ASSERT_EQ(block.block_height, (output.global_amount_index == 0 ? 0 : DECOY_BLOCK_HEIGHT));
+        CHECK_AND_ASSERT_EQ(output.flags, 0);
+      }
+    CHECK_AND_ASSERT_EQ(returned_indices.size(), expected_count);
+    CHECK_AND_ASSERT_MES(returned_indices.count(0), false, "relaxed genesis output was omitted");
+    return true;
+  };
+  CHECK_AND_ASSERT_MES(check_forced_pool(ring_size, DECOYS_COUNT + 1), false, "outputs eligible for the requested ring were pruned");
+  CHECK_AND_ASSERT_MES(check_forced_pool(ring_size - 1, 1), false, "forced-mix outputs accepted a smaller requested ring");
+
+  auto proxy = std::make_shared<core_proxy>(m_core_proxy);
+  for (size_t account : {BOB_ACC_IDX, ALICE_ACC_IDX})
+  {
+    auto wallet = init_playtime_test_wallet(events, c, account);
+    wallet->refresh();
+    wallet->set_core_proxy(proxy);
+    bool rejected = false;
+    try
+    {
+      transaction tx{};
+      std::vector<tx_destination_entry> destinations{tx_destination_entry(COIN / 2, m_accounts[MINER_ACC_IDX].get_public_address())};
+      wallet->transfer(destinations, ring_size - 1, 0, TESTS_DEFAULT_FEE, empty_extra, empty_attachment, tx);
+    }
+    catch (const tools::error::not_enough_outs_to_mix&)
+    {
+      rejected = true;
+    }
+    CHECK_AND_ASSERT_MES(rejected, false, "insufficient decoys did not reject the requested ring");
+    CHECK_AND_ASSERT_EQ(proxy->m_sends, 0);
+    CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
+  }
+  LOG_PRINT_MAGENTA("[BARE DECOY COUNTS] forced-mix eligibility uses the requested ring; both wallets reject insufficient decoys without broadcasting", LOG_LEVEL_0);
+  return true;
+}
+
+//------------------------------------------------------------------------------
+
+hardfork_4_bare_decoy_before_hf4::hardfork_4_bare_decoy_before_hf4()
+{
+  REGISTER_CALLBACK_METHOD(hardfork_4_bare_decoy_before_hf4, c1);
+}
+
+bool hardfork_4_bare_decoy_before_hf4::generate(std::vector<test_event_entry>& events) const
+{
+  const uint64_t ts = test_core_time::get_time();
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
+  std::vector<tx_destination_entry> destinations{
+    tx_destination_entry(6 * COIN / 10, alice_acc.get_public_address()),
+    tx_destination_entry(COIN, miner_acc.get_public_address())
+  };
+  CHECK_AND_ASSERT_MES(replace_coinbase_in_genesis_block(destinations, generator, events, blk_0), false, "cannot fund the pre-HF4 bare input");
+  DO_CALLBACK(events, "configure_core");
+  REWIND_BLOCKS_N_WITH_TIME(events, final_block, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  DO_CALLBACK(events, "c1");
+  return true;
+}
+
+bool hardfork_4_bare_decoy_before_hf4::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  struct core_proxy : public tools::i_core_proxy
+  {
+    explicit core_proxy(std::shared_ptr<tools::i_core_proxy> delegate) : m_delegate(std::move(delegate)) {}
+
+    bool call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request& req, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::response& rsp) override
+    {
+      ++m_calls;
+      m_request = req;
+      const bool result = m_delegate->call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4(req, rsp);
+      m_response = rsp;
+      return result;
+    }
+
+    bool call_COMMAND_RPC_SEND_RAW_TX(const COMMAND_RPC_SEND_RAW_TX::request& req, COMMAND_RPC_SEND_RAW_TX::response& rsp) override
+    {
+      ++m_sends;
+      return m_delegate->call_COMMAND_RPC_SEND_RAW_TX(req, rsp);
+    }
+
+    std::shared_ptr<tools::i_core_proxy> m_delegate;
+    size_t m_calls = 0;
+    size_t m_sends = 0;
+    COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request m_request{};
+    COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::response m_response{};
+  };
+
+  const uint64_t bare_amount = 6 * COIN / 10;
+  auto& bcs = c.get_blockchain_storage();
+  CHECK_AND_ASSERT_EQ(bcs.get_top_block_height(), CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  CHECK_AND_ASSERT_MES(!bcs.get_core_runtime_config().is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, bcs.get_top_block_height()),
+    false, "HF4 is already active in the pre-HF4 fixture");
+  CHECK_AND_ASSERT_EQ(bcs.get_outputs_container().get_item_size(bare_amount), 1);
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
+  auto wallet = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
+  wallet->refresh();
+  // Use the shared embedded table even before HF4.
+  auto proxy = std::make_shared<core_proxy>(m_core_proxy);
+  wallet->set_core_proxy(proxy);
+  transaction tx{};
+  std::vector<tx_destination_entry> destinations{tx_destination_entry(COIN / 2, m_accounts[MINER_ACC_IDX].get_public_address())};
+  bool rejected = false;
+  try
+  {
+    wallet->transfer(destinations, CURRENCY_HF4_MANDATORY_DECOY_SET_SIZE, 0, TESTS_DEFAULT_FEE, empty_extra, empty_attachment, tx);
+  }
+  catch (const tools::error::not_enough_outs_to_mix&)
+  {
+    rejected = true;
+  }
+  CHECK_AND_ASSERT_MES(rejected, false, "pre-HF4 shortage reduced the requested ring");
+  CHECK_AND_ASSERT_EQ(proxy->m_calls, 1);
+  CHECK_AND_ASSERT_EQ(proxy->m_sends, 0);
+  CHECK_AND_ASSERT_EQ(proxy->m_request.batches.size(), 1);
+  const auto& request_batch = proxy->m_request.batches[0];
+  CHECK_AND_ASSERT_EQ(request_batch.input_amount, bare_amount);
+  CHECK_AND_ASSERT_MES(request_batch.heights.empty(), false, "pre-HF4 bare input used height selection");
+  CHECK_AND_ASSERT_EQ(request_batch.ring_size, CURRENCY_HF4_MANDATORY_DECOY_SET_SIZE + 1);
+  CHECK_AND_ASSERT_EQ(request_batch.global_offsets.size(), CURRENCY_HF4_MANDATORY_DECOY_SET_SIZE + 1);
+  const auto count_it = currency::bare_outputs_snapshot::bare_output_count_by_amount.find(bare_amount);
+  CHECK_AND_ASSERT_MES(count_it != currency::bare_outputs_snapshot::bare_output_count_by_amount.end() && count_it->second != 0, false, "missing embedded count for the pre-HF4 bare amount");
+  for (uint64_t global_offset : request_batch.global_offsets)
+    CHECK_AND_ASSERT_MES(global_offset < count_it->second, false, "pre-HF4 candidate is outside the embedded amount range");
+  CHECK_AND_ASSERT_EQ(proxy->m_response.status, std::string(API_RETURN_CODE_OK));
+  CHECK_AND_ASSERT_EQ(proxy->m_response.blocks_batches.size(), 1);
+  const auto& response_batch = proxy->m_response.blocks_batches[0];
+  CHECK_AND_ASSERT_EQ(response_batch.blocks.size(), 1);
+  CHECK_AND_ASSERT_EQ(response_batch.blocks[0].block_height, 0);
+  CHECK_AND_ASSERT_EQ(response_batch.blocks[0].outs.size(), 1);
+  CHECK_AND_ASSERT_EQ(response_batch.blocks[0].outs[0].global_amount_index, 0);
+  CHECK_AND_ASSERT_EQ(response_batch.blocks[0].outs[0].flags, 0);
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
+  LOG_PRINT_MAGENTA("[BARE DECOY COUNTS] pre-HF4 with the shared embedded table: sixteen candidates, N=1, shortage rejected without broadcasting", LOG_LEVEL_0);
   return true;
 }
 

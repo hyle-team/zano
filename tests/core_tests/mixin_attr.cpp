@@ -286,6 +286,22 @@ bool mix_in_spent_outs::c1(currency::core& c, size_t ev_index, const std::vector
   
   CHECK_AND_ASSERT_MES(tx.vin.size() == 1, false, "tx vin.size() is not 1");
   CHECK_AND_ASSERT_MES(tx.vin[0].type() == typeid(txin_to_key) && boost::get<txin_to_key>(tx.vin[0]).key_offsets.size() == 2, false, "Incorrect vin[0] type of key_offsets"); // make sure 1 fake output was used
+
+  auto& bcs = c.get_blockchain_storage();
+  const auto& input = boost::get<txin_to_key>(tx.vin[0]);
+  CHECK_AND_ASSERT_MES(input.amount == m_test_amount, false, "Incorrect input amount");
+  const auto absolute = relative_output_offsets_to_absolute(input.key_offsets);
+  for (const auto& reference : absolute)
+  {
+    CHECK_AND_ASSERT_MES(reference.type() == typeid(uint64_t), false, "Unexpected output reference");
+    const uint64_t index = boost::get<uint64_t>(reference);
+    auto output = bcs.get_outputs_container().get_subitem(input.amount, index);
+    CHECK_AND_ASSERT_MES(output, false, "Ring output is missing");
+    auto tx_entry = bcs.get_tx_chain_entry(output->tx_id);
+    CHECK_AND_ASSERT_MES(tx_entry && output->out_no < tx_entry->m_spent_flags.size(), false, "Ring output metadata is missing");
+    CHECK_AND_ASSERT_MES(!tx_entry->m_spent_flags[output->out_no], false, "Obviously spent output was included in the ring");
+  }
+  CHECK_AND_ASSERT_MES(boost::get<uint64_t>(absolute[0]) != boost::get<uint64_t>(absolute[1]), false, "Ring contains duplicate outputs");
   
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect number of txs in the pool");
 

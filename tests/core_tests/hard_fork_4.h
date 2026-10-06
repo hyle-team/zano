@@ -43,6 +43,36 @@ struct hardfork_4_wallet_sweep_bare_outs : public wallet_test
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };
 
+struct hardfork_4_bare_decoy_indices : public wallet_test
+{
+  enum
+  {
+    DECOY_BLOCK_HEIGHT = 11,
+    HF4_ACTIVE_AFTER = 20,
+    FINAL_TOP_HEIGHT = 46,
+    DECOYS_COUNT = 16
+  };
+
+  hardfork_4_bare_decoy_indices();
+  bool configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};
+
+struct hardfork_4_bare_decoy_forced_mix : public hardfork_4_bare_decoy_indices
+{
+  hardfork_4_bare_decoy_forced_mix();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};
+
+struct hardfork_4_bare_decoy_before_hf4 : public hardfork_4_bare_decoy_indices
+{
+  hardfork_4_bare_decoy_before_hf4();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};
+
 struct hardfork_4_pop_tx_from_global_index : public wallet_test
 {
   hardfork_4_pop_tx_from_global_index();

@@ -678,21 +678,25 @@ namespace currency
     {
       uint64_t input_amount;
       std::vector<uint64_t> heights;
+      std::vector<uint64_t> global_offsets{};
+      uint64_t ring_size = 0;
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(input_amount)            DOC_DSCR("Amount to be processed in the batch.") DOC_EXMP_AUTO(1000000) DOC_END
         KV_SERIALIZE(heights)                 DOC_DSCR("Array of heights to be processed in the batch.") DOC_EXMP_AUTO(1) DOC_END
+        KV_SERIALIZE(global_offsets)          DOC_DSCR("Candidate output indices for a nonzero amount, mutually exclusive with heights. Their number is the requested pool size. Out-of-range indices are reduced modulo the current amount count, duplicates and unsuitable outputs are replaced.") DOC_EXMP_AUTO(0) DOC_END
+        KV_SERIALIZE(ring_size)               DOC_DSCR("Requested individual ring size, including the real input, at least 2 and no greater than the candidate count, or 0 for heights.") DOC_EXMP_AUTO(0) DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
     struct request
     {
       std::vector<request_batch> batches;               // multiple amounts with heights to be processed in a single call
-      uint64_t              height_upper_limit;         // if nonzero, all the decoy outputs must be either older than, or the same age as this height
+      uint64_t              height_upper_limit;         // applies to height based batches, ignored for bare index batches
       std::string           look_up_strategy;           // LOOK_UP_STRATEGY_REGULAR_TX or LOOK_UP_STRATEGY_POS_COINBASE
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(batches)                 DOC_DSCR("List of request batches, each containing an amount and corresponding heights to be processed.") DOC_EXMP_AUTO(1) DOC_END
-        KV_SERIALIZE(height_upper_limit)      DOC_DSCR("Maximum blockchain height from which decoys can be taken. If nonzero, decoys must be at this height or older.") DOC_EXMP(2555000) DOC_END
+        KV_SERIALIZE(height_upper_limit)      DOC_DSCR("Maximum blockchain height for height-based batches. If nonzero, decoys must be at this height or older. Ignored for bare index batches.") DOC_EXMP(2555000) DOC_END
         KV_SERIALIZE(look_up_strategy)        DOC_DSCR("LOOK_UP_STRATEGY_REGULAR_TX or LOOK_UP_STRATEGY_POS_COINBASE") DOC_EXMP("LOOK_UP_STRATEGY_REGULAR_TX") DOC_END
 
       END_KV_SERIALIZE_MAP()
