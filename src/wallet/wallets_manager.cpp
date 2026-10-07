@@ -1828,7 +1828,7 @@ std::string wallets_manager::make_hf6_snapshot(uint64_t wallet_id, const std::st
   tools::wallet_public::hf6_snapshot_result result{};
   try
   {
-    if (wptr->make_hf6_snapshot_to_file_cancellable(chosen_location, result.file)) // cancellable via cancel_hf6_snapshot(); writes <address>.snapshot-json into chosen_location's dir
+    if (wptr->make_hf6_snapshot_to_file_cancellable(chosen_location, result.file)) // cancellable via cancel_hf6_snapshot()
       result.status = API_RETURN_CODE_OK;
     else
       result.status = API_RETURN_CODE_INTERNAL_ERROR;

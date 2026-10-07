@@ -3379,8 +3379,12 @@ void wallet2::load(const std::wstring& wallet_, const std::string& password, boo
   clear();
 #ifdef HF6_SNAPSHOT_BUILD
   // keep the original wallet file completely untouched
-  std::wstring wallet_to_open = wallet_ + L".hf6-pre-rollback";
+  static const std::wstring postfix = L".hf6-pre-rollback";
+  std::wstring wallet_to_open = wallet_;
+  size_t postfix_pos = wallet_to_open.rfind(postfix);
+  if (postfix_pos == std::wstring::npos || postfix_pos + postfix.size() != wallet_to_open.size())
   {
+    wallet_to_open += postfix;
     boost::system::error_code ec;
     if (!boost::filesystem::exists(wallet_to_open, ec))
     {
@@ -3390,7 +3394,7 @@ void wallet2::load(const std::wstring& wallet_, const std::string& password, boo
     }
   }
   prepare_file_names(wallet_to_open);
-  m_pending_ki_file = m_wallet_file + L".outkey2ki";
+  m_pending_ki_file = m_wallet_file + L".outkey2ki"; // practically we don't need it for snapshots, but anyway
 #else
   prepare_file_names(wallet_);
 #endif
@@ -9214,7 +9218,7 @@ bool wallet2::make_hf6_snapshot(wallet_public::wallet_hf6_snapshot_t& ws, std::a
 {
   // In the HF6_SNAPSHOT_BUILD flavor the wallet is always fully synced with concise mode off (a one-time
   // full resync is forced on load via the wallet-file version bump in currency_config.h), so a snapshot is
-  // simply a scan of m_transfers -- no detached copy, no resync. We only verify the preconditions here.
+  // simply a scan of m_transfers -- no detached copy, no resync.
   WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(!m_watch_only, "make_hf6_snapshot needs a spendable wallet (kiss proofs require the spend secret key)");
   WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(!m_concise_mode, "make_hf6_snapshot requires a non-concise wallet (build with HF6_SNAPSHOT_BUILD)");
   // The chain is frozen at c_height_max, so caught-up-to-tip means the whole snapshot window is present;

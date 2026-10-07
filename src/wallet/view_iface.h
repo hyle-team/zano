@@ -225,7 +225,7 @@ public:
   struct make_hf6_snapshot_request
   {
     uint64_t    wallet_id;
-    std::string out_path; // user-chosen Save-As path; only its directory is used (filename is fixed)
+    std::string out_path; // user-chosen Save-As path
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(wallet_id)

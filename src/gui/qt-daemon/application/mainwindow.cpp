@@ -2086,7 +2086,6 @@ QString MainWindow::make_hf6_snapshot(const QString& param)
   LOG_API_TIMING();
   PREPARE_ARG_FROM_JSON(view::make_hf6_snapshot_request, req);
   // returns hf6_snapshot_result json {status, file}; long-running, so the UI calls this via async_call.
-  // req.out_path is the user-chosen Save-As location (only its directory is used; the filename is fixed).
   return QString::fromStdString(m_backend.make_hf6_snapshot(req.wallet_id, req.out_path));
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
