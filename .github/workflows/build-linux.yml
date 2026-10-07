@@ -506,8 +506,23 @@ jobs:
               awk '$1 ~ /^libevent-2[.]1[.]so[.]/ || $1 ~ /^libminizip[.]so[.]/ { print $1 }'
           )
 
+          # NSS loads softokn/freebl/dbm modules dynamically, so ldd alone misses them.
+          # Bundle the complete native NSS/NSPR library set, including package aliases only once.
+          native_arch=$(dpkg --print-architecture)
+          nss_package_files=$(dpkg-query -L "libnss3:$native_arch" "libnspr4:$native_arch")
+          mapfile -t nss_runtime_libraries < <(
+            printf '%s\n' "$nss_package_files" |
+              awk -F/ '$NF ~ /^lib.*[.]so$/ && !seen[$NF]++ { print }'
+          )
+          test "${#nss_runtime_libraries[@]}" -gt 0
+          nss_library_args=()
+          for library in "${nss_runtime_libraries[@]}"; do
+            nss_library_args+=(--library "$library")
+          done
+
           "$linuxdeploy" \
             --appdir "$appdir" \
+            "${nss_library_args[@]}" \
             --executable "$appdir/usr/bin/Zano" \
             --executable "$appdir/usr/bin/zanod" \
             --executable "$appdir/usr/bin/simplewallet" \
@@ -536,6 +551,16 @@ jobs:
             fi
           done
 
+          nss_runtime_files=()
+          for library in "${nss_runtime_libraries[@]}"; do
+            bundled_library="$appdir/usr/lib/${library##*/}"
+            if [[ ! -f "$bundled_library" ]]; then
+              echo "::error::NSS/NSPR library ${library##*/} was not bundled in the AppDir"
+              exit 1
+            fi
+            nss_runtime_files+=("$bundled_library")
+          done
+
           xcb_plugin=$(find "$appdir" -type f -name libqxcb.so -path '*/platforms/*' -print -quit)
           test -n "$xcb_plugin"
           readelf -h "$xcb_plugin" | grep -F "Machine:" | grep -F "${{ matrix.elf_machine }}"
@@ -548,11 +573,20 @@ jobs:
               exit 1
             fi
           done
-          for runtime_file in "$webengine_process" "$xcb_plugin"; do
-            if ldd "$runtime_file" | grep -F 'not found'; then
+          for runtime_file in "$appdir/usr/bin/Zano" "$webengine_process" "$xcb_plugin" "${nss_runtime_files[@]}"; do
+            runtime_ldd=$(ldd "$runtime_file")
+            if printf '%s\n' "$runtime_ldd" | grep -F 'not found'; then
               echo "::error::$runtime_file has unresolved shared-library dependencies"
               exit 1
             fi
+            for library in "${nss_runtime_libraries[@]}"; do
+              soname=${library##*/}
+              if printf '%s\n' "$runtime_ldd" | grep -F "$soname => " >/dev/null &&
+                 ! printf '%s\n' "$runtime_ldd" | grep -F "$soname => $appdir/" >/dev/null; then
+                echo "::error::$runtime_file resolves NSS/NSPR library $soname outside the AppDir"
+                exit 1
+              fi
+            done
           done
           for binary in Zano zanod simplewallet connectivity_tool gateway_rpc_proxy; do
             if ldd "$appdir/usr/bin/$binary" | grep -F 'not found'; then
