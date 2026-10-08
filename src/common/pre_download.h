@@ -26,10 +26,10 @@ namespace tools
   static constexpr pre_download_entry c_pre_download_mdbx_unpruned    = { "https://f005.backblazeb2.com/file/zano-predownload/zano_mdbx_95_3709300_unpruned.pak", "d9e43d8eb01eeace563b9ccef24829837ad9aae19a426e735e527b30a8b422c9", 17773590319, 25232547840 };
   static constexpr pre_download_entry c_pre_download_lmdb_unpruned    = { "https://f005.backblazeb2.com/file/zano-predownload/zano_lmdb_95_3709300_unpruned.pak", "8a3da1f1b6c7e0114ca8b492a3ec5e1fdd3dcd523ad789af123bf9011fd236c0", 20782901824, 25138483200 };
 #else
-  static constexpr pre_download_entry c_pre_download_mdbx             = { "https://f005.backblazeb2.com/file/zano-predownload/zano_testnet_mdbx_95_37800.pak", "fb300b1b810983f30b60b5afe7c490e1a0a0208de130d3dbee26ff821193aa46", 197913560, 536862720 };
-  static constexpr pre_download_entry c_pre_download_lmdb             = { "https://f005.backblazeb2.com/file/zano-predownload/zano_testnet_lmdb_95_37800.pak", "9a27ae32d33483d9a225e979577870156d9da07a0dc8ea8bc4d7fe4d789b3197", 224593297, 412372992 };
-  static constexpr pre_download_entry c_pre_download_mdbx_unpruned    = { "", "", 0, 0 };
-  static constexpr pre_download_entry c_pre_download_lmdb_unpruned    = { "", "", 0, 0 };
+  static constexpr pre_download_entry c_pre_download_mdbx             = { "https://f005.backblazeb2.com/file/zano-predownload/zano_testnet_mdbx_95_216000.pak", "853bcb754ef232495f1cc4e228f15bbbccbdbc783000387b8e4f2567825ac1e3", 1124004026, 2147450880 };
+  static constexpr pre_download_entry c_pre_download_lmdb             = { "https://f005.backblazeb2.com/file/zano-predownload/zano_testnet_lmdb_95_216000.pak", "5e13e172851df509466b0ec3b440010fd8bcc6fa2c7d071d2f4589e73669020c", 1308033571, 2041757696 };
+  static constexpr pre_download_entry c_pre_download_mdbx_unpruned    = c_pre_download_mdbx;
+  static constexpr pre_download_entry c_pre_download_lmdb_unpruned    = c_pre_download_lmdb;
 #endif
 
   static constexpr uint64_t pre_download_min_size_difference = 512 * 1024 * 1024; // minimum difference in size between local DB and the downloadable one to start downloading
