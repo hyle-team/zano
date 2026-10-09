@@ -105,6 +105,8 @@ bool gbt_pool_invalid_txs_asset_overemit::c1(currency::core& c, size_t ev_index,
 
   std::vector<crypto::hash> bad_tx_hashes;
   bad_tx_hashes.reserve(N_EMITS);
+  std::vector<crypto::hash> bad_tx_raw_hashes;
+  bad_tx_raw_hashes.reserve(N_EMITS);
 
   c.get_tx_pool().unsecure_disable_tx_validation_on_addition(true);
   for (size_t i = 0; i < N_EMITS; ++i)
@@ -121,6 +123,7 @@ bool gbt_pool_invalid_txs_asset_overemit::c1(currency::core& c, size_t ev_index,
       return false;
     }
     bad_tx_hashes.push_back(get_transaction_hash(emit_tx));
+    bad_tx_raw_hashes.push_back(get_object_hash(emit_tx));
   }
   c.get_tx_pool().unsecure_disable_tx_validation_on_addition(false);
 
@@ -170,7 +173,7 @@ bool gbt_pool_invalid_txs_asset_overemit::c1(currency::core& c, size_t ev_index,
   const uint64_t h_after = c.get_current_blockchain_size();
 
   size_t blacklisted_now = 0;
-  for (const auto& h : bad_tx_hashes)
+  for (const auto& h : bad_tx_raw_hashes)
     if (c.get_tx_pool().is_tx_blacklisted(h)) ++blacklisted_now;
 
   LOG_PRINT_MAGENTA("try_mint_pos=" << (mint_res ? "OK" : "FAIL")

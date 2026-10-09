@@ -227,3 +227,50 @@ struct block_choice_rule_bigger_fee : public wallet_test
 private:
   struct argument_assert;
 };
+
+struct gen_block_sig_bad_poisons_block_hash : public test_chain_unit_enchanced
+{
+  bool generate(std::vector<test_event_entry>& events) const;
+};
+
+struct gen_block_hash_bad_orphans_honest_child : public test_chain_unit_enchanced
+{
+  bool generate(std::vector<test_event_entry>& events) const;
+};
+
+struct gen_block_hash_bad_blocks_legit_resend : public test_chain_unit_enchanced
+{
+  gen_block_hash_bad_blocks_legit_resend();
+  bool generate(std::vector<test_event_entry>& events) const;
+
+  bool check_block_verification_context(const currency::block_verification_context& bvc, size_t event_idx, const currency::block& blk);
+  bool mark_poisoned_resend_block(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+
+  size_t m_poisoned_resend_block_index;
+};
+
+struct gen_pos_miner_sig_bad_then_legit : public test_chain_unit_enchanced
+{
+  gen_pos_miner_sig_bad_then_legit();
+  bool generate(std::vector<test_event_entry>& events) const;
+
+  bool check_block_verification_context(const currency::block_verification_context& bvc, size_t event_idx, const currency::block& blk);
+  bool mark_healthy_pos_block(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+
+  size_t m_healthy_block_index;
+};
+
+struct gen_pos_miner_proof_bad_reorg_invalidates_hash : public test_chain_unit_enchanced
+{
+  gen_pos_miner_proof_bad_reorg_invalidates_hash();
+  bool generate(std::vector<test_event_entry>& events) const;
+
+  bool check_block_verification_context(const currency::block_verification_context& bvc, size_t event_idx, const currency::block& blk);
+  bool check_bad_alt_block(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+  bool mark_healthy_resend(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+  bool mark_healthy_child(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+
+  size_t m_healthy_resend_index;
+  size_t m_healthy_child_index;
+  crypto::hash m_tip_before_reorg;
+};

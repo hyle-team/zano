@@ -1273,7 +1273,7 @@ bool block_template_and_invalid_tx_proofs::c1(currency::core& c, size_t ev_index
       continue;
     }
     CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 2);
-    CHECK_AND_ASSERT_MES(!c.get_tx_pool().is_tx_blacklisted(bad_tx_id), false, "bad tx " << name << " was blacklisted before the simulation");
+    CHECK_AND_ASSERT_MES(!c.get_tx_pool().is_tx_blacklisted(get_object_hash(bad_tx)), false, "bad tx " << name << " was blacklisted before the simulation");
 
     // build a block template from the pool (now holding the bad tx) and mine it, exactly as a miner would
     currency::block top_block{};
@@ -1296,8 +1296,8 @@ bool block_template_and_invalid_tx_proofs::c1(currency::core& c, size_t ev_index
 
     CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 2); // both txs shuld be still there
     // desired outcome: the bad tx is blacklisted, the good tx is not, and the submitted block was not accepted
-    const bool bad_blacklisted  = c.get_tx_pool().is_tx_blacklisted(bad_tx_id);
-    const bool good_blacklisted = c.get_tx_pool().is_tx_blacklisted(good_tx_id);
+    const bool bad_blacklisted  = c.get_tx_pool().is_tx_blacklisted(get_object_hash(bad_tx));
+    const bool good_blacklisted = c.get_tx_pool().is_tx_blacklisted(get_object_hash(m_good_tx));
     currency::block new_top{};
     c.get_blockchain_storage().get_top_block(new_top);
     const bool chain_unchanged = get_block_hash(new_top) == get_block_hash(top_block);
