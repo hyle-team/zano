@@ -256,8 +256,7 @@ namespace currency
       ss << "Zano HF6 wallet snapshot report\n";
       ss << "address             : " << ws.address << "\n";
       ss << "outputs in snapshot : " << ws.outputs.size() << "\n";
-      ss << "window heights      : [" << tools::wallet_public::wallet_hf6_snapshot_t::c_height_min << ", "
-         << tools::wallet_public::wallet_hf6_snapshot_t::c_height_max << "]\n\n";
+      ss << "window heights      : [" << c_hf6_rollback_min_height << ", " << c_hf6_rollback_max_height << "]\n\n";
       if (!r.valid)
       {
         ss << "RESULT: INVALID\n";
@@ -266,12 +265,12 @@ namespace currency
       }
       ss << "RESULT: VALID\n";
       ss << "outputs matched     : " << r.outputs_matched << "\n\n";
-      ss << fmt_hf6_asset_map("balance as of height " + std::to_string(tools::wallet_public::wallet_hf6_snapshot_t::c_height_min), r.balance_at_min, r.asset_meta) << "\n";
-      ss << fmt_hf6_asset_map("balance as of height " + std::to_string(tools::wallet_public::wallet_hf6_snapshot_t::c_height_max), r.balance_at_max, r.asset_meta) << "\n";
+      ss << fmt_hf6_asset_map("partial balance as of height " + std::to_string(c_hf6_rollback_min_height), r.partial_balance_at_min, r.asset_meta) << "\n";
+      ss << fmt_hf6_asset_map("partial balance as of height " + std::to_string(c_hf6_rollback_max_height), r.partial_balance_at_max, r.asset_meta) << "\n";
       ss << fmt_hf6_asset_map("received in window", r.received_in_window, r.asset_meta) << "\n";
       ss << fmt_hf6_asset_map("spent in window", r.spent_in_window, r.asset_meta);
 
-      ss << "\ntransactions (" << r.movements.size() << "):\n";
+      ss << "\npartial list of transactions (" << r.movements.size() << "):\n";
       if (r.movements.empty())
         ss << "  (none)\n";
       for (const auto& mv : r.movements)

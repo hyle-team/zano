@@ -9754,8 +9754,8 @@ tools::wallet_public::wallet_hf6_snapshot_check_result_t blockchain_storage::pro
   std::string scan_err;
 
   const uint64_t total_txs = m_db_transactions.size();
-  uint64_t next_decile = 1; // progress is logged per 10% -> at most 10 messages for the whole scan
-  auto block_ts = [this](uint64_t h) -> uint64_t { return h < m_db_blocks.size() ? m_db_blocks[h]->bl.timestamp : 0; };
+  uint64_t next_decile = 1; // progress is logged per 10%
+  auto get_block_ts = [this](uint64_t h) -> uint64_t { return h < m_db_blocks.size() ? m_db_blocks[h]->bl.timestamp : 0; };
 
   m_db_transactions.enumerate_items([&](uint64_t i, const crypto::hash& tx_id, const transaction_chain_entry& tce) -> bool
   {
@@ -9817,7 +9817,7 @@ tools::wallet_public::wallet_hf6_snapshot_check_result_t blockchain_storage::pro
       // keep all outs in [3833001, 3878977] range
       if (c_hf6_rollback_min_height <= tce.m_keeper_block_height && tce.m_keeper_block_height <= c_hf6_rollback_max_height)
         keep = true;
-      // keep back refs hop1 with regard to [3833001, 3878977] txs
+      // keep all hop1 back refs with regard to all txs from [3833001, 3878977]
       if (currency::is_out_in_back_refs_hop1(amount_for_gindex, gindex))
         keep = true;
       if (!keep)
@@ -9849,7 +9849,6 @@ tools::wallet_public::wallet_hf6_snapshot_check_result_t blockchain_storage::pro
       }
 
       // kiss proves knowledge of x:  ki - P = x*(Hp(P) - G)  =>  ki is the genuine key image of P.
-      // Hp = 8*fromfe(cn_fast_hash(P)); same base for bare and ZC key images (hash_helper_t::hp == hash_to_ec).
       const crypto::key_image& ki = so.ki;
       crypto::point_t P_pt;
       crypto::point_t ki_pt;
@@ -9928,22 +9927,22 @@ tools::wallet_public::wallet_hf6_snapshot_check_result_t blockchain_storage::pro
       }
 
       // balances: created by height H and still unspent at H (spent_h > H)
-      if (created_h <= wallet_hf6_snapshot_t::c_height_min && spent_h > wallet_hf6_snapshot_t::c_height_min)
-        res.balance_at_min[asset_id] += amount;
-      if (created_h <= wallet_hf6_snapshot_t::c_height_max && spent_h > wallet_hf6_snapshot_t::c_height_max)
-        res.balance_at_max[asset_id] += amount;
+      if (created_h <= c_hf6_rollback_min_height && spent_h > c_hf6_rollback_min_height)
+        res.partial_balance_at_min[asset_id] += amount;
+      if (created_h <= c_hf6_rollback_max_height && spent_h > c_hf6_rollback_max_height)
+        res.partial_balance_at_max[asset_id] += amount;
 
       // flows in [c_height_min, c_height_max] inclusive: received by creation height, spent by spend height
-      if (created_h >= wallet_hf6_snapshot_t::c_height_min && created_h <= wallet_hf6_snapshot_t::c_height_max)
+      if (created_h >= c_hf6_rollback_min_height && created_h <= c_hf6_rollback_max_height)
         res.received_in_window[asset_id] += amount;
-      if (spent_h >= wallet_hf6_snapshot_t::c_height_min && spent_h <= wallet_hf6_snapshot_t::c_height_max)
+      if (spent_h >= c_hf6_rollback_min_height && spent_h <= c_hf6_rollback_max_height)
         res.spent_in_window[asset_id] += amount;
 
       {
         wh6s_movement_t mv{};
         mv.received  = true;
         mv.height    = created_h;
-        mv.timestamp = block_ts(created_h);
+        mv.timestamp = get_block_ts(created_h);
         mv.asset_id  = asset_id;
         mv.amount    = amount;
         mv.tx_id     = tx_id;
@@ -9954,7 +9953,7 @@ tools::wallet_public::wallet_hf6_snapshot_check_result_t blockchain_storage::pro
         wh6s_movement_t mv{};
         mv.received  = false;
         mv.height    = spent_h;
-        mv.timestamp = block_ts(spent_h);
+        mv.timestamp = get_block_ts(spent_h);
         mv.asset_id  = asset_id;
         mv.amount    = amount;
         mv.tx_id     = spend_tx_id;
@@ -10007,10 +10006,9 @@ bool blockchain_storage::validate_and_process_wallet_hf6_snapshot(const tools::w
   };
 
   LOG_PRINT_L0("wallet hf6 snapshot VALID, address " << ws.address << ", outputs matched: " << res.outputs_matched);
-  log_map("balance at min (h <= " + std::to_string(tools::wallet_public::wallet_hf6_snapshot_t::c_height_min) + ")", res.balance_at_min);
-  log_map("balance at max (h <= " + std::to_string(tools::wallet_public::wallet_hf6_snapshot_t::c_height_max) + ")", res.balance_at_max);
-  log_map("received in [" + std::to_string(tools::wallet_public::wallet_hf6_snapshot_t::c_height_min) + ", " + std::to_string(tools::wallet_public::wallet_hf6_snapshot_t::c_height_max) + "]", res.received_in_window);
-  log_map("spent in [" + std::to_string(tools::wallet_public::wallet_hf6_snapshot_t::c_height_min) + ", " + std::to_string(tools::wallet_public::wallet_hf6_snapshot_t::c_height_max) + "]", res.spent_in_window);
+  log_map("partial balance at min (h <= " + std::to_string(c_hf6_rollback_min_height) + ")", res.partial_balance_at_min);
+  log_map("partial balance at max (h <= " + std::to_string(c_hf6_rollback_max_height) + ")", res.partial_balance_at_max);
+  log_map("received in [" + std::to_string(c_hf6_rollback_min_height) + ", " + std::to_string(c_hf6_rollback_max_height) + "]", res.received_in_window);
+  log_map("spent in [" + std::to_string(c_hf6_rollback_min_height) + ", " + std::to_string(c_hf6_rollback_max_height) + "]", res.spent_in_window);
   return true;
 }
-

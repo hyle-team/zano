@@ -16,6 +16,7 @@
 #include "currency_core/bc_escrow_service.h"
 #include "rpc/core_rpc_server_commands_defs.h"
 #include "currency_protocol/blobdatatype.h"
+#include "currency_core/out_back_refs_hop1.h"
 
 
 const uint64_t WALLET_GLOBAL_OUTPUT_INDEX_UNDEFINED = std::numeric_limits<uint64_t>::max();
@@ -2395,9 +2396,6 @@ namespace tools::wallet_public
 
   struct wallet_hf6_snapshot_t
   {
-    static constexpr uint64_t   c_height_min = ZANO_HARDFORK_06_AFTER_HEIGHT; // 3833001
-    static constexpr uint64_t   c_height_max = 3878977;
-
     //std::string                 filename;
     std::string                 address;
     crypto::secret_key          view_secret_key;
@@ -2438,13 +2436,13 @@ namespace tools::wallet_public
     uint64_t     outputs_matched = 0;      // owned outputs cross-checked against the snapshot and kiss-verified
 
     // per-asset (asset_id -> summed amount):
-    std::unordered_map<crypto::public_key, uint64_t> balance_at_min;      // unspent as of c_height_min
-    std::unordered_map<crypto::public_key, uint64_t> balance_at_max;      // unspent as of c_height_max
-    std::unordered_map<crypto::public_key, uint64_t> received_in_window;  // outputs created in [c_height_min, c_height_max]
-    std::unordered_map<crypto::public_key, uint64_t> spent_in_window;     // outputs whose ki was spent in [c_height_min, c_height_max]
+    std::unordered_map<crypto::public_key, uint64_t> partial_balance_at_min;  // partial unspent as of c_height_min (due to UTXO filtering)
+    std::unordered_map<crypto::public_key, uint64_t> partial_balance_at_max;  // partial unspent as of c_height_max
+    std::unordered_map<crypto::public_key, uint64_t> received_in_window;      // outputs created in [c_height_min, c_height_max]
+    std::unordered_map<crypto::public_key, uint64_t> spent_in_window;         // outputs whose ki was spent in [c_height_min, c_height_max]
 
-    std::vector<wh6s_movement_t> movements;                              // every received/spent movement, sorted by timestamp
-    std::unordered_map<crypto::public_key, wh6s_asset_meta_t> asset_meta; // decimal_point/ticker per asset seen (resolved once)
+    std::vector<wh6s_movement_t> movements;                                   // received/spent movement, sorted by timestamp
+    std::unordered_map<crypto::public_key, wh6s_asset_meta_t> asset_meta;     // decimal_point/ticker per asset seen (resolved once)
   };
 
   // Result of a make_hf6_snapshot long-op (wallets_manager / GUI / light-wallet path).

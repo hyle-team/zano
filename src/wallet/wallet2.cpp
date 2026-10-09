@@ -3377,6 +3377,7 @@ void wallet2::load_votes_config()
 void wallet2::load(const std::wstring& wallet_, const std::string& password, bool skip_pending_ki_load /* = false */)
 {
   clear();
+  bool hf6_snapshot_resync_needed = false;
 #ifdef HF6_SNAPSHOT_BUILD
   // keep the original wallet file completely untouched
   static const std::wstring postfix = L".hf6-pre-rollback";
@@ -3391,6 +3392,7 @@ void wallet2::load(const std::wstring& wallet_, const std::string& password, boo
       WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(boost::filesystem::exists(wallet_, ec), "wallet file not found: " << epee::string_encoding::convert_to_ansii(wallet_));
       boost::filesystem::copy_file(wallet_, wallet_to_open, ec);
       WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(!ec, "failed to copy wallet to pre-rollback file " << epee::string_encoding::convert_to_ansii(wallet_to_open) << ": " << ec.message());
+      hf6_snapshot_resync_needed = true;
     }
   }
   prepare_file_names(wallet_to_open);
@@ -3477,6 +3479,11 @@ void wallet2::load(const std::wstring& wallet_, const std::string& password, boo
     need_to_resync = true;
   }
 
+  if (hf6_snapshot_resync_needed && !need_to_resync)
+  {
+    WLT_LOG_L0("Resyncing the wallet in order to prepare correct hf6 snapshot...");
+    reset_history();
+  }
 
 
   if (m_watch_only && !is_auditable())
