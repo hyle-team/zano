@@ -10,6 +10,16 @@ if [ -d "${script_dir}/apprun-hooks" ]; then
   done
 fi
 
+# --custom-apprun replaces linuxdeploy's default AppRun, and plugin-qt's hook does
+# not set LD_LIBRARY_PATH. NSS loads softokn/freebl via dlopen by soname. The
+# v2.2.3.603 release image ships libnss3/libnssutil3 and no libsoftokn3.so, so
+# Ubuntu 26.04 loads the host softokn, which requires NSSUTIL_3.108. The bundled
+# libnssutil3 does not provide that symbol and WebEngine aborts before the UI
+# finishes loading. Prefer AppDir usr/lib so the builder NSS set stays together.
+if [ -d "${script_dir}/usr/lib" ]; then
+  export LD_LIBRARY_PATH="${script_dir}/usr/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+fi
+
 parse_manual_binary_arguments()
 {
   local input="$1"

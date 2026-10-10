@@ -31,6 +31,7 @@ env:
   QT_VERSION: 6.8.3
   LINUXDEPLOY_VERSION: 1-alpha-20251107-1
   LINUXDEPLOY_QT_VERSION: 1-alpha-20250213-1
+  APPIMAGETOOL_VERSION: '1.9.1'
 
 jobs:
   build:
@@ -53,6 +54,7 @@ jobs:
             baseline: Ubuntu 22.04 / glibc 2.35
             linuxdeploy_sha256: c20cd71e3a4e3b80c3483cef793cda3f4e990aca14014d23c544ca3ce1270b4d
             linuxdeploy_qt_sha256: 15106be885c1c48a021198e7e1e9a48ce9d02a86dd0a1848f00bdbf3c1c92724
+            appimagetool_sha256: ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0
           - arch: arm64
             runner: ubuntu-24.04-arm
             cmake_arch: default
@@ -65,6 +67,7 @@ jobs:
             baseline: Ubuntu 24.04 / glibc 2.39
             linuxdeploy_sha256: 620095110d693282b8ebeb244a95b5e911cf8f65f76c88b4b47d16ae6346fcff
             linuxdeploy_qt_sha256: bf1c24aff6d749b5cf423afad6f15abd4440f81dec1aab95706b25f6667cdcf1
+            appimagetool_sha256: f0837e7448a0c1e4e650a93bb3e85802546e60654ef287576f46c71c126a9158
     env:
       DEPS_DIR: ${{ github.workspace }}/_deps-linux
       BUILD_DIR: ${{ github.workspace }}/build-linux
@@ -100,6 +103,7 @@ jobs:
             libicu-dev \
             libminizip-dev \
             libnss3 \
+            libnspr4 \
             libxkbcommon-x11-0 \
             libxcb-cursor0 \
             patchelf \
@@ -361,6 +365,7 @@ jobs:
           mkdir -p "$TOOLS_DIR"
           linuxdeploy="$TOOLS_DIR/linuxdeploy-${{ matrix.appimage_arch }}.AppImage"
           qt_plugin="$TOOLS_DIR/linuxdeploy-plugin-qt-${{ matrix.appimage_arch }}.AppImage"
+          appimagetool="$TOOLS_DIR/appimagetool-${{ matrix.appimage_arch }}.AppImage"
 
           curl --fail --location --retry 3 --output "$linuxdeploy" \
             "https://github.com/linuxdeploy/linuxdeploy/releases/download/${LINUXDEPLOY_VERSION}/linuxdeploy-${{ matrix.appimage_arch }}.AppImage"
@@ -369,7 +374,11 @@ jobs:
           curl --fail --location --retry 3 --output "$qt_plugin" \
             "https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/${LINUXDEPLOY_QT_VERSION}/linuxdeploy-plugin-qt-${{ matrix.appimage_arch }}.AppImage"
           echo "${{ matrix.linuxdeploy_qt_sha256 }}  $qt_plugin" | sha256sum --check --strict
-          chmod 0755 "$linuxdeploy" "$qt_plugin"
+
+          curl --fail --location --retry 3 --output "$appimagetool" \
+            "https://github.com/AppImage/appimagetool/releases/download/${APPIMAGETOOL_VERSION}/appimagetool-${{ matrix.appimage_arch }}.AppImage"
+          echo "${{ matrix.appimagetool_sha256 }}  $appimagetool" | sha256sum --check --strict
+          chmod 0755 "$linuxdeploy" "$qt_plugin" "$appimagetool"
 
       - name: Assemble Qt 6 GUI AppImage
         env:
@@ -506,8 +515,30 @@ jobs:
               awk '$1 ~ /^libevent-2[.]1[.]so[.]/ || $1 ~ /^libminizip[.]so[.]/ { print $1 }'
           )
 
+          # NSS loads softokn/freebl via dlopen, so ldd misses them. The
+          # v2.2.3.603 AppImage shipped Qt's partial NSS set (libnss3 and
+          # libnssutil3, no libsoftokn3). Ubuntu 26.04 then loads host softokn,
+          # which requires NSSUTIL_3.108 and Chromium fatals. Bundle the complete
+          # builder NSS/NSPR set, including package aliases once.
+          native_arch=$(dpkg --print-architecture)
+          nss_package_files=$(dpkg-query -L "libnss3:$native_arch" "libnspr4:$native_arch")
+          mapfile -t nss_runtime_libraries < <(
+            printf '%s\n' "$nss_package_files" |
+              awk -F/ '$NF ~ /^lib.*[.]so$/ && !seen[$NF]++ { print }'
+          )
+          test "${#nss_runtime_libraries[@]}" -gt 0
+          nss_library_args=()
+          for library in "${nss_runtime_libraries[@]}"; do
+            nss_library_args+=(--library "$library")
+          done
+
+          # libsystemd from the 22.04 builder breaks newer hosts (LIBSYSTEMD_254)
+          # once AppRun pins usr/lib. Leave it on the host.
           "$linuxdeploy" \
             --appdir "$appdir" \
+            "${nss_library_args[@]}" \
+            --exclude-library 'libsystemd.so*' \
+            --exclude-library 'libudev.so*' \
             --executable "$appdir/usr/bin/Zano" \
             --executable "$appdir/usr/bin/zanod" \
             --executable "$appdir/usr/bin/simplewallet" \
@@ -516,12 +547,86 @@ jobs:
             --desktop-file "$appdir/usr/share/applications/Zano.desktop" \
             --icon-file "$appdir/usr/share/icons/hicolor/256x256/apps/Zano.png" \
             --custom-apprun utils/Zano_appimage_wrapper.sh \
-            --plugin qt \
-            --output appimage
+            --plugin qt
+
+          # plugin-qt may leave Qt's partial NSS in place. Force the builder set
+          # into usr/lib so softokn/freebl match libnssutil3.
+          for library in "${nss_runtime_libraries[@]}"; do
+            dest="$appdir/usr/lib/${library##*/}"
+            cp -L "$library" "$dest"
+            chmod u+w "$dest"
+            if [[ -f "$dest" ]] && file -b "$dest" | grep -q 'ELF .*shared object'; then
+              patchelf --set-rpath '$ORIGIN' "$dest"
+            fi
+          done
+          mapfile -t nss_versioned_libraries < <(
+            printf '%s\n' "$nss_package_files" |
+              awk -F/ '$NF ~ /^lib.*[.]so[.]/ && !seen[$NF]++ { print }'
+          )
+          for library in "${nss_versioned_libraries[@]}"; do
+            dest="$appdir/usr/lib/${library##*/}"
+            [[ -e "$dest" ]] && continue
+            cp -L "$library" "$dest"
+            chmod u+w "$dest"
+            if [[ -f "$dest" ]] && file -b "$dest" | grep -q 'ELF .*shared object'; then
+              patchelf --set-rpath '$ORIGIN' "$dest"
+            fi
+          done
+          mapfile -t nss_chk_files < <(
+            printf '%s\n' "$nss_package_files" |
+              awk -F/ '$NF ~ /[.]chk$/ && !seen[$NF]++ { print }'
+          )
+          for chk in "${nss_chk_files[@]}"; do
+            install -m 0644 "$chk" "$appdir/usr/lib/${chk##*/}"
+          done
+
+          while IFS= read -r -d '' stale; do
+            rm -f "$stale"
+          done < <(
+            find "$appdir" \( -type f -o -type l \) \( \
+              -name 'libsystemd.so*' -o -name 'libudev.so*' \
+            \) -print0
+          )
+          if find "$appdir" \( -name 'libsystemd.so*' -o -name 'libudev.so*' \) | grep -q .; then
+            echo '::error::AppDir still contains host systemd/udev libraries after prune'
+            find "$appdir" \( -name 'libsystemd.so*' -o -name 'libudev.so*' \) -print
+            exit 1
+          fi
+          for library in "${nss_runtime_libraries[@]}"; do
+            if [[ ! -f "$appdir/usr/lib/${library##*/}" ]]; then
+              echo "::error::NSS/NSPR library ${library##*/} was not bundled in the AppDir"
+              exit 1
+            fi
+          done
+          if [[ ! -f "$appdir/usr/lib/libsoftokn3.so" ]]; then
+            echo '::error::libsoftokn3.so was not bundled; host softokn would mix with builder NSS'
+            exit 1
+          fi
+
+          appimagetool="$TOOLS_DIR/appimagetool-${{ matrix.appimage_arch }}.AppImage"
+          export APPIMAGE_EXTRACT_AND_RUN=1
+          export ARCH="${{ matrix.appimage_arch }}"
+          "$appimagetool" --no-appstream "$appdir" "$OUTPUT"
 
           test -x "$OUTPUT"
           file "$OUTPUT"
           readelf -h "$OUTPUT" | grep -F "Machine:" | grep -F "${{ matrix.elf_machine }}"
+
+          extract_root="$RUNNER_TEMP/appimage-extract-check"
+          rm -rf "$extract_root"
+          mkdir -p "$extract_root"
+          pushd "$extract_root" >/dev/null
+          "$OUTPUT" --appimage-extract >/dev/null
+          popd >/dev/null
+          if find "$extract_root/squashfs-root" \( -name 'libsystemd.so*' -o -name 'libudev.so*' \) | grep -q .; then
+            echo '::error::Packed AppImage still contains systemd/udev libraries'
+            exit 1
+          fi
+          if ! find "$extract_root/squashfs-root" -name 'libsoftokn3.so' -print -quit | grep -q .; then
+            echo '::error::Packed AppImage is missing libsoftokn3.so'
+            exit 1
+          fi
+          rm -rf "$extract_root"
           test -x "$appdir/AppRun"
           webengine_process=$(find "$appdir" -type f -name QtWebEngineProcess -print -quit)
           test -n "$webengine_process"
