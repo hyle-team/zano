@@ -3322,6 +3322,90 @@ bool blockchain_storage::get_random_outs_for_amounts3(const COMMAND_RPC_GET_RAND
   return true;
 }
 //------------------------------------------------------------------
+bool blockchain_storage::get_bare_outs_by_indices(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request_batch& batch, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::blocks_batch& response_batch, uint64_t chain_size) const
+{
+  CHECK_AND_ASSERT_MES(batch.input_amount != 0 && batch.heights.empty() && batch.ring_size >= 2 && batch.global_offsets.size() >= batch.ring_size, false, "invalid bare output candidate request");
+  const uint64_t outputs_count = m_db_outputs.get_item_size(batch.input_amount);
+  auto& out_blocks = response_batch.blocks;
+  const size_t pool_target = batch.global_offsets.size();
+  std::unordered_set<uint64_t> checked_indices;
+  checked_indices.reserve(pool_target);
+  std::vector<std::pair<uint64_t, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry>> pool;
+  pool.reserve(pool_target);
+
+  auto load_output = [&](uint64_t global_index, uint64_t ring_size, uint64_t& block_height, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry& entry, bool& eligible) -> bool
+  {
+    auto output_ptr = m_db_outputs.get_subitem(batch.input_amount, global_index);
+    CHECK_AND_ASSERT_MES(output_ptr, false, "bare output index is missing");
+    auto tx_ptr = m_db_transactions.find(output_ptr->tx_id);
+    CHECK_AND_ASSERT_MES(tx_ptr, false, "bare output transaction is missing");
+    const uint64_t output_index = output_ptr->out_no;
+    CHECK_AND_ASSERT_MES(output_index < tx_ptr->tx.vout.size() && tx_ptr->m_global_output_indexes.size() == tx_ptr->tx.vout.size() && tx_ptr->m_spent_flags.size() == tx_ptr->tx.vout.size(), false, "inconsistent bare output metadata");
+    CHECK_AND_ASSERT_MES(tx_ptr->m_global_output_indexes[output_index] == global_index, false, "inconsistent bare output index");
+    block_height = tx_ptr->m_keeper_block_height;
+    CHECK_AND_ASSERT_MES(block_height < chain_size, false, "bare output block is out of range");
+    const auto& output = tx_ptr->tx.vout[output_index];
+    CHECK_AND_ASSERT_MES(output.type() == typeid(tx_out_bare), false, "bare output has an unexpected type");
+    const auto& bare_output = boost::get<tx_out_bare>(output);
+    CHECK_AND_ASSERT_MES(bare_output.amount == batch.input_amount && bare_output.target.type() == typeid(txout_to_key), false, "inconsistent bare output amount or target");
+    eligible = chain_size - block_height >= CURRENCY_MINED_MONEY_UNLOCK_WINDOW && build_random_out_entry_from_tx_entry(*tx_ptr, output_index, batch.input_amount, global_index, ring_size, false, /*height_upper_limit=*/0, entry);
+    return true;
+  };
+
+  auto try_index = [&](uint64_t global_index) -> bool
+  {
+    if (!checked_indices.insert(global_index).second)
+      return true;
+    uint64_t block_height = 0;
+    COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry entry{};
+    bool eligible = false;
+    if (!load_output(global_index, batch.ring_size, block_height, entry, eligible))
+      return false;
+    if (eligible)
+      pool.emplace_back(block_height, entry);
+    return true;
+  };
+
+  if (outputs_count != 0)
+  {
+    for (uint64_t global_index : batch.global_offsets)
+    {
+      if (checked_indices.size() == outputs_count)
+        break;
+      if (global_index >= outputs_count)
+        global_index %= outputs_count;
+      const size_t previous_pool_size = pool.size();
+      // collisions and ineligible outputs by walking forward from this candidate
+      while (pool.size() == previous_pool_size && checked_indices.size() < outputs_count)
+      {
+        if (!try_index(global_index))
+          return false;
+        global_index = global_index == outputs_count - 1 ? 0 : global_index + 1;
+      }
+    }
+  }
+
+  std::unordered_map<uint64_t, size_t> block_indices;
+  block_indices.reserve(pool.size());
+  out_blocks.reserve(pool.size());
+  for (const auto& output : pool)
+  {
+    const uint64_t block_height = output.first;
+    auto block_it = block_indices.find(block_height);
+    if (block_it == block_indices.end())
+    {
+      const size_t block_index = out_blocks.size();
+      out_blocks.emplace_back();
+      out_blocks.back().block_height = block_height;
+      block_it = block_indices.emplace(block_height, block_index).first;
+    }
+    out_blocks[block_it->second].outs.emplace_back(output.second);
+  }
+  LOG_PRINT_L1("[GET_RANDOM_OUTS4_BARE]: amount: " << batch.input_amount << ", indexed: " << outputs_count
+    << ", requested pool: " << pool_target << ", ring size: " << batch.ring_size << ", checked: " << checked_indices.size() << ", returned: " << pool.size());
+  return true;
+}
+//------------------------------------------------------------------
 bool blockchain_storage::get_random_outs_for_amounts4(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request& req, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::response& res) const
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
@@ -3333,7 +3417,8 @@ bool blockchain_storage::get_random_outs_for_amounts4(const COMMAND_RPC_GET_RAND
 
   TIME_MEASURE_START_MS(total_time_ms);
 
-  const uint64_t top_block_height = get_current_blockchain_size() - CURRENCY_MINED_MONEY_UNLOCK_WINDOW;
+  const uint64_t chain_size = get_current_blockchain_size();
+  const uint64_t top_block_height = chain_size - CURRENCY_MINED_MONEY_UNLOCK_WINDOW;
   const uint64_t height_limit = (req.height_upper_limit && req.height_upper_limit <= top_block_height) ? req.height_upper_limit : top_block_height;
   const uint64_t hf4_active_after_height = m_core_runtime_config.hard_forks.get_height_the_hardfork_active_after(ZANO_HARDFORK_04_ZARCANUM);
   res.blocks_batches.clear();
@@ -3353,6 +3438,17 @@ bool blockchain_storage::get_random_outs_for_amounts4(const COMMAND_RPC_GET_RAND
     res.blocks_batches.emplace_back();
     auto& out_blocks = res.blocks_batches.back().blocks;
     out_blocks.reserve(req.batches[i].heights.size());
+
+    // bare variant of selection
+    const auto& batch = req.batches[i];
+    if (!batch.global_offsets.empty() || batch.ring_size != 0)
+    {
+      if (!get_bare_outs_by_indices(batch, res.blocks_batches.back(), chain_size))
+        return false;
+
+      total_blocks_found += out_blocks.size();
+      continue;
+    }
 
     auto search_pass = [&](const std::string& strategy)
     {
@@ -3974,6 +4070,92 @@ void blockchain_storage::print_blockchain_outs_stats() const
     ss << std::setw(15) << print_money_brief(it->first) << std::setw(10) << it->second.total << std::setw(10) << it->second.unspent << std::setw(10) << it->second.mixable << ENDL;
 
   LOG_PRINT_L0("OUTS: " << ENDL << ss.str());
+}
+//------------------------------------------------------------------
+bool blockchain_storage::export_bare_outputs(const std::string& file) const
+{
+  struct bucket_t
+  {
+    uint64_t indexed_count = 0;
+    uint64_t visited_count = 0;
+  };
+  std::map<uint64_t, bucket_t> buckets;
+  const uint64_t hf4_height = m_core_runtime_config.hard_forks.get_height_the_hardfork_active_after(ZANO_HARDFORK_04_ZARCANUM);
+  uint64_t snapshot_height = 0;
+  uint64_t snapshot_time = 0;
+  crypto::hash genesis_id{}, hf4_id{}, snapshot_id{};
+
+  try
+  {
+    {
+      CRITICAL_REGION_LOCAL(m_read_lock);
+      CHECK_AND_ASSERT_MES(m_db_blocks.size() != 0, false, "Cannot export bare outputs from an empty blockchain");
+      snapshot_height = m_db_blocks.size() - 1;
+      CHECK_AND_ASSERT_MES(snapshot_height > hf4_height, false, "Synchronize past HF4 before exporting bare outputs");
+      snapshot_time = m_core_runtime_config.get_core_time();
+      genesis_id = get_block_hash(m_db_blocks[0]->bl);
+      hf4_id = get_block_hash(m_db_blocks[hf4_height]->bl);
+      snapshot_id = get_block_hash(m_db_blocks[snapshot_height]->bl);
+      LOG_PRINT_L0("Exporting bare output counts at height " << snapshot_height);
+
+      bool valid = true;
+      uint64_t progress = 0;
+      const uint64_t entries_count = m_db_outputs.size();
+      m_db_outputs.enumerate_subitems([&](uint64_t i, uint64_t amount, uint64_t index, const global_output_entry& /*entry*/) -> bool
+      {
+        const uint64_t current_progress = 20 * i / entries_count;
+        if (current_progress != progress)
+        {
+          progress = current_progress;
+          LOG_PRINT_L0(progress * 5 << "%");
+        }
+        if (amount == 0)
+          return true;
+
+        valid = false; // any failed invariant aborts the export instead of producing incomplete data
+        auto& bucket = buckets[amount];
+        if (bucket.visited_count == 0)
+          bucket.indexed_count = m_db_outputs.get_item_size(amount);
+        CHECK_AND_ASSERT_MES(index < bucket.indexed_count, false, "Bare output index out of range: amount " << amount << ", index " << index);
+        ++bucket.visited_count;
+        valid = true;
+        return true;
+      });
+      CHECK_AND_ASSERT_MES(valid, false, "Bare output export aborted due to an invalid database entry");
+      CHECK_AND_ASSERT_MES(!buckets.empty(), false, "No bare output buckets found");
+      for (const auto& item : buckets)
+        CHECK_AND_ASSERT_MES(item.second.visited_count == item.second.indexed_count, false, "Incomplete bare output bucket for amount " << item.first);
+    }
+
+    boost::filesystem::ofstream stream;
+    stream.exceptions(std::ios::failbit | std::ios::badbit);
+    stream.open(file_io_utils::convert_utf8_to_wstring_if_needed(file), std::ios::binary | std::ios::out | std::ios::trunc);
+    stream << "// Generated by Zano " << PROJECT_VERSION_LONG << " (formation " << CURRENCY_FORMATION_VERSION << ").\n"
+      << "// Genesis: " << genesis_id << "\n"
+      << "// Final bare block: " << hf4_height << ", " << hf4_id << "\n"
+      << "// Snapshot block: " << snapshot_height << ", " << snapshot_id << ", scan start core time: " << snapshot_time << "\n"
+      << "// Amounts are atomic units. Counts include ALL indexed bare outputs, regardless of eligibility.\n"
+      << "// For each amount, valid global indices are [0, count); count is not the maximum index.\n"
+      << "#include <cstdint>\n#include <unordered_map>\n\n"
+      << "namespace currency { namespace bare_outputs_snapshot {\n"
+      << "extern const std::unordered_map<std::uint64_t, std::uint64_t> bare_output_count_by_amount = {\n";
+
+    uint64_t indexed_count = 0;
+    for (const auto& item : buckets)
+    {
+      indexed_count += item.second.indexed_count;
+      stream << "  {" << item.first << "ULL, " << item.second.indexed_count << "ULL},\n";
+    }
+    stream << "};\n}} // namespace currency::bare_outputs_snapshot\n";
+    stream.close();
+    LOG_PRINT_L0("Exported counts for " << buckets.size() << " bare amounts, " << indexed_count << " indexed outputs to " << file);
+    return true;
+  }
+  catch (const std::exception& e)
+  {
+    LOG_ERROR("Failed to export bare outputs to " << file << ": " << e.what());
+    return false;
+  }
 }
 //------------------------------------------------------------------
 void blockchain_storage::print_blockchain_outs(const std::string& file) const
