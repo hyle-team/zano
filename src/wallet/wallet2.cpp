@@ -2782,6 +2782,7 @@ void wallet2::refresh(size_t& blocks_fetched, bool& received_money, std::atomic<
     {
       bool full_reset_needed = false;
       pull_blocks(added_blocks, stop, full_reset_needed);
+      try_count = 0;
       if (full_reset_needed)
       {
         if (reset_count > 1)
