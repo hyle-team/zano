@@ -488,7 +488,7 @@ bool hardfork_4_bare_decoy_indices::c1(currency::core& c, size_t ev_index, const
         forwarded.height_upper_limit = 1; // bare candidates must ignore the height limit
       else if (m_change == OWN_ABSENT)
         for (size_t i = 0; i < forwarded.batches[0].global_offsets.size(); ++i)
-          forwarded.batches[0].global_offsets[i] = i + 1; // all sixteen Bob outputs, Alice adds her own index locally
+          forwarded.batches[0].global_offsets[i] = i + 1; // omit Alice's requested output while returning enough decoys
       CHECK_AND_ASSERT_MES(m_delegate->call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4(forwarded, rsp), false, "candidate output RPC failed");
       CHECK_AND_ASSERT_MES(rsp.status == API_RETURN_CODE_OK && rsp.blocks_batches.size() == 1
         && !rsp.blocks_batches[0].blocks.empty() && !rsp.blocks_batches[0].blocks[0].outs.empty(), false, "invalid genuine candidate response");
@@ -724,10 +724,22 @@ bool hardfork_4_bare_decoy_indices::c1(currency::core& c, size_t ev_index, const
     CHECK_AND_ASSERT_EQ(batch.global_offsets.size(), inputs_count * (decoys_count + 1));
     for (uint64_t index : batch.global_offsets)
       CHECK_AND_ASSERT_MES(index < count_it->second, false, "wallet candidate exceeded the embedded amount range");
+    if (account == ALICE_ACC_IDX)
+      CHECK_AND_ASSERT_MES(std::find(batch.global_offsets.begin(), batch.global_offsets.end(), own_outputs[0].m_global_output_index)
+        != batch.global_offsets.end(), false, "wallet omitted its real output from the candidate request");
     if (!expect_success)
     {
-      if (change == core_proxy::MISSING || change == core_proxy::EMPTY_POOL || change == core_proxy::OLD_NODE)
-        CHECK_AND_ASSERT_MES(not_enough_decoys, false, "short or empty pool did not report insufficient decoys");
+      if (change == core_proxy::OWN_ABSENT)
+      {
+        size_t returned_count = 0;
+        for (const auto& block : proxy->m_response.blocks_batches[0].blocks)
+          for (const auto& output : block.outs)
+          {
+            CHECK_AND_ASSERT_MES(output.global_amount_index != own_outputs[0].m_global_output_index, false, "own-absent control returned the real output");
+            ++returned_count;
+          }
+        CHECK_AND_ASSERT_MES(returned_count >= decoys_count, false, "own-absent control did not return enough decoys");
+      }
       return true;
     }
 
@@ -740,8 +752,6 @@ bool hardfork_4_bare_decoy_indices::c1(currency::core& c, size_t ev_index, const
         available.insert(output.global_amount_index);
     if (account == BOB_ACC_IDX)
       CHECK_AND_ASSERT_EQ(available.size(), DECOYS_COUNT + 1);
-    if (change == core_proxy::OWN_ABSENT)
-      CHECK_AND_ASSERT_MES(!available.count(0), false, "own-absent control returned Alice's output");
     if (change == core_proxy::HEIGHT_LIMIT)
       CHECK_AND_ASSERT_MES(std::any_of(response_batch.blocks.begin(), response_batch.blocks.end(), [](const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::outputs_in_block& block)
         { return block.block_height > 1 && !block.outs.empty(); }), false, "height-limit control returned no later bare outputs");
@@ -753,6 +763,8 @@ bool hardfork_4_bare_decoy_indices::c1(currency::core& c, size_t ev_index, const
       auto real = std::find_if(own_outputs.begin(), own_outputs.end(), [&](const tools::transfer_details& td) { return td.m_key_image == input.k_image; });
       CHECK_AND_ASSERT_MES(real != own_outputs.end(), false, "wallet selected an unknown input");
       CHECK_AND_ASSERT_MES(real_indices.insert(real->m_global_output_index).second, false, "wallet reused a real input");
+      CHECK_AND_ASSERT_MES(std::find(batch.global_offsets.begin(), batch.global_offsets.end(), real->m_global_output_index)
+        != batch.global_offsets.end(), false, "wallet omitted a real input from the aggregated candidate request");
       CHECK_AND_ASSERT_EQ(input.key_offsets.size(), decoys_count + 1);
       const auto absolute = relative_output_offsets_to_absolute(input.key_offsets);
       std::unordered_set<uint64_t> ring_indices;
@@ -760,7 +772,7 @@ bool hardfork_4_bare_decoy_indices::c1(currency::core& c, size_t ev_index, const
       {
         CHECK_AND_ASSERT_MES(reference.type() == typeid(uint64_t), false, "unexpected output reference");
         const uint64_t index = boost::get<uint64_t>(reference);
-        CHECK_AND_ASSERT_MES((index == real->m_global_output_index || available.count(index)) && ring_indices.insert(index).second, false, "invalid or duplicate ring output");
+        CHECK_AND_ASSERT_MES(available.count(index) && ring_indices.insert(index).second, false, "ring output was not returned by the daemon or is duplicated");
       }
       CHECK_AND_ASSERT_MES(ring_indices.count(real->m_global_output_index), false, "ring omitted its real output");
     }
@@ -773,7 +785,7 @@ bool hardfork_4_bare_decoy_indices::c1(currency::core& c, size_t ev_index, const
 
   for (const auto change : {core_proxy::MISSING, core_proxy::DUPLICATE, core_proxy::OWN_KEY, core_proxy::OLD_NODE, core_proxy::NOT_ALLOWED, core_proxy::EMPTY_POOL})
     CHECK_AND_ASSERT_MES(attempt_transfer(change, BOB_ACC_IDX, COIN, false), false, "malformed or unavailable response was accepted");
-  CHECK_AND_ASSERT_MES(attempt_transfer(core_proxy::OWN_ABSENT, ALICE_ACC_IDX, COIN / 2, true), false, "full pool without the own output could not be spent");
+  CHECK_AND_ASSERT_MES(attempt_transfer(core_proxy::OWN_ABSENT, ALICE_ACC_IDX, COIN / 2, false), false, "wallet broadcast a transfer after the daemon omitted the real output");
   CHECK_AND_ASSERT_MES(attempt_transfer(core_proxy::NONE, ALICE_ACC_IDX, COIN / 2, true), false, "old genesis input could not be spent");
   CHECK_AND_ASSERT_MES(attempt_transfer(core_proxy::HEIGHT_LIMIT, ALICE_ACC_IDX, COIN / 2, true), false, "height limit prevented a bare transfer");
   CHECK_AND_ASSERT_MES(attempt_transfer(core_proxy::NONE, BOB_ACC_IDX, COIN, true, true), false, "aggregated bare candidate lookup failed");
