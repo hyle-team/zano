@@ -3484,6 +3484,9 @@ void wallet2::load(const std::wstring& wallet_, const std::string& password, boo
   {
     WLT_LOG_L0("Resyncing the wallet in order to prepare correct hf6 snapshot...");
     reset_history();
+    if (data_file.is_open())
+      data_file.close();
+    store();
   }
 
 
