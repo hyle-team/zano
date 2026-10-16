@@ -427,6 +427,129 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
 
 //----------------------------------------------------------------------------------------------------
 
+enum bad_amount_commitment_kind { bac_wrong_asset_id = 0, bac_wrong_amount = 1 };
+
+static const char* get_bad_amount_commitment_kind_name(bad_amount_commitment_kind kind)
+{
+  switch(kind)
+  {
+  case bac_wrong_asset_id: return "wrong_asset_id";
+  case bac_wrong_amount:   return "wrong_amount";
+  default:                 return "unknown";
+  }
+}
+
+asset_registration_and_bad_amount_commitment::asset_registration_and_bad_amount_commitment()
+{
+  REGISTER_CALLBACK_METHOD(asset_registration_and_bad_amount_commitment, c1);
+}
+
+bool asset_registration_and_bad_amount_commitment::generate(std::vector<test_event_entry>& events) const
+{
+  // Test idea: a register op with a corrupted amount commitment must be rejected in the pool and in a block,
+  // both when the commitment is built under the wrong asset id and when it commits to the wrong amount.
+  uint64_t ts = test_core_time::get_time();
+  m_accounts.resize(MINER_ACC_IDX + 1);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
+  DO_CALLBACK(events, "configure_core");
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 3);
+
+  DO_CALLBACK(events, "c1");
+  return true;
+}
+
+bool asset_registration_and_bad_amount_commitment::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  std::shared_ptr<debug_wallet2> miner_wlt = init_playtime_test_wallet_t<debug_wallet2>(events, c, MINER_ACC_IDX);
+  miner_wlt->get_account().set_createtime(0);
+  miner_wlt->refresh();
+
+  asset_descriptor_base adb{};
+  adb.total_max_supply  = 1000000000000000000ULL;
+  adb.full_name         = "Bad commitment coin";
+  adb.ticker            = "BADC";
+  adb.decimal_point     = 12;
+
+  std::vector<tx_destination_entry> destinations(2);
+  destinations[0].addr.push_back(miner_wlt->get_account().get_public_address());
+  destinations[0].amount    = adb.total_max_supply / 2;
+  destinations[0].asset_id  = null_pkey;
+  destinations[1].addr.push_back(miner_wlt->get_account().get_public_address());
+  destinations[1].amount    = adb.total_max_supply / 2;
+  destinations[1].asset_id  = null_pkey;
+
+  // corrupt the register op's amount commitment after it's computed but before the g-proof is signed,
+  // so the tx is well-formed and every other proof is consistent -- only the commitment is wrong
+  bad_amount_commitment_kind kind = bac_wrong_asset_id;
+  miner_wlt->get_debug_events_dispatcher().SUBSCIRBE_DEBUG_EVENT<wde_construct_tx_handle_asset_descriptor_operation>([&](const wde_construct_tx_handle_asset_descriptor_operation& o)
+  {
+    if(o.pado->operation_type != ASSET_DESCRIPTOR_OPERATION_REGISTER)
+      return;
+    crypto::point_t asset_id_pt{};
+    CHECK_AND_ASSERT_THROW_MES(get_or_calculate_asset_id(*o.pado, &asset_id_pt, nullptr), "get_or_calculate_asset_id failed");
+    crypto::point_t commitment = crypto::point_t(o.pado->opt_amount_commitment.get()).modify_mul8();
+    switch(kind)
+    {
+    case bac_wrong_asset_id:  commitment += crypto::scalar_t(o.pado->opt_descriptor->current_supply) * (native_coin_asset_id_pt - asset_id_pt); break; // rebase the amount onto the native tag
+    case bac_wrong_amount:    commitment += asset_id_pt; break; // committed amount becomes current_supply + 1
+    default:                  CHECK_AND_ASSERT_THROW_MES(false, "unknown bad_amount_commitment_kind");
+    }
+    o.pado->opt_amount_commitment = (crypto::c_scalar_1div8 * commitment).to_public_key();
+  });
+
+  for(kind = bac_wrong_asset_id; kind <= bac_wrong_amount; kind = static_cast<bad_amount_commitment_kind>(kind + 1))
+  {
+    const char* kind_name = get_bad_amount_commitment_kind_name(kind);
+    transaction tx{};
+    crypto::public_key asset_id = null_pkey;
+
+    bool r = false;
+    // check pool side rejection
+    try
+    {
+      miner_wlt->deploy_new_asset(adb, destinations, tx, asset_id);
+    }
+    catch(tools::error::tx_rejected&)
+    {
+      r = true;
+    }
+    CHECK_AND_ASSERT_MES(r, false, "register with bad amount commitment (" << kind_name << ") was accepted by the wallet");
+
+    // force it past the pool's validation and make sure a block still can't carry it
+    c.get_tx_pool().unsecure_disable_tx_validation_on_addition(true);
+    miner_wlt->deploy_new_asset(adb, destinations, tx, asset_id);
+    CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "unexpected pool tx count for " << kind_name << ": " << c.get_pool_transactions_count());
+    r = mine_next_pow_block_in_playtime(miner_wlt->get_account().get_public_address(), c);
+    CHECK_AND_ASSERT_MES(!r, false, "block with a bad amount commitment (" << kind_name << ") was mined");
+    CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "bad tx unexpectedly left the pool for " << kind_name);
+    c.get_tx_pool().unsecure_disable_tx_validation_on_addition(false);
+    c.get_tx_pool().purge_transactions();
+    miner_wlt->refresh();
+
+    asset_descriptor_base adb_probe{};
+    CHECK_AND_ASSERT_MES(!c.get_blockchain_storage().get_asset_info(asset_id, adb_probe), false, "asset " << kind_name << " was registered despite a bad commitment");
+  }
+
+  miner_wlt->get_debug_events_dispatcher().UNSUBSCRIBE_ALL();
+
+  // positive control: the same descriptor registers cleanly once the commitment isn't corrupted
+  transaction tx{};
+  crypto::public_key asset_id = null_pkey;
+  miner_wlt->deploy_new_asset(adb, destinations, tx, asset_id);
+  bool r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
+  miner_wlt->refresh();
+
+  asset_descriptor_base registered{};
+  CHECK_AND_ASSERT_MES(c.get_blockchain_storage().get_asset_info(asset_id, registered), false, "valid asset registration was rejected");
+  CHECK_AND_ASSERT_EQ(registered.current_supply, adb.total_max_supply);
+
+  return true;
+}
+
+//----------------------------------------------------------------------------------------------------
 
 assets_and_explicit_native_coins_in_outs::assets_and_explicit_native_coins_in_outs()
 {

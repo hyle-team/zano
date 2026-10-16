@@ -1238,6 +1238,7 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY(gen_simple_chain_split_1);
     GENERATE_AND_PLAY_HF(alt_blocks_validation_and_same_new_amount_in_two_txs, "3-*");
     GENERATE_AND_PLAY_HF(alt_blocks_with_the_same_txs, "3-*");
+    GENERATE_AND_PLAY_HF(alt_blocks_pruning, "3-*");
     GENERATE_AND_PLAY_HF(chain_switching_when_out_spent_in_alt_chain_mixin, "3-*");
     GENERATE_AND_PLAY_HF(chain_switching_when_out_spent_in_alt_chain_ref_id, "3-4");
     GENERATE_AND_PLAY_HF(alt_chain_and_block_tx_fee_median, "3-*");
@@ -1382,6 +1383,9 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY_HF(hard_fork_4_consolidated_txs, "3-*");
     GENERATE_AND_PLAY_HF(hardfork_4_wallet_transfer_with_mandatory_mixins, "3-*");
     GENERATE_AND_PLAY(hardfork_4_wallet_sweep_bare_outs);
+    GENERATE_AND_PLAY(hardfork_4_bare_decoy_indices);
+    GENERATE_AND_PLAY(hardfork_4_bare_decoy_forced_mix);
+    GENERATE_AND_PLAY(hardfork_4_bare_decoy_before_hf4);
     GENERATE_AND_PLAY_HF(hardfork_4_pop_tx_from_global_index, "4-*");
     GENERATE_AND_PLAY(hardfork_4_pos_decoy_transition);
 
@@ -1410,6 +1414,7 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY(zarcanum_basic_test);
 
     GENERATE_AND_PLAY_HF(multiassets_basic_test, "4-*");
+    GENERATE_AND_PLAY_HF(asset_registration_and_bad_amount_commitment, "5-*");
     GENERATE_AND_PLAY_HF(ionic_swap_basic_test, "4-*");
     GENERATE_AND_PLAY_HF(ionic_swap_exact_amounts_test, "4-*");
     GENERATE_AND_PLAY_HF(ionic_swap_overflow_check_test, "4-*");

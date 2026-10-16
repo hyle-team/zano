@@ -648,6 +648,150 @@ bool alt_blocks_with_the_same_txs::check_tx_not_related_to_altblock(currency::co
 
 //-----------------------------------------------------------------------------------------------------
 
+alt_blocks_pruning::alt_blocks_pruning()
+{
+  REGISTER_CALLBACK_METHOD(alt_blocks_pruning, check_oldest_pruned);
+  REGISTER_CALLBACK_METHOD(alt_blocks_pruning, prepare_same_timestamp_pruning);
+  REGISTER_CALLBACK_METHOD(alt_blocks_pruning, check_same_timestamp_pruning);
+}
+
+bool alt_blocks_pruning::generate(std::vector<test_event_entry>& events) const
+{
+  // Test idea: make sure overflow pruning removes the oldest alt blocks, handles equal receive timestamps, and clears the pruned blocks tx/key-image bookkeeping
+  /*
+                              /-(blk_main_1)-(blk_main_2)-(blk_main_3)
+    (blk_0)-...-(blk_fork)---|--(blk_alt_oldest, tx_oldest)
+                             |--(blk_alt_middle)
+                              \-(blk_alt_newest)
+
+    Phase 1: [oldest:10, middle:20, newest:30] - prune(max=2) -> [middle, newest]
+             Re-add oldest -> accepted without stale tx/key-image state
+    Phase 2: [oldest:100, middle:100, newest:100, extra:100] - prune(max=2) -> any two
+             Exactly two blocks must remain despite the duplicate timestamp keys
+  */
+
+  GENERATE_ACCOUNT(miner_acc);
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  DO_CALLBACK(events, "configure_core");
+  if (m_hardforks.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, 2))
+  {
+    test_gentime_settings tgts = generator.get_test_gentime_settings();
+    tgts.split_strategy = tests_random_split_strategy;
+    generator.set_test_gentime_settings(tgts);
+  }
+
+  MAKE_NEXT_BLOCK(events, blk_1, blk_0, miner_acc);
+  REWIND_BLOCKS_N(events, blk_fork, blk_1, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+
+  MAKE_TX(events, tx_oldest, miner_acc, miner_acc, TESTS_DEFAULT_FEE, blk_fork);
+
+  MAKE_NEXT_BLOCK(events, blk_main_1, blk_fork, miner_acc);
+  MAKE_NEXT_BLOCK(events, blk_main_2, blk_main_1, miner_acc);
+  MAKE_NEXT_BLOCK(events, blk_main_3, blk_main_2, miner_acc);
+
+  MAKE_NEXT_BLOCK_TX1(events, blk_alt_oldest, blk_fork, miner_acc, tx_oldest);
+  MAKE_NEXT_BLOCK_TIMESTAMP_ADJUSTMENT(1, events, blk_alt_middle, blk_fork, miner_acc);
+  MAKE_NEXT_BLOCK_TIMESTAMP_ADJUSTMENT(2, events, blk_alt_newest, blk_fork, miner_acc);
+
+  m_oldest_alt_block_id = get_block_hash(blk_alt_oldest);
+  m_middle_alt_block_id = get_block_hash(blk_alt_middle);
+  m_newest_alt_block_id = get_block_hash(blk_alt_newest);
+  m_oldest_alt_tx_id = get_transaction_hash(tx_oldest);
+
+  DO_CALLBACK(events, "check_oldest_pruned");
+
+  ADD_BLOCK(events, blk_alt_oldest);
+  DO_CALLBACK(events, "prepare_same_timestamp_pruning");
+
+  ADD_BLOCK(events, blk_alt_oldest);
+  ADD_BLOCK(events, blk_alt_middle);
+  ADD_BLOCK(events, blk_alt_newest);
+  MAKE_NEXT_BLOCK_TIMESTAMP_ADJUSTMENT(3, events, blk_alt_extra, blk_fork, miner_acc);
+  m_extra_alt_block_id = get_block_hash(blk_alt_extra);
+
+  DO_CALLBACK(events, "check_same_timestamp_pruning");
+  return true;
+}
+
+bool alt_blocks_pruning::check_oldest_pruned(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  blockchain_storage& bcs = c.get_blockchain_storage();
+  blockchain_storage::alt_chain_container alt_blocks;
+  bcs.get_alternative_chains(alt_blocks);
+  CHECK_AND_ASSERT_MES(alt_blocks.size() == 3, false, "unexpected alt block count: " << alt_blocks.size());
+
+  auto oldest_it = alt_blocks.find(m_oldest_alt_block_id);
+  auto middle_it = alt_blocks.find(m_middle_alt_block_id);
+  auto newest_it = alt_blocks.find(m_newest_alt_block_id);
+  CHECK_AND_ASSERT_MES(oldest_it != alt_blocks.end(), false, "oldest alt block is missing");
+  CHECK_AND_ASSERT_MES(middle_it != alt_blocks.end(), false, "middle alt block is missing");
+  CHECK_AND_ASSERT_MES(newest_it != alt_blocks.end(), false, "newest alt block is missing");
+
+  oldest_it->second.timestamp = 10;
+  middle_it->second.timestamp = 20;
+  newest_it->second.timestamp = 30;
+  bcs.set_alternative_chains(alt_blocks);
+
+  core_runtime_config config = bcs.get_core_runtime_config();
+  config.max_alt_blocks = 2;
+  bcs.set_core_runtime_config(config);
+  CHECK_AND_ASSERT_MES(bcs.prune_aged_alt_blocks(), false, "prune_aged_alt_blocks failed");
+
+  alt_blocks.clear();
+  bcs.get_alternative_chains(alt_blocks);
+  CHECK_AND_ASSERT_MES(alt_blocks.size() == 2, false, "unexpected alt block count after pruning: " << alt_blocks.size());
+  CHECK_AND_ASSERT_MES(alt_blocks.count(m_oldest_alt_block_id) == 0, false, "oldest alt block was not pruned");
+  CHECK_AND_ASSERT_MES(alt_blocks.count(m_middle_alt_block_id) == 1, false, "middle alt block was pruned");
+  CHECK_AND_ASSERT_MES(alt_blocks.count(m_newest_alt_block_id) == 1, false, "newest alt block was pruned");
+  CHECK_AND_ASSERT_MES(!bcs.is_tx_related_to_altblock(m_oldest_alt_tx_id), false, "pruned alt block still owns a tx refcount");
+
+  return true;
+}
+
+bool alt_blocks_pruning::prepare_same_timestamp_pruning(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  blockchain_storage& bcs = c.get_blockchain_storage();
+  CHECK_AND_ASSERT_MES(bcs.have_block_alt(m_oldest_alt_block_id), false, "re-added alt block was not retained");
+  CHECK_AND_ASSERT_MES(bcs.is_tx_related_to_altblock(m_oldest_alt_tx_id), false, "re-added alt block has no tx refcount");
+
+  bcs.clear_altblocks();
+  core_runtime_config config = bcs.get_core_runtime_config();
+  config.max_alt_blocks = CURRENCY_ALT_BLOCK_MAX_COUNT;
+  bcs.set_core_runtime_config(config);
+  return true;
+}
+
+bool alt_blocks_pruning::check_same_timestamp_pruning(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  blockchain_storage& bcs = c.get_blockchain_storage();
+  blockchain_storage::alt_chain_container alt_blocks;
+  bcs.get_alternative_chains(alt_blocks);
+  CHECK_AND_ASSERT_MES(alt_blocks.size() == 4, false, "unexpected alt block count: " << alt_blocks.size());
+  CHECK_AND_ASSERT_MES(alt_blocks.count(m_oldest_alt_block_id) == 1, false, "oldest alt block is missing");
+  CHECK_AND_ASSERT_MES(alt_blocks.count(m_middle_alt_block_id) == 1, false, "middle alt block is missing");
+  CHECK_AND_ASSERT_MES(alt_blocks.count(m_newest_alt_block_id) == 1, false, "newest alt block is missing");
+  CHECK_AND_ASSERT_MES(alt_blocks.count(m_extra_alt_block_id) == 1, false, "extra alt block is missing");
+
+  for (auto& entry : alt_blocks)
+    entry.second.timestamp = 100;
+  bcs.set_alternative_chains(alt_blocks);
+
+  core_runtime_config config = bcs.get_core_runtime_config();
+  config.max_alt_blocks = 2;
+  bcs.set_core_runtime_config(config);
+  CHECK_AND_ASSERT_MES(bcs.prune_aged_alt_blocks(), false, "prune_aged_alt_blocks failed");
+
+  alt_blocks.clear();
+  bcs.get_alternative_chains(alt_blocks);
+  CHECK_AND_ASSERT_MES(alt_blocks.size() == 2, false, "same-timestamp blocks were not fully pruned: " << alt_blocks.size());
+  CHECK_AND_ASSERT_MES((alt_blocks.count(m_oldest_alt_block_id) != 0) == bcs.is_tx_related_to_altblock(m_oldest_alt_tx_id), false,
+    "alt block presence and tx refcount disagree after pruning");
+
+  return true;
+}
+
+//-----------------------------------------------------------------------------------------------------
+
 bool chain_switching_when_out_spent_in_alt_chain_mixin::generate(std::vector<test_event_entry>& events) const
 {
   // Test idea: make sure a tx can spend an output with mixins from another tx when both txs are in an altchain.
