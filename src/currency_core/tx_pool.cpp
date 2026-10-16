@@ -759,9 +759,29 @@ namespace currency
     // 1) the only side effect of a tx being blacklisted is the one is just ignored by fill_block_template(), but it still can be added to blockchain/pool
     // 2) it's permanent
     auto db_tx_ptr = m_db.begin_transaction_obj();
-    m_db_black_tx_list.set(get_transaction_hash(tx), true);
+    const crypto::hash tx_raw_hash = get_object_hash(tx);
+    m_db_black_tx_list.set(tx_raw_hash, true);
     db_tx_ptr->commit_transaction();
-    LOG_PRINT_YELLOW("TX ADDED TO POOL'S BLACKLIST: " << get_transaction_hash(tx) << ", full black list: " << ENDL << get_blacklisted_txs_string(), LOG_LEVEL_0);
+    LOG_PRINT_YELLOW("TX ADDED TO POOL'S BLACKLIST: " << tx_raw_hash << ", full black list: " << ENDL << get_blacklisted_txs_string(), LOG_LEVEL_0);
+    return true;
+  }
+  //---------------------------------------------------------------------------------
+  bool tx_memory_pool::remove_blacklisted_tx_if_different(const crypto::hash& tx_id, const crypto::hash& tx_raw_hash)
+  {
+    auto tx_ptr = m_db_transactions.get(tx_id);
+    if (!tx_ptr)
+      return false;
+
+    const crypto::hash pooled_raw_hash = get_object_hash(tx_ptr->tx);
+    if (pooled_raw_hash == tx_raw_hash || !is_tx_blacklisted(pooled_raw_hash))
+      return false;
+
+    transaction old_tx = tx_ptr->tx;
+    const bool kept_by_block = tx_ptr->kept_by_block;
+    auto db_tx_ptr = m_db.begin_transaction_obj();
+    m_db_transactions.erase(tx_id);
+    on_tx_remove(tx_id, old_tx, kept_by_block);
+    db_tx_ptr->commit_transaction();
     return true;
   }
   //---------------------------------------------------------------------------------
@@ -938,7 +958,7 @@ namespace currency
   {
     //not the best implementation at this time, sorry :(
 
-    if (is_tx_blacklisted(id))
+    if (is_tx_blacklisted(get_object_hash(txd.tx)))
     {
       LOG_PRINT_L2("[is_transaction_ready_to_go]Tx " << id << " skipped as it blacklisted");
       return false;
@@ -1065,7 +1085,7 @@ namespace currency
           << std::setw(7) << txd.last_failed_height << " "
           << std::setw(9) << print16(txd.last_failed_id) << "    "
           << std::setw(3) << txd.tx.version << "   "
-          << (txd.kept_by_block ? "kept_by_block " : "") << (is_tx_blacklisted(tx.first) ? "BLACKLISTED " : "")
+          << (txd.kept_by_block ? "kept_by_block " : "") << (is_tx_blacklisted(get_object_hash(txd.tx)) ? "BLACKLISTED " : "")
           << ENDL;
       }
       return ss.str();
@@ -1402,9 +1422,9 @@ namespace currency
     }
   }
   //---------------------------------------------------------------------------------
-  bool tx_memory_pool::is_tx_blacklisted(const crypto::hash& id) const
+  bool tx_memory_pool::is_tx_blacklisted(const crypto::hash& tx_raw_hash) const
   {
-    return m_db_black_tx_list.get(id) != nullptr;
+    return m_db_black_tx_list.get(tx_raw_hash) != nullptr;
   }
   //---------------------------------------------------------------------------------
   bool tx_memory_pool::load_keyimages_cache()

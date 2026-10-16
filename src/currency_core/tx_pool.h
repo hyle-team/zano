@@ -104,6 +104,7 @@ namespace currency
     bool on_blockchain_dec(uint64_t new_block_height, const crypto::hash& top_block_id);
     bool on_finalize_db_transaction();
     bool add_transaction_to_black_list(const transaction& tx);
+    bool remove_blacklisted_tx_if_different(const crypto::hash& tx_id, const crypto::hash& tx_raw_hash);
     bool force_relay_pool() const;
     bool set_protocol(i_currency_protocol* pprotocol);
 
@@ -142,7 +143,7 @@ namespace currency
 
     void remove_incompatible_txs(); // made public to be called after the BCS is loaded and hardfork info is ready
 
-    bool is_tx_blacklisted(const crypto::hash& id) const;
+    bool is_tx_blacklisted(const crypto::hash& tx_raw_hash) const;
 
 #ifdef TX_POOL_USE_UNSECURE_TEST_FUNCTIONS
     void unsecure_disable_tx_validation_on_addition(bool validation_disabled) { m_unsecure_disable_tx_validation_on_addition = validation_disabled; }

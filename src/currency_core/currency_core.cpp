@@ -356,11 +356,15 @@ namespace currency
   //-----------------------------------------------------------------------------------------------
   bool core::add_new_tx(const transaction& tx, const crypto::hash& tx_hash, size_t blob_size, tx_verification_context& tvc, bool kept_by_block)
   {
+    CRITICAL_REGION_LOCAL(m_mempool);
     if(m_mempool.have_tx(tx_hash))
     {
-      LOG_PRINT_L3("add_new_tx: already have tx " << tx_hash << " in the pool");
-      tvc.m_already_existed = true;
-      return true;
+      if (!m_mempool.remove_blacklisted_tx_if_different(tx_hash, get_object_hash(tx)))
+      {
+        LOG_PRINT_L3("add_new_tx: already have tx " << tx_hash << " in the pool");
+        tvc.m_already_existed = true;
+        return true;
+      }
     }
 
     if(m_blockchain_storage.have_tx(tx_hash))
