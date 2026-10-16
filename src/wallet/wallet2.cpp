@@ -5012,7 +5012,7 @@ void wallet2::append_heights_with_distribution(std::vector<uint64_t>& heights, s
   heights.insert(heights.end(), tmp.begin(), tmp.end());
 }
 
-void wallet2::append_bare_decoy_candidates(COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request_batch& batch, size_t decoy_count, const std::unordered_map<uint64_t, uint64_t>& bare_output_count_by_amount) const
+void wallet2::append_bare_decoy_candidates(COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request_batch& batch, size_t decoy_count, uint64_t real_gindex, const std::unordered_map<uint64_t, uint64_t>& bare_output_count_by_amount) const
 {
   const size_t max_bare_pool_size = CURRENCY_TX_MAX_ALLOWED_INPUTS * (CURRENCY_HF4_MANDATORY_DECOY_SET_SIZE + 1) * 2;
   WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(decoy_count < max_bare_pool_size, "Requested bare ring exceeds the daemon output limit");
@@ -5027,8 +5027,10 @@ void wallet2::append_bare_decoy_candidates(COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AM
   WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(batch.global_offsets.size() <= max_bare_pool_size - ring_size, "Requested bare pool exceeds the daemon output limit");
   batch.ring_size = std::max(batch.ring_size, uint64_t(ring_size));
 
+  // include the real
+  batch.global_offsets.push_back(real_gindex);
   // the daemon resolves collisions and a tiny bucket must not stall sampling
-  for (size_t j = 0; j < ring_size; ++j)
+  for (size_t j = 0; j < decoy_count; ++j)
     batch.global_offsets.push_back(position(random));
 }
 
@@ -5079,7 +5081,7 @@ void wallet2::plan_decoy_batches_for_sources( size_t fake_outputs_count_, const 
       auto& batch = req4.batches[batch_idx];
       if (use_bare_candidates)
       {
-        append_bare_decoy_candidates(batch, target_outputs, bare_outputs_snapshot::bare_output_count_by_amount);
+        append_bare_decoy_candidates(batch, target_outputs, td.m_global_output_index, bare_outputs_snapshot::bare_output_count_by_amount);
       }
       else
       {
@@ -5112,6 +5114,8 @@ void wallet2::plan_decoy_batches_for_sources( size_t fake_outputs_count_, const 
   {
     if (batch.global_offsets.empty())
       continue;
+    // shuffle for hiding the real position
+    std::shuffle(batch.global_offsets.begin(), batch.global_offsets.end(), crypto::uniform_random_bit_generator());
     WLT_LOG_L1("[BARE DECOYS] amount=" << batch.input_amount << ", candidates=" << batch.global_offsets.size() << ", ring size=" << batch.ring_size);
   }
 }
@@ -5149,6 +5153,47 @@ void wallet2::distribute_decoys_and_build_sources(const currency::COMMAND_RPC_GE
     WLT_LOG_L1("[BARE DECOYS] amount=" << requested.input_amount << ", requested=" << requested.global_offsets.size() << ", returned=" << outputs.size());
   }
 
+  std::vector<std::unordered_set<uint64_t>> reserved(req4.batches.size());
+  std::vector<size_t> needed_decoys(req4.batches.size(), 0);
+  for (const auto& plan : plans)
+  {
+    if (!plan.use_bare_candidates)
+      continue;
+    const transfer_details& td = *plan.td;
+    const auto& outputs = indexed_outputs.at(plan.batch_idx);
+    const auto real_it = outputs.find(td.m_global_output_index);
+    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(real_it != outputs.end(), "Daemon omitted the real bare output from the candidate pool");
+    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(real_it->second.block_height == td.m_ptx_wallet_info->m_block_height, "Daemon returned a wrong height for the real bare output");
+    crypto::public_key own_key{};
+    WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(get_out_pub_key_from_tx_out_v(td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index], own_key), "Cannot obtain the real bare output key");
+    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(real_it->second.output->stealth_address == own_key, "Daemon returned a wrong key for the real bare output");
+    WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(reserved[plan.batch_idx].insert(td.m_global_output_index).second, "Selected the same real bare output twice");
+    needed_decoys[plan.batch_idx] += plan.target_decoy_count;
+  }
+ 
+  std::vector<std::vector<uint64_t>> available_decoys(req4.batches.size()); // [bucket_id][out position -> glob index]
+  for (size_t i = 0; i < req4.batches.size(); ++i)
+  {
+    if (needed_decoys[i] == 0)
+      continue;
+    auto& available_indexes = available_decoys[i];
+    for (const auto& item : indexed_outputs[i])
+    {
+      if (reserved[i].count(item.first) == 0)
+      {
+        available_indexes.push_back(item.first);
+      }
+    }
+    if (available_indexes.size() < needed_decoys[i])
+    {
+      std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount> scanty_outs(1);
+      scanty_outs.front().amount = req4.batches[i].input_amount;
+      THROW_IF_FALSE_WALLET_EX(false, error::not_enough_outs_to_mix, scanty_outs, needed_decoys[i]);
+    }
+
+    std::shuffle(available_indexes.begin(), available_indexes.end(), crypto::uniform_random_bit_generator());
+  }
+
   for (const mix_input_plan& plan : plans)
   {
     const transfer_details& td = *plan.td;
@@ -5170,21 +5215,12 @@ void wallet2::distribute_decoys_and_build_sources(const currency::COMMAND_RPC_GE
       if (plan.use_bare_candidates)
       {
         const auto& outputs = indexed_outputs[plan.batch_idx];
-        const auto real_it = outputs.find(td.m_global_output_index);
-        if (real_it != outputs.end())
+        auto& available_indexes = available_decoys[plan.batch_idx];
+        for (size_t j = 0; j < plan.target_decoy_count; ++j)
         {
-          WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(real_it->second.block_height == td.m_ptx_wallet_info->m_block_height, "Daemon returned a wrong height for the real bare output");
-          crypto::public_key own_key{};
-          WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(get_out_pub_key_from_tx_out_v(td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index], own_key), "Cannot obtain the real bare output key");
-          WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(real_it->second.output->stealth_address == own_key, "Daemon returned a wrong key for the real bare output");
+          local_decoys.push_back(*outputs.at(available_indexes.back()).output);
+          available_indexes.pop_back();
         }
-        for (const auto& item : outputs)
-          if (item.first != td.m_global_output_index)
-            local_decoys.push_back(*item.second.output);
-
-        std::shuffle(local_decoys.begin(), local_decoys.end(), crypto::uniform_random_bit_generator());
-        if (local_decoys.size() > plan.target_decoy_count)
-          local_decoys.resize(plan.target_decoy_count);
       }
       else
       {
