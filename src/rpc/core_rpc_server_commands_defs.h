@@ -268,13 +268,17 @@ namespace currency
     {
       uint64_t minimum_height;
       std::list<crypto::hash> block_ids;
+      // the emergency old client cutoff reused m_return_compact as a compatibility flag
+      // TODO: remove it once the cutoff is retired, m_return_legacy_full selects the response format
       bool m_return_compact = false;
+      bool m_return_legacy_full = false;
       std::string m_client_version;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(minimum_height)                  DOC_DSCR("The minimum height of the returning buch of blocks.") DOC_EXMP(0) DOC_END
         KV_SERIALIZE_CONTAINER_POD_AS_BLOB(block_ids) /* TODO !!! DOC_DSCR("Current state of the local blockchain. Hashes of the most recent 10 blocks goes first, then each 2nd, then 4th, 8, 16, 32, 64 and so on, and the last one is always hash of the genesis block.") DOC_END */
         KV_SERIALIZE(m_return_compact)
+        KV_SERIALIZE(m_return_legacy_full)
         KV_SERIALIZE(m_client_version)
       END_KV_SERIALIZE_MAP()
     };

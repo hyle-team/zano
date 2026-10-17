@@ -342,7 +342,7 @@ namespace currency
 
     if(!req.m_return_compact)
     {
-      // if not compact than it's an old client, drop connection.
+      // if not compact than it's an old client, drop connection, m_return_compact is now only a compatibility flag
       res.status = API_RETURN_CODE_GENESIS_MISMATCH;
       return true;
     }
@@ -393,7 +393,7 @@ namespace currency
     CHECK_RPC_LIMITS(req.block_ids.size(), RPC_LIMIT_COMMAND_RPC_GET_BLOCKS_DIRECT_BLOCK_IDS);
     if (!req.m_return_compact)
     {
-      // if not compact than it's an old client, drop connection.
+      // if not compact than it's an old client, drop connection, m_return_compact is now only a compatibility flag
       res.status = API_RETURN_CODE_GENESIS_MISMATCH;
       return true;
     }
@@ -435,7 +435,7 @@ namespace currency
     {
       res.blocks.emplace_back();
       auto& entry = res.blocks.back();
-      entry.compact = req.m_return_compact;
+      entry.compact = !req.m_return_legacy_full;
       if (entry.compact)
       {
         block compact_block = b.first->bl;
