@@ -5043,22 +5043,6 @@ void wallet2::plan_decoy_batches_for_sources( size_t fake_outputs_count_, const 
   plans.clear();
   plans.reserve(selected_indices.size());
 
-  // local map: amount_key -> batch index
-  std::unordered_map<uint64_t, size_t> batch_index_by_amount;
-  batch_index_by_amount.reserve(selected_indices.size() + 1);
-
-  auto ensure_batch = [&](uint64_t amount_key) -> size_t
-  {
-    auto it = batch_index_by_amount.find(amount_key);
-    if (it != batch_index_by_amount.end())
-      return it->second;
-    const size_t idx = req4.batches.size();
-    req4.batches.resize(idx + 1);
-    req4.batches[idx].input_amount = amount_key; // 0 => ZC
-    batch_index_by_amount.emplace(amount_key, idx);
-    return idx;
-  };
-
   for (size_t pos = 0; pos < selected_indices.size(); ++pos)
   {
     const uint64_t tr_idx = selected_indices[pos];
@@ -5071,14 +5055,17 @@ void wallet2::plan_decoy_batches_for_sources( size_t fake_outputs_count_, const 
       : (td.is_zc() ? m_core_runtime_config.hf4_minimum_mixins : fake_outputs_count_);
 
     const bool needs_decoys = target_outputs > 0;
-    const uint64_t amount_key = td.is_zc() ? uint64_t(0) : td.amount();
+    const uint64_t amount_for_g_index_out = td.amount_for_global_output_index();
     size_t batch_idx = SIZE_MAX;
     const bool use_bare_candidates = needs_decoys && !td.is_zc() && bare_candidates_enabled;
 
     if (needs_decoys)
     {
-      batch_idx = ensure_batch(amount_key);
+      batch_idx = req4.batches.size();
+      req4.batches.emplace_back();
       auto& batch = req4.batches[batch_idx];
+      batch.input_amount = amount_for_g_index_out;
+
       if (use_bare_candidates)
       {
         append_bare_decoy_candidates(batch, target_outputs, td.m_global_output_index, bare_outputs_snapshot::bare_output_count_by_amount);
@@ -5105,7 +5092,7 @@ void wallet2::plan_decoy_batches_for_sources( size_t fake_outputs_count_, const 
       /*target_decoy_count*/       target_outputs,
       /*needs_decoys*/             needs_decoys,
       /*is_real_output_post_hf4*/  real_is_post,
-      /*batch_key*/                amount_key,
+      /*amount_for_g_index_out*/   amount_for_g_index_out,
       /*batch_idx*/                batch_idx,
       /*use_bare_candidates*/      use_bare_candidates
     });

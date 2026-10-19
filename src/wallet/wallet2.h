@@ -389,7 +389,7 @@ namespace tools
         size_t            target_decoy_count;          // how many decoys we want
         bool              needs_decoys;                // (!auditable && target_decoy_count > 0)
         bool              is_real_output_post_hf4;     // zone HF real output
-        uint64_t          batch_key;                   // 0 for ZC, otherwise td.amount()
+        uint64_t          amount_for_g_index_out;      // 0 for ZC, otherwise td.amount()
         size_t            batch_idx;                   // batch index in req4/resp4 (SIZE_MAX if not needed)
         bool              use_bare_candidates;         // daemon resolves and fills the amount pool
       };
