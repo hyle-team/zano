@@ -5055,7 +5055,6 @@ void wallet2::plan_decoy_batches_for_sources( size_t fake_outputs_count_, const 
       : (td.is_zc() ? m_core_runtime_config.hf4_minimum_mixins : fake_outputs_count_);
 
     const bool needs_decoys = target_outputs > 0;
-    const uint64_t amount_for_g_index_out = td.amount_for_global_output_index();
     size_t batch_idx = SIZE_MAX;
     const bool use_bare_candidates = needs_decoys && !td.is_zc() && bare_candidates_enabled;
 
@@ -5064,7 +5063,7 @@ void wallet2::plan_decoy_batches_for_sources( size_t fake_outputs_count_, const 
       batch_idx = req4.batches.size();
       req4.batches.emplace_back();
       auto& batch = req4.batches[batch_idx];
-      batch.input_amount = amount_for_g_index_out;
+      batch.input_amount = td.amount_for_global_output_index();
 
       if (use_bare_candidates)
       {
@@ -5092,7 +5091,6 @@ void wallet2::plan_decoy_batches_for_sources( size_t fake_outputs_count_, const 
       /*target_decoy_count*/       target_outputs,
       /*needs_decoys*/             needs_decoys,
       /*is_real_output_post_hf4*/  real_is_post,
-      /*amount_for_g_index_out*/   amount_for_g_index_out,
       /*batch_idx*/                batch_idx,
       /*use_bare_candidates*/      use_bare_candidates
     });
