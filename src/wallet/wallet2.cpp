@@ -1851,7 +1851,8 @@ void wallet2::pull_blocks(size_t& blocks_added, std::atomic<bool>& stop, bool& f
 
   req.m_client_version = PROJECT_VERSION_LONG;
   req.minimum_height = get_wallet_minimum_height();
-  req.m_return_compact = m_compact_sync;
+  req.m_return_compact = true;
+  req.m_return_legacy_full = !m_compact_sync;
   if (req.minimum_height > m_height_of_start_sync)
     m_height_of_start_sync = req.minimum_height;
 
