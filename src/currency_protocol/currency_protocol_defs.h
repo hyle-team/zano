@@ -31,12 +31,14 @@ namespace currency
     std::list<blobdata> txs;
     std::vector<uint64_t> coinbase_global_outs;
     std::vector<struct_with_one_t_type<std::vector<uint64_t> > > tx_global_outs;
+    bool compact = false;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(block)
       KV_SERIALIZE(txs)
       KV_SERIALIZE(coinbase_global_outs)
       KV_SERIALIZE(tx_global_outs)
+      KV_SERIALIZE(compact)
     END_KV_SERIALIZE_MAP()
   };
 
@@ -45,6 +47,8 @@ namespace currency
     std::shared_ptr<const block_extended_info> block_ptr;
     std::shared_ptr<const transaction_chain_entry> coinbase_ptr;
     std::list<std::shared_ptr<const transaction_chain_entry> > txs_ptr;
+    // wallet transport metadata; never serialized into the blockchain database
+    bool compact = false;
   };
 
   /************************************************************************/

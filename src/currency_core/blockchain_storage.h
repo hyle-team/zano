@@ -627,6 +627,7 @@ namespace currency
 
     std::atomic<bool> m_is_in_checkpoint_zone;
     std::atomic<bool> m_is_blockchain_storing;
+    std::atomic<bool> m_is_irreverseble_prunning_on;
     bool m_non_pruning_mode_enabled;
 
     std::string m_config_folder;

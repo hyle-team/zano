@@ -50,5 +50,6 @@ namespace command_line
   const arg_descriptor<std::string> arg_deeplink  ( "deeplink-params", "Deeplink parameter, in that case app just forward params to running app");
 
   const arg_descriptor<bool>        arg_allow_legacy_payment_id_size ("allow-legacy-payment-id-size", "Temporary removes requirement for payment id to be 8 bytes long");
+  const arg_descriptor<bool>        arg_unsecure_disable_extension_id_check("unsecure-disable-extension-id-check", "Disable official extension ID check for HTTP requests");
 
 }

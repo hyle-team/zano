@@ -68,66 +68,67 @@ namespace currency
     }
 
 
-  #define DEFINE_TERMS(hf0_val, hf1_val, hf2_val, hf3_val, hf4_val, hf5_val, hf6_val, hf7_val, container_mask_val, Type) \
+  #define DEFINE_TERMS(hf0_val, hf1_val, hf2_val, hf3_val, hf4_val, hf5_val, hf6_val, hf7_val, hf8_val, container_mask_val, Type) \
     template <> struct type_hf_terms_traits<Type> {                     \
-      static constexpr allowance hf[] = { hf0_val, hf1_val, hf2_val, hf3_val, hf4_val, hf5_val, hf6_val, hf7_val }; \
+      static constexpr allowance hf[] = { hf0_val, hf1_val, hf2_val, hf3_val, hf4_val, hf5_val, hf6_val, hf7_val, hf8_val }; \
       static constexpr uint8_t container_mask = container_mask_val;   \
     };
     
    
-   //hard fork id:  0     1     2     3     4     5     6     7
+   
+   //hard fork id:  0     1     2     3     4     5     6     7     8   
    // 
    //payloads
-    DEFINE_TERMS(   many, many, many, many, many, many, many, many,   extra|attach,      tx_service_attachment              );
-    DEFINE_TERMS(   one,  one,  one,  one,  one,  one,  one,  one,    extra,             tx_comment                         );
-    DEFINE_TERMS(   one,  one,  one,  one,  one,  one,  no,   no,     extra|attach,      tx_payer_old                       );
-    DEFINE_TERMS(   one,  one,  one,  one,  one,  one,  no,   no,     extra|attach,      tx_receiver_old                    );
-    DEFINE_TERMS(   no,   no,   one,  one,  one,  one,  no,   no,     extra|attach,      tx_payer                           );
-    DEFINE_TERMS(   no,   no,   one,  one,  one,  one,  no,   no,     extra|attach,      tx_receiver                        );
-    DEFINE_TERMS(   many, many, many, many, many, many, many, many,   extra,             tx_derivation_hint                 );
-    DEFINE_TERMS(   many, many, many, many, many, many, many, many,   extra|attach,      std::string                        );
-    DEFINE_TERMS(   many, many, many, many, many, many, many, many,   extra|attach,      tx_crypto_checksum                 );
-    DEFINE_TERMS(   one,  one,  one,  one,  one,  one,  one,  one,    extra,             etc_tx_time                        );
-    DEFINE_TERMS(   one,  one,  one,  one,  one,  one,  no,   no,     extra,             etc_tx_details_unlock_time         );
-    DEFINE_TERMS(   no,   one,  one,  one,  one,  one,  no,   no,     extra,             etc_tx_details_unlock_time2        );
-    DEFINE_TERMS(   one,  one,  one,  one,  one,  one,  one,  one,    extra,             etc_tx_details_expiration_time     );
-    DEFINE_TERMS(   one,  one,  one,  one,  one,  one,  one,  one,    extra,             etc_tx_details_flags               );
-    DEFINE_TERMS(   one,  one,  one,  one,  one,  one,  one,  one,    extra,             crypto::public_key                 );
-    DEFINE_TERMS(   one,  one,  one,  one,  one,  one,  one,  one,    extra,             extra_attachment_info              );
-    DEFINE_TERMS(   one,  one,  no,   no,   no,   no,   no,   no,     extra,             extra_alias_entry_old              );
-    DEFINE_TERMS(   one,  one,  one,  one,  one,  one,  one,  one,    extra,             extra_user_data                    );   //how we use this?
-    DEFINE_TERMS(   one,  one,  one,  one,  one,  one,  one,  one,    extra,             extra_padding                      );
-    DEFINE_TERMS(   one,  one,  one,  one,  one,  one,  one,  one,    extra,             etc_tx_flags16_t                   );
-    DEFINE_TERMS(   no,   no,   one,  one,  one,  one,  one,  one,    extra,             extra_alias_entry                  );
-    DEFINE_TERMS(   no,   no,   no,   no,   one,  one,  one,  one,    extra,             zarcanum_tx_data_v1                );
-    DEFINE_TERMS(   no,   no,   no,   no,   one,  one,  one,  one,    extra,             asset_descriptor_operation         );
-    DEFINE_TERMS(   no,   no,   no,   no,   no,   no,   one,  one,    extra,             gateway_address_descriptor_operation);
-    DEFINE_TERMS(   no,   no,   no,   no,   no,   no,   one,  one,    extra,             etc_coinbase_block_cumulative_size );    
+    DEFINE_TERMS(   many, many, many, many, many, many, many, many, many,   extra|attach,      tx_service_attachment               );
+    DEFINE_TERMS(   one,  one,  one,  one,  one,  one,  one,  one,  one,    extra,             tx_comment                          );
+    DEFINE_TERMS(   one,  one,  one,  one,  one,  one,  no,   no,   no,     extra|attach,      tx_payer_old                        );
+    DEFINE_TERMS(   one,  one,  one,  one,  one,  one,  no,   no,   no,     extra|attach,      tx_receiver_old                     );
+    DEFINE_TERMS(   no,   no,   one,  one,  one,  one,  no,   no,   no,     extra|attach,      tx_payer                            );
+    DEFINE_TERMS(   no,   no,   one,  one,  one,  one,  no,   no,   no,     extra|attach,      tx_receiver                         );
+    DEFINE_TERMS(   many, many, many, many, many, many, many, many, many,   extra,             tx_derivation_hint                  );
+    DEFINE_TERMS(   many, many, many, many, many, many, many, many, many,   extra|attach,      std::string                         );
+    DEFINE_TERMS(   many, many, many, many, many, many, many, many, many,   extra|attach,      tx_crypto_checksum                  );
+    DEFINE_TERMS(   one,  one,  one,  one,  one,  one,  one,  one,  one,    extra,             etc_tx_time                         );
+    DEFINE_TERMS(   one,  one,  one,  one,  one,  one,  no,   no,   no,     extra,             etc_tx_details_unlock_time          );
+    DEFINE_TERMS(   no,   one,  one,  one,  one,  one,  no,   no,   no,     extra,             etc_tx_details_unlock_time2         );
+    DEFINE_TERMS(   one,  one,  one,  one,  one,  one,  one,  one,  one,    extra,             etc_tx_details_expiration_time      );
+    DEFINE_TERMS(   one,  one,  one,  one,  one,  one,  one,  one,  one,    extra,             etc_tx_details_flags                );
+    DEFINE_TERMS(   one,  one,  one,  one,  one,  one,  one,  one,  one,    extra,             crypto::public_key                  );
+    DEFINE_TERMS(   one,  one,  one,  one,  one,  one,  one,  one,  one,    extra,             extra_attachment_info               );
+    DEFINE_TERMS(   one,  one,  no,   no,   no,   no,   no,   no,   no,     extra,             extra_alias_entry_old               );
+    DEFINE_TERMS(   one,  one,  one,  one,  one,  one,  one,  one,  one,    extra,             extra_user_data                     );   //how we use this?
+    DEFINE_TERMS(   one,  one,  one,  one,  one,  one,  one,  one,  one,    extra,             extra_padding                       );
+    DEFINE_TERMS(   one,  one,  one,  one,  one,  one,  one,  one,  one,    extra,             etc_tx_flags16_t                    );
+    DEFINE_TERMS(   no,   no,   one,  one,  one,  one,  one,  one,  one,    extra,             extra_alias_entry                   );
+    DEFINE_TERMS(   no,   no,   no,   no,   one,  one,  one,  one,  one,    extra,             zarcanum_tx_data_v1                 );
+    DEFINE_TERMS(   no,   no,   no,   no,   one,  one,  one,  one,  one,    extra,             asset_descriptor_operation          );
+    DEFINE_TERMS(   no,   no,   no,   no,   no,   no,   one,  no,   no,     extra,             gateway_address_descriptor_operation);
+    DEFINE_TERMS(   no,   no,   no,   no,   no,   no,   one,  one,  one,    extra,             etc_coinbase_block_cumulative_size  );
       //inputs
-    DEFINE_TERMS(   one,  one,  one,  one,  one,  one,  one,  one,    input,             txin_gen                           );
-    DEFINE_TERMS(   many, many, many, many, many, many, many, many,   input,             txin_to_key                        );
-    DEFINE_TERMS(   many, many, many, many, many, many, many, many,   input,             txin_multisig                      );
-    DEFINE_TERMS(   no,   no,   no,   no,   many, many, many, many,   input,             txin_zc_input                      );
-    DEFINE_TERMS(   no,   no,   no,   no,   no,   no,   many, many,   input,             txin_gateway                       );
+    DEFINE_TERMS(   one,  one,  one,  one,  one,  one,  one,  one,  one,    input,             txin_gen                            );
+    DEFINE_TERMS(   many, many, many, many, many, many, many, many, many,   input,             txin_to_key                         );
+    DEFINE_TERMS(   many, many, many, many, many, many, many, many, many,   input,             txin_multisig                       );
+    DEFINE_TERMS(   no,   no,   no,   no,   many, many, many, many, many,   input,             txin_zc_input                       );
+    DEFINE_TERMS(   no,   no,   no,   no,   no,   no,   many, no,   no,     input,             txin_gateway                        );
       //outputs
-    DEFINE_TERMS(   many, many, many, many, no,   no,   no,   no,     output,            tx_out_bare                        );
-    DEFINE_TERMS(   no,   no,   no,   no,   many, many, many, many,   output,            tx_out_zarcanum                    );
-    DEFINE_TERMS(   no,   no,   no,   no,   no,   no,   many, many,   output,            tx_out_gateway                     );
+    DEFINE_TERMS(   many, many, many, many, no,   no,   no,   no,   no,     output,            tx_out_bare                         );
+    DEFINE_TERMS(   no,   no,   no,   no,   many, many, many, many, many,   output,            tx_out_zarcanum                     );
+    DEFINE_TERMS(   no,   no,   no,   no,   no,   no,   many, no,   no,     output,            tx_out_gateway                      );
       //signatures
-    DEFINE_TERMS(   many, many, many, many, many, many, many, many,   signtr,            NLSAG_sig                          );
-    DEFINE_TERMS(   no,   no,   no,   no,   many, many, many, many,   signtr,            void_sig                           );
-    DEFINE_TERMS(   no,   no,   no,   no,   many, many, many, many,   signtr,            ZC_sig                             );
-    DEFINE_TERMS(   no,   no,   no,   no,   many, many, many, many,   signtr,            zarcanum_sig                       );
-    DEFINE_TERMS(   no,   no,   no,   no,   no  , no,   many, many,   signtr,            gateway_sig                        );
+    DEFINE_TERMS(   many, many, many, many, many, many, many, many, many,   signtr,            NLSAG_sig                           );
+    DEFINE_TERMS(   no,   no,   no,   no,   many, many, many, many, many,   signtr,            void_sig                            );
+    DEFINE_TERMS(   no,   no,   no,   no,   many, many, many, many, many,   signtr,            ZC_sig                              );
+    DEFINE_TERMS(   no,   no,   no,   no,   many, many, many, many, many,   signtr,            zarcanum_sig                        );
+    DEFINE_TERMS(   no,   no,   no,   no,   no,   no,   many, no,   no,     signtr,            gateway_sig                         );
       //proofs
-    DEFINE_TERMS(   no,   no,   no,   no,   many, many, many, many,   proofs,            zc_asset_surjection_proof          );
-    DEFINE_TERMS(   no,   no,   no,   no,   many, many, many, many,   proofs,            zc_outs_range_proof                );
-    DEFINE_TERMS(   no,   no,   no,   no,   one,  one,  one,  one,    proofs,            zc_balance_proof                   );
-    DEFINE_TERMS(   no,   no,   no,   no,   no,   no,   one,  one,    proofs,            zc_gw_balance_proof                );
-    DEFINE_TERMS(   no,   no,   no,   no,   one,  one,  one,  one,    proofs,            asset_operation_proof              );
-    DEFINE_TERMS(   no,   no,   no,   no,   one,  one,  one,  one,    proofs,            asset_operation_ownership_proof    );
-    DEFINE_TERMS(   no,   no,   no,   no,   one,  one,  one,  one,    proofs,            asset_operation_ownership_proof_eth);
-    DEFINE_TERMS(   no,   no,   no,   no,   no,   no,   one,  one,    proofs,            gateway_address_ownership_proof    );
+    DEFINE_TERMS(   no,   no,   no,   no,   many, many, many, many, many,   proofs,            zc_asset_surjection_proof           );
+    DEFINE_TERMS(   no,   no,   no,   no,   many, many, many, many, many,   proofs,            zc_outs_range_proof                 );
+    DEFINE_TERMS(   no,   no,   no,   no,   one,  one,  one,  one,  one,    proofs,            zc_balance_proof                    );
+    DEFINE_TERMS(   no,   no,   no,   no,   no,   no,   one,  no,   no,     proofs,            zc_gw_balance_proof                 );
+    DEFINE_TERMS(   no,   no,   no,   no,   one,  one,  one,  one,  one,    proofs,            asset_operation_proof               );
+    DEFINE_TERMS(   no,   no,   no,   no,   one,  one,  one,  one,  one,    proofs,            asset_operation_ownership_proof     );
+    DEFINE_TERMS(   no,   no,   no,   no,   one,  one,  one,  one,  one,    proofs,            asset_operation_ownership_proof_eth );
+    DEFINE_TERMS(   no,   no,   no,   no,   no,   no,   one,  no,   no,     proofs,            gateway_address_ownership_proof     );
 
 
 

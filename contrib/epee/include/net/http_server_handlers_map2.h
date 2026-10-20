@@ -372,7 +372,6 @@ namespace epee {
       LOG_PRINT("[HTTP/JSON][" << epee::string_tools::get_ip_string_from_int32(m_conn_context.m_remote_ip ) << "][" << query_info.m_URI << "] processed with " << ticks1-ticks << "/"<< ticks2-ticks1 << "/" << ticks3-ticks2 << "ms", LOG_LEVEL_2); \
     }
 
-
 #define MAP_URI_AUTO_BIN2(s_pattern, callback_f, command_type) \
     else if(auto_doc<command_type, false>(s_pattern, "", false, docs) && query_info.m_URI == s_pattern) \
     { \

@@ -11,6 +11,10 @@
 #include "string_coding.h"
 #include "random_helper.h"
 #include "tx_builder.h"
+#include "chaingen_helpers.h"
+#include "currency_core/currency_format_utils.h"
+#include "common/boost_serialization_helper.h"
+#include <atomic>
 
 using namespace epee;
 using namespace crypto;
@@ -4191,4 +4195,458 @@ bool wallet_reorganize_and_trim_test::c1(currency::core& c, size_t ev_index, con
     CHECK_AND_ASSERT_MES(false, false, "wallet concise mode check failed");
   }
   return true;
+}
+
+//------------------------------------------------------------------------------
+namespace
+{
+  // Use the core's compact block handler and shared decoder without HTTP transport.
+  class compact_sync_test_proxy : public tools::i_core_proxy
+  {
+  public:
+    explicit compact_sync_test_proxy(std::shared_ptr<tools::i_core_proxy> inner, bool force_compact = false)
+      : m_inner(std::move(inner)), m_force_compact(force_compact)
+    {}
+
+    bool call_COMMAND_RPC_GET_BLOCKS_DIRECT(const COMMAND_RPC_GET_BLOCKS_DIRECT::request& req, COMMAND_RPC_GET_BLOCKS_DIRECT::response& res) override
+    {
+      if (req.block_ids.size() == 1)
+        ++genesis_requests;
+
+      if (!m_force_compact && !req.m_return_compact)
+      {
+        ++full_requests;
+        return m_inner->call_COMMAND_RPC_GET_BLOCKS_DIRECT(req, res);
+      }
+      ++compact_requests;
+
+      COMMAND_RPC_GET_BLOCKS_FAST::request wire_req{};
+      wire_req.minimum_height = req.minimum_height;
+      wire_req.block_ids = req.block_ids;
+      wire_req.m_return_compact = true;
+      COMMAND_RPC_GET_BLOCKS_FAST::response wire_res{};
+      CHECK_AND_ASSERT_MES(m_inner->call_COMMAND_RPC_GET_BLOCKS_FAST(wire_req, wire_res), false, "compact RPC request failed");
+      res.status = wire_res.status;
+      if (res.status != API_RETURN_CODE_OK)
+        return true;
+      res.current_height = wire_res.current_height;
+      res.start_height = wire_res.start_height;
+      res.current_hardfork = wire_res.current_hardfork;
+      CHECK_AND_ASSERT_MES(currency::unserialize_block_complete_entry(wire_res, res), false, "compact production decoder failed");
+      for (const auto& entry : res.blocks)
+      {
+        const uint64_t height = get_block_height(entry.block_ptr->bl);
+        CHECK_AND_ASSERT_MES(entry.compact, false, "compact RPC must trim every block, including genesis and the tip");
+        const auto& miner_tx = entry.block_ptr->bl.miner_tx;
+        CHECK_AND_ASSERT_MES(miner_tx.signatures.empty() && miner_tx.proofs.empty(), false, "coinbase was not compact");
+        for (const auto& tx : entry.txs_ptr)
+          CHECK_AND_ASSERT_MES(tx->tx.signatures.empty() && tx->tx.proofs.empty(), false, "transaction was not compact");
+        ++compact_blocks;
+        compact_transactions += entry.txs_ptr.size();
+        if (height == 0)
+          ++compact_genesis_blocks;
+        if (height + 1 == res.current_height)
+          ++compact_tip_blocks;
+        if (is_pos_block(entry.block_ptr->bl))
+          ++compact_pos_blocks;
+      }
+
+      return true;
+    }
+
+    bool call_COMMAND_RPC_FORCE_RELAY_RAW_TXS(const COMMAND_RPC_FORCE_RELAY_RAW_TXS::request& req, COMMAND_RPC_FORCE_RELAY_RAW_TXS::response& res) override
+    {
+      relayed_txs.assign(req.txs_as_hex.begin(), req.txs_as_hex.end());
+      res.status = API_RETURN_CODE_OK;
+      return true;
+    }
+
+#define FORWARD_COMPACT_TEST_RPC(command) \
+    bool call_##command(const currency::command::request& req, currency::command::response& res) override \
+    { return m_inner->call_##command(req, res); }
+    FORWARD_COMPACT_TEST_RPC(COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES)
+    FORWARD_COMPACT_TEST_RPC(COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE)
+    FORWARD_COMPACT_TEST_RPC(COMMAND_RPC_GET_INFO)
+    FORWARD_COMPACT_TEST_RPC(COMMAND_RPC_GET_TX_POOL)
+    FORWARD_COMPACT_TEST_RPC(COMMAND_RPC_GET_CURRENT_CORE_TX_EXPIRATION_MEDIAN)
+    FORWARD_COMPACT_TEST_RPC(COMMAND_RPC_GET_ALIASES_BY_ADDRESS)
+    FORWARD_COMPACT_TEST_RPC(COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3)
+    FORWARD_COMPACT_TEST_RPC(COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4)
+    FORWARD_COMPACT_TEST_RPC(COMMAND_RPC_SEND_RAW_TX)
+    FORWARD_COMPACT_TEST_RPC(COMMAND_RPC_GET_TRANSACTIONS)
+    FORWARD_COMPACT_TEST_RPC(COMMAND_RPC_GETBLOCKTEMPLATE)
+    FORWARD_COMPACT_TEST_RPC(COMMAND_RPC_SUBMITBLOCK)
+    FORWARD_COMPACT_TEST_RPC(COMMAND_RPC_SUBMITBLOCK2)
+    FORWARD_COMPACT_TEST_RPC(COMMAND_RPC_GET_POS_MINING_DETAILS)
+    FORWARD_COMPACT_TEST_RPC(COMMAND_RPC_GET_ASSET_INFO)
+#undef FORWARD_COMPACT_TEST_RPC
+
+    bool check_connection() override { return m_inner->check_connection(); }
+    bool is_daemon_inbox() override { return m_inner->is_daemon_inbox(); }
+    time_t get_last_success_interract_time() override { return m_inner->get_last_success_interract_time(); }
+
+    uint64_t compact_blocks = 0;
+    uint64_t compact_transactions = 0;
+    uint64_t compact_pos_blocks = 0;
+    uint64_t compact_tip_blocks = 0;
+    uint64_t compact_genesis_blocks = 0;
+    uint64_t full_requests = 0;
+    uint64_t compact_requests = 0;
+    uint64_t genesis_requests = 0;
+    std::vector<std::string> relayed_txs;
+
+  private:
+    std::shared_ptr<tools::i_core_proxy> m_inner;
+    bool m_force_compact;
+  };
+
+  transaction scan_transaction(transaction tx)
+  {
+    tx.signatures.clear();
+    tx.proofs.clear();
+    return tx;
+  }
+
+  bool compare_wallet_sync_state(const tools::wallet2& full, const tools::wallet2& compact)
+  {
+    CHECK_AND_ASSERT_MES(full.get_blockchain_current_size() == compact.get_blockchain_current_size(), false, "wallet heights differ");
+    uint64_t full_unlocked = 0, full_in = 0, full_out = 0, full_mined = 0;
+    uint64_t compact_unlocked = 0, compact_in = 0, compact_out = 0, compact_mined = 0;
+    CHECK_AND_ASSERT_MES(full.balance(full_unlocked, full_in, full_out, full_mined) == compact.balance(compact_unlocked, compact_in, compact_out, compact_mined), false, "balances differ");
+    CHECK_AND_ASSERT_MES(full_unlocked == compact_unlocked && full_in == compact_in && full_out == compact_out && full_mined == compact_mined, false, "balance components differ");
+    CHECK_AND_ASSERT_MES(full.m_transfer_history.size() == compact.m_transfer_history.size(), false, "history sizes differ");
+    for (size_t i = 0; i != full.m_transfer_history.size(); ++i)
+    {
+      auto a = full.m_transfer_history[i];
+      auto b = compact.m_transfer_history[i];
+      currency::load_wallet_transfer_info_flags(a);
+      currency::load_wallet_transfer_info_flags(b);
+      // the retained size field describes the stored transaction and differs after trimming
+      a.tx_blob_size = b.tx_blob_size = 0;
+      // compare fees, payment IDs, employed inputs/outputs, addresses and decrypted service/contract data
+      CHECK_AND_ASSERT_MES(epee::serialization::store_t_to_json(a) == epee::serialization::store_t_to_json(b), false, "public history differs at " << i);
+      CHECK_AND_ASSERT_MES(tx_to_blob(scan_transaction(a.tx)) == tx_to_blob(scan_transaction(b.tx)), false, "history prefix/attachments differ at " << i);
+    }
+    CHECK_AND_ASSERT_MES(full.m_transfers.size() == compact.m_transfers.size(), false, "transfer counts differ");
+    for (const auto& item : full.m_transfers)
+    {
+      auto found = compact.m_transfers.find(item.first);
+      CHECK_AND_ASSERT_MES(found != compact.m_transfers.end(), false, "missing transfer " << item.first);
+      tools::transfer_details a = item.second, b = found->second;
+      a.m_ptx_wallet_info = std::make_shared<tools::transaction_wallet_info>(*a.m_ptx_wallet_info);
+      b.m_ptx_wallet_info = std::make_shared<tools::transaction_wallet_info>(*b.m_ptx_wallet_info);
+      a.m_ptx_wallet_info->m_tx = scan_transaction(a.m_ptx_wallet_info->m_tx);
+      b.m_ptx_wallet_info->m_tx = scan_transaction(b.m_ptx_wallet_info->m_tx);
+      std::string a_blob, b_blob;
+      CHECK_AND_ASSERT_MES(tools::serialize_obj_to_buff(a, a_blob) && tools::serialize_obj_to_buff(b, b_blob), false, "transfer serialization failed");
+      CHECK_AND_ASSERT_MES(a_blob == b_blob, false, "transfer keys, indices, commitments, masks or flags differ at " << item.first);
+    }
+    return true;
+  }
+
+  void configure_compact_wallet(const std::shared_ptr<tools::wallet2>& wallet, const std::shared_ptr<compact_sync_test_proxy>& proxy)
+  {
+    set_playtime_test_wallet_options(wallet);
+    wallet->set_concise_mode_reorg_max_reorg_blocks(8);
+    wallet->set_concise_mode_truncate_history(std::numeric_limits<uint64_t>::max());
+    wallet->set_core_proxy(proxy);
+    wallet->set_compact_sync(true);
+  }
+}
+
+wallet_compact_sync::wallet_compact_sync()
+{
+  REGISTER_CALLBACK_METHOD(wallet_compact_sync, check_sync);
+}
+
+bool wallet_compact_sync::generate(std::vector<test_event_entry>& events) const
+{
+  GENERATE_ACCOUNT(miner);
+  GENERATE_ACCOUNT(alice);
+  GENERATE_ACCOUNT(bob);
+  m_accounts = {miner, alice, bob};
+  block genesis{};
+  generator.construct_genesis_block(genesis, miner, test_core_time::get_time());
+  events.push_back(genesis);
+  DO_CALLBACK(events, "configure_core");
+  REWIND_BLOCKS_N_WITH_TIME(events, mature, genesis, miner, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 2);
+  MAKE_TX_FEE(events, funding, miner, alice, MK_TEST_COINS(2000), TESTS_DEFAULT_FEE, mature);
+  MAKE_NEXT_BLOCK_TX1(events, funded, mature, miner, funding);
+  REWIND_BLOCKS_N_WITH_TIME(events, old_funding, funded, miner, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 10);
+  DO_CALLBACK(events, "check_sync");
+  return true;
+}
+
+bool wallet_compact_sync::check_sync(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  auto proxy = std::make_shared<compact_sync_test_proxy>(m_core_proxy);
+  auto full = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
+  auto compact = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
+  full->set_concise_mode_reorg_max_reorg_blocks(8);
+  full->set_concise_mode_truncate_history(std::numeric_limits<uint64_t>::max());
+  configure_compact_wallet(compact, proxy);
+  full->refresh();
+  compact->refresh();
+  CHECK_AND_ASSERT_MES(proxy->compact_blocks && proxy->compact_tip_blocks && proxy->compact_genesis_blocks,
+    false, "compact wire path was not exercised");
+  CHECK_AND_ASSERT_MES(compare_wallet_sync_state(*full, *compact), false, "initial sync mismatch");
+  CHECK_AND_ASSERT_MES(compact->m_transfer_history.size() == 1, false, "expected one historical deposit");
+  CHECK_AND_ASSERT_MES(compact->m_transfers.size() == 1, false, "fixture requires a single 2000-coin source output");
+  CHECK_AND_ASSERT_MES(compact->m_transfer_history.front().tx.signatures.empty() && compact->m_transfer_history.front().tx.proofs.empty(), false, "historical deposit was not compact");
+
+  // mint using an output whose source transaction has no signatures/proofs
+  uint64_t before_pos = c.get_current_blockchain_size();
+  CHECK_AND_ASSERT_MES(compact->try_mint_pos(), false, "compact source staking failed");
+  CHECK_AND_ASSERT_MES(c.get_current_blockchain_size() == before_pos + 1, false, "no PoS block was accepted");
+  block pos_block{};
+  CHECK_AND_ASSERT_MES(c.get_blockchain_storage().get_top_block(pos_block) && is_pos_block(pos_block), false, "expected PoS block");
+  const auto compact_pos_blocks = proxy->compact_pos_blocks;
+  full->refresh();
+  compact->refresh();
+  CHECK_AND_ASSERT_MES(proxy->compact_pos_blocks > compact_pos_blocks, false, "current PoS tip was not compact");
+  CHECK_AND_ASSERT_MES(compare_wallet_sync_state(*full, *compact), false, "PoS principal/reward mismatch");
+
+  CHECK_AND_ASSERT_MES(mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 10), false, "coinbase maturity blocks failed");
+  full->refresh();
+  compact = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
+  configure_compact_wallet(compact, proxy);
+  compact->refresh();
+  CHECK_AND_ASSERT_MES(proxy->compact_pos_blocks != 0, false, "compact PoS coinbase was not scanned");
+  CHECK_AND_ASSERT_MES(compare_wallet_sync_state(*full, *compact), false, "compact PoS resync mismatch");
+  bool has_unspent_coinbase = false;
+  for (const auto& item : compact->m_transfers)
+  {
+    if (!item.second.is_spent())
+    {
+      CHECK_AND_ASSERT_MES(is_coinbase(item.second.m_ptx_wallet_info->m_tx), false, "expected only coinbase outputs after staking");
+      has_unspent_coinbase = true;
+    }
+  }
+  CHECK_AND_ASSERT_MES(has_unspent_coinbase, false, "staking principal/reward outputs were lost");
+  // keep the sender separate: it retains local recipient metadata that a wallet scanning the blockchain cannot recover. Compare two observers with the same
+  // starting height while still spending the compact coinbase checked above
+  auto compact_sender = compact;
+  compact = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
+  configure_compact_wallet(compact, proxy);
+  compact->refresh();
+  transaction spend_tx{};
+  compact_sender->transfer(COIN, m_accounts[BOB_ACC_IDX].get_public_address(), spend_tx);
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "spend of compact coinbase source was not accepted");
+  CHECK_AND_ASSERT_MES(!spend_tx.signatures.empty(), false, "wallet-authored pending transaction must have signatures");
+  if (spend_tx.version < TRANSACTION_VERSION_POST_HF4)
+    CHECK_AND_ASSERT_MES(spend_tx.proofs.empty(), false, "legacy full transaction unexpectedly has proofs");
+  proxy->relayed_txs.clear();
+  compact_sender->resend_unconfirmed();
+  const auto expected_spend_relay = epee::string_tools::buff_to_hex_nodelimer(tx_to_blob(spend_tx));
+  CHECK_AND_ASSERT_MES(proxy->relayed_txs.size() == 1 && proxy->relayed_txs.front() == expected_spend_relay,
+    false, "complete wallet-authored pending transaction was not relayed unchanged");
+
+  // both recent transactions arrive through Compact; only the sender already has a complete outgoing copy
+  auto miner = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
+  miner->refresh();
+  transaction recent_tx{};
+  miner->transfer(COIN, m_accounts[ALICE_ACC_IDX].get_public_address(), recent_tx);
+  const uint64_t recent_start = c.get_current_blockchain_size();
+  CHECK_AND_ASSERT_MES(mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, 2), false, "recent transaction confirmation failed");
+  full->refresh();
+  compact->refresh();
+  compact_sender->refresh();
+  CHECK_AND_ASSERT_MES(compare_wallet_sync_state(*full, *compact), false, "recent compact transaction mismatch");
+  const auto spend_tx_hash = get_transaction_hash(spend_tx);
+  const auto recent_tx_hash = get_transaction_hash(recent_tx);
+  CHECK_AND_ASSERT_MES(compact_sender->m_unconfirmed_txs.count(spend_tx_hash) == 0, false, "confirmed outgoing payment remained pending");
+  const auto check_complete_confirmed_spend = [&]() -> bool
+  {
+    size_t history_entries = 0, change_outputs = 0;
+    for (const auto& wti : compact_sender->m_transfer_history)
+    {
+      if (wti.tx_hash == spend_tx_hash)
+      {
+        ++history_entries;
+        CHECK_AND_ASSERT_MES(tx_to_blob(wti.tx) == tx_to_blob(spend_tx), false, "complete outgoing history was replaced by its compact copy");
+      }
+    }
+    CHECK_AND_ASSERT_MES(history_entries == 1, false, "confirmed outgoing payment is missing or duplicated in history");
+    for (const auto& item : compact_sender->m_transfers)
+    {
+      const auto& source_tx = item.second.m_ptx_wallet_info->m_tx;
+      if (get_transaction_hash(source_tx) == spend_tx_hash)
+      {
+        ++change_outputs;
+        CHECK_AND_ASSERT_MES(tx_to_blob(source_tx) == tx_to_blob(spend_tx), false, "change output source lost the complete outgoing transaction");
+      }
+    }
+    CHECK_AND_ASSERT_MES(change_outputs != 0, false, "confirmed outgoing payment has no change output");
+    return true;
+  };
+  CHECK_AND_ASSERT_MES(check_complete_confirmed_spend(), false, "complete outgoing transaction lost on compact confirmation");
+  const std::wstring sender_filename = L"~coretests.wallet.compact-sync-sender.tmp";
+  const std::string sender_password = "compact-sender-test";
+  compact_sender->reset_password(sender_password);
+  compact_sender->store(sender_filename);
+  compact_sender = std::make_shared<tools::wallet2>();
+  compact_sender->load(sender_filename, sender_password);
+  compact_sender->set_core_runtime_config(c.get_blockchain_storage().get_core_runtime_config());
+  configure_compact_wallet(compact_sender, proxy);
+  CHECK_AND_ASSERT_MES(check_complete_confirmed_spend(), false, "complete confirmed outgoing transaction lost on save/load");
+  const std::wstring filename = L"~coretests.wallet.compact-sync.tmp";
+  const std::string password = "compact-sync-test";
+  compact->reset_password(password);
+  compact->store(filename);
+  compact = std::make_shared<tools::wallet2>();
+  compact->load(filename, password);
+  compact->set_core_runtime_config(c.get_blockchain_storage().get_core_runtime_config());
+  configure_compact_wallet(compact, proxy);
+  CHECK_AND_ASSERT_MES(compare_wallet_sync_state(*full, *compact), false, "save/load mismatch");
+
+  // a shallow, shorter replacement preserves detached Compact transactions when switching back to full
+  CHECK_AND_ASSERT_MES(c.get_blockchain_storage().truncate_blockchain(recent_start), false, "shallow truncate failed");
+  c.get_tx_pool().purge_transactions();
+  CHECK_AND_ASSERT_MES(mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, 1), false, "shallow replacement chain failed");
+  const auto shallow_genesis_requests = proxy->genesis_requests;
+  compact->set_compact_sync(false);
+  compact->set_concise_mode(false);
+  full->refresh();
+  const auto shallow_full_requests = proxy->full_requests;
+  const auto shallow_compact_requests = proxy->compact_requests;
+  compact->refresh();
+  CHECK_AND_ASSERT_MES(proxy->full_requests > shallow_full_requests && proxy->compact_requests == shallow_compact_requests,
+    false, "switching to Full during a shallow reorg still requested Compact blocks");
+  compact_sender->refresh();
+  CHECK_AND_ASSERT_MES(proxy->genesis_requests == shallow_genesis_requests, false, "shallow reorg unexpectedly reset wallet");
+  CHECK_AND_ASSERT_MES(compact->m_unconfirmed_txs.size() == 2 && compact->m_unconfirmed_txs.count(spend_tx_hash) && compact->m_unconfirmed_txs.count(recent_tx_hash),
+    false, "detached compact payments were lost from pending accounting");
+  CHECK_AND_ASSERT_MES(compact_sender->m_unconfirmed_txs.count(spend_tx_hash) && tx_to_blob(compact_sender->m_unconfirmed_txs.at(spend_tx_hash).tx) == tx_to_blob(spend_tx),
+    false, "detached wallet-authored payment lost its complete original");
+  proxy->relayed_txs.clear();
+  compact->resend_unconfirmed();
+  CHECK_AND_ASSERT_MES(proxy->relayed_txs.empty(), false, "observer relayed a pruned incoming or outgoing payment after detach");
+  CHECK_AND_ASSERT_MES(compare_wallet_sync_state(*full, *compact), false, "shallow reorg mismatch");
+
+  // the senders mixed pending queue retains its complete original naturally, while the incoming copy remains compact
+  compact_sender->resend_unconfirmed();
+  CHECK_AND_ASSERT_MES(proxy->relayed_txs.size() == 1 && proxy->relayed_txs.front() == expected_spend_relay,
+    false, "mixed pending queue did not relay only the complete transaction");
+  CHECK_AND_ASSERT_MES(compact_sender->m_unconfirmed_txs.size() == 2 && compact_sender->m_unconfirmed_txs.at(recent_tx_hash).tx.signatures.empty(),
+    false, "relay changed pending accounting or the compact deposit");
+  compact_sender->store(sender_filename);
+  compact_sender = std::make_shared<tools::wallet2>();
+  compact_sender->load(sender_filename, sender_password);
+  compact_sender->set_core_runtime_config(c.get_blockchain_storage().get_core_runtime_config());
+  configure_compact_wallet(compact_sender, proxy);
+  CHECK_AND_ASSERT_MES(compact_sender->m_unconfirmed_txs.size() == 2 && compact_sender->m_unconfirmed_txs.count(spend_tx_hash) &&
+    tx_to_blob(compact_sender->m_unconfirmed_txs.at(spend_tx_hash).tx) == tx_to_blob(spend_tx) && compact_sender->m_unconfirmed_txs.count(recent_tx_hash) &&
+    compact_sender->m_unconfirmed_txs.at(recent_tx_hash).tx.signatures.empty(), false, "reload changed the sender's full/compact pending copies");
+  proxy->relayed_txs.clear();
+  compact_sender->resend_unconfirmed();
+  CHECK_AND_ASSERT_MES(proxy->relayed_txs.size() == 1 && proxy->relayed_txs.front() == expected_spend_relay,
+    false, "reloaded mixed pending queue did not relay only the complete original");
+
+  // Pending Compact copies survive reload and switching back to Full.
+  const auto detached_pending = compact->m_unconfirmed_txs;
+  compact->store(filename);
+  compact = std::make_shared<tools::wallet2>();
+  compact->load(filename, password);
+  compact->set_core_runtime_config(c.get_blockchain_storage().get_core_runtime_config());
+  configure_compact_wallet(compact, proxy);
+  compact->set_compact_sync(false);
+  compact->set_concise_mode(false);
+  const auto reload_full_requests = proxy->full_requests;
+  const auto reload_compact_requests = proxy->compact_requests;
+  compact->refresh();
+  CHECK_AND_ASSERT_MES(proxy->full_requests > reload_full_requests && proxy->compact_requests == reload_compact_requests,
+    false, "reloaded wallet did not refresh in Full mode");
+  CHECK_AND_ASSERT_MES(proxy->genesis_requests == shallow_genesis_requests, false, "shorter compact branch caused a rescan after reload or mode change");
+  CHECK_AND_ASSERT_MES(compact->m_unconfirmed_txs.size() == detached_pending.size(), false, "reload changed the pending transaction count");
+  for (const auto& item : detached_pending)
+  {
+    const auto loaded = compact->m_unconfirmed_txs.find(item.first);
+    CHECK_AND_ASSERT_MES(loaded != compact->m_unconfirmed_txs.end(), false, "reload lost a detached pending transaction");
+    std::string before_blob, after_blob;
+    CHECK_AND_ASSERT_MES(tools::serialize_obj_to_buff(item.second, before_blob) && tools::serialize_obj_to_buff(loaded->second, after_blob), false, "pending state serialization failed");
+    CHECK_AND_ASSERT_MES(before_blob == after_blob, false, "reload or Full refresh changed a detached pending transaction");
+  }
+  proxy->relayed_txs.clear();
+  compact->resend_unconfirmed();
+  CHECK_AND_ASSERT_MES(proxy->relayed_txs.empty(), false, "pruned pending transactions were relayed after reload or mode change");
+
+  // the network can confirm the original complete transaction again; the compact pending copy must be accounted for exactly once
+  compact->set_concise_mode(true);
+  compact->set_compact_sync(true);
+  CHECK_AND_ASSERT_MES(mine_next_pow_block_in_playtime_with_given_txs(m_accounts[MINER_ACC_IDX].get_public_address(), c, std::vector<transaction>{spend_tx}), false, "outgoing payment reconfirmation failed");
+  full->refresh();
+  compact->refresh();
+  compact_sender->refresh();
+  CHECK_AND_ASSERT_MES(compact->m_unconfirmed_txs.size() == 1 && compact->m_unconfirmed_txs.count(recent_tx_hash), false, "reconfirmed outgoing payment remained pending or lost the detached deposit");
+  CHECK_AND_ASSERT_MES(compare_wallet_sync_state(*full, *compact), false, "outgoing compact reconfirmation mismatch");
+  CHECK_AND_ASSERT_MES(compact_sender->m_unconfirmed_txs.size() == 1 && compact_sender->m_unconfirmed_txs.count(recent_tx_hash), false, "sender retained the reconfirmed payment or lost the detached deposit");
+  CHECK_AND_ASSERT_MES(check_complete_confirmed_spend(), false, "outgoing reconfirmation lost or duplicated the complete original");
+  uint64_t sender_unlocked = 0, sender_in = 0, sender_out = 0, sender_mined = 0;
+  uint64_t observer_unlocked = 0, observer_in = 0, observer_out = 0, observer_mined = 0;
+  CHECK_AND_ASSERT_MES(compact_sender->balance(sender_unlocked, sender_in, sender_out, sender_mined) == compact->balance(observer_unlocked, observer_in, observer_out, observer_mined),
+    false, "sender and observer balances differ after outgoing reconfirmation");
+  CHECK_AND_ASSERT_MES(sender_unlocked == observer_unlocked && sender_in == observer_in && sender_out == observer_out && sender_mined == observer_mined,
+    false, "sender and observer balance components differ after outgoing reconfirmation");
+
+  // the existing concise depth limit still resets the wallet and preserves a detached compact deposit in pending accounting
+  const uint64_t deep_start = c.get_current_blockchain_size();
+  CHECK_AND_ASSERT_MES(mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, 10), false, "deep reorg preparation failed");
+  full->refresh();
+  compact->refresh();
+  std::string pending_before_blob;
+  CHECK_AND_ASSERT_MES(tools::serialize_obj_to_buff(compact->m_unconfirmed_txs.at(recent_tx_hash), pending_before_blob), false, "pending reference serialization failed");
+  compact->set_compact_sync(false);
+  const auto deep_genesis_requests = proxy->genesis_requests;
+  CHECK_AND_ASSERT_MES(c.get_blockchain_storage().truncate_blockchain(deep_start), false, "deep truncate failed");
+  c.get_tx_pool().purge_transactions();
+  CHECK_AND_ASSERT_MES(mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, 2), false, "deep replacement chain failed");
+  full->refresh();
+  const auto deep_full_requests = proxy->full_requests;
+  const auto deep_compact_requests = proxy->compact_requests;
+  compact->refresh();
+  CHECK_AND_ASSERT_MES(proxy->full_requests > deep_full_requests && proxy->compact_requests == deep_compact_requests,
+    false, "concise reset did not stay in Full mode");
+  CHECK_AND_ASSERT_MES(proxy->genesis_requests > deep_genesis_requests, false, "concise reorg depth limit did not reset wallet");
+  CHECK_AND_ASSERT_MES(compact->m_unconfirmed_txs.size() == 1 && compact->m_unconfirmed_txs.count(recent_tx_hash) == 1,
+    false, "full resync lost or added pending transactions");
+  std::string pending_after_blob;
+  CHECK_AND_ASSERT_MES(tools::serialize_obj_to_buff(compact->m_unconfirmed_txs.at(recent_tx_hash), pending_after_blob), false, "pending state serialization failed");
+  CHECK_AND_ASSERT_MES(pending_after_blob == pending_before_blob, false, "full resync changed pending transactions");
+  CHECK_AND_ASSERT_MES(compare_wallet_sync_state(*full, *compact), false, "full resync after concise depth limit mismatch");
+  proxy->relayed_txs.clear();
+  compact->resend_unconfirmed();
+  CHECK_AND_ASSERT_MES(proxy->relayed_txs.empty(), false, "pruned pending transaction was relayed after a full resync");
+  compact->set_compact_sync(true);
+  CHECK_AND_ASSERT_MES(mine_next_pow_block_in_playtime_with_given_txs(m_accounts[MINER_ACC_IDX].get_public_address(), c, std::vector<transaction>{recent_tx}), false, "incoming deposit reconfirmation failed");
+  full->refresh();
+  compact->refresh();
+  CHECK_AND_ASSERT_MES(compact->m_unconfirmed_txs.empty(), false, "reconfirmed incoming compact deposit remained pending");
+  CHECK_AND_ASSERT_MES(compare_wallet_sync_state(*full, *compact), false, "incoming compact reconfirmation mismatch");
+  return true;
+}
+
+wallet_compact_sync_escrow::wallet_compact_sync_escrow()
+{
+  REGISTER_CALLBACK_METHOD(wallet_compact_sync_escrow, check_transport);
+}
+
+bool wallet_compact_sync_escrow::generate(std::vector<test_event_entry>& events) const
+{
+  CHECK_AND_ASSERT_MES(escrow_wallet_test::generate(events), false, "escrow fixture generation failed");
+  DO_CALLBACK(events, "check_transport");
+  return true;
+}
+
+bool wallet_compact_sync_escrow::check_transport(currency::core&, size_t, const std::vector<test_event_entry>&)
+{
+  const auto* proxy = dynamic_cast<const compact_sync_test_proxy*>(m_core_proxy.get());
+  CHECK_AND_ASSERT_MES(proxy && proxy->compact_transactions && proxy->compact_tip_blocks && proxy->compact_genesis_blocks,
+    false, "escrow fixture did not exercise the compact wire path");
+  return true;
+}
+
+void wallet_compact_sync_escrow::set_core_proxy(std::shared_ptr<tools::i_core_proxy> proxy)
+{
+  // the reused legacy fixture creates its own wallets; force every confirmed transaction through Compact, preserving signed nested templates
+  wallet_test::set_core_proxy(proxy ? std::make_shared<compact_sync_test_proxy>(std::move(proxy), true) : nullptr);
 }

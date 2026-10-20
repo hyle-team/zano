@@ -240,5 +240,6 @@ namespace command_line
   extern const arg_descriptor<std::string> arg_enable_block_socks5_relay_proxy;
   extern const arg_descriptor<std::string> arg_block_relay_url;
   extern const arg_descriptor<bool>        arg_allow_legacy_payment_id_size;
+  extern const arg_descriptor<bool>        arg_unsecure_disable_extension_id_check;
   
 }

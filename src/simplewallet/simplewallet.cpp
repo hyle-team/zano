@@ -3836,6 +3836,7 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_params, command_line::arg_block_relay_url);
   command_line::add_arg(desc_params, arg_concise_mode);
   command_line::add_arg(desc_params, arg_resync_and_exit);
+  command_line::add_arg(desc_params, command_line::arg_unsecure_disable_extension_id_check);
 
 
   tools::wallet_rpc_server::init_options(desc_params);
@@ -4100,6 +4101,13 @@ int main(int argc, char* argv[])
     {
       LOG_PRINT_L0("Wallet RPC server was not started");
       return EXIT_FAILURE;
+    }
+
+    if(command_line::has_arg(vm, command_line::arg_unsecure_disable_extension_id_check) && command_line::get_arg(vm, command_line::arg_unsecure_disable_extension_id_check))
+    {
+#ifndef MOBILE_WALLET_BUILD
+      wrpc.get_origin_verifier().set_enabled(false);
+#endif
     }
 
     tools::signal_handler::install([&wrpc/*, &wal*/ /* TODO(unassigned): use? */] {
