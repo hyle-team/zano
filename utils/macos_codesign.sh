@@ -343,10 +343,10 @@ cmd_notarize() {
   case "$target" in
     *.dmg|*.pkg)
       note "stapling $target"
-      # stapler downloads the ticket from Apple and can hit the same transient
-      # network failures as the submit, so retry it too. validate is local-only.
+      # Both staple and validate fetch the ticket from Apple's CDN (CloudKit
+      # ticket-delivery) and routinely hit transient -1005 drops on CI, so retry both.
       retry_apple "staple $(basename "$target")" xcrun stapler staple "$target"
-      xcrun stapler validate "$target"
+      retry_apple "validate $(basename "$target")" xcrun stapler validate "$target"
       ;;
     *.zip)
       note "notarized; a .zip cannot be stapled (the ticket is served online instead)"
@@ -370,14 +370,14 @@ cmd_notarize_app() {
 
   note "stapling $app"
   retry_apple "staple $(basename "$app")" xcrun stapler staple "$app"
-  xcrun stapler validate "$app"
+  retry_apple "validate $(basename "$app")" xcrun stapler validate "$app"
 }
 
 cmd_staple() {
   local target="${1:?staple needs a path}"
   note "stapling $target"
   retry_apple "staple $(basename "$target")" xcrun stapler staple "$target"
-  xcrun stapler validate "$target"
+  retry_apple "validate $(basename "$target")" xcrun stapler validate "$target"
 }
 
 # ------------------------------------------------------------------- verify ---
@@ -391,7 +391,7 @@ cmd_verify_app() {
   codesign --display --verbose=2 "$app" 2>&1 | grep -q 'flags=.*runtime' \
     || die "$app is not signed with the hardened runtime"
   echo "--- notarization ticket ---"
-  xcrun stapler validate "$app" || die "$app has no stapled notarization ticket"
+  retry_apple "notarization ticket on $(basename "$app")" xcrun stapler validate "$app"
   echo "--- Gatekeeper ---"
   spctl --assess --verbose=4 --type exec "$app"
 }
@@ -401,7 +401,7 @@ cmd_verify_dmg() {
   echo "--- codesign ---"
   codesign --verify --strict --verbose=2 "$dmg"
   echo "--- notarization ticket ---"
-  xcrun stapler validate "$dmg" || die "$dmg has no stapled notarization ticket"
+  retry_apple "notarization ticket on $(basename "$dmg")" xcrun stapler validate "$dmg"
   echo "--- Gatekeeper ---"
   spctl --assess --verbose=4 --type open --context context:primary-signature "$dmg"
 }
