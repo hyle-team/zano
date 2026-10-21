@@ -90,17 +90,32 @@ protected:
   {
     params_check_balance(size_t account_index = 0,
       uint64_t total_balance = 0,
-      uint64_t unlocked_balance = std::numeric_limits<uint64_t>::max(),
-      uint64_t mined_balance = std::numeric_limits<uint64_t>::max(),
-      uint64_t awaiting_in = std::numeric_limits<uint64_t>::max(),
-      uint64_t awaiting_out = std::numeric_limits<uint64_t>::max())
-      : account_index(account_index), total_balance(total_balance), unlocked_balance(unlocked_balance), mined_balance(mined_balance), awaiting_in(awaiting_in), awaiting_out(awaiting_out) {}
+      uint64_t unlocked_balance = INVALID_BALANCE_VAL,
+      uint64_t mined_balance = INVALID_BALANCE_VAL,
+      uint64_t awaiting_in = INVALID_BALANCE_VAL,
+      uint64_t awaiting_out = INVALID_BALANCE_VAL,
+      const crypto::public_key& asset_id = currency::native_coin_asset_id,
+      size_t asset_decimal_point = CURRENCY_DISPLAY_DECIMAL_POINT)
+      : account_index(account_index), total_balance(total_balance), unlocked_balance(unlocked_balance), mined_balance(mined_balance), awaiting_in(awaiting_in), awaiting_out(awaiting_out)
+      , asset_id(asset_id), asset_decimal_point(asset_decimal_point)
+    {}
+
+    params_check_balance(size_t account_index,
+      uint64_t total_balance,
+      const crypto::public_key& asset_id,
+      size_t asset_decimal_point)
+      : account_index(account_index), total_balance(total_balance), unlocked_balance(INVALID_BALANCE_VAL), mined_balance(INVALID_BALANCE_VAL), awaiting_in(INVALID_BALANCE_VAL), awaiting_out(INVALID_BALANCE_VAL)
+      , asset_id(asset_id), asset_decimal_point(asset_decimal_point)
+    {}
+
     uint64_t total_balance;
     uint64_t unlocked_balance;
     uint64_t mined_balance;
     uint64_t awaiting_in;
     uint64_t awaiting_out;
     size_t account_index;
+    crypto::public_key asset_id;
+    size_t asset_decimal_point;
   };
 
   struct core_http_rpc_server_details

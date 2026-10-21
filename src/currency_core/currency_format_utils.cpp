@@ -3197,7 +3197,8 @@ namespace currency
         add_attachments_info_to_extra(tx.extra, tx.attachment);
     }
     
-
+    
+    if (ftp.pevents_dispatcher) ftp.pevents_dispatcher->RAISE_DEBUG_EVENT(wde_construct_tx_before_prefix_hash_sealing{ &tx });
     //
     // generate proofs and signatures
     // (any changes made below should only affect the signatures/proofs and should not impact the prefix hash calculation)
