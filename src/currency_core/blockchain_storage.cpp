@@ -6012,7 +6012,8 @@ bool blockchain_storage::add_transaction_from_block(const transaction& tx, const
   TIME_MEASURE_FINISH_PD_COND(need_to_profile, tx_append_is_expired);
 
   CHECK_AND_ASSERT_MES(validate_tx_for_hardfork_specific_terms(tx, tx_id, bl_height), false, "tx " << tx_id << ": hardfork-specific validation failed");
-  
+  CHECK_AND_ASSERT_MES(validate_tx_gw_asset_ids_against_blockchain_state(tx, tx_id, bl_height), false, "tx " << tx_id << ": gateway asset id validation failed");
+
   TIME_MEASURE_START_PD(tx_process_extra);
   bool r = process_blockchain_tx_extra(tx, tx_id, bl_height);
   CHECK_AND_ASSERT_MES(r, false, "failed to process_blockchain_tx_extra");
@@ -7645,6 +7646,57 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
 
 
 
+
+  return true;
+}
+//------------------------------------------------------------------
+// checks each gw output's asset id is registered, uses m_db_assets so main chain only
+bool blockchain_storage::validate_tx_gw_asset_ids_against_blockchain_state(const transaction& tx, const crypto::hash& tx_id, uint64_t block_height) const
+{
+  CRITICAL_REGION_LOCAL(m_read_lock);
+
+  if (!m_core_runtime_config.is_hardfork_active_for_height(ZANO_HARDFORK_06, block_height))
+    return true; // before HF6 there are no gw outs to check
+
+  // take into account registering asset (in a deferred fashion)
+  bool has_asset_register_operation = false, ado_checked = false;
+  crypto::public_key ado_asset_id{};
+  auto check_ado = [&]() -> bool {
+    if (ado_checked)
+      return true;
+    asset_descriptor_operation ado{};
+    if (get_type_in_variant_container(tx.extra, ado))
+    {
+      if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER)
+      {
+        CHECK_AND_ASSERT_MES(get_or_calculate_asset_id(ado, nullptr, &ado_asset_id), false, "validate_tx_gw_asset_ids_against_blockchain_state: get_or_calculate_asset_id failed");
+        has_asset_register_operation = true;
+      }
+    }
+    ado_checked = true;
+    return true;
+  };
+
+  for(size_t output_index = 0; output_index < tx.vout.size(); ++output_index)
+  {
+    if (tx.vout[output_index].type() == typeid(tx_out_gateway))
+    {
+      const tx_out_gateway& gwo = boost::get<tx_out_gateway>(tx.vout[output_index]);
+      if (gwo.asset_id == native_coin_asset_id_1div8)
+        continue; // good -- native coin
+      crypto::public_key asset_id{};
+      CHECK_AND_ASSERT_MES(crypto::pub_key_mul8(gwo.asset_id, asset_id), false, "pub_key_mul8 failed for out #" << output_index);
+      CHECK_AND_ASSERT_TRUE(check_ado());
+      if (has_asset_register_operation && asset_id == ado_asset_id)
+        continue; // good -- ado registered asset
+      auto ptr = m_db_assets.find(asset_id); // TODO optimization: we can build a cache for frequent asset ids in future -- sowle
+      if (!ptr)
+      {
+        LOG_PRINT_RED_L0("gw output #" << output_index << " has non-existing asset id: " << asset_id);
+        return false;
+      }
+    }
+  }
 
   return true;
 }

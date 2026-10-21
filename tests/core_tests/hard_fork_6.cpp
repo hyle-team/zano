@@ -8,6 +8,7 @@
 #include "chaingen_helpers.h"
 #include "random_helper.h"
 #include "currency_core/crypto_config.h"
+#include "wallet/wallet_debug_events_definitions.h"
 
 using namespace currency;
 
@@ -2236,6 +2237,265 @@ bool hard_fork_6_asset_descriptor_limits::generate(std::vector<test_event_entry>
   CHECK_AND_ASSERT_MES(make_update_tx(blk_6, adb, asset_id, good_meta, tx_post_good_meta_update),  false, "build post-HF6 valid update failed");
   ADD_CUSTOM_EVENT(events, tx_post_good_meta_update);
   MAKE_NEXT_BLOCK_TX1(events, blk_7, blk_6, miner_acc, tx_post_good_meta_update);
+
+  return true;
+}
+
+//------------------------------------------------------------------------------
+
+hard_fork_6_gw_out_with_bad_asset_id::hard_fork_6_gw_out_with_bad_asset_id()
+{
+  REGISTER_CALLBACK_METHOD(hard_fork_6_gw_out_with_bad_asset_id, c1);
+}
+
+bool hard_fork_6_gw_out_with_bad_asset_id::generate(std::vector<test_event_entry>& events) const
+{
+  // Test idea: make sure gw outputs can only have already registered (or same-tx-registered) asset IDs
+  // c1: the same when chain switching moves the asset registration away and back
+
+  bool r = false;
+  uint64_t ts = test_core_time::get_time();
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
+  account_base& bob_acc   = m_accounts[BOB_ACC_IDX];   bob_acc.generate();   bob_acc.set_createtime(ts);
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
+
+  DO_CALLBACK(events, "configure_core"); // default configure_core callback will initialize core runtime config with m_hardforks
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+  MAKE_NEXT_BLOCK(events, blk_1, blk_0r, miner_acc);
+  
+  // tx_0b: small ZC outputs to Alice
+  transaction tx_0b{};
+  CHECK_AND_ASSERT_SUCCESS(construct_tx_with_many_outputs(m_hardforks, events, blk_1, miner_acc.get_keys(), alice_acc.get_public_address(), MK_TEST_COINS(301), 10, TESTS_DEFAULT_FEE, tx_0b));
+  ADD_CUSTOM_EVENT(events, tx_0b);
+
+  MAKE_NEXT_BLOCK_TX1(events, blk_2, blk_1, miner_acc, tx_0b);
+
+  REWIND_BLOCKS_N(events, blk_2r, blk_2, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  // register gw address
+  m_gw_addr_view  = keypair::generate();
+  m_gw_addr_spend = keypair::generate();
+
+  gateway_address_descriptor_operation gwdo{};
+  gateway_address_descriptor_operation_register gwdo_reg{};
+  gwdo_reg.view_pub_key = m_gw_addr_view.pub;
+  gwdo_reg.descriptor.meta_info = "prevention-reversal asymmetry is the direct dynamical consequence of hysteresis";
+  gwdo_reg.descriptor.owner_key = m_gw_addr_spend.pub;
+  gwdo.operation = gwdo_reg;
+  MAKE_TX_EXTRA_ATTACH_FEE(events, tx_3, miner_acc, miner_acc, 0, CURRENCY_GATEWAY_ADDRESS_REGISTRATION_FEE, blk_2r, std::vector<extra_v>({ gwdo }), empty_attachment);
+  MAKE_NEXT_BLOCK_TX1(events, blk_3, blk_2r, miner_acc, tx_3);
+
+  // register asset (tx_1: Alice to herself + gw)
+  size_t current_hardfork_id = m_hardforks.get_the_most_recent_hardfork_id_for_height(get_block_height(blk_2r));
+  std::vector<tx_destination_entry> destinations;
+  transaction tx_1{};
+  asset_descriptor_base adb{};
+  {
+    adb.total_max_supply = 420;
+    adb.ticker = "CIIS";
+    adb.full_name = "Cognitive Immunization and Intervention Stratagies";
+    adb.meta_info = "immunization can act as reducing the probability that ordinary LLM use develops into persistent dependency";
+    asset_descriptor_operation ado{};
+    fill_ado_version_based_onhardfork(ado, current_hardfork_id);
+    ado.opt_descriptor = adb;
+    fill_adb_version_based_onhardfork(*ado.opt_descriptor, current_hardfork_id);
+    ado.operation_type = ASSET_DESCRIPTOR_OPERATION_REGISTER;
+    for(size_t i = 0; i < 12; ++i)
+      destinations.emplace_back(10, m_accounts[ALICE_ACC_IDX].get_public_address(), null_pkey);
+    destinations.emplace_back(1, m_gw_addr_view.pub, null_pkey); // 1 unit of new asset goes to the gw address in the same tx
+    destinations.emplace_back(MK_TEST_COINS(100), m_accounts[ALICE_ACC_IDX].get_public_address());
+    r = construct_tx_to_key(m_hardforks, events, tx_1, blk_2r, alice_acc, destinations, TESTS_DEFAULT_FEE, 0, 0, std::vector<attachment_v>({ado}));
+    CHECK_AND_ASSERT_MES(r, false, "construct_tx_to_key failed");
+    CHECK_AND_ASSERT_TRUE(get_type_in_variant_container(tx_1.extra, ado));
+    CHECK_AND_ASSERT_TRUE(get_or_calculate_asset_id(ado, nullptr, &m_asset_id));
+    ADD_CUSTOM_EVENT(events, tx_1);
+  }
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_4, blk_3, miner_acc, std::list<transaction>({ tx_1 }));
+
+  REWIND_BLOCKS_N(events, blk_4r, blk_4, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  DO_CALLBACK_PARAMS_STR(events, "check_gw_balance", t_serializable_object_to_blob(gw_address_balance_check_param{ m_gw_addr_view.pub, 0 }));
+
+  // Alice sends native coins and the asset to gw addr
+  destinations.clear();
+  destinations.emplace_back(MK_TEST_COINS(13), m_gw_addr_view.pub);
+  destinations.emplace_back(100, m_gw_addr_view.pub, m_asset_id);
+  transaction tx_5{};
+  r = construct_tx_to_key(m_hardforks, events, tx_5, blk_4r, alice_acc, destinations);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx_to_key failed");
+  ADD_CUSTOM_EVENT(events, tx_5);
+  
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_5, blk_4r, miner_acc, std::list<transaction>({ tx_5 }));
+
+  // check gw addresses' balances
+  DO_CALLBACK_PARAMS_STR(events, "check_gw_balance", t_serializable_object_to_blob(gw_address_balance_check_param{ m_gw_addr_view.pub, MK_TEST_COINS(13) }));
+  DO_CALLBACK_PARAMS_STR(events, "check_gw_balance", t_serializable_object_to_blob(gw_address_balance_check_param{ m_gw_addr_view.pub, 100 + 1,           m_asset_id }));
+
+  ///
+  /// try to make gw outputs with non-existing asset id
+  ///
+  crypto::point_t anti_asset_pt = -crypto::point_t(m_asset_id);
+  crypto::public_key anti_asset_id = anti_asset_pt.to_public_key();
+  crypto::public_key anti_native_coin_asset_id = (-currency::native_coin_asset_id_pt).to_public_key();
+  CHECK_AND_ASSERT_TRUE(crypto::point_t(anti_native_coin_asset_id) + crypto::point_t(native_coin_asset_id_pt) == crypto::c_point_0);
+
+  // get ZC sources
+  std::unordered_map<crypto::public_key, uint64_t> amounts;
+  amounts[native_coin_asset_id] = TESTS_DEFAULT_FEE;
+  amounts[m_asset_id] = 20;
+  std::vector<tx_source_entry> sources;
+  r = fill_tx_sources(sources, events, blk_5, alice_acc.get_keys(), amounts, 0, std::vector<tx_source_entry>(), fts_default);
+  CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources failed");
+  std::unordered_map<crypto::public_key, uint64_t> found_amounts;
+  get_sources_total_amount(sources, found_amounts);
+  CHECK_AND_ASSERT_EQ(amounts.size(), found_amounts.size());
+  CHECK_AND_ASSERT_EQ(amounts[m_asset_id], found_amounts[m_asset_id]); // should be exact amount found
+  uint64_t change_native = found_amounts[native_coin_asset_id] - amounts[native_coin_asset_id];
+
+  destinations.clear();
+  destinations.emplace_back(change_native,                    m_accounts[ALICE_ACC_IDX].get_public_address());
+  destinations.emplace_back(20,                               m_accounts[ALICE_ACC_IDX].get_public_address(),     m_asset_id); // returning consumed asset back
+  destinations.emplace_back(1'000'000,                        m_gw_addr_view.pub,                                 m_asset_id);
+  destinations.emplace_back(1'000'000,                        m_accounts[BOB_ACC_IDX].get_public_address(),       m_asset_id);
+  destinations.emplace_back(2'000'000,                        m_gw_addr_view.pub,                                 anti_asset_id);
+  destinations.emplace_back(MK_TEST_COINS(1'000'000),         m_accounts[BOB_ACC_IDX].get_public_address(),       native_coin_asset_id);
+  destinations.emplace_back(MK_TEST_COINS(1'000'000),         m_gw_addr_view.pub,                                 native_coin_asset_id);
+  destinations.emplace_back(MK_TEST_COINS(2'000'000),         m_gw_addr_view.pub,                                 anti_native_coin_asset_id);
+
+  // construct tx_6_bad
+  size_t tx_hardfork_id{};
+  uint64_t tx_version = get_tx_version_and_hardfork_id(get_block_height(blk_5) + 1, m_hardforks, tx_hardfork_id);
+  finalize_tx_param ftp{};
+  ftp.tx_version = tx_version;
+  ftp.tx_hardfork_id = tx_hardfork_id;
+  ftp.sources = sources;
+  ftp.prepared_destinations = destinations;
+  ftp.shuffle = true;
+  epee::misc_utils::events_dispatcher debug_events_dispatcher;
+  debug_events_dispatcher.SUBSCIRBE_DEBUG_EVENT<wde_construct_tx_before_prefix_hash_sealing>([&](const wde_construct_tx_before_prefix_hash_sealing& w){
+    // replace autocalculated fee
+    auto it = std::remove_if(w.tx->extra.begin(), w.tx->extra.end(), [](const payload_items_v& pi) { return pi.type() == typeid(zarcanum_tx_data_v1); });
+    w.tx->extra.erase(it, w.tx->extra.end());
+    w.tx->extra.push_back(zarcanum_tx_data_v1{ TESTS_DEFAULT_FEE });
+  });
+  ftp.pevents_dispatcher = &debug_events_dispatcher;
+
+  finalized_tx ft{};
+  r = construct_tx(alice_acc.get_keys(), ftp, ft);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
+  const transaction& tx_6_bad = ft.tx;
+
+  DO_CALLBACK(events, "mark_invalid_tx");
+  ADD_CUSTOM_EVENT(events, tx_6_bad);
+
+  // simulate kept_by_block
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, true));
+  ADD_CUSTOM_EVENT(events, tx_6_bad);
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, false));
+  DO_CALLBACK(events, "mark_invalid_block");
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_6b, blk_5, miner_acc, std::list<transaction>({ tx_6_bad }));
+
+  //
+  // construct tx_6_good using the very same input data, but legit destinations
+  //
+  destinations.clear();
+  destinations.emplace_back(change_native,                    m_accounts[ALICE_ACC_IDX].get_public_address());
+  destinations.emplace_back(20,                               m_accounts[BOB_ACC_IDX].get_public_address(),       m_asset_id);
+  ftp.prepared_destinations = destinations;
+  ft = finalized_tx{};
+  r = construct_tx(alice_acc.get_keys(), ftp, ft);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
+  const transaction& tx_6_good = ft.tx;
+  // should be accepted to the pool and confirmed in a block without an issue
+  ADD_CUSTOM_EVENT(events, tx_6_good);
+  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(1));
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_6, blk_5, miner_acc, std::list<transaction>({ tx_6_good }));
+  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(0));
+
+  // final checks
+  DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(BOB_ACC_IDX, 20, m_asset_id, 0));
+  DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(BOB_ACC_IDX, MK_TEST_COINS(0)));
+
+  DO_CALLBACK_PARAMS_STR(events, "check_gw_balance", t_serializable_object_to_blob(gw_address_balance_check_param{ m_gw_addr_view.pub, 101,               m_asset_id }));
+  DO_CALLBACK_PARAMS_STR(events, "check_gw_balance", t_serializable_object_to_blob(gw_address_balance_check_param{ m_gw_addr_view.pub, MK_TEST_COINS(13) }));
+
+  DO_CALLBACK(events, "c1");
+
+  return true;
+}
+
+bool hard_fork_6_gw_out_with_bad_asset_id::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  // split -- A (asset 2 reg) -- A+1 (asset 2 emitted to gw)     --  4 blocks
+  //      \-- 3 blocks        -- reg (emission is not ready yet) --  emission
+
+  const blockchain_storage& bcs = c.get_blockchain_storage();
+  const account_public_address& miner_addr = m_accounts[MINER_ACC_IDX].get_public_address();
+  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
+  alice_wlt->refresh();
+
+  auto gw_get_balance = [&](const crypto::public_key& asset_id) -> uint64_t {
+    std::shared_ptr<const gateway_address_data> pd = bcs.get_gateway_address_info(m_gw_addr_view.pub);
+    CHECK_AND_ASSERT_THROW_MES(pd, "gw address not found: " << m_gw_addr_view.pub);
+    auto it = pd->balances.find(asset_id);
+    return it == pd->balances.end() ? 0 : it->second.amount;
+  };
+
+  uint64_t split_block_height = 0;
+  const crypto::hash split_block_id = bcs.get_top_block_id(split_block_height);
+
+  asset_descriptor_base adb{};
+  adb.total_max_supply = 1000;
+  adb.ticker = "CIIS2";
+  std::vector<tx_destination_entry> destinations;
+  destinations.emplace_back(10, m_accounts[ALICE_ACC_IDX].get_public_address(), null_pkey);
+  transaction tx_reg{};
+  crypto::public_key asset_2_id{};
+  alice_wlt->deploy_new_asset(adb, destinations, tx_reg, asset_2_id);
+
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 1);
+  CHECK_AND_ASSERT_TRUE(mine_next_pow_block_in_playtime(miner_addr, c));
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
+
+  alice_wlt->refresh();
+  destinations.clear();
+  destinations.emplace_back(7, m_gw_addr_view.pub, null_pkey);
+  transaction tx_emit{};
+  alice_wlt->emit_asset(asset_2_id, destinations, tx_emit);
+
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 1);
+  block blk_a1{};
+  CHECK_AND_ASSERT_TRUE(mine_next_pow_block_in_playtime(miner_addr, c, &blk_a1));
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
+  CHECK_AND_ASSERT_EQ(gw_get_balance(asset_2_id), 7);
+
+  // switch away from A
+  CHECK_AND_ASSERT_TRUE(mine_next_pow_blocks_in_playtime_with_given_txs(miner_addr, std::vector<transaction>(), c, 3, split_block_id));
+  CHECK_AND_ASSERT_EQ(bcs.get_top_block_height(), split_block_height + 3);
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 2);
+  asset_descriptor_base adb_2{};
+  CHECK_AND_ASSERT_TRUE(!bcs.get_asset_info(asset_2_id, adb_2));
+  CHECK_AND_ASSERT_EQ(gw_get_balance(asset_2_id), 0);
+
+  CHECK_AND_ASSERT_TRUE(mine_next_pow_block_in_playtime(miner_addr, c));
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 1);
+  CHECK_AND_ASSERT_TRUE(c.get_tx_pool().have_tx(get_transaction_hash(tx_emit)));
+  CHECK_AND_ASSERT_TRUE(bcs.get_asset_info(asset_2_id, adb_2));
+  CHECK_AND_ASSERT_EQ(gw_get_balance(asset_2_id), 0);
+
+  CHECK_AND_ASSERT_TRUE(mine_next_pow_block_in_playtime(miner_addr, c));
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
+  CHECK_AND_ASSERT_EQ(gw_get_balance(asset_2_id), 7);
+
+  // switch back to A
+  CHECK_AND_ASSERT_TRUE(mine_next_pow_blocks_in_playtime_with_given_txs(miner_addr, std::vector<transaction>(), c, 4, get_block_hash(blk_a1)));
+  CHECK_AND_ASSERT_EQ(bcs.get_top_block_height(), split_block_height + 6);
+  CHECK_AND_ASSERT_EQ(bcs.get_block_id_by_height(split_block_height + 2), get_block_hash(blk_a1));
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
+  CHECK_AND_ASSERT_EQ(gw_get_balance(asset_2_id), 7);
 
   return true;
 }
