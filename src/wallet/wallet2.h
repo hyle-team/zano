@@ -389,7 +389,6 @@ namespace tools
         size_t            target_decoy_count;          // how many decoys we want
         bool              needs_decoys;                // (!auditable && target_decoy_count > 0)
         bool              is_real_output_post_hf4;     // zone HF real output
-        uint64_t          batch_key;                   // 0 for ZC, otherwise td.amount()
         size_t            batch_idx;                   // batch index in req4/resp4 (SIZE_MAX if not needed)
         bool              use_bare_candidates;         // daemon resolves and fills the amount pool
       };
@@ -815,7 +814,7 @@ namespace tools
     //performance inefficient call, suitable only for rare ocasions or super lazy developers
     bool proxy_to_daemon(const std::string& uri, const std::string& body, int& response_code, std::string& response_body);
     void set_concise_mode(bool enabled) { m_concise_mode = enabled; }
-    // сallers opt in, older daemons ignore the request flag and return full blocks
+    // compact is the default, disabling it requests legacy full block responses
     void set_compact_sync(bool enabled) { m_compact_sync = enabled; }
     bool get_compact_sync() const { return m_compact_sync; }
     void set_concise_mode_reorg_max_reorg_blocks(uint64_t max_blocks) { m_wallet_concise_mode_max_reorg_blocks = max_blocks; }

@@ -45,6 +45,7 @@ namespace tools
     req.block_ids = rqt.block_ids;
     req.minimum_height = rqt.minimum_height;
     req.m_return_compact = rqt.m_return_compact;
+    req.m_return_legacy_full = rqt.m_return_legacy_full;
     currency::COMMAND_RPC_GET_BLOCKS_FAST::response res = AUTO_VAL_INIT(res);
     bool r = call_COMMAND_RPC_GET_BLOCKS_FAST(req, res);
     rsp.status = res.status;

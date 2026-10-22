@@ -4213,17 +4213,17 @@ namespace
       if (req.block_ids.size() == 1)
         ++genesis_requests;
 
-      if (!m_force_compact && !req.m_return_compact)
-      {
+      const bool return_compact = m_force_compact || !req.m_return_legacy_full;
+      if (return_compact)
+        ++compact_requests;
+      else
         ++full_requests;
-        return m_inner->call_COMMAND_RPC_GET_BLOCKS_DIRECT(req, res);
-      }
-      ++compact_requests;
 
       COMMAND_RPC_GET_BLOCKS_FAST::request wire_req{};
       wire_req.minimum_height = req.minimum_height;
       wire_req.block_ids = req.block_ids;
-      wire_req.m_return_compact = true;
+      wire_req.m_return_compact = req.m_return_compact;
+      wire_req.m_return_legacy_full = !return_compact;
       COMMAND_RPC_GET_BLOCKS_FAST::response wire_res{};
       CHECK_AND_ASSERT_MES(m_inner->call_COMMAND_RPC_GET_BLOCKS_FAST(wire_req, wire_res), false, "compact RPC request failed");
       res.status = wire_res.status;
@@ -4236,7 +4236,9 @@ namespace
       for (const auto& entry : res.blocks)
       {
         const uint64_t height = get_block_height(entry.block_ptr->bl);
-        CHECK_AND_ASSERT_MES(entry.compact, false, "compact RPC must trim every block, including genesis and the tip");
+        CHECK_AND_ASSERT_MES(entry.compact == return_compact, false, "block representation does not match the request");
+        if (!return_compact)
+          continue;
         const auto& miner_tx = entry.block_ptr->bl.miner_tx;
         CHECK_AND_ASSERT_MES(miner_tx.signatures.empty() && miner_tx.proofs.empty(), false, "coinbase was not compact");
         for (const auto& tx : entry.txs_ptr)
@@ -4379,6 +4381,18 @@ bool wallet_compact_sync::generate(std::vector<test_event_entry>& events) const
 
 bool wallet_compact_sync::check_sync(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
+  // the legacy full flag must not bypass the emergency old client cutoff
+  {
+    COMMAND_RPC_GET_BLOCKS_FAST::request req{};
+    req.block_ids.push_back(get_block_hash(boost::get<block>(events.front())));
+    for (bool legacy_full : {false, true})
+    {
+      req.m_return_legacy_full = legacy_full;
+      COMMAND_RPC_GET_BLOCKS_FAST::response res{};
+      CHECK_AND_ASSERT_MES(m_core_proxy->call_COMMAND_RPC_GET_BLOCKS_FAST(req, res) && res.status == API_RETURN_CODE_GENESIS_MISMATCH,
+        false, "old client was not rejected");
+    }
+  }
   auto proxy = std::make_shared<compact_sync_test_proxy>(m_core_proxy);
   auto full = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
   auto compact = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
@@ -4454,6 +4468,23 @@ bool wallet_compact_sync::check_sync(currency::core& c, size_t ev_index, const s
   CHECK_AND_ASSERT_MES(compare_wallet_sync_state(*full, *compact), false, "recent compact transaction mismatch");
   const auto spend_tx_hash = get_transaction_hash(spend_tx);
   const auto recent_tx_hash = get_transaction_hash(recent_tx);
+  // full wire responses must preserve the signed transaction, including its proofs
+  {
+    COMMAND_RPC_GET_BLOCKS_FAST::request req{};
+    req.block_ids.push_back(get_block_hash(boost::get<block>(events.front())));
+    req.m_return_compact = true;
+    req.m_return_legacy_full = true;
+    COMMAND_RPC_GET_BLOCKS_FAST::response res{};
+    CHECK_AND_ASSERT_MES(m_core_proxy->call_COMMAND_RPC_GET_BLOCKS_FAST(req, res) && res.status == API_RETURN_CODE_OK, false, "legacy full RPC request failed");
+    const auto spend_blob = tx_to_blob(spend_tx);
+    bool full_spend_found = false;
+    for (const auto& entry : res.blocks)
+    {
+      CHECK_AND_ASSERT_MES(!entry.compact, false, "legacy full RPC returned compact blocks");
+      full_spend_found |= std::find(entry.txs.begin(), entry.txs.end(), spend_blob) != entry.txs.end();
+    }
+    CHECK_AND_ASSERT_MES(full_spend_found, false, "legacy full RPC lost the complete signed transaction");
+  }
   CHECK_AND_ASSERT_MES(compact_sender->m_unconfirmed_txs.count(spend_tx_hash) == 0, false, "confirmed outgoing payment remained pending");
   const auto check_complete_confirmed_spend = [&]() -> bool
   {
