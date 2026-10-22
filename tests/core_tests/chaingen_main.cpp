@@ -1187,17 +1187,17 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY(wallet_sending_to_integrated_address);
     GENERATE_AND_PLAY_HF(block_template_blacklist_test, "4-*");
     GENERATE_AND_PLAY_HF(wallet_rpc_hardfork_verification, "5");
-    GENERATE_AND_PLAY_HF(wallet_rpc_gateway_address, "6-*");
-    GENERATE_AND_PLAY_HF(wallet_rpc_gateway_signatures, "6-*");
-    GENERATE_AND_PLAY_HF(wallet_rpc_gateway_illegal_asset_id, "6-*");
-    GENERATE_AND_PLAY_HF(wallet_rpc_gateway_overspend, "6-*");
-    GENERATE_AND_PLAY_HF(wallet_rpc_gateway_service_entries, "6-*");
-    GENERATE_AND_PLAY_HF(wallet_rpc_gateway_history_after_outgoing, "6-*");
-    GENERATE_AND_PLAY_HF(wallet_rpc_gateway_reorg_spend, "6-*");
-    GENERATE_AND_PLAY_HF(wallet_rpc_gateway_reorg_receive, "6-*");
-    GENERATE_AND_PLAY_HF(wallet_rpc_gateway_owner_change_altchain, "6-*");
-    GENERATE_AND_PLAY_HF(wallet_rpc_gateway_limits, "6-*");
-    GENERATE_AND_PLAY_HF(wallet_rpc_gateway_decrypt_op, "6-*");
+    GENERATE_AND_PLAY_HF(wallet_rpc_gateway_address, "6"); // change to "6,8-*
+    GENERATE_AND_PLAY_HF(wallet_rpc_gateway_signatures, "6"); // change to "6,8-*
+    GENERATE_AND_PLAY_HF(wallet_rpc_gateway_illegal_asset_id, "6"); // change to "6,8-*
+    GENERATE_AND_PLAY_HF(wallet_rpc_gateway_overspend, "6"); // change to "6,8-*
+    GENERATE_AND_PLAY_HF(wallet_rpc_gateway_service_entries, "6"); // change to "6,8-*
+    GENERATE_AND_PLAY_HF(wallet_rpc_gateway_history_after_outgoing, "6"); // change to "6,8-*
+    GENERATE_AND_PLAY_HF(wallet_rpc_gateway_reorg_spend, "6"); // change to "6,8-*
+    GENERATE_AND_PLAY_HF(wallet_rpc_gateway_reorg_receive, "6"); // change to "6,8-*
+    GENERATE_AND_PLAY_HF(wallet_rpc_gateway_owner_change_altchain, "6"); // change to "6,8-*
+    GENERATE_AND_PLAY_HF(wallet_rpc_gateway_limits, "6"); // change to "6,8-*
+    GENERATE_AND_PLAY_HF(wallet_rpc_gateway_decrypt_op, "6"); // change to "6,8-*
     GENERATE_AND_PLAY_HF(wallet_rpc_and_tx_unlock_time, "5-*");
     GENERATE_AND_PLAY_HF(wallet_rpc_sweep_below, "4-*");
     GENERATE_AND_PLAY_HF(wallet_rpc_sweep_below_wo_native, "4-*");
@@ -1399,7 +1399,7 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY_HF(hard_fork_6_and_alt_chain, "6-*");
     GENERATE_AND_PLAY_HF(hard_fork_6_and_self_directed_tx_with_payment_id, "6-*");
     GENERATE_AND_PLAY(hard_fork_6_coinbase_size_rules);
-    GENERATE_AND_PLAY_HF(hard_fork_6_gw_incompatible_with_mode_separate, "6-*");
+    GENERATE_AND_PLAY_HF(hard_fork_6_gw_incompatible_with_mode_separate, "6"); // change to "6,8-*
     GENERATE_AND_PLAY(hard_fork_6_asset_descriptor_limits);
 
     // GW address alt-chain tests
