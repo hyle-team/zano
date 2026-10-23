@@ -9254,7 +9254,7 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
   };
 
 
-  uint64_t height_of_current_alt_block = alt_chain.size() ? alt_chain.back()->second.height + 1 : split_height + 1;
+  uint64_t height_of_current_alt_block = alt_chain.size() ? alt_chain.back()->second.height + 1 : split_height;
 
   for (size_t pk_n = 0; pk_n < abs_key_offsets.size(); ++pk_n)
   {
@@ -9292,13 +9292,16 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
             const tx_out_v& out_in_alt = alt_outputs[input_amount][local_offset];
             
             uint64_t height_of_source_block = (*alt_it)->second.height;
-            CHECK_AND_ASSERT_MES(height_of_current_alt_block > height_of_source_block, false, "Intenral error: height_of_current_alt_block > height_of_source_block failed");
+            CHECK_AND_ASSERT_MES(height_of_current_alt_block > height_of_source_block, false, "height_of_current_alt_block > height_of_source_block failed");
 
             bool r = is_output_allowed_for_input(out_in_alt, input_v);
             CHECK_AND_ASSERT_MES(r, false, "Input and output incompatible type");
 
             r = add_output_to_the_ring(out_in_alt, pk_n);
             CHECK_AND_ASSERT_MES(r, false, "offset #" << pk_n << ": add_output_to_the_ring failed");
+            
+            if (max_related_block_height < height_of_source_block)
+              max_related_block_height = height_of_source_block;
             
             found = true;
             break;
@@ -9323,7 +9326,7 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
       if (it != alt_chain_tx_ids.end())
       {
         uint64_t height_of_source_block = it->second.second;
-        CHECK_AND_ASSERT_MES(height_of_current_alt_block > height_of_source_block, false, "Intenral error: height_of_current_alt_block > height_of_source_block failed");
+        CHECK_AND_ASSERT_MES(height_of_current_alt_block > height_of_source_block, false, "height_of_current_alt_block > height_of_source_block failed");
 
         //source tx found in altchain
         CHECK_AND_ASSERT_MES(it->second.first.vout.size() > out_n, false, "Internal error: out_n(" << out_n << ") >= it->second.vout.size()(" << it->second.first.vout.size() << ")");
@@ -9334,6 +9337,10 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
 
         r = add_output_to_the_ring(out_in_alt, pk_n);
         CHECK_AND_ASSERT_MES(r, false, "offset #" << pk_n << ": add_output_to_the_ring failed");
+
+        if (max_related_block_height < height_of_source_block)
+          max_related_block_height = height_of_source_block;
+
         continue; // found in altchain, continue with the new output
       }
     }
@@ -9394,6 +9401,7 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
       uint64_t last_pow_block_height = 0;
       r = build_stake_modifier(sm, alt_chain, split_height, nullptr, &last_pow_block_height);
       CHECK_AND_ASSERT_MES(r, false, "failed to build_stake_modifier");
+      CHECK_AND_ASSERT_MES(max_related_block_height <= last_pow_block_height, false, "alt block stake input refs' max related block height is " << max_related_block_height << " while last PoW block height is " << last_pow_block_height);
       r = build_kernel(input_key_image, sk, sm, pos_block_timestamp);
       CHECK_AND_ASSERT_MES(r, false, "failed to build kernel_stake");
       crypto::hash kernel_hash = crypto::cn_fast_hash(&sk, sizeof(sk));
@@ -9428,7 +9436,8 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
   if (p_max_related_block_height != nullptr)
     *p_max_related_block_height = max_related_block_height;
 
-  uint64_t alt_bl_h = split_height + alt_chain.size() + 1;
+  // the same check is already in validate_alt_block_txs(), consider careful deduplication -- sowle
+  uint64_t alt_bl_h = split_height + alt_chain.size();
   if (m_core_runtime_config.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, alt_bl_h))
   {
     if (alt_bl_h - max_related_block_height < CURRENCY_HF4_MANDATORY_MIN_COINAGE)
