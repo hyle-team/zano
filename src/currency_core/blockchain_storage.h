@@ -778,8 +778,8 @@ namespace currency
     void calculate_local_gindex_lookup_table_for_height(uint64_t split_height, std::map<uint64_t, uint64_t>& increments) const;
     void do_erase_altblock(alt_chain_container::iterator it);
     uint64_t get_blockchain_launch_timestamp()const;
-    bool is_output_allowed_for_input(const tx_out_v& out_v, const txin_v& in_v, uint64_t top_minus_source_height) const;
-    bool is_output_allowed_for_input(const txout_target_v& out_v, const txin_v& in_v, uint64_t top_minus_source_height) const;
+    bool is_output_allowed_for_input(const tx_out_v& out_v, const txin_v& in_v) const;
+    bool is_output_allowed_for_input(const txout_target_v& out_v, const txin_v& in_v) const;
     bool is_output_allowed_for_input(const txout_to_key& out_v, const txin_v& in_v) const;
     bool is_output_allowed_for_input(const tx_out_zarcanum& out, const txin_v& in_v) const;
     void remove_old_dbs();
@@ -884,7 +884,7 @@ namespace currency
       VARIANT_SWITCH_BEGIN(tx_ptr->tx.vout[n]);
       VARIANT_CASE_CONST(tx_out_bare, o)
       {
-        bool r = is_output_allowed_for_input(o.target, verified_input, get_current_blockchain_size() - tx_ptr->m_keeper_block_height);
+        bool r = is_output_allowed_for_input(o.target, verified_input);
         CHECK_AND_ASSERT_MES(r, false, "Input and output incompatible type");
 
         if (o.target.type() == typeid(txout_to_key))
