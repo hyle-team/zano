@@ -71,3 +71,8 @@ struct block_template_and_invalid_tx_proofs : public test_chain_unit_enchanced
   mutable currency::transaction              m_good_tx;
   mutable std::vector<std::pair<uint64_t, currency::transaction>> m_bad_txs; // .first is a bad_proof_kind
 };
+
+struct alt_chain_ring_members_age : public test_chain_unit_enchanced
+{
+  bool generate(std::vector<test_event_entry>& events) const;
+};

@@ -1424,6 +1424,7 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY(zarcanum_pos_block_math);
     GENERATE_AND_PLAY(zarcanum_in_alt_chain);
     GENERATE_AND_PLAY_HF(zarcanum_in_alt_chain_2, "4-*");
+    GENERATE_AND_PLAY_HF(alt_chain_ring_members_age, "4-*");
     GENERATE_AND_PLAY(assets_and_explicit_native_coins_in_outs);
     GENERATE_AND_PLAY(zarcanum_block_with_txs);
     GENERATE_AND_PLAY_HF(block_template_and_invalid_tx_proofs, "5-*");
