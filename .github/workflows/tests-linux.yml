@@ -135,6 +135,29 @@ jobs:
             libicu-dev \
             perl
 
+      # A memory peak during the build (see "Build test binaries") takes the
+      # whole runner down ("The runner has received a shutdown signal")
+      # rather than failing the compiler, and skips every later step,
+      # log upload included. Swap turns such a peak into a slowdown. Whatever
+      # swap the image ships with is replaced by one 8 GiB file on /mnt, the
+      # hosted runner's temporary disk, so it does not take space from the
+      # build directory; the image's own /mnt/swapfile, if any, is removed to
+      # give its space back.
+      - name: Set up 8 GiB swap
+        run: |
+          set -euo pipefail
+          echo "Swap before:"
+          swapon --show
+          sudo swapoff -a
+          sudo rm -f /mnt/swapfile
+          sudo fallocate -l 8G /mnt/ci-swapfile
+          sudo chmod 600 /mnt/ci-swapfile
+          sudo mkswap /mnt/ci-swapfile >/dev/null
+          sudo swapon /mnt/ci-swapfile
+          echo "Swap after:"
+          swapon --show
+          free -h
+
       # restore/save are separate so successfully built dependencies enter the
       # cache immediately even if a later Zano build or test step fails
       - name: Restore Boost and OpenSSL cache
@@ -276,16 +299,25 @@ jobs:
           # translation units cannot exhaust the runner. The three executables
           # are linked one at a time on purpose: each link runs LTO over every
           # Zano library, and three of those at once would not fit in 16 GiB.
+          #
+          # coretests is compiled with at most two jobs. Its translation units
+          # are the heaviest of all (chaingen_main.cpp pulls in every test
+          # header), and with four of them compiling at once the runner ran
+          # out of resources and shut down mid-build. unit_tests has already
+          # built every library coretests links, so only coretests' own
+          # sources pay for the lower parallelism.
           mem_gib=$(( $(getconf _PHYS_PAGES) * $(getconf PAGE_SIZE) / (1024 * 1024 * 1024) ))
           jobs=$(( (mem_gib + 2) / 4 ))
           if (( jobs < 1 )); then jobs=1; fi
           if (( jobs > $(nproc) )); then jobs=$(nproc); fi
-          echo "Building with $jobs parallel jobs ($(nproc) CPUs, ${mem_gib} GiB RAM)"
+          coretests_jobs=$(( jobs < 2 ? jobs : 2 ))
+          echo "Building with $jobs parallel jobs, $coretests_jobs for coretests ($(nproc) CPUs, ${mem_gib} GiB RAM)"
 
           ccache --zero-stats >/dev/null
-          for target in unit_tests functional_tests coretests; do
+          for target in unit_tests functional_tests; do
             cmake --build "$BUILD_DIR" --parallel "$jobs" --target "$target"
           done
+          cmake --build "$BUILD_DIR" --parallel "$coretests_jobs" --target coretests
           ccache --show-stats
 
           # Only the test targets and the libraries they need were requested;
