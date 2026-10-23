@@ -15,6 +15,13 @@ struct multiassets_basic_test : public wallet_test
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };
 
+struct asset_registration_and_bad_amount_commitment : public wallet_test
+{
+  asset_registration_and_bad_amount_commitment();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};
+
 struct assets_and_explicit_native_coins_in_outs : public wallet_test
 {
   assets_and_explicit_native_coins_in_outs();

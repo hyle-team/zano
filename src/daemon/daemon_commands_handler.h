@@ -43,6 +43,7 @@ public:
     m_cmd_binder.set_handler("print_bc_outs", boost::bind(&daemon_commands_handler::print_bc_outs, this, ph::_1));
     m_cmd_binder.set_handler("print_market", boost::bind(&daemon_commands_handler::print_market, this, ph::_1));
     m_cmd_binder.set_handler("print_bc_outs_stats", boost::bind(&daemon_commands_handler::print_bc_outs_stats, this, ph::_1));
+    m_cmd_binder.set_handler("export_bare_outputs", boost::bind(&daemon_commands_handler::export_bare_outputs, this, ph::_1), "export_bare_outputs <file.cpp> - Export amount -> count for all indexed bare outputs");
     m_cmd_binder.set_handler("print_block", boost::bind(&daemon_commands_handler::print_block, this, ph::_1), "Print block, print_block <block_hash> | <block_height>");
     m_cmd_binder.set_handler("print_block_info", boost::bind(&daemon_commands_handler::print_block_info, this, ph::_1), "Print block info, print_block <block_hash> | <block_height>");
     m_cmd_binder.set_handler("print_tx_prun_info", boost::bind(&daemon_commands_handler::print_tx_prun_info, this, ph::_1), "Print tx prunning info");
@@ -215,6 +216,16 @@ private:
   {
     m_srv.get_payload_object().get_core().get_blockchain_storage().print_blockchain_outs_stats();
     return true;
+  }
+  //--------------------------------------------------------------------------------
+  bool export_bare_outputs(const std::vector<std::string>& args)
+  {
+    if (args.size() != 1)
+    {
+      std::cout << "Usage: export_bare_outputs <file.cpp>" << ENDL;
+      return false;
+    }
+    return m_srv.get_payload_object().get_core().get_blockchain_storage().export_bare_outputs(args[0]);
   }
   //--------------------------------------------------------------------------------
   bool print_cn(const std::vector<std::string>& args)
