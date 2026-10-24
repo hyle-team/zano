@@ -9281,7 +9281,7 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
   vector<crypto::CLSAG_GGX_input_ref_t> zc_input_ring;                          // ZC outputs
   vector<crypto::CLSAG_GGXXG_input_ref_t> zarcanum_input_ring;                  // Zarcanum outputs
 
-  auto add_output_to_the_ring = [&](const tx_out_v& out_v, size_t index, uint64_t top_minus_source_height) -> bool {
+  auto add_output_to_the_ring = [&](const tx_out_v& out_v, size_t index) -> bool {
     VARIANT_SWITCH_BEGIN(out_v)
       VARIANT_CASE_CONST(tx_out_bare, bo)
       {
@@ -9306,7 +9306,7 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
   };
 
 
-  uint64_t height_of_current_alt_block = alt_chain.size() ? alt_chain.back()->second.height + 1 : split_height + 1;
+  uint64_t height_of_current_alt_block = alt_chain.size() ? alt_chain.back()->second.height + 1 : split_height;
 
   for (size_t pk_n = 0; pk_n < abs_key_offsets.size(); ++pk_n)
   {
@@ -9344,14 +9344,16 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
             const tx_out_v& out_in_alt = alt_outputs[input_amount][local_offset];
             
             uint64_t height_of_source_block = (*alt_it)->second.height;
-            CHECK_AND_ASSERT_MES(height_of_current_alt_block > height_of_source_block, false, "Intenral error: height_of_current_alt_block > height_of_source_block failed");
-            uint64_t top_minus_source_height = height_of_current_alt_block - height_of_source_block;
+            CHECK_AND_ASSERT_MES(height_of_current_alt_block > height_of_source_block, false, "height_of_current_alt_block > height_of_source_block failed");
 
-            bool r = is_output_allowed_for_input(out_in_alt, input_v, top_minus_source_height);
+            bool r = is_output_allowed_for_input(out_in_alt, input_v);
             CHECK_AND_ASSERT_MES(r, false, "Input and output incompatible type");
 
-            r = add_output_to_the_ring(out_in_alt, pk_n, top_minus_source_height);
+            r = add_output_to_the_ring(out_in_alt, pk_n);
             CHECK_AND_ASSERT_MES(r, false, "offset #" << pk_n << ": add_output_to_the_ring failed");
+            
+            if (max_related_block_height < height_of_source_block)
+              max_related_block_height = height_of_source_block;
             
             found = true;
             break;
@@ -9376,18 +9378,21 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
       if (it != alt_chain_tx_ids.end())
       {
         uint64_t height_of_source_block = it->second.second;
-        CHECK_AND_ASSERT_MES(height_of_current_alt_block > height_of_source_block, false, "Intenral error: height_of_current_alt_block > height_of_source_block failed");
-        uint64_t top_minus_source_height = height_of_current_alt_block - height_of_source_block;
+        CHECK_AND_ASSERT_MES(height_of_current_alt_block > height_of_source_block, false, "height_of_current_alt_block > height_of_source_block failed");
 
         //source tx found in altchain
         CHECK_AND_ASSERT_MES(it->second.first.vout.size() > out_n, false, "Internal error: out_n(" << out_n << ") >= it->second.vout.size()(" << it->second.first.vout.size() << ")");
         const tx_out_v& out_in_alt = it->second.first.vout[out_n];
 
-        r = is_output_allowed_for_input(out_in_alt, input_v, top_minus_source_height);
+        r = is_output_allowed_for_input(out_in_alt, input_v);
         CHECK_AND_ASSERT_MES(r, false, "Input and output incompatible type");
 
-        r = add_output_to_the_ring(out_in_alt, pk_n, top_minus_source_height);
+        r = add_output_to_the_ring(out_in_alt, pk_n);
         CHECK_AND_ASSERT_MES(r, false, "offset #" << pk_n << ": add_output_to_the_ring failed");
+
+        if (max_related_block_height < height_of_source_block)
+          max_related_block_height = height_of_source_block;
+
         continue; // found in altchain, continue with the new output
       }
     }
@@ -9401,7 +9406,6 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
 
     uint64_t height_of_source_block = p->m_keeper_block_height;
     CHECK_AND_ASSERT_MES(height_of_current_alt_block > height_of_source_block, false, "Intenral error: height_of_current_alt_block > height_of_source_block failed");
-    uint64_t top_minus_source_height = height_of_current_alt_block - height_of_source_block;
 
     uint8_t mix_attr = 0;
     if (get_mix_attr_from_tx_out_v(out_in_main, mix_attr))
@@ -9415,10 +9419,10 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
     r = p->m_keeper_block_height < split_height;
     CHECK_AND_ASSERT_MES(r, false, "input offset #" << pk_n << " refers to main chain tx " << tx_id << " at height " << p->m_keeper_block_height << " while split height is " << split_height);
 
-    r = is_output_allowed_for_input(out_in_main, input_v, top_minus_source_height);
+    r = is_output_allowed_for_input(out_in_main, input_v);
     CHECK_AND_ASSERT_MES(r, false, "Input and output incompatible type");
 
-    r = add_output_to_the_ring(out_in_main, pk_n, top_minus_source_height);
+    r = add_output_to_the_ring(out_in_main, pk_n);
     CHECK_AND_ASSERT_MES(r, false, "offset #" << pk_n << ": add_output_to_the_ring failed");
 
     if (max_related_block_height < p->m_keeper_block_height)
@@ -9449,6 +9453,7 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
       uint64_t last_pow_block_height = 0;
       r = build_stake_modifier(sm, alt_chain, split_height, nullptr, &last_pow_block_height);
       CHECK_AND_ASSERT_MES(r, false, "failed to build_stake_modifier");
+      CHECK_AND_ASSERT_MES(max_related_block_height <= last_pow_block_height, false, "alt block stake input refs' max related block height is " << max_related_block_height << " while last PoW block height is " << last_pow_block_height);
       r = build_kernel(input_key_image, sk, sm, pos_block_timestamp);
       CHECK_AND_ASSERT_MES(r, false, "failed to build kernel_stake");
       crypto::hash kernel_hash = crypto::cn_fast_hash(&sk, sizeof(sk));
@@ -9483,7 +9488,8 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
   if (p_max_related_block_height != nullptr)
     *p_max_related_block_height = max_related_block_height;
 
-  uint64_t alt_bl_h = split_height + alt_chain.size() + 1;
+  // the same check is already in validate_alt_block_txs(), consider careful deduplication -- sowle
+  uint64_t alt_bl_h = split_height + alt_chain.size();
   if (m_core_runtime_config.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, alt_bl_h))
   {
     if (alt_bl_h - max_related_block_height < CURRENCY_HF4_MANDATORY_MIN_COINAGE)
@@ -9498,11 +9504,11 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
   return true;
 }
 //------------------------------------------------------------------
-bool blockchain_storage::is_output_allowed_for_input(const tx_out_v& out_v, const txin_v& in_v, uint64_t top_minus_source_height) const
+bool blockchain_storage::is_output_allowed_for_input(const tx_out_v& out_v, const txin_v& in_v) const
 {
   if (out_v.type() == typeid(tx_out_bare))
   {
-    return is_output_allowed_for_input(boost::get<tx_out_bare>(out_v).target, in_v, top_minus_source_height);
+    return is_output_allowed_for_input(boost::get<tx_out_bare>(out_v).target, in_v);
   }
   else if (out_v.type() == typeid(tx_out_zarcanum))
   {
@@ -9516,7 +9522,7 @@ bool blockchain_storage::is_output_allowed_for_input(const tx_out_v& out_v, cons
   return true;
 }
 //------------------------------------------------------------------
-bool blockchain_storage::is_output_allowed_for_input(const txout_target_v& out_v, const txin_v& in_v, uint64_t top_minus_source_height)const
+bool blockchain_storage::is_output_allowed_for_input(const txout_target_v& out_v, const txin_v& in_v) const
 {
   if (out_v.type() == typeid(txout_to_key))
   {
