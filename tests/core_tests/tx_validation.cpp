@@ -2631,3 +2631,156 @@ bool tx_input_mixins::generate(std::vector<test_event_entry>& events) const
 
   return true;
 }
+
+gen_tx_hash_bad_standalone_then_legit::gen_tx_hash_bad_standalone_then_legit()
+  : m_healthy_tx_index(std::numeric_limits<size_t>::max())
+{
+  REGISTER_CALLBACK_METHOD(gen_tx_hash_bad_standalone_then_legit, mark_healthy_tx);
+}
+
+bool gen_tx_hash_bad_standalone_then_legit::mark_healthy_tx(currency::core& /*c*/, size_t ev_index, const std::vector<test_event_entry>& /*events*/)
+{
+  m_healthy_tx_index = ev_index + 1;
+  return true;
+}
+
+bool gen_tx_hash_bad_standalone_then_legit::check_tx_verification_context(const currency::tx_verification_context& tvc, bool tx_added, size_t event_idx, const currency::transaction& tx)
+{
+  if (event_idx == m_healthy_tx_index)
+  {
+    CHECK_AND_ASSERT_MES(tx_added && tvc.m_added_to_pool && !tvc.m_already_existed && !tvc.m_verification_failed, false,
+      "healthy tx was not accepted after the damaged version: tx_added=" << tx_added
+      << ", m_added_to_pool=" << tvc.m_added_to_pool << ", m_already_existed=" << tvc.m_already_existed
+      << ", m_verification_failed=" << tvc.m_verification_failed);
+    LOG_PRINT_L0("Healthy standalone tx: tx_added=" << tx_added
+      << ", m_already_existed=" << tvc.m_already_existed);
+    return true;
+  }
+  return test_chain_unit_enchanced::check_tx_verification_context(tvc, tx_added, event_idx, tx);
+}
+
+bool gen_tx_hash_bad_standalone_then_legit::generate(std::vector<test_event_entry>& events) const
+{
+  // A rejected tx must not block the healthy copy with the same id
+  GENERATE_ACCOUNT(miner_acc);
+  GENERATE_ACCOUNT(alice_acc);
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  MAKE_NEXT_BLOCK(events, blk_1, blk_0, miner_acc);
+  REWIND_BLOCKS_N(events, blk_1r, blk_1, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  MAKE_TX(events, tx_1, miner_acc, alice_acc, MK_TEST_COINS(1), blk_1r);
+  events.pop_back();
+  transaction broken_tx = tx_1;
+  CHECK_AND_ASSERT_MES(!broken_tx.signatures.empty() &&
+    broken_tx.signatures.front().type() == typeid(NLSAG_sig), false, "tx_1 has no NLSAG signature to corrupt");
+  auto& ring_sigs = boost::get<NLSAG_sig>(broken_tx.signatures.front()).s;
+  CHECK_AND_ASSERT_MES(!ring_sigs.empty(), false, "tx_1 has no NLSAG ring signature to corrupt");
+  ring_sigs.front().c.data[0] ^= 0x01;
+  ring_sigs.front().c.data[1] ^= 0x02;
+  CHECK_AND_ASSERT_MES(get_transaction_hash(broken_tx) == get_transaction_hash(tx_1), false,
+    "broken_tx and tx_1 must share the same hash");
+
+  DO_CALLBACK(events, "mark_invalid_tx");
+  events.push_back(broken_tx);
+  DO_CALLBACK(events, "mark_healthy_tx");
+  events.push_back(tx_1);
+
+  return true;
+}
+
+gen_tx_hash_bad_bypasses_pool_revalidation::gen_tx_hash_bad_bypasses_pool_revalidation()
+  : m_poisoned_resend_tx_index(std::numeric_limits<size_t>::max()), m_poisoned_raw_hash(null_hash)
+{
+  REGISTER_CALLBACK_METHOD(gen_tx_hash_bad_bypasses_pool_revalidation, mark_poisoned_resend_tx);
+  REGISTER_CALLBACK_METHOD(gen_tx_hash_bad_bypasses_pool_revalidation, check_healthy_resend_tx);
+}
+
+bool gen_tx_hash_bad_bypasses_pool_revalidation::mark_poisoned_resend_tx(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  CHECK_AND_ASSERT_MES(ev_index + 1 < events.size(), false, "missing healthy resend event");
+  const transaction* healthy_tx = boost::get<transaction>(&events[ev_index + 1]);
+  CHECK_AND_ASSERT_MES(healthy_tx, false, "healthy resend event is not a transaction");
+  transaction pooled_tx{};
+  CHECK_AND_ASSERT_MES(c.get_tx_pool().get_transaction(get_transaction_hash(*healthy_tx), pooled_tx), false,
+    "damaged transaction was not retained in the pool under the healthy transaction's hash");
+  CHECK_AND_ASSERT_MES(pooled_tx.proofs.empty(), false,
+    "transaction in the pool has proofs: expected the damaged version");
+  m_poisoned_raw_hash = get_object_hash(pooled_tx);
+  CHECK_AND_ASSERT_MES(c.get_tx_pool().is_tx_blacklisted(m_poisoned_raw_hash), false,
+    "damaged transaction in the pool was not blacklisted by its raw hash");
+  m_poisoned_resend_tx_index = ev_index + 1;
+  return true;
+}
+
+bool gen_tx_hash_bad_bypasses_pool_revalidation::check_healthy_resend_tx(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  CHECK_AND_ASSERT_MES(ev_index > 0, false, "missing healthy resend transaction event");
+  const transaction* healthy_tx = boost::get<transaction>(&events[ev_index - 1]);
+  CHECK_AND_ASSERT_MES(healthy_tx, false, "previous event is not the healthy resend transaction");
+  transaction pooled_tx{};
+  CHECK_AND_ASSERT_MES(c.get_tx_pool().get_transaction(get_transaction_hash(*healthy_tx), pooled_tx), false,
+    "healthy transaction was not found in the pool after resend");
+  const crypto::hash healthy_raw_hash = get_object_hash(*healthy_tx);
+  CHECK_AND_ASSERT_MES(get_object_hash(pooled_tx) == healthy_raw_hash, false,
+    "the pool still contains the damaged transaction under the shared tx id");
+  CHECK_AND_ASSERT_MES(c.get_tx_pool().is_tx_blacklisted(m_poisoned_raw_hash) &&
+    !c.get_tx_pool().is_tx_blacklisted(healthy_raw_hash), false,
+    "raw-hash blacklist does not distinguish the damaged and healthy transactions");
+  LOG_PRINT_L0("Healthy tx replaced damaged pooled tx: tx_id=" << get_transaction_hash(*healthy_tx)
+    << ", tx_raw_hash=" << healthy_raw_hash << ", damaged_tx_raw_hash=" << m_poisoned_raw_hash);
+  return true;
+}
+
+bool gen_tx_hash_bad_bypasses_pool_revalidation::check_tx_verification_context(const currency::tx_verification_context& tvc, bool tx_added, size_t event_idx, const currency::transaction& tx)
+{
+  if (event_idx == m_poisoned_resend_tx_index)
+  {
+    CHECK_AND_ASSERT_MES(tx_added && tvc.m_added_to_pool && !tvc.m_already_existed && !tvc.m_verification_failed, false,
+      ENDL << "event #" << event_idx << ": healthy resend was not validated and added to the pool; got m_already_existed="
+      << tvc.m_already_existed << ", tx_added=" << tx_added << ", m_added_to_pool=" << tvc.m_added_to_pool
+      << ", m_verification_failed=" << tvc.m_verification_failed << ENDL);
+    LOG_PRINT_L0("Healthy tx after damaged block: m_already_existed=" << tvc.m_already_existed
+      << ", tx_added=" << tx_added);
+    return true;
+  }
+  return test_chain_unit_enchanced::check_tx_verification_context(tvc, tx_added, event_idx, tx);
+}
+
+bool gen_tx_hash_bad_bypasses_pool_revalidation::generate(std::vector<test_event_entry>& events) const
+{
+  // A blacklisted pooled tx must be replaced by the healthy copy
+  GENERATE_ACCOUNT(miner_acc);
+  GENERATE_ACCOUNT(alice_acc);
+  std::list<currency::account_base> coin_stake_sources;
+  coin_stake_sources.push_back(miner_acc);
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  DO_CALLBACK(events, "configure_core");
+
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 11);
+
+  MAKE_TX(events, tx_1, miner_acc, alice_acc, MK_TEST_COINS(1), blk_0r);
+  events.pop_back();
+  CHECK_AND_ASSERT_MES(!tx_1.proofs.empty(), false, "tx_1 has no proofs to corrupt -- check hardfork wiring/configure_core");
+
+  transaction broken_tx = tx_1;
+  broken_tx.proofs.clear();
+  CHECK_AND_ASSERT_MES(get_transaction_hash(broken_tx) == get_transaction_hash(tx_1), false,
+    "broken_tx and tx_1 must share the same hash -- otherwise this test doesn't exercise the intended bug");
+  CHECK_AND_ASSERT_MES(get_object_hash(broken_tx) != get_object_hash(tx_1), false,
+    "broken_tx and tx_1 must have different raw hashes");
+
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block | event_visitor_settings::set_skip_txs_blobsize_check, true, true));
+  events.push_back(broken_tx);
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block | event_visitor_settings::set_skip_txs_blobsize_check, false, false));
+
+  DO_CALLBACK(events, "mark_invalid_block");
+  MAKE_NEXT_POS_BLOCK_TX1(events, blk_2, blk_0r, miner_acc, coin_stake_sources, broken_tx);
+
+  DO_CALLBACK(events, "mark_poisoned_resend_tx");
+  events.push_back(tx_1);
+  DO_CALLBACK(events, "check_healthy_resend_tx");
+
+  return true;
+}
