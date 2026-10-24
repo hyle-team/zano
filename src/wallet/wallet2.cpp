@@ -44,9 +44,10 @@ using namespace epee;
 #include "currency_core/crypto_config.h"
 #include "crypto/zarcanum.h"
 #include "wallet_debug_events_definitions.h"
+#include "wallet_internal_events_definitions.h"
 #include "decoy_selection.h"
 #include "wallet_helpers.h"
-
+#include "currency_core/bc_hf_booster_service.h"
 #include "net/levin_socks5.h"
 
 using namespace currency;
@@ -1866,7 +1867,7 @@ void wallet2::pull_blocks(size_t& blocks_added, std::atomic<bool>& stop, bool& f
   {
     LOG_ERROR("Daemon currently on the hardfork (" << res.current_hardfork
                                                    << ") at heigh (" << res.current_height << "), while wallet think it's hardfork (" << get_core_runtime_config().hard_forks.get_the_most_recent_hardfork_id_for_height(res.current_height) << ") at a given height");
-    m_debug_events_dispatcher.RAISE_DEBUG_EVENT(wde_pulling_hardforks_missmatch);
+    m_events_dispatcher.RAISE_EVENT(wde_pulling_hardforks_missmatch);
     m_core_proxy->set_incompatible_server_flag(true);
     THROW_IF_TRUE_WALLET_EX(true, error::wallet_internal_error, "Daemon and wallet ver validation failed, hardforks missmatch");
   }
@@ -1916,7 +1917,7 @@ void wallet2::pull_blocks(size_t& blocks_added, std::atomic<bool>& stop, bool& f
   {    
     LOG_ERROR("Daemon currently on the hardfork (" << res.current_hardfork 
       << ") at heigh (" << res.current_height << "), while wallet think it's hardfork (" << get_core_runtime_config().hard_forks.get_the_most_recent_hardfork_id_for_height(res.current_height)  << ") at a given height");
-    m_debug_events_dispatcher.RAISE_DEBUG_EVENT(wde_pulling_hardforks_missmatch);
+    m_events_dispatcher.RAISE_EVENT(wde_pulling_hardforks_missmatch);
     m_core_proxy->set_incompatible_server_flag(true);
     THROW_IF_TRUE_WALLET_EX(true, error::wallet_internal_error, "Daemon and wallet ver validation failed, hardforks missmatch");
   }
@@ -2300,7 +2301,7 @@ bool wallet2::sweep_bare_unspent_outputs(const currency::account_public_address&
   {
     currency::finalized_tx ftx{};
     currency::finalize_tx_param ftp{};
-    ftp.pevents_dispatcher = &m_debug_events_dispatcher;
+    ftp.pevents_dispatcher = &m_events_dispatcher;
     ftp.tx_version = get_current_tx_version_and_hardfork_id(ftp.tx_hardfork_id);
 
     if (!prepare_tx_sources(decoys_count, /*use_all_decoys_if_found_less_than_required*/ true, ftp.sources, group.tids))
@@ -6027,6 +6028,51 @@ uint64_t wallet2::get_alias_cost(const std::string& alias)
   return rsp.reward;
 }
 //----------------------------------------------------------------------------------------------------
+void wallet2::submit_hf_booster(uint64_t hf_id, uint64_t new_hf_height, const crypto::secret_key& maintainer_key, currency::finalized_tx& ft)
+{
+  bc_services::hf_booster_update upd = AUTO_VAL_INIT(upd);
+
+  upd.hf_id = hf_id;
+  upd.hf_new_activation_height = new_hf_height;
+   
+  m_events_dispatcher.SUBSCIRBE_EVENT<wie_construct_tx_on_onetime_key_created>([&](const wie_construct_tx_on_onetime_key_created& o)
+  { 
+    CHECK_AND_ASSERT_THROW_MES(m_current_context.pfinalize_tx_param, "pfinalize_tx_param is null");
+    upd.tx_onetime_pub_key = o.onetime_keypair.pub;
+    crypto::hash h = bc_services::get_hf_booster_update_hash(upd);
+    bool r = crypto::generate_schnorr_sig(h, maintainer_key, upd.maintainer_signature);
+    CHECK_AND_ASSERT_THROW_MES(r, "Failed to generate schnorr signature on submit_hf_booster");
+
+    // validate against the maintainer pub key
+    CHECK_AND_ASSERT_THROW_MES(m_core_runtime_config.maintainers_public_keys[hf_id], "Maintainer public key not found on submit_hf_booster");
+    crypto::public_key maintainer_pub = *m_core_runtime_config.maintainers_public_keys[hf_id];
+    r = crypto::verify_schnorr_sig(h, maintainer_pub, upd.maintainer_signature);
+    CHECK_AND_ASSERT_THROW_MES(r, "Failed to verify schnorr signature on submit_hf_booster");
+
+    currency::tx_service_attachment att;
+    bc_services::pack_attachment_as_gzipped_json(upd, att);
+    att.service_id = BC_HF_BOOSTER_SERVICE_ID;
+    att.instruction = BC_HF_BOOSTER_SERVICE_INSTRUCTION_UPDATE;
+    
+    // we'll keep(and recognize) this in extra only, as it define 
+    // consensus rules and can't be in attachment as attachments is subject for pruning
+    m_current_context.pfinalize_tx_param->extra.push_back(att); 
+    LOG_PRINT_GREEN("HF booster update signed successfully", LOG_LEVEL_0);
+  });
+
+  construct_tx_param ctp = get_default_construct_tx_param();
+
+  tx_destination_entry td = AUTO_VAL_INIT(td);
+  td.addr.push_back(this->get_account().get_public_address());
+  td.amount   = COIN / 100;  // 0.01 ZANO to make tx valid
+  td.asset_id = currency::native_coin_asset_id;
+  ctp.dsts.push_back(td);
+
+  this->transfer(ctp, ft, true, nullptr);
+  m_events_dispatcher.UNSUBSCRIBE_EVENT<wie_construct_tx_on_onetime_key_created>();
+
+}
+//----------------------------------------------------------------------------------------------------
 void wallet2::request_alias_registration(currency::extra_alias_entry& ai, currency::transaction& res_tx, uint64_t fee, uint64_t reward, const crypto::secret_key& authority_key)
 {
   if (!validate_alias_name(ai.m_alias))
@@ -8858,7 +8904,7 @@ void wallet2::transfer(construct_tx_param& ctp,
 
   TIME_MEASURE_START(prepare_transaction_time);
   currency::finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
-  ftp.pevents_dispatcher = &m_debug_events_dispatcher;
+  ftp.pevents_dispatcher = &m_events_dispatcher;
   ftp.tx_version = get_current_tx_version_and_hardfork_id(ftp.tx_hardfork_id);
   if (!prepare_transaction(ctp, ftp))
   {

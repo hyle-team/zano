@@ -35,6 +35,7 @@ using namespace epee;
 #include "crypto/bitcoin/sha256_helper.h"
 #include "crypto_config.h"
 #include "wallet/wallet_debug_events_definitions.h"
+#include "wallet/wallet_internal_events_definitions.h"
 
 
 #define DBG_VAL_PRINT(x) ((void)0) // LOG_PRINT_CYAN(std::setw(42) << std::left << #x ":" << x, LOG_LEVEL_0)
@@ -1212,6 +1213,7 @@ namespace currency
     mutable bool was_alias = false;
     mutable bool was_asset = false;
     mutable bool was_gateway = false;
+    mutable bool was_hf_booster = false;
 
 
     tx_extra_info& rei;
@@ -1269,12 +1271,28 @@ namespace currency
       ENSURE_ONETIME(was_padding, "padding");
       return true;
     }
+
+     bool operator()(const tx_service_attachment& sa) const
+    {
+       if (sa.service_id == BC_HF_BOOSTER_SERVICE_ID && sa.instruction == BC_HF_BOOSTER_SERVICE_INSTRUCTION_UPDATE)
+       {
+         ENSURE_ONETIME(was_hf_booster, "hf_booster");
+
+       }
+
+      
+      return true;
+    }
+
     template<class t_extra_typename>
     bool operator()(const t_extra_typename& k) const
     {
       //do nothing for rest
       return true;
     }
+
+
+
   };
   //------------------------------------------------------------------------------------
   bool parse_and_validate_tx_extra(const transaction& tx, tx_extra_info& extra)
@@ -2819,7 +2837,7 @@ namespace currency
       gen_context.ao_amount_commitment = amount_of_burned_assets * gen_context.ao_asset_id_pt + gen_context.ao_amount_blinding_mask * crypto::c_point_G;
       ado.opt_amount_commitment = (crypto::c_scalar_1div8 * gen_context.ao_amount_commitment).to_public_key();
 
-      if (ftp.pevents_dispatcher) ftp.pevents_dispatcher->RAISE_DEBUG_EVENT(wde_construct_tx_handle_asset_descriptor_operation_before_burn{ &ado });
+      if (ftp.pevents_dispatcher) ftp.pevents_dispatcher->RAISE_EVENT(wde_construct_tx_handle_asset_descriptor_operation_before_burn{ &ado });
     
     }
     else
@@ -2865,7 +2883,7 @@ namespace currency
 
         //fields that not supposed to be changed?
       }
-      if (ftp.pevents_dispatcher) ftp.pevents_dispatcher->RAISE_DEBUG_EVENT(wde_construct_tx_handle_asset_descriptor_operation_before_seal{ &ado });
+      if (ftp.pevents_dispatcher) ftp.pevents_dispatcher->RAISE_EVENT(wde_construct_tx_handle_asset_descriptor_operation_before_seal{ &ado });
 
     }
     return true;
@@ -2887,15 +2905,29 @@ namespace currency
     bool r = false;
     transaction& tx = result.tx;
     crypto::secret_key& one_time_tx_secret_key = result.one_time_key;
-
     result.ftp = ftp;
     CHECK_AND_ASSERT_MES(sources.size() <= CURRENCY_TX_MAX_ALLOWED_INPUTS,    false, "Too many inputs: "  << sources.size()      << ", max allowed: " << CURRENCY_TX_MAX_ALLOWED_INPUTS << ". Tx cannot be constructed.");
     uint64_t tx_max_allowed_outs = ftp.tx_version >= TRANSACTION_VERSION_POST_HF4 ? CURRENCY_TX_MAX_ALLOWED_OUTS : CURRENCY_TX_MAX_ALLOWED_OUTS_PRE_HF4;
     CHECK_AND_ASSERT_MES(destinations.size() <= tx_max_allowed_outs, false, "Too many outputs: " << destinations.size() << ", max allowed: " << tx_max_allowed_outs   << ". Tx cannot be constructed.");
 
     bool append_mode = false;
-    if (flags&TX_FLAG_SIGNATURE_MODE_SEPARATE && tx.vin.size())
+    if(flags & TX_FLAG_SIGNATURE_MODE_SEPARATE && tx.vin.size())
       append_mode = true;
+
+
+    tx_generation_context& gen_context = result.ftp.gen_context;
+    gen_context.tx_outs_attr           = tx_outs_attr;  // reconsder this -- sowle
+
+    if(!append_mode)
+    {
+      gen_context.set_tx_key(keypair::generate());
+      // deterministic_generate_tx_onetime_key(key_images_total, sender_account_keys, txkey);
+      one_time_tx_secret_key = gen_context.tx_key.sec;
+      if(ftp.pevents_dispatcher)
+        ftp.pevents_dispatcher->RAISE_EVENT(wie_construct_tx_on_onetime_key_created { gen_context.tx_key });       
+    }
+
+
 
     if (!append_mode)
     {
@@ -3032,15 +3064,10 @@ namespace currency
     }
 
 
-    tx_generation_context& gen_context = result.ftp.gen_context;
-    gen_context.tx_outs_attr = tx_outs_attr; // reconsder this -- sowle
 
     if (!append_mode)
     {
-      gen_context.set_tx_key(keypair::generate());
-      //deterministic_generate_tx_onetime_key(key_images_total, sender_account_keys, txkey);
       add_tx_pub_key_to_extra(tx, gen_context.tx_key.pub);
-      one_time_tx_secret_key = gen_context.tx_key.sec;
 
       //add flags
       etc_tx_flags16_t e = AUTO_VAL_INIT(e);
@@ -3104,7 +3131,7 @@ namespace currency
       {
         bool r = construct_tx_handle_ado(sender_account_keys, ftp, *pado, gen_context, gen_context.tx_key, shuffled_dsts);
         CHECK_AND_ASSERT_MES(r, false, "Failed to construct_tx_handle_ado()");
-        if (ftp.pevents_dispatcher) ftp.pevents_dispatcher->RAISE_DEBUG_EVENT(wde_construct_tx_handle_asset_descriptor_operation{ pado });
+        if (ftp.pevents_dispatcher) ftp.pevents_dispatcher->RAISE_EVENT(wde_construct_tx_handle_asset_descriptor_operation{ pado });
       }
     }
 
@@ -3198,7 +3225,7 @@ namespace currency
     }
     
     
-    if (ftp.pevents_dispatcher) ftp.pevents_dispatcher->RAISE_DEBUG_EVENT(wde_construct_tx_before_prefix_hash_sealing{ &tx });
+    if (ftp.pevents_dispatcher) ftp.pevents_dispatcher->RAISE_EVENT(wde_construct_tx_before_prefix_hash_sealing{ &tx });
     //
     // generate proofs and signatures
     // (any changes made below should only affect the signatures/proofs and should not impact the prefix hash calculation)
@@ -3281,7 +3308,7 @@ namespace currency
           asset_operation_ownership_proof aoop{};
           r = crypto::generate_schnorr_sig(tx_prefix_hash, sender_account_keys.spend_secret_key, aoop.gss);
           CHECK_AND_ASSERT_MES(r, false, "Failed to sign ado proof");
-          if (ftp.pevents_dispatcher) ftp.pevents_dispatcher->RAISE_DEBUG_EVENT(wde_construct_tx_after_asset_ownership_proof_generated{ &aoop });
+          if (ftp.pevents_dispatcher) ftp.pevents_dispatcher->RAISE_EVENT(wde_construct_tx_after_asset_ownership_proof_generated{ &aoop });
           tx.proofs.emplace_back(aoop);
         }
       }

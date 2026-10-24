@@ -232,6 +232,6 @@ class  debug_wallet2: public tools::wallet2
 public:
   epee::misc_utils::events_dispatcher& get_debug_events_dispatcher()
   {
-    return this->m_debug_events_dispatcher;
+    return this->m_events_dispatcher;
   }
 };

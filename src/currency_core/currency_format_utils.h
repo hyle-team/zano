@@ -32,6 +32,7 @@
 #include "bc_attachments_helpers.h"
 #include "bc_payments_id_service.h"
 #include "bc_offers_service_basic.h"
+#include "bc_hf_booster_service.h"
 
 
 // ------ get_tx_type_definition -------------
@@ -66,6 +67,7 @@ namespace currency
     extra_attachment_info m_attachment_info;
     asset_descriptor_operation m_asset_operation;
     std::optional<gateway_address_descriptor_operation> m_opt_gateway_address_operation;
+    std::optional<bc_services::hf_booster_update> m_opt_hf_booster_update;
   };
 
   //---------------------------------------------------------------------------------------------------------------

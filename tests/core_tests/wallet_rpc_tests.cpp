@@ -1957,7 +1957,7 @@ bool wallet_rpc_hardfork_verification::c1(currency::core& c, size_t, const std::
   bool hf_mismatch_err = false;
 
   miner_wlt->get_debug_events_dispatcher()
-    .SUBSCIRBE_DEBUG_EVENT<wde_error_type>([&](const wde_error_type& e)
+    .SUBSCIRBE_EVENT<wde_error_type>([&](const wde_error_type& e)
     {
       if (e == wde_pulling_hardforks_missmatch)
         hf_mismatch_err = true;

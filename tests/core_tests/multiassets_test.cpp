@@ -178,7 +178,7 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
 
   //------------------- tests that trying to break stuff  -------------------
   //tests that trying to break stuff
-  miner_wlt->get_debug_events_dispatcher().SUBSCIRBE_DEBUG_EVENT<wde_construct_tx_after_asset_ownership_proof_generated>([&](const wde_construct_tx_after_asset_ownership_proof_generated& o)
+  miner_wlt->get_debug_events_dispatcher().SUBSCIRBE_EVENT<wde_construct_tx_after_asset_ownership_proof_generated>([&](const wde_construct_tx_after_asset_ownership_proof_generated& o)
   {
     //crypto::signature s = currency::null_sig;
     o.pownership_proof->gss = crypto::generic_schnorr_sig_s{};
@@ -314,7 +314,7 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
 
 
   // check emit_asset() with modified 'current_supply'
-  miner_wlt->get_debug_events_dispatcher().SUBSCIRBE_DEBUG_EVENT<wde_construct_tx_handle_asset_descriptor_operation_before_seal>([&](const wde_construct_tx_handle_asset_descriptor_operation_before_seal& o)
+  miner_wlt->get_debug_events_dispatcher().SUBSCIRBE_EVENT<wde_construct_tx_handle_asset_descriptor_operation_before_seal>([&](const wde_construct_tx_handle_asset_descriptor_operation_before_seal& o)
   {
     if(o.pado->version < ASSET_DESCRIPTOR_OPERATION_HF5_VER)
     {
@@ -354,7 +354,7 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
   //test burn that burns more than tx has
   miner_wlt->get_debug_events_dispatcher().UNSUBSCRIBE_ALL();
 
-  miner_wlt->get_debug_events_dispatcher().SUBSCIRBE_DEBUG_EVENT<wde_construct_tx_handle_asset_descriptor_operation_before_burn>([&](const wde_construct_tx_handle_asset_descriptor_operation_before_burn& o)
+  miner_wlt->get_debug_events_dispatcher().SUBSCIRBE_EVENT<wde_construct_tx_handle_asset_descriptor_operation_before_burn>([&](const wde_construct_tx_handle_asset_descriptor_operation_before_burn& o)
   {
     if (o.pado->version < ASSET_DESCRIPTOR_OPERATION_HF5_VER)
     {
@@ -483,7 +483,7 @@ bool asset_registration_and_bad_amount_commitment::c1(currency::core& c, size_t 
   // corrupt the register op's amount commitment after it's computed but before the g-proof is signed,
   // so the tx is well-formed and every other proof is consistent -- only the commitment is wrong
   bad_amount_commitment_kind kind = bac_wrong_asset_id;
-  miner_wlt->get_debug_events_dispatcher().SUBSCIRBE_DEBUG_EVENT<wde_construct_tx_handle_asset_descriptor_operation>([&](const wde_construct_tx_handle_asset_descriptor_operation& o)
+  miner_wlt->get_debug_events_dispatcher().SUBSCIRBE_EVENT<wde_construct_tx_handle_asset_descriptor_operation>([&](const wde_construct_tx_handle_asset_descriptor_operation& o)
   {
     if(o.pado->operation_type != ASSET_DESCRIPTOR_OPERATION_REGISTER)
       return;

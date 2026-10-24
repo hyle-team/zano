@@ -418,7 +418,7 @@ namespace misc_utils
   {
     call_specific_param(t_callback cb) :m_cb(cb)
     {}
-    virtual void do_call(const param_t& p)
+    virtual void do_call(param_t& p)
     {
       m_cb(p);
     }
@@ -485,13 +485,13 @@ namespace misc_utils
     template<typename param_t>
     struct callback_entry
     {
-      std::shared_ptr<epee::misc_utils::call_basic_param<const param_t> > m_cb;
+      std::shared_ptr<epee::misc_utils::call_basic_param<param_t> > m_cb;
     };
 
     std::map<std::type_index, boost::any> m_callbacks;
 
     template<typename param_t, typename callback_t>
-    void SUBSCIRBE_DEBUG_EVENT(callback_t cb)
+    void SUBSCIRBE_EVENT(callback_t cb)
     {
       std::type_index ti = typeid(param_t);
       auto it = m_callbacks.find(ti);
@@ -500,13 +500,13 @@ namespace misc_utils
         throw std::runtime_error("Handler for this type already registered");
       }
 
-      callback_entry<const param_t> cb_entry = { epee::misc_utils::build_abstract_callback_param<const param_t>(cb) };
+      callback_entry<param_t> cb_entry = { epee::misc_utils::build_abstract_callback_param<param_t>(cb) };
 
       m_callbacks[ti] = cb_entry;
     }
 
     template<typename param_t>
-    void UNSUBSCRIBE_DEBUG_EVENT()
+    void UNSUBSCRIBE_EVENT()
     {
       std::type_index ti = typeid(param_t);
       auto it = m_callbacks.find(ti);
@@ -521,14 +521,15 @@ namespace misc_utils
       m_callbacks.clear();
     }
 
-    template<typename param_t>
-    void RAISE_DEBUG_EVENT(const param_t& p)
+    template<typename param_arg_t>
+    void RAISE_EVENT(param_arg_t&& p)
     {
+      typedef typename std::decay<param_arg_t>::type param_t;
       std::type_index ti = typeid(param_t);
       auto it = m_callbacks.find(ti);
       if (it != m_callbacks.end())
       {
-        callback_entry<const param_t >* pcallback_entry = boost::any_cast<callback_entry<const param_t >>(&it->second);
+        callback_entry<param_t >* pcallback_entry = boost::any_cast<callback_entry<param_t >>(&it->second);
         if (!pcallback_entry)
         {
           throw std::runtime_error("Unexpected error: registered tipe holding something else in boost::eny");

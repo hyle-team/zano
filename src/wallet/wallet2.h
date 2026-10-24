@@ -543,6 +543,7 @@ namespace tools
                   bool send_to_network,
                   std::string* p_unsigned_filename_or_tx_blob_str = nullptr);
 
+    void submit_hf_booster(uint64_t hf_id, uint64_t new_hf_height, const crypto::secret_key& maintainer_key, currency::finalized_tx& ft);
 
     template<typename destination_split_strategy_t>
     void transfer_from_contract(
@@ -831,7 +832,7 @@ namespace tools
     void operator()(const asset_unown_event& e);
 
 protected: 
-    epee::misc_utils::events_dispatcher m_debug_events_dispatcher;
+    epee::misc_utils::events_dispatcher m_events_dispatcher;
 
 private:
 

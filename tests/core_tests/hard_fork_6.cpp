@@ -2375,7 +2375,7 @@ bool hard_fork_6_gw_out_with_bad_asset_id::generate(std::vector<test_event_entry
   ftp.prepared_destinations = destinations;
   ftp.shuffle = true;
   epee::misc_utils::events_dispatcher debug_events_dispatcher;
-  debug_events_dispatcher.SUBSCIRBE_DEBUG_EVENT<wde_construct_tx_before_prefix_hash_sealing>([&](const wde_construct_tx_before_prefix_hash_sealing& w){
+  debug_events_dispatcher.SUBSCIRBE_EVENT<wde_construct_tx_before_prefix_hash_sealing>([&](const wde_construct_tx_before_prefix_hash_sealing& w){
     // replace autocalculated fee
     auto it = std::remove_if(w.tx->extra.begin(), w.tx->extra.end(), [](const payload_items_v& pi) { return pi.type() == typeid(zarcanum_tx_data_v1); });
     w.tx->extra.erase(it, w.tx->extra.end());

@@ -117,6 +117,7 @@ namespace currency
 
     hard_forks_descriptor hard_forks;
     std::array<int, ZANO_HARDFORKS_TOTAL> min_build_numbers_for_hard_forks;
+    std::array<std::optional<crypto::public_key>, ZANO_HARDFORKS_TOTAL> maintainers_public_keys;
 
     bool is_hardfork_active_for_height(size_t hardfork_id, uint64_t upcoming_block_height) const
     {
@@ -151,10 +152,21 @@ namespace currency
     pc.hard_forks.set_hardfork_height(2, ZANO_HARDFORK_02_AFTER_HEIGHT);
     pc.hard_forks.set_hardfork_height(3, ZANO_HARDFORK_03_AFTER_HEIGHT);
     pc.hard_forks.set_hardfork_height(4, ZANO_HARDFORK_04_AFTER_HEIGHT);
-    pc.hard_forks.set_hardfork_height(5, ZANO_HARDFORK_05_AFTER_HEIGHT); pc.min_build_numbers_for_hard_forks[5] = ZANO_HARDFORK_05_MIN_BUILD_VER;
-    pc.hard_forks.set_hardfork_height(6, ZANO_HARDFORK_06_AFTER_HEIGHT); pc.min_build_numbers_for_hard_forks[6] = ZANO_HARDFORK_06_MIN_BUILD_VER;
-    pc.hard_forks.set_hardfork_height(7, ZANO_HARDFORK_07_AFTER_HEIGHT); pc.min_build_numbers_for_hard_forks[7] = ZANO_HARDFORK_07_MIN_BUILD_VER;
-    pc.hard_forks.set_hardfork_height(8, ZANO_HARDFORK_08_AFTER_HEIGHT); pc.min_build_numbers_for_hard_forks[8] = ZANO_HARDFORK_08_MIN_BUILD_VER;
+    //HF5
+    pc.hard_forks.set_hardfork_height(5, ZANO_HARDFORK_05_AFTER_HEIGHT); 
+    pc.min_build_numbers_for_hard_forks[5] = ZANO_HARDFORK_05_MIN_BUILD_VER;
+    //HF6
+    pc.hard_forks.set_hardfork_height(6, ZANO_HARDFORK_06_AFTER_HEIGHT); 
+    pc.min_build_numbers_for_hard_forks[6] = ZANO_HARDFORK_06_MIN_BUILD_VER;
+    //HF7
+    pc.hard_forks.set_hardfork_height(7, ZANO_HARDFORK_07_AFTER_HEIGHT); 
+    pc.min_build_numbers_for_hard_forks[7] = ZANO_HARDFORK_07_MIN_BUILD_VER;
+    //HF8
+    pc.hard_forks.set_hardfork_height(8, ZANO_HARDFORK_08_AFTER_HEIGHT); 
+    pc.min_build_numbers_for_hard_forks[8] = ZANO_HARDFORK_08_MIN_BUILD_VER;
+    pc.maintainers_public_keys[8] = epee::string_tools::hex_to_pod<crypto::public_key>(ZANO_HARDFORK_08_MAINTAINERS_PUBLIC_KEY);
+    // HF9 - TODO: add HF9 when it is scheduled
+
     static_assert(8 + 1 == ZANO_HARDFORKS_TOTAL);
 
     pc.get_core_time = &core_runtime_config::_default_core_time_function;
