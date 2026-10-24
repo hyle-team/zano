@@ -327,6 +327,9 @@ static_assert(CURRENCY_FORMATION_VERSION == 103);
 
 #define ZANO_HARDFORK_07_AFTER_HEIGHT                   3833000
 #define ZANO_HARDFORK_07_MIN_BUILD_VER                  600
+
+#define ZANO_HARDFORK_08_AFTER_HEIGHT                   9999999
+#define ZANO_HARDFORK_08_MIN_BUILD_VER                  999
 #else
 // Testnet
 #define ZANO_HARDFORK_01_AFTER_HEIGHT                   0
@@ -345,6 +348,8 @@ static_assert(CURRENCY_FORMATION_VERSION == 103);
 #define ZANO_HARDFORK_07_AFTER_HEIGHT                   500000
 #define ZANO_HARDFORK_07_MIN_BUILD_VER                  600
 
+#define ZANO_HARDFORK_08_AFTER_HEIGHT                   9999999
+#define ZANO_HARDFORK_08_MIN_BUILD_VER                  999
 #endif
 
 
@@ -356,9 +361,10 @@ static_assert(CURRENCY_FORMATION_VERSION == 103);
 #define ZANO_HARDFORK_05                                5
 #define ZANO_HARDFORK_06                                6
 #define ZANO_HARDFORK_07                                7
-#define ZANO_HARDFORKS_TOTAL                            8
+#define ZANO_HARDFORK_08                                8
+#define ZANO_HARDFORKS_TOTAL                            9
 
-#define ZANO_ACTIVE_HARDFORKS_TOTAL                     8
+#define ZANO_ACTIVE_HARDFORKS_TOTAL                     8         // last scheduled (with real height) hardfork id + 1; startup truncates a chain not compliant with it
 
 
 static_assert(CURRENCY_MINER_TX_MAX_OUTS <= CURRENCY_TX_MAX_ALLOWED_OUTS, "Miner tx must obey normal tx max outs limit");

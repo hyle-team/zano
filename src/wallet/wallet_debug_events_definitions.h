@@ -1,12 +1,11 @@
-// Copyright (c) 2014-2023 Zano Project
+// Copyright (c) 2014-2026 Zano Project
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
-
 #pragma once
 
-
-
-//Wallet Debug Events
+//
+// Wallet Debug Events
+//
 struct wde_construct_tx_handle_asset_descriptor_operation
 {
   currency::asset_descriptor_operation* pado;
@@ -38,4 +37,11 @@ struct wde_construct_tx_after_asset_ownership_eth_proof_generated
 enum wde_error_type
 {
   wde_pulling_hardforks_missmatch, 
+};
+
+
+
+struct wde_construct_tx_before_prefix_hash_sealing
+{
+  currency::transaction* tx;
 };

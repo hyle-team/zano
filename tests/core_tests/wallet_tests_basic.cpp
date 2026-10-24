@@ -23,7 +23,7 @@ wallet_test::wallet_test()
 bool wallet_test::check_balance_via_build_wallets(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
   // This is old version, it checks balance using test_generator::build_wallets(), which is using blockchain data from test_generator::m_blocks_info
-  params_check_balance pcb = AUTO_VAL_INIT(pcb);
+  params_check_balance pcb{};
   bool r = epee::string_tools::hex_to_pod(boost::get<callback_entry>(events[ev_index]).callback_params, pcb);
   CHECK_AND_ASSERT_MES(r, false, "check_balance: Can't obtain event params");
   CHECK_AND_ASSERT_MES(pcb.account_index < m_accounts.size(), false, "check_balance: invalid account index");
@@ -49,7 +49,7 @@ bool wallet_test::check_balance_via_build_wallets(currency::core& c, size_t ev_i
   r = generator.build_wallets(get_block_hash(*top_block), accounts, w, c.get_blockchain_storage().get_core_runtime_config());
   CHECK_AND_ASSERT_MES(r && w.size() == 1 && w[0].wallet != 0, false, "check_balance: failed to build wallets");
 
-  if (!check_balance_via_wallet(*w[0].wallet, get_test_account_name_by_id(pcb.account_index).c_str(), pcb.total_balance, pcb.mined_balance, pcb.unlocked_balance, pcb.awaiting_in, pcb.awaiting_out))
+  if (!check_balance_via_wallet(*w[0].wallet, get_test_account_name_by_id(pcb.account_index).c_str(), pcb.total_balance, pcb.mined_balance, pcb.unlocked_balance, pcb.awaiting_in, pcb.awaiting_out, pcb.asset_id, pcb.asset_decimal_point))
     return false;
 
   return true;
@@ -58,7 +58,7 @@ bool wallet_test::check_balance_via_build_wallets(currency::core& c, size_t ev_i
 bool wallet_test::check_balance(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
   // Newer version, uses the core with actual data via special proxy to sync wallets and get balance.
-  params_check_balance pcb = AUTO_VAL_INIT(pcb);
+  params_check_balance pcb{};
   bool r = epee::string_tools::hex_to_pod(boost::get<callback_entry>(events[ev_index]).callback_params, pcb);
   CHECK_AND_ASSERT_MES(r, false, "check_balance: Can't obtain event params");
 
@@ -67,7 +67,8 @@ bool wallet_test::check_balance(currency::core& c, size_t ev_index, const std::v
   bool has_aliases = false;
   w->scan_tx_pool(has_aliases);
 
-  if (!check_balance_via_wallet(*w.get(), get_test_account_name_by_id(pcb.account_index).c_str(), pcb.total_balance, INVALID_BALANCE_VAL, pcb.unlocked_balance, pcb.awaiting_in, pcb.awaiting_out))
+  if (!check_balance_via_wallet(*w.get(), get_test_account_name_by_id(pcb.account_index).c_str(), pcb.total_balance, INVALID_BALANCE_VAL, pcb.unlocked_balance, pcb.awaiting_in, pcb.awaiting_out,
+    pcb.asset_id, pcb.asset_decimal_point))
     return false;
 
   return true;
