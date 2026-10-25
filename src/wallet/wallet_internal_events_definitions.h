@@ -10,5 +10,6 @@
 struct wie_construct_tx_on_onetime_key_created
 {
   currency::keypair& onetime_keypair;
+  currency::transaction& tx;
 };
 

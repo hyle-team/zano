@@ -6035,9 +6035,8 @@ void wallet2::submit_hf_booster(uint64_t hf_id, uint64_t new_hf_height, const cr
   upd.hf_id = hf_id;
   upd.hf_new_activation_height = new_hf_height;
    
-  m_events_dispatcher.SUBSCIRBE_EVENT<wie_construct_tx_on_onetime_key_created>([&](const wie_construct_tx_on_onetime_key_created& o)
+  m_events_dispatcher.SUBSCIRBE_EVENT<wie_construct_tx_on_onetime_key_created>([&](wie_construct_tx_on_onetime_key_created& o)
   { 
-    CHECK_AND_ASSERT_THROW_MES(m_current_context.pfinalize_tx_param, "pfinalize_tx_param is null");
     upd.tx_onetime_pub_key = o.onetime_keypair.pub;
     crypto::hash h = bc_services::get_hf_booster_update_hash(upd);
     bool r = crypto::generate_schnorr_sig(h, maintainer_key, upd.maintainer_signature);
@@ -6056,7 +6055,7 @@ void wallet2::submit_hf_booster(uint64_t hf_id, uint64_t new_hf_height, const cr
     
     // we'll keep(and recognize) this in extra only, as it define 
     // consensus rules and can't be in attachment as attachments is subject for pruning
-    m_current_context.pfinalize_tx_param->extra.push_back(att); 
+    o.tx.extra.push_back(att); 
     LOG_PRINT_GREEN("HF booster update signed successfully", LOG_LEVEL_0);
   });
 

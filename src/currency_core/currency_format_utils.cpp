@@ -2920,11 +2920,6 @@ namespace currency
 
     if(!append_mode)
     {
-      gen_context.set_tx_key(keypair::generate());
-      // deterministic_generate_tx_onetime_key(key_images_total, sender_account_keys, txkey);
-      one_time_tx_secret_key = gen_context.tx_key.sec;
-      if(ftp.pevents_dispatcher)
-        ftp.pevents_dispatcher->RAISE_EVENT(wie_construct_tx_on_onetime_key_created { gen_context.tx_key });       
     }
 
 
@@ -2940,6 +2935,15 @@ namespace currency
       tx.version = ftp.tx_version;
       if (tx.version >= TRANSACTION_VERSION_POST_HF5)
         tx.hardfork_id = ftp.tx_hardfork_id;
+
+      gen_context.set_tx_key(keypair::generate());
+      // deterministic_generate_tx_onetime_key(key_images_total, sender_account_keys, txkey);
+      one_time_tx_secret_key = gen_context.tx_key.sec;
+      if(ftp.pevents_dispatcher)
+        ftp.pevents_dispatcher->RAISE_EVENT(wie_construct_tx_on_onetime_key_created { gen_context.tx_key, tx });       
+
+
+
 
       if (unlock_time != 0)
         set_tx_unlock_time(tx, unlock_time);
