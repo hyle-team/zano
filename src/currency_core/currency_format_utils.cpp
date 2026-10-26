@@ -1277,7 +1277,10 @@ namespace currency
        if (sa.service_id == BC_HF_BOOSTER_SERVICE_ID && sa.instruction == BC_HF_BOOSTER_SERVICE_INSTRUCTION_UPDATE)
        {
          ENSURE_ONETIME(was_hf_booster, "hf_booster");
-
+         bc_services::hf_booster_update upd = AUTO_VAL_INIT(upd);
+         bool r = bc_services::unpack_attachment_as_gzipped_json(upd, sa);
+         CHECK_AND_ASSERT_THROW_MES(r, "Failed to unpack hf_booster_update attachment");
+         rei.m_opt_hf_booster_update = upd;
        }
 
       

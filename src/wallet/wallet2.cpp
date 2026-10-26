@@ -1862,17 +1862,6 @@ void wallet2::pull_blocks(size_t& blocks_added, std::atomic<bool>& stop, bool& f
   if (!r)
     throw error::no_connection_to_daemon(LOCATION_STR, "getblocks.bin");
 
-  // check if wallet are "on the same hardfork" with daemon with latest height of daemon
-  if(res.current_hardfork != 0 && res.current_hardfork != get_core_runtime_config().hard_forks.get_the_most_recent_hardfork_id_for_height(res.current_height))
-  {
-    LOG_ERROR("Daemon currently on the hardfork (" << res.current_hardfork
-                                                   << ") at heigh (" << res.current_height << "), while wallet think it's hardfork (" << get_core_runtime_config().hard_forks.get_the_most_recent_hardfork_id_for_height(res.current_height) << ") at a given height");
-    m_events_dispatcher.RAISE_EVENT(wde_pulling_hardforks_missmatch);
-    m_core_proxy->set_incompatible_server_flag(true);
-    THROW_IF_TRUE_WALLET_EX(true, error::wallet_internal_error, "Daemon and wallet ver validation failed, hardforks missmatch");
-  }
-
-
   if (res.status == API_RETURN_CODE_GENESIS_MISMATCH)
   {
     WLT_LOG_MAGENTA("Reseting genesis block...", LOG_LEVEL_0);
@@ -1910,6 +1899,18 @@ void wallet2::pull_blocks(size_t& blocks_added, std::atomic<bool>& stop, bool& f
     "wrong daemon response: m_start_height=" + std::to_string(res.start_height) +
     " not less than local blockchain size=" + std::to_string(get_blockchain_current_size()));
 
+  // update hardforks if daemon returned more recent hardforks
+  if (res.rti_hardforks.size())
+  {
+    if (res.rti_hardforks.size() != m_core_runtime_config.hard_forks.m_height_the_hardfork_n_active_after.size())
+    {
+      m_events_dispatcher.RAISE_EVENT(wde_pulling_hardforks_missmatch);
+      m_core_proxy->set_incompatible_server_flag(true);
+      THROW_IF_TRUE_WALLET_EX(true, error::wallet_internal_error, "Daemon and wallet ver validation failed, hardforks missmatch");
+    }
+    std::copy(res.rti_hardforks.begin(), res.rti_hardforks.end(), m_core_runtime_config.hard_forks.m_height_the_hardfork_n_active_after.begin());
+  }
+  
   //check if wallet are "on the same hardfork" with daemon with latest height of daemon
   //we have two entries of the same code for now, after all daemons would be updated to lates version we can get rid of this
   //one, as older version doesn't fill current_hardfork if genesis missmatch

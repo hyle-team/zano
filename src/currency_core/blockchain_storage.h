@@ -569,6 +569,9 @@ namespace currency
     typedef tools::db::cached_key_value_accessor<gateway_address_id_type, gateway_address_data, true, false> gateway_addresses_container;
     typedef tools::db::chunked_key_to_array_accessor<gateway_address_id_type, crypto::hash, false, 100> gateway_address_transactions_container;
 
+    //hf booster
+    typedef tools::db::cached_key_value_accessor<uint64_t, std::list<uint64_t>, true, true> hardforks_updates_container;
+
 
     //-----------------------------------------
 
@@ -617,6 +620,7 @@ namespace currency
     assets_container m_db_assets;
     gateway_addresses_container m_db_gateway_addresses;
     gateway_address_transactions_container m_db_gateway_transactions;
+    hardforks_updates_container m_db_hardfork_updates;
 
 
 
@@ -752,10 +756,14 @@ namespace currency
     bool put_gw_address_operation(const transaction& tx, const crypto::hash& tx_id, const gateway_address_descriptor_operation& ado, const uint64_t height);
     bool pop_gw_address_operation(const gateway_address_descriptor_operation& ado, const uint64_t height, const crypto::hash& tx_id);
 
+    bool put_hf_booster_update(const transaction& tx, const crypto::hash& tx_id, const bc_services::hf_booster_update& update, const uint64_t height);
+    bool pop_hf_booster_update(const transaction& tx, const crypto::hash& tx_id, const bc_services::hf_booster_update& update, const uint64_t height);
+
     bool put_gw_address_operation_register(const transaction& tx, const crypto::hash& tx_id, const gateway_address_descriptor_operation_register& gao, const uint64_t height);
     bool put_gw_address_operation_update(const transaction& tx, const crypto::hash& tx_id, const gateway_address_descriptor_operation_update& gao, const uint64_t height);
     bool validate_gw_address_ownership(const transaction& tx, const crypto::hash& tx_id, const gateway_address_descriptor_operation_update& gao, const gateway_address_data& gad, const uint64_t height);
 
+    bool hf_booster_load_hardforks_from_db();
     void fill_addr_to_alias_dict();
     //bool resync_spent_tx_flags();
     bool prune_ring_signatures_and_attachments_if_need();
