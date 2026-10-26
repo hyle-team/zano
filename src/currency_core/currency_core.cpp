@@ -359,6 +359,9 @@ namespace currency
     CRITICAL_REGION_LOCAL(m_mempool);
     if(m_mempool.have_tx(tx_hash))
     {
+      // replace blacklisted copy, validate incoming
+      // pool: tx_damaged (blacklisted) -> remove
+      // recv: tx_good (same tx_id, different raw) -> validate -> pool
       if (!m_mempool.remove_blacklisted_tx_if_different(tx_hash, get_object_hash(tx)))
       {
         LOG_PRINT_L3("add_new_tx: already have tx " << tx_hash << " in the pool");

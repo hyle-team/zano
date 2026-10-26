@@ -4205,6 +4205,7 @@ bool blockchain_storage::find_blockchain_supplement(const std::list<crypto::hash
 //------------------------------------------------------------------
 bool blockchain_storage::get_block_raw_bundle_hash(const block& bl, const transactions_map& onboard_transactions, crypto::hash& block_raw_bundle_hash) const
 {
+  // block_raw_bundle_hash = hash(block_blob + hash(full_tx1) + hash(full_tx2) + ...)
   CRITICAL_REGION_LOCAL(m_read_lock);
   blobdata bundle = block_to_blob(bl);
   for (const crypto::hash& tx_id : bl.tx_hashes)
@@ -4217,7 +4218,10 @@ bool blockchain_storage::get_block_raw_bundle_hash(const block& bl, const transa
     {
       auto tx_ptr = m_db_transactions.find(tx_id);
       if (!tx_ptr)
+      {
+        LOG_PRINT_L1("get_block_raw_bundle_hash: transaction " << tx_id << " not found for block " << get_block_hash(bl));
         return false; // the complete block content is not available yet
+      }
       tx = tx_ptr->tx;
     }
     CHECK_AND_ASSERT_MES(get_transaction_hash(tx) == tx_id, false, "block contains a transaction with a mismatched id: " << tx_id);
@@ -8604,7 +8608,7 @@ bool blockchain_storage::add_new_block(const block& bl, block_verification_conte
       }
       if (already_invalid)
       {
-        LOG_PRINT_L3("block with block_raw_bundle_hash = " << block_raw_bundle_hash << " already marked invalid");
+        LOG_PRINT_L1("block with block_raw_bundle_hash = " << block_raw_bundle_hash << " already marked invalid");
         bvc.m_already_exists = true;
         db_tx_ptr->commit_transaction();
         return false;
