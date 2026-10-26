@@ -5123,9 +5123,13 @@ bool wallet_rpc_sweep_below::c1(currency::core& c, size_t ev_index, const std::v
 
     CHECK_AND_ASSERT_EQ(trace_proxy->m_v4_request.look_up_strategy, std::string(LOOK_UP_STRATEGY_REGULAR_TX));
     CHECK_AND_ASSERT_EQ(trace_proxy->m_v4_request.height_upper_limit, c.get_top_block_height());
-    CHECK_AND_ASSERT_EQ(trace_proxy->m_v4_request.batches.size(), 1);
-    CHECK_AND_ASSERT_EQ(trace_proxy->m_v4_request.batches[0].input_amount, 0);
-    CHECK_AND_ASSERT_EQ(trace_proxy->m_v4_request.batches[0].heights.size(), 3 * (CURRENCY_HF4_MANDATORY_DECOY_SET_SIZE + 1));
+    CHECK_AND_ASSERT_EQ(trace_proxy->m_v4_request.batches.size(), 3);
+    for (const auto& batch : trace_proxy->m_v4_request.batches)
+    {
+      CHECK_AND_ASSERT_EQ(batch.input_amount, 0);
+      CHECK_AND_ASSERT_EQ(batch.heights.size(), CURRENCY_HF4_MANDATORY_DECOY_SET_SIZE + 1);
+      CHECK_AND_ASSERT_MES(batch.global_offsets.empty(), false, "case WO: ZC input used bare candidates");
+    }
     CHECK_AND_ASSERT_EQ(trace_proxy->m_v4_response.status, std::string(API_RETURN_CODE_OK));
     CHECK_AND_ASSERT_EQ(trace_proxy->m_v4_response.blocks_batches.size(), trace_proxy->m_v4_request.batches.size());
     CHECK_AND_ASSERT_MES(code == 0, false, "case WO: sweep_below in WO wallet failed, code=" << code);
@@ -5304,9 +5308,13 @@ bool wallet_rpc_sweep_below::c1(currency::core& c, size_t ev_index, const std::v
 
     CHECK_AND_ASSERT_EQ(trace_proxy->m_v4_request.look_up_strategy, std::string(LOOK_UP_STRATEGY_REGULAR_TX));
     CHECK_AND_ASSERT_EQ(trace_proxy->m_v4_request.height_upper_limit, c.get_top_block_height());
-    CHECK_AND_ASSERT_EQ(trace_proxy->m_v4_request.batches.size(), 1);
-    CHECK_AND_ASSERT_EQ(trace_proxy->m_v4_request.batches[0].input_amount, 0);
-    CHECK_AND_ASSERT_EQ(trace_proxy->m_v4_request.batches[0].heights.size(), 2 * (CURRENCY_HF4_MANDATORY_DECOY_SET_SIZE + 1));
+    CHECK_AND_ASSERT_EQ(trace_proxy->m_v4_request.batches.size(), 2);
+    for (const auto& batch : trace_proxy->m_v4_request.batches)
+    {
+      CHECK_AND_ASSERT_EQ(batch.input_amount, 0);
+      CHECK_AND_ASSERT_EQ(batch.heights.size(), CURRENCY_HF4_MANDATORY_DECOY_SET_SIZE + 1);
+      CHECK_AND_ASSERT_MES(batch.global_offsets.empty(), false, "case max_inputs=2: ZC input used bare candidates");
+    }
     CHECK_AND_ASSERT_EQ(trace_proxy->m_v4_response.status, std::string(API_RETURN_CODE_OK));
     CHECK_AND_ASSERT_EQ(trace_proxy->m_v4_response.blocks_batches.size(), trace_proxy->m_v4_request.batches.size());
     CHECK_AND_ASSERT_MES(code == 0, false, "case max_inputs=2: sweep failed, code=" << code);

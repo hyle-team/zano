@@ -342,7 +342,7 @@ static_assert(CURRENCY_FORMATION_VERSION == 103);
 #define ZANO_HARDFORK_06_AFTER_HEIGHT                   1050
 #define ZANO_HARDFORK_06_MIN_BUILD_VER                  474
 
-#define ZANO_HARDFORK_07_AFTER_HEIGHT                   1050
+#define ZANO_HARDFORK_07_AFTER_HEIGHT                   500000
 #define ZANO_HARDFORK_07_MIN_BUILD_VER                  600
 
 #endif

@@ -1334,3 +1334,137 @@ bool block_template_and_invalid_tx_proofs::c1(currency::core& c, size_t ev_index
     "(the bad tx must be rejected and blacklisted; see the per-variant log above)");
   return true;
 }
+
+//------------------------------------------------------------------------------
+
+bool alt_chain_ring_members_age::generate(std::vector<test_event_entry>& events) const
+{
+  // Test idea: make sure alt blocks follow the same ring member age rules as main chain blocks:
+  //   tx ring member    : at least CURRENCY_HF4_MANDATORY_MIN_COINAGE blocks old, both from the main chain and from the alt chain itself
+  //   stake ring member : not newer than the last PoW block
+  // Both sides of each boundary are checked. The main chain is kept heavier, so no chain switching occurs.
+  //
+  //  0  .. 10    11    12 .. 19    20    21 .. 29    30    31    32 .. 36    37    38    39 .. 47    48    49    50    51   <- height
+  // (0 )..(0r)- (1 )- (  )..(1r)- (2 )- (  )..(  )- (  )- (  )- (  )..(2r)- (3 )- !4 !- !  !..!4r!- (5 )- !6 !- (7 )- !8 !  <- main chain
+  //             tx_0           |     |                                      tx_3  tx_4           |
+  //                            |     |                                                           |- !5c!      stake from 37: accepted (37 <= 37, the last PoW)
+  //                            |     |                                                           \- #5c_bad#  stake from 38: rejected (38 > 37)
+  //                            |     |- (3a)                                                                  tx_5 from 11: accepted (21 - 11 = 10)
+  //                            |     \- (3b)..(  )- (4b)- (5b)                                                tx_8, tx_9 from 21: accepted (31 - 21 = 10)
+  //                            |        tx_6     |- #4b_bad_1#                                                tx_8 from 21: rejected (30 - 21 = 9)
+  //                            |        tx_7     \- #4b_bad_2#                                                tx_9 from 21: rejected (refs by id, HF4 only)
+  //                            \- #2a_bad#                                                                    tx_5 from 11: rejected (20 - 11 = 9)
+
+  static_assert(CURRENCY_HF4_MANDATORY_MIN_COINAGE == 10); // the heights above rely on it
+
+  bool r = false;
+  GENERATE_ACCOUNT(miner_acc);
+  GENERATE_ACCOUNT(alice_acc);
+  GENERATE_ACCOUNT(bob_acc);
+  GENERATE_ACCOUNT(carol_acc);
+  GENERATE_ACCOUNT(dan_acc);
+  GENERATE_ACCOUNT(eve_acc);
+  std::list<account_base> miner_stake_sources({ miner_acc });
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  DO_CALLBACK(events, "configure_core"); // necessary to set m_hardforks
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  DO_CALLBACK_PARAMS(events, "check_hardfork_active", static_cast<size_t>(ZANO_HARDFORK_04_ZARCANUM));
+
+  std::vector<tx_destination_entry> destinations;
+  destinations.emplace_back(MK_TEST_COINS(10), alice_acc.get_public_address());
+  destinations.emplace_back(MK_TEST_COINS(10), bob_acc.get_public_address());
+  destinations.emplace_back(MK_TEST_COINS(10), carol_acc.get_public_address());
+  destinations.emplace_back(MK_TEST_COINS(10), dan_acc.get_public_address());
+  destinations.emplace_back(MK_TEST_COINS(10), eve_acc.get_public_address());
+  transaction tx_0{};
+  r = construct_tx_to_key(m_hardforks, events, tx_0, blk_0r, miner_acc, destinations);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx_to_key failed");
+  ADD_CUSTOM_EVENT(events, tx_0);
+  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(1));
+  MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_0);
+  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(0));
+
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_1r, blk_1, miner_acc, 8);
+  MAKE_NEXT_BLOCK(events, blk_2, blk_1r, miner_acc);
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_2r, blk_2, miner_acc, 16);
+
+  // Eve and Dan move their coins to the last PoW block and to the first of 10 PoS blocks following it
+  MAKE_TX(events, tx_3, eve_acc, eve_acc, MK_TEST_COINS(5), blk_2r);
+  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(1));
+  MAKE_NEXT_BLOCK_TX1(events, blk_3, blk_2r, miner_acc, tx_3);
+  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(0));
+  MAKE_TX(events, tx_4, dan_acc, dan_acc, MK_TEST_COINS(5), blk_3);
+  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(1));
+  MAKE_NEXT_POS_BLOCK_TX1(events, blk_4, blk_3, miner_acc, miner_stake_sources, tx_4);
+  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(0));
+  REWIND_POS_BLOCKS_N_WITH_TIME(events, blk_4r, blk_4, miner_acc, miner_stake_sources, 9);
+
+  MAKE_NEXT_BLOCK(events, blk_5, blk_4r, miner_acc);
+  MAKE_NEXT_POS_BLOCK(events, blk_6, blk_5, miner_acc, miner_stake_sources);
+  MAKE_NEXT_BLOCK(events, blk_7, blk_6, miner_acc);
+  MAKE_NEXT_POS_BLOCK(events, blk_8, blk_7, miner_acc, miner_stake_sources);
+  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_8));
+
+  // tx ring member from the main chain
+  MAKE_TX(events, tx_5, alice_acc, alice_acc, MK_TEST_COINS(5), blk_2);
+  DO_CALLBACK(events, "mark_invalid_block");
+  MAKE_NEXT_BLOCK_TX1(events, blk_2a_bad, blk_1r, miner_acc, tx_5);
+  MAKE_NEXT_BLOCK_TX1(events, blk_3a, blk_2, miner_acc, tx_5);
+
+  // tx ring member from the alt chain, referred to by gindex (Bob) and by id (Carol)
+  MAKE_TX(events, tx_6, bob_acc, bob_acc, MK_TEST_COINS(5), blk_2);
+  MAKE_TX(events, tx_7, carol_acc, carol_acc, MK_TEST_COINS(5), blk_2);
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_3b, blk_2, miner_acc, std::list<transaction>({ tx_6, tx_7 }));
+  REWIND_BLOCKS_N(events, blk_3br, blk_3b, miner_acc, 8);
+  MAKE_NEXT_BLOCK(events, blk_4b, blk_3br, miner_acc);
+
+  // these txs spend alt chain outputs, so they go with their blocks and are not returned to the pool once a block is rejected
+  auto add_tx_kept_by_block = [&events](const transaction& tx) {
+    events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, true));
+    events.push_back(tx);
+    events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, false));
+  };
+
+  transaction tx_8{};
+  r = construct_tx_to_key(m_hardforks, events, tx_8, blk_4b, bob_acc, bob_acc, MK_TEST_COINS(2), TESTS_DEFAULT_FEE, 0);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx_to_key failed");
+  add_tx_kept_by_block(tx_8);
+  DO_CALLBACK(events, "mark_invalid_block");
+  MAKE_NEXT_BLOCK_TX1(events, blk_4b_bad_1, blk_3br, miner_acc, tx_8);
+  std::list<transaction> blk_5b_txs({ tx_8 });
+
+  if (!m_hardforks.is_hardfork_active_for_height(ZANO_HARDFORK_05, get_block_height(blk_4b))) // refs by id are not allowed since HF5
+  {
+    transaction tx_9{};
+    r = construct_tx_to_key(m_hardforks, events, tx_9, blk_4b, carol_acc, std::vector<tx_destination_entry>{ tx_destination_entry(MK_TEST_COINS(2), carol_acc.get_public_address()) },
+      TESTS_DEFAULT_FEE, 0, CURRENCY_TO_KEY_OUT_RELAXED, empty_extra, empty_attachment, true, true, true /* use_ref_by_id */);
+    CHECK_AND_ASSERT_MES(r, false, "construct_tx_to_key failed");
+    add_tx_kept_by_block(tx_9);
+    DO_CALLBACK(events, "mark_invalid_block");
+    MAKE_NEXT_BLOCK_TX1(events, blk_4b_bad_2, blk_3br, miner_acc, tx_9);
+    blk_5b_txs.push_back(tx_9);
+  }
+
+  for (const transaction& tx : blk_5b_txs)
+    add_tx_kept_by_block(tx);
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_5b, blk_4b, miner_acc, blk_5b_txs);
+
+  // stake ring member vs the last PoW block
+  block blk_5c_bad{};
+  r = make_next_pos_block(generator, events, blk_4r, dan_acc, MK_TEST_COINS(1), 0, std::vector<transaction>{}, fts_check_for_spends, blk_5c_bad);
+  CHECK_AND_ASSERT_MES(r, false, "make_next_pos_block failed");
+  generator.add_block_info(blk_5c_bad, std::list<transaction>{});
+  DO_CALLBACK(events, "mark_invalid_block");
+  ADD_CUSTOM_EVENT(events, blk_5c_bad);
+
+  block blk_5c{};
+  r = make_next_pos_block(generator, events, blk_4r, eve_acc, MK_TEST_COINS(1), 0, std::vector<transaction>{}, fts_check_for_spends, blk_5c);
+  CHECK_AND_ASSERT_MES(r, false, "make_next_pos_block failed");
+  generator.add_block_info(blk_5c, std::list<transaction>{});
+  ADD_CUSTOM_EVENT(events, blk_5c);
+
+  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_8));
+
+  return true;
+}

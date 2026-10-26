@@ -1390,6 +1390,9 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY_HF(hard_fork_4_consolidated_txs, "3-*");
     GENERATE_AND_PLAY_HF(hardfork_4_wallet_transfer_with_mandatory_mixins, "3-*");
     GENERATE_AND_PLAY(hardfork_4_wallet_sweep_bare_outs);
+    GENERATE_AND_PLAY(hardfork_4_bare_decoy_indices);
+    GENERATE_AND_PLAY(hardfork_4_bare_decoy_forced_mix);
+    GENERATE_AND_PLAY(hardfork_4_bare_decoy_before_hf4);
     GENERATE_AND_PLAY_HF(hardfork_4_pop_tx_from_global_index, "4-*");
     GENERATE_AND_PLAY(hardfork_4_pos_decoy_transition);
 
@@ -1428,6 +1431,7 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY(zarcanum_pos_block_math);
     GENERATE_AND_PLAY(zarcanum_in_alt_chain);
     GENERATE_AND_PLAY_HF(zarcanum_in_alt_chain_2, "4-*");
+    GENERATE_AND_PLAY_HF(alt_chain_ring_members_age, "4-*");
     GENERATE_AND_PLAY(assets_and_explicit_native_coins_in_outs);
     GENERATE_AND_PLAY(zarcanum_block_with_txs);
     GENERATE_AND_PLAY_HF(block_template_and_invalid_tx_proofs, "5-*");
