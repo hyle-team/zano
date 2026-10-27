@@ -1404,6 +1404,13 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY_HF(hard_fork_6_gw_out_with_bad_asset_id, "6,8-*");
 
     GENERATE_AND_PLAY(hf_booster_hf8_activation_basic);
+    GENERATE_AND_PLAY(hf_booster_gentime_basic);
+    GENERATE_AND_PLAY_INTERMITTED_BY_BLOCKCHAIN_SAVELOAD(hf_booster_gentime_basic);
+    GENERATE_AND_PLAY(hf_booster_reorg_before_activation);
+    GENERATE_AND_PLAY(hf_booster_reorg_after_activation);
+    GENERATE_AND_PLAY(hf_booster_rollback_on_invalid_block);
+    GENERATE_AND_PLAY(hf_booster_runtime_config_reset_keeps_boost);
+    GENERATE_AND_PLAY(hf_booster_invalid_boosters_rejected);
 
     // GW address alt-chain tests
     GENERATE_AND_PLAY(gw_addr_altchain_spend_in_both_chains);

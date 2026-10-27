@@ -668,7 +668,7 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
 
 
   store_db_solo_options_values();
-  hf_booster_load_hardforks_from_db();
+  init_booster_hf();
 
   m_services_mgr.init(config_folder, vm);
 
@@ -840,6 +840,15 @@ bool blockchain_storage::pop_block_from_blockchain(transactions_map& onboard_tra
   m_db_blocks.pop_back();
 
   on_block_removed(*bei_ptr);
+  return true;
+}
+//------------------------------------------------------------------
+bool blockchain_storage::init_booster_hf()
+{
+  if(m_db_hardfork_updates.size())
+    hf_booster_store_hardforks_to_db();
+  else
+    hf_booster_load_hardforks_from_db();
   return true;
 }
 //------------------------------------------------------------------
@@ -5708,6 +5717,15 @@ bool blockchain_storage::pop_gw_address_operation(const gateway_address_descript
   return true;
 }
 //------------------------------------------------------------------
+bool blockchain_storage::hf_booster_store_hardforks_to_db()
+{
+  for(uint64_t hf_id = 0; hf_id != hard_forks_descriptor::m_total_count; hf_id++)
+  {
+    m_db_hardfork_updates.set(hf_id, std::list<uint64_t>(1, m_core_runtime_config.hard_forks.get_height_the_hardfork_active_after(hf_id)));
+  }
+  return true;
+}
+//------------------------------------------------------------------
 bool blockchain_storage::hf_booster_load_hardforks_from_db()
 {
   for (uint64_t hf_id = 0; hf_id != hard_forks_descriptor::m_total_count; hf_id++)
@@ -5723,21 +5741,8 @@ bool blockchain_storage::hf_booster_load_hardforks_from_db()
 //------------------------------------------------------------------
 bool blockchain_storage::put_hf_booster_update(const transaction& tx, const crypto::hash& tx_id, const bc_services::hf_booster_update& update, const uint64_t height)
 {
-  // validate update operation virst
-  crypto::public_key tx_onetime_key = currency::get_tx_pub_key_from_extra(tx);
-  CHECK_AND_ASSERT_THROW_MES(tx_onetime_key != null_pkey, "Failed to get tx pub key from extra on submit_hf_booster");
-  CHECK_AND_ASSERT_THROW_MES(update.tx_onetime_pub_key == tx_onetime_key, "Tx onetime pub key mismatch on submit_hf_booster");
-
-  crypto::hash h         = bc_services::get_hf_booster_update_hash(update);
-
-  // validate if we aware of this hardfork
-  CHECK_AND_ASSERT_THROW_MES(m_core_runtime_config.hard_forks.m_total_count > update.hf_id, "Unknown hf_id on put_hf_booster_update: " << update.hf_id);
-
-  // validate against the maintainer pub key
-  CHECK_AND_ASSERT_THROW_MES(m_core_runtime_config.maintainers_public_keys[update.hf_id], "Maintainer public key not found on put_hf_booster_update");
-  crypto::public_key maintainer_pub = *m_core_runtime_config.maintainers_public_keys[update.hf_id];
-  bool r = crypto::verify_schnorr_sig(h, maintainer_pub, update.maintainer_signature);
-  CHECK_AND_ASSERT_THROW_MES(r, "Failed to verify schnorr signature on submit_hf_booster");
+  bool r = verify_hf_booster_signature(update, tx, m_core_runtime_config);
+  CHECK_AND_ASSERT_THROW_MES(r, "Failed to verify hf_booster_update signature for hf_id: " << update.hf_id << ", tx_id: " << tx_id);
 
   // check against minimal distance allowed betwen hf height and current height and other conditions
   CHECK_AND_ASSERT_THROW_MES(update.hf_new_activation_height > get_current_blockchain_size(), "hf_booster_update: update.hf_new_activation_height > get_current_blockchain_size() failed");
@@ -8923,6 +8928,7 @@ bool blockchain_storage::add_new_block(const block& bl, block_verification_conte
         db_tx_ptr->abort_transaction();
         CHECK_AND_ASSERT_MES(validate_blockchain_prev_links(), false, "EPIC FAIL! 2.2");
         m_tx_pool.on_finalize_db_transaction();
+        on_abort_transaction();
         return r;
       }
       db_tx_ptr->commit_transaction();
@@ -9126,10 +9132,11 @@ bool blockchain_storage::build_kernel(const crypto::key_image& ki,
   return true;
 }
 //------------------------------------------------------------------
-void blockchain_storage::set_core_runtime_config(const core_runtime_config& pc) const
+void blockchain_storage::set_core_runtime_config(const core_runtime_config& pc)
 {
   m_core_runtime_config = pc;
   m_services_mgr.set_core_runtime_config(pc);
+  hf_booster_store_hardforks_to_db();
 }
 //------------------------------------------------------------------
 const core_runtime_config& blockchain_storage::get_core_runtime_config() const

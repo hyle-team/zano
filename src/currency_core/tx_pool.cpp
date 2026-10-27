@@ -228,6 +228,12 @@ namespace currency
         tvc.m_verification_failed = true;
         return false;
       }
+      if(!check_hf_booster_entries(tx))
+      {
+        tvc.m_verification_failed = true;
+        return false;
+      }
+
     }
     TIME_MEASURE_FINISH_PD(check_keyimages_ws_ms_time);
 
@@ -291,6 +297,25 @@ namespace currency
       << "/" << m_performance_data.db_commit_time.get_last_val()
       << ")");
 
+    return true;
+  }
+  //---------------------------------------------------------------------------------
+  bool tx_memory_pool::check_hf_booster_entries(const transaction &tx)const 
+  {
+    tx_extra_info extra_info { };
+    if (!parse_and_validate_tx_extra(tx, extra_info))
+    {
+      LOG_PRINT_L0("Failed to parse tx extra for tx " << get_transaction_hash(tx));
+      return false;
+    }
+    if (extra_info.m_opt_hf_booster_update)
+    {
+      bool r = verify_hf_booster_signature(*extra_info.m_opt_hf_booster_update, tx, m_blockchain.get_core_runtime_config());
+      if (!r)
+      {
+        LOG_PRINT_L0("HF booster update validation failed for tx " << get_transaction_hash(tx));
+      }
+    }
     return true;
   }
   //---------------------------------------------------------------------------------

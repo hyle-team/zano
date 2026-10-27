@@ -6049,7 +6049,7 @@ void wallet2::submit_hf_booster(uint64_t hf_id, uint64_t new_hf_height, const cr
     r = crypto::verify_schnorr_sig(h, maintainer_pub, upd.maintainer_signature);
     CHECK_AND_ASSERT_THROW_MES(r, "Failed to verify schnorr signature on submit_hf_booster");
 
-    currency::tx_service_attachment att;
+    currency::tx_service_attachment att { };
     bc_services::pack_attachment_as_gzipped_json(upd, att);
     att.service_id = BC_HF_BOOSTER_SERVICE_ID;
     att.instruction = BC_HF_BOOSTER_SERVICE_INSTRUCTION_UPDATE;

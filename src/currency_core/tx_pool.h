@@ -167,6 +167,7 @@ namespace currency
     void set_taken(const crypto::hash& id);
     void reset_all_taken();
     bool load_keyimages_cache();
+    bool check_hf_booster_entries(const transaction& tx)const;
     
     typedef tools::db::cached_key_value_accessor<crypto::hash, tx_details, true, false> transactions_container;
     typedef tools::db::cached_key_value_accessor<crypto::hash, bool, false, false> hash_container; 

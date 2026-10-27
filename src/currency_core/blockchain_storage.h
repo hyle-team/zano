@@ -418,7 +418,7 @@ namespace currency
     bool validate_asset_operation_hf5(asset_op_verification_context& avc) const;
     bool validate_asset_operation(asset_op_verification_context& avc, uint64_t height) const;
 
-    void set_core_runtime_config(const core_runtime_config& pc) const;
+    void set_core_runtime_config(const core_runtime_config& pc);
     const core_runtime_config& get_core_runtime_config()const;
     size_t get_current_sequence_factor(bool pos)const;
     bool get_last_n_blocks_sizes(std::vector<size_t>& sz, size_t count)const;
@@ -764,6 +764,8 @@ namespace currency
     bool validate_gw_address_ownership(const transaction& tx, const crypto::hash& tx_id, const gateway_address_descriptor_operation_update& gao, const gateway_address_data& gad, const uint64_t height);
 
     bool hf_booster_load_hardforks_from_db();
+    bool hf_booster_store_hardforks_to_db();
+    bool init_booster_hf();
     void fill_addr_to_alias_dict();
     //bool resync_spent_tx_flags();
     bool prune_ring_signatures_and_attachments_if_need();
