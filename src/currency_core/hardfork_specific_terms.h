@@ -102,33 +102,33 @@ namespace currency
     DEFINE_TERMS(   no,   no,   one,  one,  one,  one,  one,  one,  one,    extra,             extra_alias_entry                   );
     DEFINE_TERMS(   no,   no,   no,   no,   one,  one,  one,  one,  one,    extra,             zarcanum_tx_data_v1                 );
     DEFINE_TERMS(   no,   no,   no,   no,   one,  one,  one,  one,  one,    extra,             asset_descriptor_operation          );
-    DEFINE_TERMS(   no,   no,   no,   no,   no,   no,   one,  no,   no,     extra,             gateway_address_descriptor_operation);
+    DEFINE_TERMS(   no,   no,   no,   no,   no,   no,   one,  no,   one,    extra,             gateway_address_descriptor_operation);
     DEFINE_TERMS(   no,   no,   no,   no,   no,   no,   one,  one,  one,    extra,             etc_coinbase_block_cumulative_size  );
       //inputs
     DEFINE_TERMS(   one,  one,  one,  one,  one,  one,  one,  one,  one,    input,             txin_gen                            );
     DEFINE_TERMS(   many, many, many, many, many, many, many, many, many,   input,             txin_to_key                         );
     DEFINE_TERMS(   many, many, many, many, many, many, many, many, many,   input,             txin_multisig                       );
     DEFINE_TERMS(   no,   no,   no,   no,   many, many, many, many, many,   input,             txin_zc_input                       );
-    DEFINE_TERMS(   no,   no,   no,   no,   no,   no,   many, no,   no,     input,             txin_gateway                        );
+    DEFINE_TERMS(   no,   no,   no,   no,   no,   no,   many, no,   many,   input,             txin_gateway                        );
       //outputs
     DEFINE_TERMS(   many, many, many, many, no,   no,   no,   no,   no,     output,            tx_out_bare                         );
     DEFINE_TERMS(   no,   no,   no,   no,   many, many, many, many, many,   output,            tx_out_zarcanum                     );
-    DEFINE_TERMS(   no,   no,   no,   no,   no,   no,   many, no,   no,     output,            tx_out_gateway                      );
+    DEFINE_TERMS(   no,   no,   no,   no,   no,   no,   many, no,   many,   output,            tx_out_gateway                      );
       //signatures
     DEFINE_TERMS(   many, many, many, many, many, many, many, many, many,   signtr,            NLSAG_sig                           );
     DEFINE_TERMS(   no,   no,   no,   no,   many, many, many, many, many,   signtr,            void_sig                            );
     DEFINE_TERMS(   no,   no,   no,   no,   many, many, many, many, many,   signtr,            ZC_sig                              );
     DEFINE_TERMS(   no,   no,   no,   no,   many, many, many, many, many,   signtr,            zarcanum_sig                        );
-    DEFINE_TERMS(   no,   no,   no,   no,   no,   no,   many, no,   no,     signtr,            gateway_sig                         );
+    DEFINE_TERMS(   no,   no,   no,   no,   no,   no,   many, no,   many,   signtr,            gateway_sig                         );
       //proofs
     DEFINE_TERMS(   no,   no,   no,   no,   many, many, many, many, many,   proofs,            zc_asset_surjection_proof           );
     DEFINE_TERMS(   no,   no,   no,   no,   many, many, many, many, many,   proofs,            zc_outs_range_proof                 );
     DEFINE_TERMS(   no,   no,   no,   no,   one,  one,  one,  one,  one,    proofs,            zc_balance_proof                    );
-    DEFINE_TERMS(   no,   no,   no,   no,   no,   no,   one,  no,   no,     proofs,            zc_gw_balance_proof                 );
+    DEFINE_TERMS(   no,   no,   no,   no,   no,   no,   one,  no,   one,    proofs,            zc_gw_balance_proof                 );
     DEFINE_TERMS(   no,   no,   no,   no,   one,  one,  one,  one,  one,    proofs,            asset_operation_proof               );
     DEFINE_TERMS(   no,   no,   no,   no,   one,  one,  one,  one,  one,    proofs,            asset_operation_ownership_proof     );
     DEFINE_TERMS(   no,   no,   no,   no,   one,  one,  one,  one,  one,    proofs,            asset_operation_ownership_proof_eth );
-    DEFINE_TERMS(   no,   no,   no,   no,   no,   no,   one,  no,   no,     proofs,            gateway_address_ownership_proof     );
+    DEFINE_TERMS(   no,   no,   no,   no,   no,   no,   one,  no,   one,    proofs,            gateway_address_ownership_proof     );
 
 
 

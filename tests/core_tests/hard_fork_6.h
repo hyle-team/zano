@@ -89,3 +89,14 @@ struct hard_fork_6_asset_descriptor_limits : public wallet_test
   hard_fork_6_asset_descriptor_limits();
   bool generate(std::vector<test_event_entry>& events) const;
 };
+
+struct hard_fork_6_gw_out_with_bad_asset_id : public wallet_test
+{
+  hard_fork_6_gw_out_with_bad_asset_id();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+
+  mutable crypto::public_key m_asset_id{};
+  mutable currency::keypair m_gw_addr_view{};
+  mutable currency::keypair m_gw_addr_spend{};
+};

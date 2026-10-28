@@ -244,20 +244,28 @@ namespace currency
     }
     TIME_MEASURE_FINISH_PD(check_inputs_time);
 
+    const uint64_t next_block_height = m_blockchain.get_top_block_height() + 1;
+
     if (!from_core)
     {
       if (tx.version > TRANSACTION_VERSION_PRE_HF4)
       {
         TIME_MEASURE_START_PD(check_post_hf4_balance);
         r = check_tx_balance(tx, id);
-        CHECK_AND_ASSERT_MES_CUSTOM(r, false, { tvc.m_verification_failed = true; }, "post-HF4 tx: balance proof is invalid");
+        CHECK_AND_ASSERT_MES_CUSTOM(r, false, { tvc.m_verification_failed = true; }, "post-HF4 tx " << id << ": balance proof is invalid");
         TIME_MEASURE_FINISH_PD(check_post_hf4_balance);
 
         r = process_type_in_variant_container_and_make_sure_its_unique<asset_descriptor_operation>(tx.extra, [&](const asset_descriptor_operation& ado) {
-          asset_op_verification_context avc = { tx, id, ado, m_blockchain.get_top_block_height() + 1 };
+          asset_op_verification_context avc = { tx, id, ado, next_block_height };
           return m_blockchain.validate_asset_operation(avc, m_blockchain.get_current_blockchain_size());
           }, true);
-        CHECK_AND_ASSERT_MES_CUSTOM(r, false, { tvc.m_verification_failed = true; }, "post-HF4 tx: asset operation is invalid");
+        CHECK_AND_ASSERT_MES_CUSTOM(r, false, { tvc.m_verification_failed = true; }, "post-HF4 tx " << id << ": asset operation is invalid");
+
+        if (!kept_by_block)
+        {
+          r = m_blockchain.validate_tx_gw_asset_ids(tx, next_block_height);
+          CHECK_AND_ASSERT_MES_CUSTOM(r, false, { tvc.m_verification_failed = true; }, "post-HF6 tx " << id << ": gw asset id validation failed");
+        }
       }
     }
 
@@ -995,8 +1003,11 @@ namespace currency
       return false;
     }
       
-
     if (!check_tx_multisig_ins_and_outs(txd.tx, false))
+      return false;
+
+    const uint64_t next_block_height = m_blockchain.get_top_block_height() + 1;
+    if (!m_blockchain.validate_tx_gw_asset_ids(txd.tx, next_block_height))
       return false;
 
     //transaction is ok.
