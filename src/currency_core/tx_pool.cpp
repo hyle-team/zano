@@ -263,8 +263,8 @@ namespace currency
 
         if (!kept_by_block)
         {
-          r = m_blockchain.validate_tx_gw_asset_ids_against_blockchain_state(tx, id, next_block_height);
-          CHECK_AND_ASSERT_MES_CUSTOM(r, false, { tvc.m_verification_failed = true; }, "post-HF6 tx: gw asset id validation failed");
+          r = m_blockchain.validate_tx_gw_asset_ids(tx, next_block_height);
+          CHECK_AND_ASSERT_MES_CUSTOM(r, false, { tvc.m_verification_failed = true; }, "post-HF6 tx " << id << ": gw asset id validation failed");
         }
       }
     }
@@ -1007,7 +1007,7 @@ namespace currency
       return false;
 
     const uint64_t next_block_height = m_blockchain.get_top_block_height() + 1;
-    if (!m_blockchain.validate_tx_gw_asset_ids_against_blockchain_state(txd.tx, id, next_block_height))
+    if (!m_blockchain.validate_tx_gw_asset_ids(txd.tx, next_block_height))
       return false;
 
     //transaction is ok.

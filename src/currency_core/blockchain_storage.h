@@ -191,6 +191,9 @@ namespace currency
       
       //transactions associated with the block
       transactions_map onboard_transactions;
+
+      // asset IDs from all register operations
+      std::vector<crypto::public_key> registered_asset_ids;
     };
     typedef std::unordered_map<crypto::hash, alt_block_extended_info> alt_chain_container;
     typedef std::vector<alt_chain_container::iterator> alt_chain_type; // alternative subchain, front -> mainchain(split point), back -> alternative head
@@ -344,7 +347,7 @@ namespace currency
     bool validate_tx_for_hardfork_specific_terms_types_HF4(const transaction& tx, const crypto::hash& tx_id, uint64_t block_height) const;
     bool validate_tx_for_hardfork_specific_terms(const transaction& tx, const crypto::hash& tx_id, uint64_t block_height) const;
     bool validate_tx_for_hardfork_specific_terms(const transaction& tx, const crypto::hash& tx_id) const;
-    bool validate_tx_gw_asset_ids_against_blockchain_state(const transaction& tx, const crypto::hash& tx_id, uint64_t block_height) const;
+    bool validate_tx_gw_asset_ids(const transaction& tx, uint64_t block_height, const alt_chain_type& alt_chain = alt_chain_type{}, const alt_block_extended_info* p_current_alt_block = nullptr) const;
     bool get_output_keys_for_input_with_checks(const transaction& tx, const txin_v& verified_input, std::vector<crypto::public_key>& output_keys, uint64_t& max_related_block_height, uint64_t& source_max_unlock_time_for_pos_coinbase, scan_for_keys_context& scan_context) const;
     bool get_output_keys_for_input_with_checks(const transaction& tx, const txin_v& verified_input, std::vector<crypto::public_key>& output_keys, uint64_t& max_related_block_height, uint64_t& source_max_unlock_time_for_pos_coinbase) const;
     bool check_input_signature(const transaction& tx, size_t in_index, const txin_to_key& txin, const crypto::hash& tx_prefix_hash, const std::vector<const crypto::public_key*>& output_keys_ptrs) const;
@@ -703,6 +706,7 @@ namespace currency
       const alt_chain_type& alt_chain) const;
     bool validate_alt_block_txs(const block& b, const crypto::hash& id, std::unordered_set<crypto::key_image>& collected_keyimages, alt_block_extended_info& abei, const alt_chain_type& alt_chain, uint64_t split_height, uint64_t& ki_lookup_time_total) const;
     bool update_alt_out_indexes_for_tx_in_block(const transaction& tx, alt_block_extended_info& abei)const;
+    void update_asset_id_registration_for_tx_in_block(const transaction& tx, alt_block_extended_info& abei) const;
     bool get_transaction_from_pool_or_db(const crypto::hash& tx_id, std::shared_ptr<transaction>& tx_ptr, uint64_t min_allowed_block_height = 0) const;
     void get_last_n_x_blocks(uint64_t n, bool pos_blocks, std::list<std::shared_ptr<const block_extended_info>>& blocks) const;
     bool prevalidate_miner_transaction(const block& b, uint64_t height, bool pos)const;
