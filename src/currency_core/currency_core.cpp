@@ -320,13 +320,11 @@ namespace currency
       st_inf.errors_stat.back().err_count = entry.second;
     }
     st_inf.epic_failure_happend = m_blockchain_storage.get_performnce_data().epic_failure_happend;
-    epee::log_space::log_singletone::get_journal_items(st_inf.errors_journal, pr.logs_journal_len);
     //check deadlocks
     auto dl_list = epee::deadlock_guard_singleton::get_deadlock_journal();
     if (dl_list.size())
     {
       st_inf.epic_failure_happend = true;
-      st_inf.errors_journal.insert(st_inf.errors_journal.end(), dl_list.begin(), dl_list.end());
     }
 
     return true;
