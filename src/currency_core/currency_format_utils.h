@@ -359,6 +359,7 @@ namespace currency
   bool construct_tx(const account_keys& sender_account_keys,  const finalize_tx_param& param, finalized_tx& result);
   bool get_or_calculate_asset_id(const asset_descriptor_operation& ado, crypto::point_t* p_result_point, crypto::public_key* p_result_pub_key);
   const asset_descriptor_base& get_native_coin_asset_descriptor();
+  bool get_registered_asset_id_from_tx(const transaction& tx, crypto::public_key& asset_id);
 
   bool sign_multisig_input_in_tx(currency::transaction& tx, size_t ms_input_index, const currency::account_keys& keys, const currency::transaction& source_tx, bool *p_is_input_fully_signed = nullptr);
 

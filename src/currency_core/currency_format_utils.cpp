@@ -2668,7 +2668,8 @@ namespace currency
 
     return true;
   }
-
+  //--------------------------------------------------------------------------------
+  
 #define CRYPTO_HASH_ASSET_ID_ITERATIONS 1024
   bool get_or_calculate_asset_id(const asset_descriptor_operation& ado, crypto::point_t* p_result_point, crypto::public_key* p_result_pub_key)
   {
@@ -2739,6 +2740,22 @@ namespace currency
     return native_coin_asset_descriptor;
   }
 
+  bool get_registered_asset_id_from_tx(const transaction& tx, crypto::public_key& asset_id)
+  {
+    asset_descriptor_operation ado{};
+    if (get_type_in_variant_container(tx.extra, ado))
+    {
+      if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER)
+      {
+        CHECK_AND_ASSERT_MES(get_or_calculate_asset_id(ado, nullptr, &asset_id), false, "get_registered_asset_id_from_tx: get_or_calculate_asset_id failed");
+        return true;
+      }
+    }
+    return false;
+  }
+
+  //--------------------------------------------------------------------------------
+  
   bool construct_tx_handle_ado(const account_keys& sender_account_keys, 
     const finalize_tx_param& ftp, 
     asset_descriptor_operation& ado, 
