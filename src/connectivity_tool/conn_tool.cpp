@@ -681,13 +681,9 @@ bool handle_request_stat(po::variables_map& vm, peerid_type peer_id)
 
   if(command_line::get_arg(vm, arg_request_stat_info))
   {
-    uint64_t log_journal_len = 10;
-    if (command_line::has_arg(vm, arg_log_journal_len))
-      log_journal_len = command_line::get_arg(vm, arg_log_journal_len);
 
     COMMAND_REQUEST_STAT_INFO::request req = AUTO_VAL_INIT(req);
     req.pr.chain_len = 3;
-    req.pr.logs_journal_len = log_journal_len;
     req.tr = pot;
     if(!net_utils::invoke_remote_command2(COMMAND_REQUEST_STAT_INFO::ID, req, rs.si_rsp.v, transport))
     {
@@ -1211,7 +1207,6 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_params, arg_generate_genesis);
   command_line::add_arg(desc_params, arg_genesis_split_amount);
   command_line::add_arg(desc_params, arg_get_info_flags);
-  command_line::add_arg(desc_params, arg_log_journal_len);
   command_line::add_arg(desc_params, arg_get_anonymized_peers);
   command_line::add_arg(desc_params, arg_do_consloe_log);
   command_line::add_arg(desc_params, arg_generate_integrated_address);
