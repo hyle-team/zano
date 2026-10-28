@@ -847,13 +847,16 @@ bool blockchain_storage::init_booster_hf()
 {
   if(!m_db_hardfork_updates.size())
   {
+    auto db_tx_ptr = m_db.begin_transaction_obj();
     if (m_db_blocks.size() > ZANO_HARDFORK_BOOSTER_UNAWARE_MAX_HEIGHT)
     {
       LOG_PRINT_L0("Booster-caused truncation to " << ZANO_HARDFORK_BOOSTER_UNAWARE_MAX_HEIGHT << "...");
-      truncate_blockchain(ZANO_HARDFORK_BOOSTER_UNAWARE_MAX_HEIGHT + 1);
+      
+      truncate_blockchain(ZANO_HARDFORK_BOOSTER_UNAWARE_MAX_HEIGHT + 1);      
       LOG_PRINT_L0("Booster-caused truncation done.");
     }
     hf_booster_store_hardforks_to_db();
+    db_tx_ptr->commit_transaction();
   }
   else
   {
@@ -4646,7 +4649,7 @@ bool blockchain_storage::unprocess_blockchain_tx_extra(const transaction& tx, co
   {
     CHECK_AND_ASSERT_MES(ei.m_opt_hf_booster_update.has_value(), false, "m_opt_hf_booster_update has no value");
     r = pop_hf_booster_update(tx, tx_id, ei.m_opt_hf_booster_update.value(), height);
-    CHECK_AND_ASSERT_THROW_MES(r, "pop_hf_booster_update failed, tx_id" << tx_id << ", update: " << epee::serialization::store_t_to_json(*ei.m_opt_hf_booster_update));
+    CHECK_AND_ASSERT_MES(r, false, "pop_hf_booster_update failed, tx_id" << tx_id << ", update: " << epee::serialization::store_t_to_json(*ei.m_opt_hf_booster_update));
   }
 
   return true;
@@ -5780,6 +5783,10 @@ bool blockchain_storage::put_hf_booster_update(const transaction& tx, const cryp
 //------------------------------------------------------------------
 bool blockchain_storage::pop_hf_booster_update(const transaction& tx, const crypto::hash& tx_id, const bc_services::hf_booster_update& update, const uint64_t height)
 {
+  if (!m_db_hardfork_updates.size())
+  {
+    return true;  // this is likely truncating rised by init_booster_hardforks, so we don't need to pop anything as prev build was hf_booster - not aware
+  }
   std::list<uint64_t> hf_heights;
   auto current_ptr = m_db_hardfork_updates.get(update.hf_id);
   CHECK_AND_ASSERT_MES(current_ptr, false, "pop_hf_booster_update: no hf_heights found for hf_id " << update.hf_id);
@@ -9146,7 +9153,9 @@ void blockchain_storage::set_core_runtime_config(const core_runtime_config& pc)
 {
   m_core_runtime_config = pc;
   m_services_mgr.set_core_runtime_config(pc);
+  auto db_tx_ptr = m_db.begin_transaction_obj();
   hf_booster_store_hardforks_to_db();
+  db_tx_ptr->commit_transaction();
 }
 //------------------------------------------------------------------
 const core_runtime_config& blockchain_storage::get_core_runtime_config() const

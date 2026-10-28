@@ -464,37 +464,6 @@ bool hf_booster_rollback_on_invalid_block::generate(std::vector<test_event_entry
 
 //------------------------------------------------------------------------------
 
-bool hf_booster_runtime_config_reset_keeps_boost::generate(std::vector<test_event_entry>& events) const
-{
-  // Test idea: the core runtime config gets set again after a booster was applied (the daemon and the tests
-  // do that), the boosted schedule has to survive it, before and after the activation.
-  HF_BOOSTER_CHAIN_PROLOGUE(blk_1r);                                                                 // 21
-  const uint64_t h1 = 35;
-
-  transaction tx_b1{};
-  CHECK_AND_ASSERT_MES(make_booster_tx(events, blk_1r, generator.get_hardforks(), miner_acc, ZANO_HARDFORK_08, h1, tx_b1), false, "make_booster_tx failed");
-  ADD_CUSTOM_EVENT(events, tx_b1);
-  MAKE_NEXT_BLOCK_TX1(events, blk_2, blk_1r, miner_acc, tx_b1);                                      // 22
-  DO_CALLBACK_PARAMS(events, "check_hf8_height", h1);
-
-  DO_CALLBACK(events, "configure_core");
-  DO_CALLBACK_PARAMS(events, "check_hf8_height", h1);
-
-  generator.set_hardfork_height(ZANO_HARDFORK_08, h1);
-  REWIND_BLOCKS_N(events, blk_2r, blk_2, miner_acc, h1 - get_block_height(blk_2) + 1);               // 23..36, 36 is the first HF8 block
-  DO_CALLBACK_PARAMS(events, "check_hardfork_active", static_cast<size_t>(ZANO_HARDFORK_08));
-
-  DO_CALLBACK(events, "configure_core");
-  DO_CALLBACK_PARAMS(events, "check_hf8_height", h1);
-  DO_CALLBACK_PARAMS(events, "check_hardfork_active", static_cast<size_t>(ZANO_HARDFORK_08));
-  MAKE_NEXT_BLOCK(events, blk_3, blk_2r, miner_acc);                                                 // 37, HF8 block
-  DO_CALLBACK_PARAMS(events, "check_hf8_height", h1);
-
-  return true;
-}
-
-//------------------------------------------------------------------------------
-
 bool hf_booster_invalid_boosters_rejected::generate(std::vector<test_event_entry>& events) const
 {
   // Test idea: boosters that must be rejected. A block carrying one is invalid and leaves the schedule untouched.

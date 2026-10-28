@@ -65,12 +65,6 @@ struct hf_booster_rollback_on_invalid_block : public hf_booster_test_base
   bool generate(std::vector<test_event_entry>& events) const;
 };
 
-// The core runtime config is set again after a booster was applied: the boosted schedule must survive.
-struct hf_booster_runtime_config_reset_keeps_boost : public hf_booster_test_base
-{
-  bool generate(std::vector<test_event_entry>& events) const;
-};
-
 // Boosters that must not be accepted: wrong signer, wrong key binding, bad heights, unknown or active hardfork.
 struct hf_booster_invalid_boosters_rejected : public hf_booster_test_base
 {

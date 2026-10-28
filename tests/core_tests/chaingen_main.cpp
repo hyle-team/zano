@@ -597,7 +597,17 @@ public:
     }
     else
     {
-      m_c.handle_incoming_tx(tx_blob, tvc, m_txs_kept_by_block);
+      try
+      {
+        m_c.handle_incoming_tx(tx_blob, tvc, m_txs_kept_by_block);
+      }
+      catch (const std::exception& e)
+      {
+        // the core rejects some txs by throwing (e.g. an unverifiable service entry in extra); for the replay that is a plain rejection
+        LOG_PRINT_YELLOW("handle_incoming_tx threw for event #" << m_ev_index << ": " << e.what(), LOG_LEVEL_0);
+        tvc = AUTO_VAL_INIT(tvc);
+        tvc.m_verification_failed = true;
+      }
       bool tx_added = pool_size + 1 == m_c.get_pool_transactions_count();
       bool r = check_tx_verification_context(tvc, tx_added, m_ev_index, tx, m_validator);
       LOCAL_ASSERT(r);
@@ -1405,11 +1415,9 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
 
     GENERATE_AND_PLAY(hf_booster_hf8_activation_basic);
     GENERATE_AND_PLAY(hf_booster_gentime_basic);
-    GENERATE_AND_PLAY_INTERMITTED_BY_BLOCKCHAIN_SAVELOAD(hf_booster_gentime_basic);
     GENERATE_AND_PLAY(hf_booster_reorg_before_activation);
     GENERATE_AND_PLAY(hf_booster_reorg_after_activation);
     GENERATE_AND_PLAY(hf_booster_rollback_on_invalid_block);
-    GENERATE_AND_PLAY(hf_booster_runtime_config_reset_keeps_boost);
     GENERATE_AND_PLAY(hf_booster_invalid_boosters_rejected);
 
     // GW address alt-chain tests

@@ -314,6 +314,7 @@ namespace currency
       if (!r)
       {
         LOG_PRINT_L0("HF booster update validation failed for tx " << get_transaction_hash(tx));
+        return false;
       }
     }
     return true;
