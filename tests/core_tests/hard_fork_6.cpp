@@ -2251,7 +2251,12 @@ hard_fork_6_gw_out_with_bad_asset_id::hard_fork_6_gw_out_with_bad_asset_id()
 bool hard_fork_6_gw_out_with_bad_asset_id::generate(std::vector<test_event_entry>& events) const
 {
   // Test idea: make sure gw outputs can only have already registered (or same-tx-registered) asset IDs
-  // c1: the same when chain switching moves the asset registration away and back
+  // registration        | gw out       | checked via
+  // --------------------+--------------+-------------------------------------------------
+  // same tx  (asset 1)  | same tx      | pool, main block
+  // none                | tx_6_bad     | pool, main block, alt block (all rejected)
+  // same tx  (asset 3)  | same tx      | alt block, then chain switch
+  // c1: tx (asset 2)    | next blocks  | chain switch away and back, fresh alt block on an alt-only registration
 
   bool r = false;
   uint64_t ts = test_core_time::get_time();
@@ -2398,6 +2403,15 @@ bool hard_fork_6_gw_out_with_bad_asset_id::generate(std::vector<test_event_entry
   DO_CALLBACK(events, "mark_invalid_block");
   MAKE_NEXT_BLOCK_TX_LIST(events, blk_6b, blk_5, miner_acc, std::list<transaction>({ tx_6_bad }));
 
+  // the same tx in an alt block (sibling of blk_6) must be rejected too
+  MAKE_NEXT_BLOCK(events, blk_6, blk_5, miner_acc);
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, true));
+  ADD_CUSTOM_EVENT(events, tx_6_bad);
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, false));
+  DO_CALLBACK(events, "mark_invalid_block");
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_6a, blk_5, miner_acc, std::list<transaction>({ tx_6_bad }));
+  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(0));
+
   //
   // construct tx_6_good using the very same input data, but legit destinations
   //
@@ -2412,10 +2426,46 @@ bool hard_fork_6_gw_out_with_bad_asset_id::generate(std::vector<test_event_entry
   // should be accepted to the pool and confirmed in a block without an issue
   ADD_CUSTOM_EVENT(events, tx_6_good);
   DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(1));
-  MAKE_NEXT_BLOCK_TX_LIST(events, blk_6, blk_5, miner_acc, std::list<transaction>({ tx_6_good }));
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_7, blk_6, miner_acc, std::list<transaction>({ tx_6_good }));
   DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(0));
 
-  // final checks
+  //
+  // asset 3: Alice registers it and sends to the gw address within the same tx, confirmed in an alt block first, then in the main chain via a chain switch
+  //
+  transaction tx_7{};
+  crypto::public_key asset_3_id{};
+  {
+    asset_descriptor_base adb_3{};
+    adb_3.total_max_supply = 420;
+    adb_3.ticker = "CIIS3";
+    adb_3.full_name = "Cognitive Immunization and Intervention Strategies 3";
+    asset_descriptor_operation ado{};
+    fill_ado_version_based_onhardfork(ado, current_hardfork_id);
+    ado.opt_descriptor = adb_3;
+    fill_adb_version_based_onhardfork(*ado.opt_descriptor, current_hardfork_id);
+    ado.operation_type = ASSET_DESCRIPTOR_OPERATION_REGISTER;
+    destinations.clear();
+    for(size_t i = 0; i < 12; ++i)
+      destinations.emplace_back(10, alice_acc.get_public_address(), null_pkey);
+    destinations.emplace_back(1, m_gw_addr_view.pub, null_pkey);
+    destinations.emplace_back(MK_TEST_COINS(10), alice_acc.get_public_address());
+    r = construct_tx_to_key(m_hardforks, events, tx_7, blk_6, alice_acc, destinations, TESTS_DEFAULT_FEE, 0, 0, std::vector<attachment_v>({ado})); // ZC sources, exist on both branches
+    CHECK_AND_ASSERT_MES(r, false, "construct_tx_to_key failed");
+    CHECK_AND_ASSERT_TRUE(get_type_in_variant_container(tx_7.extra, ado));
+    CHECK_AND_ASSERT_TRUE(get_or_calculate_asset_id(ado, nullptr, &asset_3_id));
+  }
+  ADD_CUSTOM_EVENT(events, tx_7);
+  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(1));
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_8a, blk_6, miner_acc, std::list<transaction>({ tx_7 })); // alt, sibling of blk_7
+  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(1));
+  DO_CALLBACK_PARAMS_STR(events, "check_gw_balance", t_serializable_object_to_blob(gw_address_balance_check_param{ m_gw_addr_view.pub, 0,                 asset_3_id }));
+  MAKE_NEXT_BLOCK(events, blk_9a, blk_8a, miner_acc); // chain switch
+  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_9a));
+  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(1)); // tx_6_good is back in the pool
+  DO_CALLBACK_PARAMS_STR(events, "check_gw_balance", t_serializable_object_to_blob(gw_address_balance_check_param{ m_gw_addr_view.pub, 1,                 asset_3_id }));
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_10, blk_9a, miner_acc, std::list<transaction>({ tx_6_good }));
+  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(0));
+
   DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(BOB_ACC_IDX, 20, m_asset_id, 0));
   DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(BOB_ACC_IDX, MK_TEST_COINS(0)));
 
@@ -2429,8 +2479,8 @@ bool hard_fork_6_gw_out_with_bad_asset_id::generate(std::vector<test_event_entry
 
 bool hard_fork_6_gw_out_with_bad_asset_id::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
-  // split -- A (asset 2 reg) -- A+1 (asset 2 emitted to gw)     --  4 blocks
-  //      \-- 3 blocks        -- reg (emission is not ready yet) --  emission
+  // split -- A (asset 2 reg) -- A+1 (asset 2 emitted to gw) -- A+2 (2nd emission, fresh alt block)  --  4 blocks
+  //      \-- 4 blocks        -- reg (emissions aren't ready yet)  -- both emissions
 
   const blockchain_storage& bcs = c.get_blockchain_storage();
   const account_public_address& miner_addr = m_accounts[MINER_ACC_IDX].get_public_address();
@@ -2472,30 +2522,48 @@ bool hard_fork_6_gw_out_with_bad_asset_id::c1(currency::core& c, size_t ev_index
   CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
   CHECK_AND_ASSERT_EQ(gw_get_balance(asset_2_id), 7);
 
+  // 2nd emission stays in the pool
+  alice_wlt->refresh();
+  destinations.clear();
+  destinations.emplace_back(3, m_gw_addr_view.pub, null_pkey);
+  transaction tx_emit_2{};
+  alice_wlt->emit_asset(asset_2_id, destinations, tx_emit_2);
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 1);
+
   // switch away from A
-  CHECK_AND_ASSERT_TRUE(mine_next_pow_blocks_in_playtime_with_given_txs(miner_addr, std::vector<transaction>(), c, 3, split_block_id));
-  CHECK_AND_ASSERT_EQ(bcs.get_top_block_height(), split_block_height + 3);
-  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 2);
+  CHECK_AND_ASSERT_TRUE(mine_next_pow_blocks_in_playtime_with_given_txs(miner_addr, std::vector<transaction>(), c, 4, split_block_id));
+  CHECK_AND_ASSERT_EQ(bcs.get_top_block_height(), split_block_height + 4);
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 3);
   asset_descriptor_base adb_2{};
   CHECK_AND_ASSERT_TRUE(!bcs.get_asset_info(asset_2_id, adb_2));
   CHECK_AND_ASSERT_EQ(gw_get_balance(asset_2_id), 0);
 
+  // fresh alt block on top of A+1 with the 2nd emission: asset 2 is registered in the alt chain only
+  block blk_a2{};
+  CHECK_AND_ASSERT_TRUE(mine_next_pow_block_in_playtime_with_given_txs(miner_addr, c, std::vector<transaction>({ tx_emit_2 }), get_block_hash(blk_a1), get_block_height(blk_a1) + 1, &blk_a2));
+  CHECK_AND_ASSERT_EQ(bcs.get_top_block_height(), split_block_height + 4); // no switch
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 3);
+  CHECK_AND_ASSERT_TRUE(!bcs.get_asset_info(asset_2_id, adb_2));
+  CHECK_AND_ASSERT_EQ(gw_get_balance(asset_2_id), 0);
+
   CHECK_AND_ASSERT_TRUE(mine_next_pow_block_in_playtime(miner_addr, c));
-  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 1);
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 2);
   CHECK_AND_ASSERT_TRUE(c.get_tx_pool().have_tx(get_transaction_hash(tx_emit)));
+  CHECK_AND_ASSERT_TRUE(c.get_tx_pool().have_tx(get_transaction_hash(tx_emit_2)));
   CHECK_AND_ASSERT_TRUE(bcs.get_asset_info(asset_2_id, adb_2));
   CHECK_AND_ASSERT_EQ(gw_get_balance(asset_2_id), 0);
 
   CHECK_AND_ASSERT_TRUE(mine_next_pow_block_in_playtime(miner_addr, c));
   CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
-  CHECK_AND_ASSERT_EQ(gw_get_balance(asset_2_id), 7);
+  CHECK_AND_ASSERT_EQ(gw_get_balance(asset_2_id), 10);
 
   // switch back to A
-  CHECK_AND_ASSERT_TRUE(mine_next_pow_blocks_in_playtime_with_given_txs(miner_addr, std::vector<transaction>(), c, 4, get_block_hash(blk_a1)));
-  CHECK_AND_ASSERT_EQ(bcs.get_top_block_height(), split_block_height + 6);
+  CHECK_AND_ASSERT_TRUE(mine_next_pow_blocks_in_playtime_with_given_txs(miner_addr, std::vector<transaction>(), c, 4, get_block_hash(blk_a2)));
+  CHECK_AND_ASSERT_EQ(bcs.get_top_block_height(), split_block_height + 7);
   CHECK_AND_ASSERT_EQ(bcs.get_block_id_by_height(split_block_height + 2), get_block_hash(blk_a1));
+  CHECK_AND_ASSERT_EQ(bcs.get_block_id_by_height(split_block_height + 3), get_block_hash(blk_a2));
   CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
-  CHECK_AND_ASSERT_EQ(gw_get_balance(asset_2_id), 7);
+  CHECK_AND_ASSERT_EQ(gw_get_balance(asset_2_id), 10);
 
   return true;
 }
