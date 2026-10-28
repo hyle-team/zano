@@ -328,6 +328,8 @@ static_assert(CURRENCY_FORMATION_VERSION == 103);
 #define ZANO_HARDFORK_07_AFTER_HEIGHT                   3833000
 #define ZANO_HARDFORK_07_MIN_BUILD_VER                  600
 
+#  define ZANO_HARDFORK_BOOSTER_UNAWARE_MAX_HEIGHT      5000000000  // the height of the last block that can be truncated to when loading from booster-unaware build
+
 #else
 // Testnet
 #define ZANO_HARDFORK_01_AFTER_HEIGHT                   0
@@ -345,6 +347,8 @@ static_assert(CURRENCY_FORMATION_VERSION == 103);
 
 #define ZANO_HARDFORK_07_AFTER_HEIGHT                   500000
 #define ZANO_HARDFORK_07_MIN_BUILD_VER                  600
+
+#  define ZANO_HARDFORK_BOOSTER_UNAWARE_MAX_HEIGHT 5000000000
 
 #endif
 

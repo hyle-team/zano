@@ -845,10 +845,20 @@ bool blockchain_storage::pop_block_from_blockchain(transactions_map& onboard_tra
 //------------------------------------------------------------------
 bool blockchain_storage::init_booster_hf()
 {
-  if(m_db_hardfork_updates.size())
+  if(!m_db_hardfork_updates.size())
+  {
+    if (m_db_blocks.size() > ZANO_HARDFORK_BOOSTER_UNAWARE_MAX_HEIGHT)
+    {
+      LOG_PRINT_L0("Booster-caused truncation to " << ZANO_HARDFORK_BOOSTER_UNAWARE_MAX_HEIGHT << "...");
+      truncate_blockchain(ZANO_HARDFORK_BOOSTER_UNAWARE_MAX_HEIGHT + 1);
+      LOG_PRINT_L0("Booster-caused truncation done.");
+    }
     hf_booster_store_hardforks_to_db();
+  }
   else
+  {
     hf_booster_load_hardforks_from_db();
+  }
   return true;
 }
 //------------------------------------------------------------------
