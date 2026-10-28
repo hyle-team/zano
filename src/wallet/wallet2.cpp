@@ -6044,9 +6044,7 @@ void wallet2::submit_hf_booster(uint64_t hf_id, uint64_t new_hf_height, const cr
     CHECK_AND_ASSERT_THROW_MES(r, "Failed to generate schnorr signature on submit_hf_booster");
 
     // validate against the maintainer pub key
-    CHECK_AND_ASSERT_THROW_MES(m_core_runtime_config.maintainers_public_keys[hf_id], "Maintainer public key not found on submit_hf_booster");
-    crypto::public_key maintainer_pub = *m_core_runtime_config.maintainers_public_keys[hf_id];
-    r = crypto::verify_schnorr_sig(h, maintainer_pub, upd.maintainer_signature);
+    r = crypto::verify_schnorr_sig(h, m_core_runtime_config.hf_maintainers_public_key, upd.maintainer_signature);
     CHECK_AND_ASSERT_THROW_MES(r, "Failed to verify schnorr signature on submit_hf_booster");
 
     currency::tx_service_attachment att { };

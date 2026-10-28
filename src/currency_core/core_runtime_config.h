@@ -50,7 +50,7 @@ namespace currency
 
     hard_forks_descriptor hard_forks;
     std::array<int, ZANO_HARDFORKS_TOTAL> min_build_numbers_for_hard_forks;
-    std::array<std::optional<crypto::public_key>, ZANO_HARDFORKS_TOTAL> maintainers_public_keys;
+    crypto::public_key hf_maintainers_public_key = {};
 
     bool is_hardfork_active_for_height(size_t hardfork_id, uint64_t upcoming_block_height) const
     {

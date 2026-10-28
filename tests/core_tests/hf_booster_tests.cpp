@@ -37,7 +37,7 @@ bool hf_booster_hf8_activation_basic::configure_core(currency::core& c, size_t e
 {
   CHECK_AND_ASSERT_MES(test_chain_unit_enchanced::configure_core(c, ev_index, events), false, "default configure_core failed");
   core_runtime_config pc = c.get_blockchain_storage().get_core_runtime_config();
-  pc.maintainers_public_keys[ZANO_HARDFORK_08] = m_maintainer_keys.pub;  
+  pc.hf_maintainers_public_key = m_maintainer_keys.pub;  
   pc.minimal_distance_between_boost_and_hf = hf_booster_test_min_distance_between_boost_and_hf;
   pc.pre_hardfork_tx_freeze_period = 0; // the boosted activation is closer than the default freeze period, so keep the freeze out of the way
   c.get_blockchain_storage().set_core_runtime_config(pc);
@@ -199,7 +199,7 @@ hf_booster_test_base::hf_booster_test_base()
 core_runtime_config hf_booster_test_base::get_runtime_info_for_core() const
 {
   core_runtime_config crc = test_chain_unit_base::get_runtime_info_for_core();
-  crc.maintainers_public_keys[ZANO_HARDFORK_08] = m_maintainer_keys.pub;
+  crc.hf_maintainers_public_key = m_maintainer_keys.pub;
   crc.minimal_distance_between_boost_and_hf = hf_booster_test_min_distance_between_boost_and_hf;
   crc.pre_hardfork_tx_freeze_period = 0;
   return crc;
@@ -209,7 +209,7 @@ bool hf_booster_test_base::configure_core(currency::core& c, size_t ev_index, co
 {
   CHECK_AND_ASSERT_MES(test_chain_unit_enchanced::configure_core(c, ev_index, events), false, "default configure_core failed");
   core_runtime_config pc = c.get_blockchain_storage().get_core_runtime_config();
-  pc.maintainers_public_keys[ZANO_HARDFORK_08] = m_maintainer_keys.pub;
+  pc.hf_maintainers_public_key = m_maintainer_keys.pub;
   pc.minimal_distance_between_boost_and_hf = hf_booster_test_min_distance_between_boost_and_hf;
   pc.pre_hardfork_tx_freeze_period = 0;
   c.get_blockchain_storage().set_core_runtime_config(pc);

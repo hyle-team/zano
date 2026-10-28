@@ -124,7 +124,9 @@ namespace currency
     //HF8
     pc.hard_forks.set_hardfork_height(8, ZANO_HARDFORK_08_AFTER_HEIGHT); 
     pc.min_build_numbers_for_hard_forks[8] = ZANO_HARDFORK_08_MIN_BUILD_VER;
-    pc.maintainers_public_keys[8] = epee::string_tools::hex_to_pod<crypto::public_key>(ZANO_HARDFORK_08_MAINTAINERS_PUBLIC_KEY);
+    
+
+    pc.hf_maintainers_public_key = epee::string_tools::hex_to_pod<crypto::public_key>(ZANO_HARDFORK_MAINTAINERS_PUBLIC_KEY);
     // HF9 - TODO: add HF9 when it is scheduled
 
     static_assert(8 + 1 == ZANO_HARDFORKS_TOTAL);
@@ -134,4 +136,4 @@ namespace currency
     CHECK_AND_ASSERT_THROW_MES(r, "failed to parse alias_validation_pub_key");
     return pc;
   }
-}
+}  // namespace currency

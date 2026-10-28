@@ -329,10 +329,6 @@ namespace currency
 
     return true;
   }
-
-
-
-
   //-----------------------------------------------------------------------------------------------
   bool core::add_new_tx(const transaction& tx, tx_verification_context& tvc, bool kept_by_block)
   {
