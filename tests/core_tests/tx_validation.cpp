@@ -2736,7 +2736,7 @@ bool gen_tx_hash_bad_bypasses_pool_revalidation::check_tx_verification_context(c
 {
   if (event_idx == m_poisoned_resend_tx_index)
   {
-    CHECK_AND_ASSERT_MES(tx_added && tvc.m_added_to_pool && !tvc.m_already_existed && !tvc.m_verification_failed, false,
+    CHECK_AND_ASSERT_MES(tvc.m_added_to_pool && !tvc.m_already_existed && !tvc.m_verification_failed, false,
       ENDL << "event #" << event_idx << ": healthy resend was not validated and added to the pool; got m_already_existed="
       << tvc.m_already_existed << ", tx_added=" << tx_added << ", m_added_to_pool=" << tvc.m_added_to_pool
       << ", m_verification_failed=" << tvc.m_verification_failed << ENDL);

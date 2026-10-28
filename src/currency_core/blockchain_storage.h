@@ -223,6 +223,7 @@ namespace currency
     bool add_new_block(const block& bl_, block_verification_context& bvc);
     bool prevalidate_block(const block& bl);
     bool clear();
+    void clear_invalid_blocks();
     bool reset_and_set_genesis_block(const block& b);
     //debug function
     bool truncate_blockchain(uint64_t to_blockchain_size);

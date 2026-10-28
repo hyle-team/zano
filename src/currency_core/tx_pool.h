@@ -104,6 +104,7 @@ namespace currency
     bool on_blockchain_dec(uint64_t new_block_height, const crypto::hash& top_block_id);
     bool on_finalize_db_transaction();
     bool add_transaction_to_black_list(const transaction& tx);
+    void clear_blacklist();
     bool remove_blacklisted_tx_if_different(const crypto::hash& tx_id, const crypto::hash& tx_raw_hash);
     bool force_relay_pool() const;
     bool set_protocol(i_currency_protocol* pprotocol);

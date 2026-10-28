@@ -737,6 +737,12 @@ namespace currency
     }
 
     m_prune_alt_blocks_interval.do_call([this](){return m_blockchain_storage.prune_aged_alt_blocks();});
+    m_clear_blacklists_interval.do_call([this]()
+    {
+      m_mempool.clear_blacklist();
+      m_blockchain_storage.clear_invalid_blocks();
+      return true;
+    });
     m_check_free_space_interval.do_call([this](){ check_free_space(); return true; });
 #ifdef CPU_MINING_ENABLED
     m_miner.on_idle();

@@ -4434,6 +4434,14 @@ bool blockchain_storage::add_block_as_invalid(const block_extended_info& bei, co
   return true;
 }
 //------------------------------------------------------------------
+void blockchain_storage::clear_invalid_blocks()
+{
+  CRITICAL_REGION_LOCAL(m_invalid_blocks_lock);
+  const size_t count = m_invalid_blocks.size();
+  m_invalid_blocks.clear();
+  LOG_PRINT_L1("Block invalid cache cleanup: cleared bundles=" << count);
+}
+//------------------------------------------------------------------
 void blockchain_storage::inspect_blocks_index()const
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
@@ -8221,7 +8229,7 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
     if (!m_is_in_checkpoint_zone)
     {
       auto cleanup = [&](){ 
-        if (!m_tx_pool.have_tx(tx_id))
+        if (taken_from_pool || !m_tx_pool.have_tx(tx_id))
           m_tx_pool.add_tx(tx, tvc, true, true);
         m_tx_pool.add_transaction_to_black_list(tx);
         purge_block_data_from_blockchain(bl, tx_processed_count); 
