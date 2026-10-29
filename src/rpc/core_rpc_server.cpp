@@ -738,6 +738,23 @@ namespace currency
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
+  bool core_rpc_server::on_gateway_get_addresses(const COMMAND_RPC_GATEWAY_GET_ADDRESSES::request& req, COMMAND_RPC_GATEWAY_GET_ADDRESSES::response& res, connection_context& cntx)
+  {
+    std::vector<gateway_address_id_type> address_ids;
+    if(!m_core.get_blockchain_storage().get_gateway_addresses(req.offset, req.count, address_ids, res.top_block_height))
+    {
+      res.status = API_RETURN_CODE_INTERNAL_ERROR;
+      return true;
+    }
+    for(const auto& address_id : address_ids)
+    {
+      res.addresses.push_back(get_account_address_as_str(address_id));
+    }
+    
+    res.status = API_RETURN_CODE_OK;
+    return true;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_gateway_get_address_info(const COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO::request& req, COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO::response& res, connection_context& cntx)
   {
     currency::gateway_address_id_type addr_id = {};

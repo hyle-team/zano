@@ -6871,6 +6871,32 @@ std::shared_ptr<const gateway_address_data> blockchain_storage::get_gateway_addr
   return m_db_gateway_addresses.find(address_id);
 }
 //------------------------------------------------------------------
+bool blockchain_storage::get_gateway_addresses(uint64_t offset, uint64_t count, std::vector<gateway_address_id_type>& address_ids, uint64_t& top_block_height) const
+{
+  CRITICAL_REGION_LOCAL(m_read_lock);
+  address_ids.clear();
+
+  CHECK_AND_ASSERT_MES(m_db_blocks.size(), false, "get_gateway_addresses: blockchain is empty");
+  top_block_height = get_top_block_height();
+
+  const uint64_t address_count = m_db_gateway_addresses.size();
+  if (count == 0 || offset >= address_count)
+    return true;
+
+  const uint64_t expected_count = std::min(count, address_count - offset);
+
+  m_db_gateway_addresses.enumerate_keys([&](uint64_t i, const gateway_address_id_type& address_id)
+  {
+    if (i < offset)
+      return true;
+    
+    address_ids.push_back(address_id);
+    return address_ids.size() < expected_count;
+  });
+  CHECK_AND_ASSERT_MES(address_ids.size() == expected_count, false, "get_gateway_addresses: failed to enumerate the requested addresses");
+  return true;
+}
+//------------------------------------------------------------------
 bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, const txin_multisig& txin, const crypto::hash& tx_prefix_hash, uint64_t& max_related_block_height) const
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
