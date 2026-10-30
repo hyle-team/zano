@@ -194,3 +194,27 @@ struct tx_input_mixins: public test_chain_unit_enchanced
   bool configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
   bool generate(std::vector<test_event_entry>& events) const;
 };
+
+struct gen_tx_hash_bad_standalone_then_legit : public test_chain_unit_enchanced
+{
+  gen_tx_hash_bad_standalone_then_legit();
+  bool generate(std::vector<test_event_entry>& events) const;
+
+  bool check_tx_verification_context(const currency::tx_verification_context& tvc, bool tx_added, size_t event_idx, const currency::transaction& tx);
+  bool mark_healthy_tx(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+
+  size_t m_healthy_tx_index;
+};
+
+struct gen_tx_hash_bad_bypasses_pool_revalidation : public test_chain_unit_enchanced
+{
+  gen_tx_hash_bad_bypasses_pool_revalidation();
+  bool generate(std::vector<test_event_entry>& events) const;
+
+  bool check_tx_verification_context(const currency::tx_verification_context& tvc, bool tx_added, size_t event_idx, const currency::transaction& tx);
+  bool mark_poisoned_resend_tx(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+  bool check_healthy_resend_tx(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+
+  size_t m_poisoned_resend_tx_index;
+  crypto::hash m_poisoned_raw_hash;
+};

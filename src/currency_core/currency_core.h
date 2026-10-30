@@ -153,6 +153,7 @@ namespace currency
      uint64_t m_stop_after_height;
      currency_protocol_stub m_protocol_stub;
      epee::math_helper::once_a_time_seconds<60*60*12, false> m_prune_alt_blocks_interval;
+     epee::math_helper::once_a_time_seconds<60*60*24, false> m_clear_blacklists_interval;
      epee::math_helper::once_a_time_seconds<60, true> m_check_free_space_interval;
      friend class tx_validate_inputs;
      std::atomic<bool> m_starter_message_showed;
