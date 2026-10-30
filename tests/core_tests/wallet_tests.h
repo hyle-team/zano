@@ -357,3 +357,8 @@ struct wallet_compact_sync_escrow : public escrow_wallet_test
   bool check_transport(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
   void set_core_proxy(std::shared_ptr<tools::i_core_proxy> proxy);
 };
+
+struct gen_wallet_shared_block_sync : public wallet_test
+{
+  bool generate(std::vector<test_event_entry>& events) const;
+};

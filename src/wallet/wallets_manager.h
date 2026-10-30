@@ -79,6 +79,8 @@ public:
     uint64_t wallet_id;
     epee::locked_object<std::list<bc_services::offer_details_ex>> offers;
 
+    std::shared_ptr<tools::shared_block_source> shared_blocks;
+    uint64_t shared_block_subscription = 0;
     std::thread miner_thread;
     void worker_func();
     void stop(bool wait = true);
@@ -245,6 +247,7 @@ private:
   view::i_view m_view_stub;
   view::i_view* m_pview;
   std::shared_ptr<tools::i_core_proxy> m_rpc_proxy;
+  std::shared_ptr<tools::shared_block_source> m_shared_blocks;
   po::variables_map m_vm;
 
   bool m_use_deffered_global_outputs;

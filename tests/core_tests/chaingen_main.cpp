@@ -1138,6 +1138,7 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY_HF(gen_alias_default_alias_info_update, "3-*");
 
     GENERATE_AND_PLAY(gen_wallet_basic_transfer);
+    GENERATE_AND_PLAY(gen_wallet_shared_block_sync);
     GENERATE_AND_PLAY(gen_wallet_refreshing_on_chain_switch);
     GENERATE_AND_PLAY(gen_wallet_refreshing_on_chain_switch_2);
     GENERATE_AND_PLAY(gen_wallet_unconfirmed_tx_from_tx_pool);
