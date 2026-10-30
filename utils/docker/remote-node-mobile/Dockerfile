@@ -1,160 +1,49 @@
-###########################################################################################
-## zanod Dockerfile
-###########################################################################################
+# Build from the repository root after initializing the native submodules.
+# See README.md beside this file for build and deployment commands.
+FROM ubuntu:24.04 AS build-deps
+ENV DEBIAN_FRONTEND=noninteractive ZANO_USE_SYSTEM_BOOST=1
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+       build-essential ca-certificates cmake git pkg-config libssl-dev \
+       libicu-dev zlib1g-dev libboost-system-dev libboost-filesystem-dev \
+       libboost-locale-dev libboost-thread-dev libboost-timer-dev \
+       libboost-date-time-dev libboost-chrono-dev libboost-regex-dev \
+       libboost-serialization-dev libboost-atomic-dev \
+       libboost-program-options-dev libboost-log-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-#
-# Usage:
-# (make sure you have correct permission for /var/data/zano-data prior to run!)
-#
-#   docker run --restart=always -v /var/data/zano-data:/home/zano/.Zano -p 11121:11121 -p 11211:11211 --name=zanod -dit zanoproject/remote-node
-#
-# To get into container and interact with the daemon:
-#   docker attach zanod
-#
-# To detach from container and left it running:
-#   Ctrl+P, Ctrl+Q
-#
-# To stop container:
-#   docker stop zanod
-#
-# To build with different lib versions, pass through --build-arg's
-#   docker build --build-arg OPENSSL_VERSION_DOT=1.1.1n --build-arg OPENSSL_HASH=40dceb51a4f6a5275bde0e6bf20ef4b91bfc32ed57c0552e2e8e15463372b17a -f utils/docker/Dockerfile .
-#
-# Available Build Args
-#   - CMake Version:    CMAKE_VERSION_DOT, CMAKE_HASH
-#   - Boost Version:    BOOST_VERSION, BOOST_VERSION_DOT, BOOST_HASH
-#   - OpenSSL Version:  OPENSSL_VERSION_DOT, OPENSSL_HASH
+FROM build-deps AS build
+WORKDIR /src
+COPY CMakeLists.txt ./
+COPY contrib/ contrib/
+COPY src/ src/
+COPY utils/test-static-assert.c utils/test-static-assert.c
+ARG BUILD_JOBS=2
+RUN cmake -S . -B build -DSTATIC=ON -DBUILD_GUI=OFF \
+      -DBUILD_TESTS=OFF -DCOMMIT_ID_IN_VERSION=OFF -DBoost_NO_BOOST_CMAKE=ON -DGIT:FILEPATH= \
+    && cmake --build build --target daemon --parallel "$BUILD_JOBS" \
+    && strip build/src/zanod
 
-#
-# Build Zano
-#
-
-FROM ubuntu:18.04 as build-prep
-
-ENV DEBIAN_FRONTEND noninteractive
-
-RUN apt update && \
-    apt install -y build-essential \
-    libicu-dev \
-    libz-dev \
-    curl \
-    gcc-8 \
-    g++-8 \
-    git
-
-RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 700 --slave /usr/bin/g++ g++ /usr/bin/g++-7 && \
-    update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-8 800 --slave /usr/bin/g++ g++ /usr/bin/g++-8
-
-WORKDIR /root
-
-# Lib Settings
-ARG CMAKE_VERSION_DOT=3.16.9
-ARG CMAKE_HASH=d71eda07d6ecf3964de65a0e36d0b171565e1aced56ba9f53ca3783406b5cacf
-
-ARG BOOST_VERSION=1_84_0
-ARG BOOST_VERSION_DOT=1.84.0
-ARG BOOST_HASH=cc4b893acf645c9d4b698e9a0f08ca8846aa5d6c68275c14c3e7949c24109454
-
-ARG OPENSSL_VERSION_DOT=1.1.1w
-ARG OPENSSL_HASH=cf3098950cb4d853ad95c0841f1f9c6d3dc102dccfcacd521d93925208b76ac8
-
-# Environment Variables
-ENV BOOST_ROOT /root/boost_${BOOST_VERSION}
-ENV OPENSSL_ROOT_DIR=/root/openssl
-
-##########################################################
-# Split download & compile to use dockers caching layers #
-##########################################################
-
-# Download CMake
-RUN set -ex \
-    && curl https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION_DOT}/cmake-${CMAKE_VERSION_DOT}-Linux-x86_64.sh -OL\
-    && echo "${CMAKE_HASH}  cmake-${CMAKE_VERSION_DOT}-Linux-x86_64.sh" | sha256sum -c
-
-# Download Boost
-RUN set -ex \
-    && curl -L -o  boost_${BOOST_VERSION}.tar.bz2 https://downloads.sourceforge.net/project/boost/boost/${BOOST_VERSION_DOT}/boost_${BOOST_VERSION}.tar.bz2 \
-    && sha256sum boost_${BOOST_VERSION}.tar.bz2 \
-    && echo "${BOOST_HASH}  boost_${BOOST_VERSION}.tar.bz2" | sha256sum -c\
-    && tar -xvf boost_${BOOST_VERSION}.tar.bz2
-
-
-# Download OpenSSL
-RUN curl https://www.openssl.org/source/openssl-${OPENSSL_VERSION_DOT}.tar.gz -OL \
-    &&  sha256sum openssl-${OPENSSL_VERSION_DOT}.tar.gz \
-    && echo "${OPENSSL_HASH} openssl-${OPENSSL_VERSION_DOT}.tar.gz" | sha256sum -c
-
-
-# Compile CMake
-RUN set -ex \
-    && mkdir /opt/cmake \
-    && sh cmake-3.16.9-Linux-x86_64.sh --prefix=/opt/cmake --skip-license\
-    && ln -s /opt/cmake/bin/cmake /usr/local/bin/cmake\
-    && cmake --version\
-    && rm cmake-3.16.9-Linux-x86_64.sh
-
-# Compile Boost
-RUN set -ex \
-    && cd boost_${BOOST_VERSION} \
-    && ./bootstrap.sh --with-libraries=system,filesystem,thread,date_time,chrono,regex,serialization,atomic,program_options,locale,timer,log \
-    && ./b2
-
-# Compile OpenSSL
-RUN set -ex \
-    && tar xaf openssl-${OPENSSL_VERSION_DOT}.tar.gz \
-    && rm openssl-${OPENSSL_VERSION_DOT}.tar.gz \
-    && cd openssl-${OPENSSL_VERSION_DOT} \
-    && ./config --prefix=/root/openssl --openssldir=/root/openssl shared zlib \
-    && make \
-    && make test \
-    && make install \
-    && cd .. \
-    && rm -rf openssl-${OPENSSL_VERSION_DOT}
-
-FROM build-prep as build
-
-# Zano
-
-RUN pwd && mem_avail_gb=$(( $(getconf _AVPHYS_PAGES) * $(getconf PAGE_SIZE) / (1024 * 1024 * 1024) )) &&\
-    make_job_slots=$(( $mem_avail_gb < 4 ? 1 : $mem_avail_gb / 4)) &&\
-    echo make_job_slots=$make_job_slots &&\
-    set -x &&\
-    git clone --single-branch --recursive https://github.com/hyle-team/zano.git &&\
-    cd zano &&\
-    mkdir build && cd build &&\
-    cmake -D STATIC=TRUE .. &&\
-    make -j $make_job_slots daemon simplewallet
-
-
-#
-# Run Zano
-#
-
-FROM ubuntu:18.04
-
-# Install dependencies and Nginx
-RUN apt update && apt install -y \
-    nginx \
-    curl \
-    && apt clean
-
-RUN useradd -ms /bin/bash zano &&\
-    mkdir -p /home/zano/.Zano &&\
-    chown -R zano:zano /home/zano/.Zano
-
-USER zano:zano
-
+FROM ubuntu:24.04 AS runtime-base
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+       ca-certificates curl nginx tini \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --uid 10001 --create-home --shell /usr/sbin/nologin zano \
+    && mkdir -p /home/zano/.Zano /home/mobile_app_config /etc/nginx/trusted-proxies \
+    && chown zano:zano /home/zano/.Zano
+COPY utils/docker/remote-node-mobile/nginx.conf /etc/nginx/nginx.conf
+COPY --chmod=755 utils/docker/remote-node-mobile/entrypoint.sh /usr/local/bin/zano-remote-node
 WORKDIR /home/zano
-COPY --chown=zano:zano --from=build /root/zano/build/src/zanod .
-COPY --chown=zano:zano --from=build /root/zano/build/src/simplewallet .
-
-# Copy Nginx configuration
-USER root
-COPY nginx.conf /etc/nginx/nginx.conf
-
-# blockchain loaction
+USER 10001:10001
 VOLUME /home/zano/.Zano
+# The daemon RPC listener stays on container loopback. Only nginx is public.
+EXPOSE 11121 33340
+ENTRYPOINT ["tini", "-g", "--", "/usr/local/bin/zano-remote-node"]
 
-EXPOSE 11121 11211 33340
-
-CMD service nginx start && ./zanod --disable-upnp --log-level=0
+FROM runtime-base AS runtime
+COPY --from=build /src/build/src/zanod /usr/local/bin/zanod
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s \
+  CMD curl --fail --silent --output /dev/null --header "Content-Type: application/json" \
+      --data "{}" http://127.0.0.1:33340/getheight || exit 1
