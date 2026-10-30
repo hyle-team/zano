@@ -328,7 +328,8 @@ static_assert(CURRENCY_FORMATION_VERSION == 103);
 #define ZANO_HARDFORK_07_AFTER_HEIGHT                   3833000
 #define ZANO_HARDFORK_07_MIN_BUILD_VER                  600
 
-#  define ZANO_HARDFORK_BOOSTER_UNAWARE_MAX_HEIGHT      5000000000  // the height of the last block that can be truncated to when loading from booster-unaware build
+
+
 
 #else
 // Testnet
@@ -365,6 +366,31 @@ static_assert(CURRENCY_FORMATION_VERSION == 103);
 #define ZANO_HARDFORKS_TOTAL                            9
 
 #define ZANO_ACTIVE_HARDFORKS_TOTAL                     8         // last scheduled (with real height) hardfork id + 1; startup truncates a chain not compliant with it
+
+
+//CHANGE THIS WHEN READY TO DEPLOY NEW HF
+#ifndef TESTNET
+// this macro defines the height of the last block that can be truncated to when loading from booster-unaware build
+#  define ZANO_HARDFORK_BOOSTER_UNAWARE_MAX_HEIGHT 5000000000  // the height of the last block that can be truncated to when loading from booster-unaware build
+
+// this macro defines the last supported hardfork id (i.e., the last hardfork that can be loaded from booster-unaware build)
+// for example, if wallet got latest hard fork info from daemon with demanding to boost hf to newer version, 
+// wallet should be aware of which hardforks are supported and which are not, and if the daemon is running newer 
+// hardfork than wallet supports, wallet should refuse to connect to continue sync with this daemon 
+#  define ZANO_LAST_SUPPORTED_HARDFORK_ID 7
+
+#else
+#  define ZANO_LAST_SUPPORTED_HARDFORK_ID 7
+#  define ZANO_HARDFORK_BOOSTER_UNAWARE_MAX_HEIGHT 5000000000  // the height of the last block that can be truncated to when loading from booster-unaware build
+#endif
+
+
+static_assert(ZANO_LAST_SUPPORTED_HARDFORK_ID < ZANO_HARDFORKS_TOTAL, "The last supported hardfork must be known to this build");
+static_assert(ZANO_LAST_SUPPORTED_HARDFORK_ID + 1 >= ZANO_ACTIVE_HARDFORKS_TOTAL, "Every hardfork scheduled at a real height must be supported");
+
+
+
+
 
 
 static_assert(CURRENCY_MINER_TX_MAX_OUTS <= CURRENCY_TX_MAX_ALLOWED_OUTS, "Miner tx must obey normal tx max outs limit");

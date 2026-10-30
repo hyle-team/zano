@@ -648,6 +648,7 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
     LOG_PRINT_MAGENTA("Storage initialized with genesis", LOG_LEVEL_0);
   } 
 
+  init_booster_hf();
   // check last hardfork activation compliance (in case of emergency hardfork)
   if(m_db_blocks.size() > m_core_runtime_config.hard_forks.m_height_the_hardfork_n_active_after[ZANO_ACTIVE_HARDFORKS_TOTAL - 1] + 1)
   {
@@ -668,7 +669,6 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
 
 
   store_db_solo_options_values();
-  init_booster_hf();
 
   m_services_mgr.init(config_folder, vm);
 
@@ -5755,6 +5755,13 @@ bool blockchain_storage::hf_booster_load_hardforks_from_db()
 bool blockchain_storage::put_hf_booster_update(const transaction& tx, const crypto::hash& tx_id, const bc_services::hf_booster_update& update, const uint64_t height)
 {
   bool r = verify_hf_booster_signature(update, tx, m_core_runtime_config);
+  //if we are in pre-HF8 zone, then we ignore this tx without breaking the chain, to avoid network split.
+  if(!r && tx.hardfork_id < ZANO_HARDFORK_08)
+  {
+    LOG_PRINT_RED_L0("Ignoring hf_booster_update tx " << tx_id << " with hf_id: " << update.hf_id << ", as we are in pre-HF8 zone, to avoid network split");
+    return true;
+  }
+
   CHECK_AND_ASSERT_THROW_MES(r, "Failed to verify hf_booster_update signature for hf_id: " << update.hf_id << ", tx_id: " << tx_id);
 
   // check against minimal distance allowed betwen hf height and current height and other conditions
@@ -5787,6 +5794,16 @@ bool blockchain_storage::pop_hf_booster_update(const transaction& tx, const cryp
   {
     return true;  // this is likely truncating rised by init_booster_hardforks, so we don't need to pop anything as prev build was hf_booster - not aware
   }
+  //make sure it was valid update
+  bool r = verify_hf_booster_signature(update, tx, m_core_runtime_config);
+  // if we are in pre-HF8 zone, then we ignore this tx without breaking the chain, to avoid network split.
+  if(!r && tx.hardfork_id < ZANO_HARDFORK_08)
+  {
+    // this was pre-HF8 tx with broken proof, so it was ignored and never used to actual put_hf_booster_update, so we don't need to pop anything
+    return true;
+  }
+
+
   std::list<uint64_t> hf_heights;
   auto current_ptr = m_db_hardfork_updates.get(update.hf_id);
   CHECK_AND_ASSERT_MES(current_ptr, false, "pop_hf_booster_update: no hf_heights found for hf_id " << update.hf_id);

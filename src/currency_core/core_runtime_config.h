@@ -16,6 +16,7 @@ namespace currency
   {
     constexpr static size_t m_total_count = ZANO_HARDFORKS_TOTAL;
     std::array<uint64_t, m_total_count> m_height_the_hardfork_n_active_after;
+    uint64_t last_supported_hardfork_id = 0;
 
     hard_forks_descriptor();
     void clear();
@@ -46,7 +47,7 @@ namespace currency
     uint64_t hf4_minimum_mixins;
     wide_difficulty_type max_pos_difficulty;
     uint64_t pre_hardfork_tx_freeze_period; // number of blocks before the hardfork activatio when no new txs are accepted (effective from HF5); 0 means feature is switched off
-    uint64_t minimal_distance_between_boost_and_hf;
+    uint64_t minimal_distance_between_boost_and_hf = 0;
 
     hard_forks_descriptor hard_forks;
     std::array<int, ZANO_HARDFORKS_TOTAL> min_build_numbers_for_hard_forks;

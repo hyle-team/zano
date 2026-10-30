@@ -227,6 +227,8 @@ bool generate_and_play(const char* const genclass_name, size_t hardfork_id = SIZ
     }
     g.get_hardforks().clear();
     g.get_hardforks().set_hardfork_height(hardfork_id, 1 /* <- height_the_hardfork_is_active_after */);
+    if(g.get_hardforks().last_supported_hardfork_id < hardfork_id)
+      g.get_hardforks().last_supported_hardfork_id = hardfork_id;
   }
   hfd_local = g.get_hardforks(); // save a copy for the safety checking at the end
 
@@ -1552,6 +1554,7 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_options, arg_worker_id);
   command_line::add_arg(desc_options, arg_run_root);
   command_line::add_arg(desc_options, arg_shm_name);
+  command_line::add_arg(desc_options, arg_beep);
 
   currency::core::init_options(desc_options);
   tools::db::db_backend_selector::init_options(desc_options);
@@ -1811,7 +1814,10 @@ int main(int argc, char* argv[])
     return 2;
   }*/
 #ifdef _WIN32
-  ::Beep(1050, 1000);
+  if(command_line::has_arg(g_vm, arg_beep))
+  {
+    ::Beep(1050, 1000);
+  }
 #endif
 
   return serious_failures_count == 0 ? 0 : 1;

@@ -31,6 +31,7 @@ hf_booster_hf8_activation_basic::hf_booster_hf8_activation_basic()
   m_hardforks.clear();
   m_hardforks.set_hardfork_height(ZANO_HARDFORK_07, 1);
   m_hardforks.set_hardfork_height(ZANO_HARDFORK_08, hf_booster_test_hf8_initial_active_after_height);
+  m_hardforks.last_supported_hardfork_id = ZANO_HARDFORK_08; // the booster moves HF8, so this build must be ready for it
 }
 
 bool hf_booster_hf8_activation_basic::configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
@@ -194,6 +195,7 @@ hf_booster_test_base::hf_booster_test_base()
   m_hardforks.clear();
   m_hardforks.set_hardfork_height(ZANO_HARDFORK_07, 1);
   m_hardforks.set_hardfork_height(ZANO_HARDFORK_08, hf_booster_test_hf8_initial_active_after_height);
+  m_hardforks.last_supported_hardfork_id = ZANO_HARDFORK_08; // the booster moves HF8, so this build must be ready for it
 }
 
 core_runtime_config hf_booster_test_base::get_runtime_info_for_core() const

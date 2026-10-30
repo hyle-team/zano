@@ -1899,30 +1899,57 @@ void wallet2::pull_blocks(size_t& blocks_added, std::atomic<bool>& stop, bool& f
     "wrong daemon response: m_start_height=" + std::to_string(res.start_height) +
     " not less than local blockchain size=" + std::to_string(get_blockchain_current_size()));
 
-  // update hardforks if daemon returned more recent hardforks
-  if (res.rti_hardforks.size())
+
+  // check hardfork compatibility  
+  bool hardforks_incompatibility = false;
+  do
   {
-    if (res.rti_hardforks.size() != m_core_runtime_config.hard_forks.m_height_the_hardfork_n_active_after.size())
+    if(res.current_hardfork > get_core_runtime_config().hard_forks.last_supported_hardfork_id)
     {
-      m_events_dispatcher.RAISE_EVENT(wde_pulling_hardforks_missmatch);
-      m_core_proxy->set_incompatible_server_flag(true);
-      THROW_IF_TRUE_WALLET_EX(true, error::wallet_internal_error, "Daemon and wallet ver validation failed, hardforks missmatch");
+      hardforks_incompatibility = true;
+      // daemon is on the hardfork that wallet doesn't support
+      LOG_PRINT_RED("Daemon currently on the hardfork (" << res.current_hardfork
+            << ") at height (" << res.current_height << "), while wallet supports only up to hardfork (" 
+            << get_core_runtime_config().hard_forks.last_supported_hardfork_id << ") at a given height",
+            LOG_LEVEL_0);
+      break;
     }
-    std::copy(res.rti_hardforks.begin(), res.rti_hardforks.end(), m_core_runtime_config.hard_forks.m_height_the_hardfork_n_active_after.begin());
-  }
-  
-  //check if wallet are "on the same hardfork" with daemon with latest height of daemon
-  //we have two entries of the same code for now, after all daemons would be updated to lates version we can get rid of this
-  //one, as older version doesn't fill current_hardfork if genesis missmatch
-  if (res.current_hardfork != 0 && res.current_hardfork != get_core_runtime_config().hard_forks.get_the_most_recent_hardfork_id_for_height(res.current_height))
-  {    
-    LOG_ERROR("Daemon currently on the hardfork (" << res.current_hardfork 
-      << ") at heigh (" << res.current_height << "), while wallet think it's hardfork (" << get_core_runtime_config().hard_forks.get_the_most_recent_hardfork_id_for_height(res.current_height)  << ") at a given height");
+
+      // update hardforks info first if it's present
+    if(res.rti_hardforks.size())
+    {
+      // if wallet know more hardforks that daemon it might be ok, as newer wallet that has work in progress about future hardforks might be in release while 
+      // server could still be on more recent but still actual versions
+      // same for the daemon - we could have newer daemon that is still compatible with the wallets on users side, but the server might be from newer 
+      // versions that have still ongoing development of future hardforks.
+      // 
+      // copy hardforks that we know from daemon to wallet
+      size_t count = std::min(res.rti_hardforks.size(), m_core_runtime_config.hard_forks.m_height_the_hardfork_n_active_after.size());
+      std::copy_n(res.rti_hardforks.begin(), count, m_core_runtime_config.hard_forks.m_height_the_hardfork_n_active_after.begin());
+    }
+
+    //this is more like self validation
+    if(res.current_hardfork != 0 && res.current_hardfork != get_core_runtime_config().hard_forks.get_the_most_recent_hardfork_id_for_height(res.current_height))
+    {
+      hardforks_incompatibility = true;
+      LOG_PRINT_RED("Daemon currently on the hardfork (" << res.current_hardfork
+                    << ") at height (" << res.current_height << "), while wallet thinks it's hardfork ("
+                    << get_core_runtime_config().hard_forks.get_the_most_recent_hardfork_id_for_height(res.current_height) << ") at a given height",
+                    LOG_LEVEL_0);
+    }
+
+    
+  } while(false);
+ 
+  if (hardforks_incompatibility)
+  {
+    LOG_ERROR("Daemon currently on the hardfork (" << res.current_hardfork
+                                                   << ") at height (" << res.current_height << "), while wallet thinks it's hardfork (" << get_core_runtime_config().hard_forks.get_the_most_recent_hardfork_id_for_height(res.current_height) << ") at a given height");
     m_events_dispatcher.RAISE_EVENT(wde_pulling_hardforks_missmatch);
     m_core_proxy->set_incompatible_server_flag(true);
-    THROW_IF_TRUE_WALLET_EX(true, error::wallet_internal_error, "Daemon and wallet ver validation failed, hardforks missmatch");
+    THROW_IF_TRUE_WALLET_EX(true, error::wallet_internal_error, "Daemon and wallet ver validation failed, hardforks incompatible");
   }
-  
+    
 
 
   try

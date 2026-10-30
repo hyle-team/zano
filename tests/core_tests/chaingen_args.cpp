@@ -19,4 +19,5 @@ namespace chaingen_args
   command_line::arg_descriptor<int32_t>     arg_worker_id                    ("multiprocess-worker-id", "Internal: index of the worker process (assigned automatically by parent)", -1);
   command_line::arg_descriptor<std::string> arg_run_root                     ("multiprocess-run-root", "Internal: directory used by parent and workers to store run artifacts and reports", "");
   command_line::arg_descriptor<std::string> arg_shm_name                     ("multiprocess-shm-name", "Internal: shared memory name used to report failed tests", "");
-}
+  command_line::arg_descriptor<bool>        arg_beep                         ("beep", "Internal: whether to beep on test finish", false);     
+  }

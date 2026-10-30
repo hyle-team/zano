@@ -1944,9 +1944,9 @@ bool wallet_rpc_hardfork_verification::generate(std::vector<test_event_entry>& e
 
 bool wallet_rpc_hardfork_verification::c1(currency::core& c, size_t, const std::vector<test_event_entry>& events)
 {
-  // The test idea: verify that wallet and core hardfork versions must match, 
-  // if wallet is on a different hardfork than the daemon, refresh should fail. 
-  // when both sides switch to the same hardfork again, refresh must succeed.
+  // The test idea: the wallet takes the daemon's hardfork schedule whatever its own one is, so a schedule
+  // difference is not an incompatibility any more. The only incompatibility is a daemon on a hardfork above
+  // the wallet's last_supported_hardfork_id: then refresh must fail and the wallet must keep its own schedule.
 
   std::shared_ptr<debug_wallet2> miner_wlt = init_playtime_test_wallet_t<debug_wallet2>(events, c, MINER_ACC_IDX);
 
@@ -1964,8 +1964,9 @@ bool wallet_rpc_hardfork_verification::c1(currency::core& c, size_t, const std::
     });
 
   miner_wlt->refresh(blocks_added, received_money, stop);
+  CHECK_AND_ASSERT_MES(!hf_mismatch_err, false, "initial refresh must succeed");
 
-  // 1) wallet->HF6, core->HF5 => error
+  // 1) wallet has its own schedule (HF6 at height 1), core is on HF5 => refresh succeeds, wallet takes the core's schedule
   {
     auto cfg = c.get_blockchain_storage().get_core_runtime_config();
     cfg.hard_forks.set_hardfork_height(6, 1);
@@ -1977,12 +1978,13 @@ bool wallet_rpc_hardfork_verification::c1(currency::core& c, size_t, const std::
 
     miner_wlt->refresh(blocks_added, received_money, stop);
 
-    CHECK_AND_ASSERT_MES(hf_mismatch_err, false, "wallet->hf6 vs core->hf5 must fail");
+    CHECK_AND_ASSERT_MES(!hf_mismatch_err, false, "wallet->hf6 vs core->hf5: refresh must succeed");
+    CHECK_AND_ASSERT_MES(miner_wlt->get_core_runtime_config().hard_forks == c.get_blockchain_storage().get_core_runtime_config().hard_forks, false,
+      "wallet->hf6 vs core->hf5: wallet must take the core's schedule");
   }
 
-  // wallet->HF5 and core->HF6 -> error
+  // 2) core moves to HF6, wallet still has the HF5 schedule => refresh succeeds, wallet follows the core to HF6
   {
-    miner_wlt->set_core_runtime_config(c.get_blockchain_storage().get_core_runtime_config());
     auto cfg = c.get_blockchain_storage().get_core_runtime_config();
     cfg.hard_forks.set_hardfork_height(6, 1);
     c.get_blockchain_storage().set_core_runtime_config(cfg);
@@ -1993,15 +1995,17 @@ bool wallet_rpc_hardfork_verification::c1(currency::core& c, size_t, const std::
 
     miner_wlt->refresh(blocks_added, received_money, stop);
 
-    CHECK_AND_ASSERT_MES(hf_mismatch_err, false, "wallet->hf5 vs core->hf6 must fail");
+    CHECK_AND_ASSERT_MES(!hf_mismatch_err, false, "wallet->hf5 vs core->hf6: refresh must succeed");
+    CHECK_AND_ASSERT_MES(miner_wlt->get_core_runtime_config().hard_forks.get_height_the_hardfork_active_after(6) == 1, false,
+      "wallet->hf5 vs core->hf6: wallet must take the core's HF6 height");
   }
 
-  // both HF6 -> success
+  // 3) core is on HF6, wallet supports only up to HF5 => refresh fails, wallet keeps its own schedule
   {
     auto cfg = c.get_blockchain_storage().get_core_runtime_config();
-    cfg.hard_forks.set_hardfork_height(6, 1);
+    cfg.hard_forks.set_hardfork_height(6, CURRENCY_MAX_BLOCK_NUMBER);
+    cfg.hard_forks.last_supported_hardfork_id = 5;
     miner_wlt->set_core_runtime_config(cfg);
-    c.get_blockchain_storage().set_core_runtime_config(cfg);
 
     hf_mismatch_err = false;
     blocks_added = 0;
@@ -2009,7 +2013,26 @@ bool wallet_rpc_hardfork_verification::c1(currency::core& c, size_t, const std::
 
     miner_wlt->refresh(blocks_added, received_money, stop);
 
-    CHECK_AND_ASSERT_MES(!hf_mismatch_err, false, "refresh must succeed when both on the same HF");
+    CHECK_AND_ASSERT_MES(hf_mismatch_err, false, "core->hf6 vs wallet supporting up to hf5 must fail");
+    CHECK_AND_ASSERT_MES(miner_wlt->get_core_runtime_config().hard_forks.get_height_the_hardfork_active_after(6) == CURRENCY_MAX_BLOCK_NUMBER, false,
+      "wallet must not take the schedule of a daemon it refuses");
+  }
+
+  // 4) the same wallet now supports up to HF6 (the boundary) => refresh succeeds, wallet takes the core's schedule
+  {
+    auto cfg = miner_wlt->get_core_runtime_config();
+    cfg.hard_forks.last_supported_hardfork_id = 6;
+    miner_wlt->set_core_runtime_config(cfg);
+
+    hf_mismatch_err = false;
+    blocks_added = 0;
+    received_money = false;
+
+    miner_wlt->refresh(blocks_added, received_money, stop);
+
+    CHECK_AND_ASSERT_MES(!hf_mismatch_err, false, "core->hf6 vs wallet supporting up to hf6: refresh must succeed");
+    CHECK_AND_ASSERT_MES(miner_wlt->get_core_runtime_config().hard_forks == c.get_blockchain_storage().get_core_runtime_config().hard_forks, false,
+      "core->hf6 vs wallet supporting up to hf6: wallet must take the core's schedule");
   }
 
   miner_wlt->callback(std::make_shared<tools::i_wallet2_callback>());

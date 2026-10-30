@@ -1276,11 +1276,18 @@ namespace currency
     {
        if (sa.service_id == BC_HF_BOOSTER_SERVICE_ID && sa.instruction == BC_HF_BOOSTER_SERVICE_INSTRUCTION_UPDATE)
        {
-         ENSURE_ONETIME(was_hf_booster, "hf_booster");
          bc_services::hf_booster_update upd = AUTO_VAL_INIT(upd);
          bool r = bc_services::unpack_attachment_as_gzipped_json(upd, sa);
-         CHECK_AND_ASSERT_THROW_MES(r, "Failed to unpack hf_booster_update attachment");
-         rei.m_opt_hf_booster_update = upd;
+
+         if (rtx.hardfork_id >= ZANO_HARDFORK_08)
+         {
+           ENSURE_ONETIME(was_hf_booster, "hf_booster");
+           CHECK_AND_ASSERT_THROW_MES(r, "Failed to unpack hf_booster_update attachment");
+         }
+         if(r && !rei.m_opt_hf_booster_update)
+         {
+           rei.m_opt_hf_booster_update = upd;
+         }
        }
 
       
@@ -1327,8 +1334,8 @@ namespace currency
     CHECK_AND_ASSERT_THROW_MES(r, "Failed to verify schnorr signature on submit_hf_booster");
 
     // now as signature is correct, we can make assumptions that this is legitimate tx if we are aware of this hardfork
-    CHECK_AND_ASSERT_THROW_MES(core_runtime_config.hard_forks.m_total_count > hfu.hf_id, "Unknown hf_id on put_hf_booster_update: " << hfu.hf_id << ENDL << "THIS BUILD MIGHT BE OUT OF DATE AND NEED TO UPDATE TO LATEST ONE");
-
+    CHECK_AND_ASSERT_THROW_MES(core_runtime_config.hard_forks.m_total_count > hfu.hf_id, "Unknown hf_id on put_hf_booster_update: " << hfu.hf_id << ENDL << ", THIS BUILD MIGHT BE OUT OF DATE AND NEED TO UPDATE TO LATEST ONE");
+    CHECK_AND_ASSERT_THROW_MES(hfu.hf_id <= core_runtime_config.hard_forks.last_supported_hardfork_id, "Hardfork ID is above last supported hardfork id: " << hfu.hf_id << " > " << core_runtime_config.hard_forks.last_supported_hardfork_id << ", THIS BUILD MIGHT BE OUT OF DATE AND NEED TO UPDATE TO LATEST ONE");
     return true;
   }
   //---------------------------------------------------------------
