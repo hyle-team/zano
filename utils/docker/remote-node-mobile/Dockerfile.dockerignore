@@ -1,0 +1,16 @@
+**
+!CMakeLists.txt
+!src/
+!src/**
+!contrib/
+!contrib/**
+!utils/
+!utils/test-static-assert.c
+!utils/docker/
+!utils/docker/remote-node-mobile/
+!utils/docker/remote-node-mobile/*
+**/.git
+**/.context
+**/.claude
+**/.env*
+**/node_modules
