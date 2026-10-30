@@ -5,6 +5,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #pragma once
+#include "shared_block_source.h"
 #include <memory>
 #include <boost/serialization/list.hpp>
 #include <boost/serialization/vector.hpp>
@@ -469,6 +470,10 @@ namespace tools
 
     bool daemon_get_asset_info(const crypto::public_key& asset_id, currency::asset_descriptor_base& adb) const;
     bool set_core_proxy(const std::shared_ptr<i_core_proxy>& proxy);
+    void set_shared_block_source(const std::shared_ptr<shared_block_source>& source, uint64_t id)
+    { m_shared_block_source = source; m_shared_block_subscription = id; }
+    bool shared_sync_deferred() const { return m_shared_sync_deferred; }
+
     void set_defragmentation_tx_settings(bool enabled, uint64_t min_outs, uint64_t max_outs, uint64_t max_allowed_amount = CURRENCY_BLOCK_REWARD, size_t decoys_count = SIZE_MAX);
     void set_pos_required_decoys_count(size_t v) { m_required_decoys_count = v; }
     void set_minimum_height(uint64_t h);
@@ -1028,6 +1033,12 @@ private:
 
     std::atomic<bool> m_stop;
     std::shared_ptr<i_core_proxy> m_core_proxy;
+    std::shared_ptr<shared_block_source> m_shared_block_source;
+    uint64_t m_shared_block_subscription = 0;
+    bool m_shared_sync_deferred = false;
+    bool fetch_blocks(const currency::COMMAND_RPC_GET_BLOCKS_DIRECT::request& req,
+      currency::COMMAND_RPC_GET_BLOCKS_DIRECT::response& res, std::atomic<bool>& stop);
+
     std::weak_ptr<i_wallet2_callback> m_wcallback;
 
 

@@ -1843,6 +1843,36 @@ uint64_t wallet2::get_wallet_minimum_height()
   return res.h;
 }
 //----------------------------------------------------------------------------------------------------
+bool wallet2::fetch_blocks(const currency::COMMAND_RPC_GET_BLOCKS_DIRECT::request& req,
+  currency::COMMAND_RPC_GET_BLOCKS_DIRECT::response& res, std::atomic<bool>& stop)
+{
+  if (!m_shared_block_source)
+    return m_core_proxy->call_COMMAND_RPC_GET_BLOCKS_DIRECT(req, res);
+  currency::COMMAND_RPC_GET_BLOCKS_FAST::response raw{};
+  uint64_t epoch = 0;
+  const auto result = m_shared_block_source->get_blocks(m_shared_block_subscription,
+    req, get_blockchain_current_size(), stop, raw, epoch, m_core_proxy->get_editable_proxy_diagnostic_info());
+  if (result == shared_block_source::result::disconnected)
+    return false;
+  if (result == shared_block_source::result::deferred)
+  {
+    m_shared_sync_deferred = true;
+    return true;
+  }
+  res.status = raw.status;
+  res.start_height = raw.start_height;
+  res.current_height = raw.current_height;
+  res.current_hardfork = raw.current_hardfork;
+  bool ok = raw.status != API_RETURN_CODE_OK || currency::unserialize_block_complete_entry(raw, res);
+  if (stop || epoch != m_shared_block_source->generation())
+  {
+    res = {};
+    m_shared_sync_deferred = true;
+    return true;
+  }
+  return ok;
+}
+//----------------------------------------------------------------------------------------------------
 void wallet2::pull_blocks(size_t& blocks_added, std::atomic<bool>& stop, bool& full_reset_needed)
 {
   blocks_added = 0;
@@ -1857,7 +1887,8 @@ void wallet2::pull_blocks(size_t& blocks_added, std::atomic<bool>& stop, bool& f
     m_height_of_start_sync = req.minimum_height;
 
   m_chain.get_short_chain_history(req.block_ids);
-  bool r = m_core_proxy->call_COMMAND_RPC_GET_BLOCKS_DIRECT(req, res);
+  bool r = fetch_blocks(req, res, stop);
+  if (m_shared_sync_deferred) return;
   if (!r)
     throw error::no_connection_to_daemon(LOCATION_STR, "getblocks.bin");
 
@@ -1893,7 +1924,8 @@ void wallet2::pull_blocks(size_t& blocks_added, std::atomic<bool>& stop, bool& f
     WLT_LOG_MAGENTA("New genesis set for wallet: " << new_genesis_id, LOG_LEVEL_0);
     m_chain.get_short_chain_history(req.block_ids);
     //req.block_ids.push_back(new_genesis_id);
-    bool r = m_core_proxy->call_COMMAND_RPC_GET_BLOCKS_DIRECT(req, res);
+    bool r = fetch_blocks(req, res, stop);
+    if (m_shared_sync_deferred) return;
     THROW_IF_TRUE_WALLET_EX(!r, error::no_connection_to_daemon, "getblocks.bin");
   }
   if (res.status == API_RETURN_CODE_BUSY)
@@ -2784,6 +2816,13 @@ bool wallet2::scan_not_compliant_unconfirmed_txs()
 //----------------------------------------------------------------------------------------------------
 void wallet2::refresh(size_t& blocks_fetched, bool& received_money, std::atomic<bool>& stop)
 {
+  m_shared_sync_deferred = false;
+  // Release idle/failed demand on every exit. Deferred demand stays pending.
+  auto shared_sync_scope = std::shared_ptr<void>(nullptr, [&](void*) {
+    if (m_shared_block_source)
+      m_shared_block_source->finish(m_shared_block_subscription, m_shared_sync_deferred);
+  });
+
   load_whitelisted_tokens_if_not_loaded();
 
   bool had_full_reset = false;
@@ -2794,7 +2833,12 @@ void wallet2::refresh(size_t& blocks_fetched, bool& received_money, std::atomic<
   size_t reset_count = 0;
   crypto::hash last_tx_hash_id = m_transfers.size() ? get_transaction_hash((--m_transfers.end())->second.m_ptx_wallet_info->m_tx) : null_hash;
   m_height_of_start_sync = get_blockchain_current_size();
-  m_last_sync_percent = 0;
+  // Idle shared probes must preserve a completed wallet's displayed progress,
+  // including while another subscriber's request is temporarily in flight.
+  const bool was_synced = m_shared_block_source && m_last_known_daemon_height != 0
+    && get_blockchain_current_size() == m_last_known_daemon_height && m_last_sync_percent == 100;
+  if (!was_synced)
+    m_last_sync_percent = 0;
   while (!stop.load(std::memory_order_relaxed))
   {
     try
@@ -2839,6 +2883,10 @@ void wallet2::refresh(size_t& blocks_fetched, bool& received_money, std::atomic<
       return;
     }
   }
+
+  if (m_shared_block_source && !m_shared_sync_deferred && !stop
+    && m_last_known_daemon_height != 0 && get_blockchain_current_size() == m_last_known_daemon_height)
+    m_last_sync_percent = 100;
 
   if (last_tx_hash_id != (m_transfers.size() ? get_transaction_hash((--m_transfers.end())->second.m_ptx_wallet_info->m_tx) : null_hash))
     received_money = true;

@@ -6,6 +6,9 @@
 #include "chaingen.h"
 #include "wallet_tests.h"
 #include "wallet_test_core_proxy.h"
+#include "wallet/shared_block_source.h"
+#include "wallet/wallets_manager.h"
+#include "wallet_test_core_proxy.h"
 #include "../../src/wallet/wallet_public_structs_defs.h"
 #include "offers_helper.h"
 #include "string_coding.h"
@@ -4680,4 +4683,156 @@ void wallet_compact_sync_escrow::set_core_proxy(std::shared_ptr<tools::i_core_pr
 {
   // the reused legacy fixture creates its own wallets; force every confirmed transaction through Compact, preserving signed nested templates
   wallet_test::set_core_proxy(proxy ? std::make_shared<compact_sync_test_proxy>(std::move(proxy), true) : nullptr);
+}
+
+
+// Shared retrieval must preserve independently scanned balances and histories.
+bool gen_wallet_shared_block_sync::generate(std::vector<test_event_entry>& events) const
+{
+  GENERATE_ACCOUNT(miner);
+  GENERATE_ACCOUNT(alice);
+  GENERATE_ACCOUNT(bob);
+  currency::block genesis{};
+  generator.construct_genesis_block(genesis, miner, test_core_time::get_time());
+  events.push_back(genesis);
+  REWIND_BLOCKS_N_WITH_TIME(events, unlocked, genesis, miner, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  MAKE_TX(events, alice_payment, miner, alice, MK_TEST_COINS(1000), unlocked);
+  MAKE_NEXT_BLOCK_TX1(events, paid_alice, unlocked, miner, alice_payment);
+  MAKE_TX(events, bob_payment, miner, bob, MK_TEST_COINS(2000), paid_alice);
+  MAKE_NEXT_BLOCK_TX1(events, paid_bob, paid_alice, miner, bob_payment);
+  REWIND_BLOCKS_N_WITH_TIME(events, tip, paid_bob, miner, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  struct counted_proxy : wallet_test_core_proxy
+  {
+    std::atomic<size_t> downloads{0};
+    size_t bytes = 0;
+    std::atomic<size_t> relays{0};
+    bool call_COMMAND_RPC_FORCE_RELAY_RAW_TXS(const currency::COMMAND_RPC_FORCE_RELAY_RAW_TXS::request& req,
+      currency::COMMAND_RPC_FORCE_RELAY_RAW_TXS::response& res) override
+    {
+      relays += req.txs_as_hex.size();res.status = API_RETURN_CODE_OK;return true;
+    }
+    bool call_COMMAND_RPC_GET_BLOCKS_FAST(const currency::COMMAND_RPC_GET_BLOCKS_FAST::request& req,
+      currency::COMMAND_RPC_GET_BLOCKS_FAST::response& res) override
+    {
+      ++downloads;
+      // This legacy fixture toggles an artificial empty second result. Real
+      // daemons return the matched tip anchor; retain that real behavior here.
+      m_first_call = true;
+      const bool ok = wallet_test_core_proxy::call_COMMAND_RPC_GET_BLOCKS_FAST(req, res);
+      for (const auto& block : res.blocks)
+      {
+        bytes += block.block.size();
+        for (const auto& tx : block.txs) bytes += tx.size();
+      }
+      return ok;
+    }
+  };
+  auto transport = std::make_shared<counted_proxy>();
+  CHECK_AND_ASSERT_MES(transport->update_blockchain(events, generator, get_block_hash(tip)), false, "prepare shared chain");
+  auto source = std::make_shared<tools::shared_block_source>(transport);
+  auto independent_transport = std::make_shared<counted_proxy>();
+  CHECK_AND_ASSERT_MES(independent_transport->update_blockchain(events, generator, get_block_hash(tip)), false, "prepare independent chain");
+  CREATE_TEST_WALLET(shared_alice, alice, genesis);
+  CREATE_TEST_WALLET(shared_bob, bob, genesis);
+  CREATE_TEST_WALLET(independent_alice, alice, genesis);
+  CREATE_TEST_WALLET(independent_bob, bob, genesis);
+  shared_alice->set_core_proxy(transport);
+  shared_bob->set_core_proxy(transport);
+  shared_alice->set_shared_block_source(source, source->subscribe());
+  shared_bob->set_shared_block_source(source, source->subscribe());
+  size_t fetched = 0;
+  shared_alice->refresh(fetched);
+  shared_bob->refresh(fetched);
+  CHECK_AND_ASSERT_MES(transport->downloads == 1, false, "one common block download");
+  const auto shared_bytes = transport->bytes;
+
+  independent_alice->set_core_proxy(independent_transport);
+  independent_bob->set_core_proxy(independent_transport);
+  independent_alice->refresh(fetched);
+  independent_bob->refresh(fetched);
+  CHECK_AND_ASSERT_MES(shared_alice->balance() == MK_TEST_COINS(1000), false, "Alice shared balance");
+  CHECK_AND_ASSERT_MES(shared_bob->balance() == MK_TEST_COINS(2000), false, "Bob shared balance");
+  CHECK_AND_ASSERT_MES(shared_alice->balance() == independent_alice->balance()
+    && shared_bob->balance() == independent_bob->balance(), false, "independent balances match");
+  CHECK_AND_ASSERT_MES(shared_alice->get_recent_transfers_total_count() == independent_alice->get_recent_transfers_total_count()
+    && shared_bob->get_recent_transfers_total_count() == independent_bob->get_recent_transfers_total_count(), false, "independent histories match");
+  CHECK_AND_ASSERT_MES(shared_alice->get_blockchain_current_size() == independent_alice->get_blockchain_current_size()
+    && shared_bob->get_blockchain_current_size() == independent_bob->get_blockchain_current_size(), false, "independent heights match");
+  CHECK_AND_ASSERT_MES(shared_bytes > 0, false, "upstream bytes counted");
+
+  // Exercise the actual worker with a signed pending transaction. Unchanged
+  // shared freshness probes must not increase transaction rebroadcast frequency.
+  auto probe_transport = std::make_shared<counted_proxy>();
+  CHECK_AND_ASSERT_MES(probe_transport->update_blockchain(events, generator, get_block_hash(tip)), false, "prepare probe chain");
+  auto probe_source = std::make_shared<tools::shared_block_source>(probe_transport);
+  CREATE_TEST_WALLET(probe_wallet, alice, genesis);
+  probe_wallet->set_core_proxy(probe_transport);
+  const auto probe_subscription = probe_source->subscribe();
+  probe_wallet->set_shared_block_source(probe_source, probe_subscription);
+  probe_wallet->refresh(fetched);
+  auto probe_events = events;
+  MAKE_TEST_WALLET_TX(probe_events, pending_probe_tx, probe_wallet, MK_TEST_COINS(100), bob);
+  CHECK_AND_ASSERT_MES(!pending_probe_tx.signatures.empty(), false, "signed pending fixture");
+  std::atomic<uint64_t> daemon_height{probe_wallet->get_blockchain_current_size()};
+  std::atomic<uint64_t> daemon_state{currency::COMMAND_RPC_GET_INFO::daemon_network_state_online};
+  i_backend_wallet_callback backend;
+  view::i_view view;
+  wallets_manager::wallet_vs_options worker{};
+  **worker.w = probe_wallet;
+  worker.wallet_id = 0;
+  worker.core_conf = probe_wallet->get_core_runtime_config();
+  worker.w_cb = std::make_shared<i_wallet_to_i_backend_adapter>(&backend, 0, probe_wallet);
+  probe_wallet->callback(worker.w_cb);
+  worker.pview = &view;
+  worker.plast_daemon_height = &daemon_height;
+  worker.plast_daemon_network_state = &daemon_state;
+  worker.m_pproxy_diagnostig_info = probe_transport->get_proxy_diagnostic_info();
+  worker.last_wallet_synch_height = probe_wallet->get_blockchain_current_size();
+  worker.shared_blocks = probe_source;
+  worker.shared_block_subscription = probe_subscription;
+  const auto before_probe_downloads = probe_transport->downloads.load();
+  const auto before_probe_relays = probe_transport->relays.load();
+  worker.miner_thread = std::thread([&] { worker.worker_func(); });
+  const auto probe_deadline = std::chrono::steady_clock::now() + std::chrono::seconds(16);
+  while (probe_transport->downloads.load() < before_probe_downloads + 2
+    && std::chrono::steady_clock::now() < probe_deadline)
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  worker.stop();
+  CHECK_AND_ASSERT_MES(probe_transport->downloads >= before_probe_downloads + 2, false, "periodic unchanged-tip probes occurred");
+  CHECK_AND_ASSERT_MES(probe_transport->relays == before_probe_relays, false, "probes do not rebroadcast pending tx");
+  CHECK_AND_ASSERT_MES(probe_wallet->get_sync_progress() == 100, false, "idle probes preserve completed sync progress");
+
+  // Replace the paid branch with a longer fork without either payment.
+  MAKE_NEXT_BLOCK(events, fork_start, unlocked, miner);
+  REWIND_BLOCKS_N_WITH_TIME(events, fork_tip, fork_start, miner, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 2);
+  CHECK_AND_ASSERT_MES(transport->update_blockchain(events, generator, get_block_hash(fork_tip)), false, "prepare fork");
+  std::this_thread::sleep_for(std::chrono::milliseconds(1100));
+  const auto before_reorg = transport->downloads.load();
+  shared_alice->refresh(fetched);
+  shared_bob->refresh(fetched);
+  const auto shared_reorg_downloads = transport->downloads - before_reorg;
+  CHECK_AND_ASSERT_MES(independent_transport->update_blockchain(events, generator, get_block_hash(fork_tip)), false, "prepare independent fork");
+  const auto before_independent_reorg = independent_transport->downloads.load();
+  independent_alice->refresh(fetched);
+  independent_bob->refresh(fetched);
+  // Divergent short histories can require separate authoritative supplements.
+  // Compare against real independent downloads instead of assuming one range.
+  CHECK_AND_ASSERT_MES(shared_reorg_downloads <
+    independent_transport->downloads - before_independent_reorg, false, "shared reorg uses fewer downloads");
+  CHECK_AND_ASSERT_MES(shared_alice->get_blockchain_current_size() == get_block_height(fork_tip) + 1
+    && shared_bob->get_blockchain_current_size() == get_block_height(fork_tip) + 1, false, "shared wallets reached fork tip");
+  // Both routes also see the same orphaned transactions in the mock pool.
+  bool aliases = false;
+  shared_alice->scan_tx_pool(aliases);
+  shared_bob->scan_tx_pool(aliases);
+  independent_alice->scan_tx_pool(aliases);
+  independent_bob->scan_tx_pool(aliases);
+  CHECK_AND_ASSERT_MES(shared_alice->get_transfer_entries_count() == 0
+    && shared_bob->get_transfer_entries_count() == 0, false, "reorg removes both confirmed payments");
+  CHECK_AND_ASSERT_MES(shared_alice->balance() == independent_alice->balance()
+    && shared_bob->balance() == independent_bob->balance(), false, "reorg balances match");
+  CHECK_AND_ASSERT_MES(shared_alice->get_recent_transfers_total_count() == independent_alice->get_recent_transfers_total_count()
+    && shared_bob->get_recent_transfers_total_count() == independent_bob->get_recent_transfers_total_count(), false, "reorg histories match");
+  return true;
 }

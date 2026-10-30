@@ -487,6 +487,12 @@ std::string wallets_manager::set_remote_node_url(const std::string& url)
     m_rpc_proxy->set_connection_addr(url);
 
   SHARED_CRITICAL_REGION_BEGIN(m_wallets_lock);
+  if (m_shared_blocks)
+  {
+    auto transport = std::make_shared<tools::default_http_core_proxy>();
+    transport->set_connection_addr(url);
+    m_shared_blocks->reset(transport);
+  }
   for (auto& w : m_wallets)
   {
     w.second.w->get()->reset_connection_addr(url);
@@ -935,6 +941,13 @@ void wallets_manager::init_wallet_entry(wallet_vs_options& wo, uint64_t id)
   if (m_remote_node_mode)
   {
     wo.w.unlocked_get()->set_compact_sync(true);
+    if (!m_shared_blocks)
+    {
+      auto transport = std::make_shared<tools::default_http_core_proxy>();
+      transport->set_connection_addr(m_daemon_address);
+      m_shared_blocks = std::make_shared<tools::shared_block_source>(transport);
+    }
+    wo.shared_blocks = m_shared_blocks;
     wo.core_conf = currency::get_default_core_runtime_config();
   }
   else
@@ -1491,6 +1504,8 @@ std::string wallets_manager::close_wallet(size_t wallet_id)
 
   try
   {
+    if (it->second.shared_blocks)
+      it->second.shared_blocks->unsubscribe(it->second.shared_block_subscription);
     it->second.major_stop = true;
     it->second.stop_for_refresh = true;
     it->second.w.unlocked_get()->stop();
@@ -2056,6 +2071,11 @@ std::string wallets_manager::run_wallet(uint64_t wallet_id)
   GET_WALLET_OPT_BY_ID(wallet_id, wo);
   if (!wo.major_stop && !wo.miner_thread.joinable())
   {
+    if (wo.shared_blocks)
+    {
+      wo.shared_block_subscription = wo.shared_blocks->subscribe();
+      wo.w->get()->set_shared_block_source(wo.shared_blocks, wo.shared_block_subscription);
+    }
     wo.miner_thread = std::thread(boost::bind(&wallets_manager::wallet_vs_options::worker_func, &wo));
   }  
   return API_RETURN_CODE_OK;
@@ -2299,6 +2319,10 @@ void wallets_manager::wallet_vs_options::worker_func()
   
   wsi.wallet_state = view::wallet_status_info::wallet_state_synchronizing;
   w_cb->long_refresh_in_progress = true;
+  uint64_t last_shared_probe_tick = std::numeric_limits<uint64_t>::max();
+  uint64_t shared_generation = 0;
+  bool shared_pending = false;
+  bool shared_chain_changed = false;
 
   while (!major_stop)
   {
@@ -2323,7 +2347,13 @@ void wallets_manager::wallet_vs_options::worker_func()
       //sync zone
       if (*plast_daemon_network_state == currency::COMMAND_RPC_GET_INFO::daemon_network_state_online)
       {
-        if (*plast_daemon_height > last_wallet_synch_height)
+        const auto now = std::chrono::steady_clock::now();
+        // Use one wall-independent cadence for every wallet in this manager.
+        // Per-wallet timers would stagger identical tip requests after startup.
+        const uint64_t probe_tick = std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()).count() / 5;
+        const bool shared_probe = shared_blocks && (shared_blocks->generation() != shared_generation
+          || probe_tick != last_shared_probe_tick);
+        if (*plast_daemon_height > last_wallet_synch_height || shared_probe || shared_pending)
         {
           wsi.is_mining = do_mining;
           bool show_progress = true;
@@ -2343,7 +2373,15 @@ void wallets_manager::wallet_vs_options::worker_func()
             prepare_wallet_status_info(*this, wsi);
             pview->update_wallet_status(wsi);
           }
-          w->get()->refresh(stop_for_refresh);
+          last_shared_probe_tick = probe_tick;
+          shared_generation = shared_blocks ? shared_blocks->generation() : 0;
+          size_t refreshed_blocks = 0;
+          bool received_money = false;
+          w->get()->refresh(refreshed_blocks, received_money, stop_for_refresh);
+          shared_chain_changed = shared_chain_changed || refreshed_blocks != 0;
+          shared_pending = w->get()->shared_sync_deferred();
+          if (shared_pending)
+            continue;
           if(major_stop)
             break;
           last_wallet_synch_height = w->get()->get_blockchain_current_size();
@@ -2356,7 +2394,10 @@ void wallets_manager::wallet_vs_options::worker_func()
           }
 
           w_cb->long_refresh_in_progress = false;
-          w->get()->resend_unconfirmed();
+          // Fresh-tip probes must not increase signed transaction rebroadcast.
+          if (!shared_blocks || shared_chain_changed)
+            w->get()->resend_unconfirmed();
+          shared_chain_changed = false;
 
           wallet_state = wsi.wallet_state = view::wallet_status_info::wallet_state_ready;
           prepare_wallet_status_info(*this, wsi);
@@ -2437,6 +2478,8 @@ void wallets_manager::wallet_vs_options::worker_func()
 }
 void wallets_manager::wallet_vs_options::stop(bool wait)
 {
+  if (shared_blocks)
+    shared_blocks->unsubscribe(shared_block_subscription);
   w.unlocked_get()->stop();
   do_mining = false;
   major_stop = true;
