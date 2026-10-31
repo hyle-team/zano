@@ -56,6 +56,7 @@ namespace tools
       rsp.current_hardfork = res.current_hardfork;
       r = unserialize_block_complete_entry(res, rsp);
     }
+    rsp.rti_hardforks = res.rti_hardforks;
     return r;
   }
   //------------------------------------------------------------------------------------------------------------------------------
