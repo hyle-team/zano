@@ -1192,7 +1192,7 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY(wallet_rpc_transfer);
     GENERATE_AND_PLAY(wallet_rpc_alias_tests);
     GENERATE_AND_PLAY_HF(wallet_rpc_exchange_suite, "3-*");
-    GENERATE_AND_PLAY_HF(wallet_true_rpc_pos_mining, "4-*");
+    //GENERATE_AND_PLAY_HF(wallet_true_rpc_pos_mining, "4-*"); //TODO: talk to sowle, this test using network, and cause a problems when used in multipprocess mode
     GENERATE_AND_PLAY_HF(wallet_rpc_cold_signing, "3,5-*");
     // GENERATE_AND_PLAY_HF(wallet_rpc_multiple_receivers, "5-*"); work in progress -- sowle
     GENERATE_AND_PLAY_HF(wallet_chain_switch_with_spending_the_same_ki, "3");
