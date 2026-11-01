@@ -548,6 +548,9 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
         LOG_PRINT_MAGENTA("migration of m_db_per_block_gindex_incs completed successfully", LOG_LEVEL_0);
       }
 #ifndef TESTNET
+
+      init_booster_hf();
+
       // MAINNET ONLY
       if (m_db_most_recent_hardfork_id == 0)
       {
@@ -648,7 +651,6 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
     LOG_PRINT_MAGENTA("Storage initialized with genesis", LOG_LEVEL_0);
   } 
 
-  init_booster_hf();
   // check last hardfork activation compliance (in case of emergency hardfork)
   if(m_db_blocks.size() > m_core_runtime_config.hard_forks.m_height_the_hardfork_n_active_after[ZANO_ACTIVE_HARDFORKS_TOTAL - 1] + 1)
   {
@@ -5732,7 +5734,7 @@ bool blockchain_storage::pop_gw_address_operation(const gateway_address_descript
 //------------------------------------------------------------------
 bool blockchain_storage::hf_booster_store_hardforks_to_db()
 {
-  for(uint64_t hf_id = 0; hf_id != hard_forks_descriptor::m_total_count; hf_id++)
+  for(uint64_t hf_id = 0; hf_id <= m_core_runtime_config.hard_forks.last_supported_hardfork_id; hf_id++)
   {
     m_db_hardfork_updates.set(hf_id, std::list<uint64_t>(1, m_core_runtime_config.hard_forks.get_height_the_hardfork_active_after(hf_id)));
   }
@@ -5741,7 +5743,7 @@ bool blockchain_storage::hf_booster_store_hardforks_to_db()
 //------------------------------------------------------------------
 bool blockchain_storage::hf_booster_load_hardforks_from_db()
 {
-  for (uint64_t hf_id = 0; hf_id != hard_forks_descriptor::m_total_count; hf_id++)
+  for(uint64_t hf_id = 0; hf_id <= m_core_runtime_config.hard_forks.last_supported_hardfork_id; hf_id++)
   {
     auto hf_ptr = m_db_hardfork_updates.find(hf_id);
     if(hf_ptr && hf_ptr->size())

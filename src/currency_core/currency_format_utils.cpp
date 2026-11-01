@@ -1322,20 +1322,20 @@ namespace currency
   bool verify_hf_booster_signature(const bc_services::hf_booster_update& hfu, const transaction& tx, const core_runtime_config& core_runtime_config)
   {
     // validate if we aware of this hardfork
-    CHECK_AND_ASSERT_THROW_MES(hfu.hf_id >= ZANO_HARDFORK_08, "Hardfork ID is below ZANO_HARDFORK_08");    
+    CHECK_AND_ASSERT_MES(hfu.hf_id >= ZANO_HARDFORK_08, false,  "Hardfork ID is below ZANO_HARDFORK_08");    
     //validate sig first, so we know if we should take this seriously and put some record in the log
     //  validate update operation virst
     crypto::public_key tx_onetime_key = currency::get_tx_pub_key_from_extra(tx);
-    CHECK_AND_ASSERT_THROW_MES(tx_onetime_key != null_pkey, "Failed to get tx pub key from extra on submit_hf_booster");
-    CHECK_AND_ASSERT_THROW_MES(hfu.tx_onetime_pub_key == tx_onetime_key, "Tx onetime pub key mismatch on submit_hf_booster");
+    CHECK_AND_ASSERT_MES(tx_onetime_key != null_pkey, false, "Failed to get tx pub key from extra on submit_hf_booster");
+    CHECK_AND_ASSERT_MES(hfu.tx_onetime_pub_key == tx_onetime_key, false, "Tx onetime pub key mismatch on submit_hf_booster");
     crypto::hash h = bc_services::get_hf_booster_update_hash(hfu);
     // validate against the maintainer pub key
     bool r = crypto::verify_schnorr_sig(h, core_runtime_config.hf_maintainers_public_key, hfu.maintainer_signature);
-    CHECK_AND_ASSERT_THROW_MES(r, "Failed to verify schnorr signature on submit_hf_booster");
+    CHECK_AND_ASSERT_MES(r, false, "Failed to verify schnorr signature on submit_hf_booster");
 
     // now as signature is correct, we can make assumptions that this is legitimate tx if we are aware of this hardfork
-    CHECK_AND_ASSERT_THROW_MES(core_runtime_config.hard_forks.m_total_count > hfu.hf_id, "Unknown hf_id on put_hf_booster_update: " << hfu.hf_id << ENDL << ", THIS BUILD MIGHT BE OUT OF DATE AND NEED TO UPDATE TO LATEST ONE");
-    CHECK_AND_ASSERT_THROW_MES(hfu.hf_id <= core_runtime_config.hard_forks.last_supported_hardfork_id, "Hardfork ID is above last supported hardfork id: " << hfu.hf_id << " > " << core_runtime_config.hard_forks.last_supported_hardfork_id << ", THIS BUILD MIGHT BE OUT OF DATE AND NEED TO UPDATE TO LATEST ONE");
+    CHECK_AND_ASSERT_MES(core_runtime_config.hard_forks.m_total_count > hfu.hf_id, false, "Unknown hf_id on put_hf_booster_update: " << hfu.hf_id << ENDL << ", THIS BUILD MIGHT BE OUT OF DATE AND NEED TO UPDATE TO LATEST ONE");
+    CHECK_AND_ASSERT_MES(hfu.hf_id <= core_runtime_config.hard_forks.last_supported_hardfork_id, false, "Hardfork ID is above last supported hardfork id: " << hfu.hf_id << " > " << core_runtime_config.hard_forks.last_supported_hardfork_id << ", THIS BUILD MIGHT BE OUT OF DATE AND NEED TO UPDATE TO LATEST ONE");
     return true;
   }
   //---------------------------------------------------------------
