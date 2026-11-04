@@ -299,6 +299,9 @@ namespace epee {
 } 
 
 
+//uri map flags
+#define UMF_NEVER_LOG                0x1
+
 
 
 #define CHAIN_HTTP_TO_MAP2(context_type) bool handle_http_request(const epee::net_utils::http::http_request_info& query_info, \
@@ -414,7 +417,6 @@ namespace epee {
 #define BEGIN_JSON_RPC_MAP(uri)    else if(docs.do_generate_documentation || query_info.m_URI == uri) \
     { \
     const char* current_zone_json_uri = uri;\
-    LOG_PRINT_L4("[JSON_REQUEST_BODY]: " << ENDL << query_info.m_body); \
     uint64_t ticks = epee::misc_utils::get_tick_count(); \
     epee::serialization::portable_storage ps; \
     if(!ps.load_from_json(query_info.m_body)) \
@@ -438,6 +440,7 @@ namespace epee {
       epee::serialization::store_t_to_json(static_cast<epee::json_rpc::error_response&>(rsp), response_info.m_body); \
       return true; \
     } \
+    LOG_PRINT_L4("[JSON_REQUEST]: [" << callback_name << "]"); \
     if(false) return true; //just a stub to have "else if"
 
 
@@ -469,11 +472,17 @@ namespace epee {
   uint64_t ticks3 = epee::misc_utils::get_tick_count(); \
   response_info.m_mime_tipe = "application/json"; \
   response_info.m_header_info.m_content_type = " application/json"; \
-  LOG_PRINT( query_info.m_URI << "[" << method_name << "] processed with " << ticks1-ticks << "/"<< ticks2-ticks1 << "/" << ticks3-ticks2 << "ms", LOG_LEVEL_2);
+  LOG_PRINT( query_info.m_URI << "[" << method_name << "] processed with " << ticks1-ticks << "/"<< ticks2-ticks1 << "/" << ticks3-ticks2 << "ms", LOG_LEVEL_2); \
+  if((flags_ & UMF_NEVER_LOG) == 0)                                                                                                                                    \
+  {                                                                                                                                                                    \
+    LOG_PRINT_L4("[JSON_RESPONSE_BODY]: [" << method_name << "]" << ENDL << response_info.m_body);                                                                                                \
+  }
+  
 
 #define MAP_JON_RPC_WE(method_name, callback_f, command_type) \
     else if(auto_doc<command_type, true>(current_zone_json_uri, method_name, true, docs) && callback_name == method_name) \
 { \
+  size_t flags_ = 0; \
   call_found = true; \
   PREPARE_OBJECTS_FROM_JSON(command_type) \
   epee::json_rpc::error_response fail_resp = AUTO_VAL_INIT(fail_resp); \
@@ -489,10 +498,36 @@ namespace epee {
   return true;\
 }
 
+#define MAP_JON_RPC_WE_FLAGS(method_name, callback_f, command_type, flags)                                                 \
+  else if(auto_doc<command_type, true>(current_zone_json_uri, method_name, true, docs) && callback_name == method_name)    \
+  {                                                                                                                        \
+    size_t flags_ = flags;                                                                                                 \
+    if((flags_ & UMF_NEVER_LOG) == 0)                                                                                      \
+    {                                                                                                                      \
+       LOG_PRINT_L4("[JSON_REQUEST_BODY]: [" << method_name << "]" << ENDL << query_info.m_body);                                                 \
+    }                                                                                                                      \
+    call_found = true;                                                                                                     \
+    PREPARE_OBJECTS_FROM_JSON(command_type)                                                                                \
+    epee::json_rpc::error_response fail_resp = AUTO_VAL_INIT(fail_resp);                                                   \
+    fail_resp.jsonrpc                        = "2.0";                                                                      \
+    fail_resp.method                         = req.method;                                                                 \
+    fail_resp.id                             = req.id;                                                                     \
+    if(!callback_f(req.params, resp.result, fail_resp.error, m_conn_context))                                              \
+    {                                                                                                                      \
+      epee::serialization::store_t_to_json(static_cast<epee::json_rpc::error_response&>(fail_resp), response_info.m_body); \
+      return true;                                                                                                         \
+    }                                                                                                                      \
+    FINALIZE_OBJECTS_TO_JSON(method_name)                                                                                  \
+    return true;                                                                                                           \
+  }
+
+
+
 #define MAP_JON_RPC_WERI(method_name, callback_f, command_type) \
     else if(auto_doc<command_type, true>(current_zone_json_uri, method_name, true, docs) && callback_name == method_name) \
 { \
   call_found = true; \
+  size_t flags_ = 0; \
   PREPARE_OBJECTS_FROM_JSON(command_type) \
   epee::json_rpc::error_response fail_resp = AUTO_VAL_INIT(fail_resp); \
   fail_resp.jsonrpc = "2.0"; \
@@ -511,6 +546,7 @@ namespace epee {
     else if(auto_doc<command_type, true>(current_zone_json_uri, method_name, true, docs) && callback_name == method_name) \
 { \
   call_found = true; \
+  size_t flags_ = 0; \
   PREPARE_OBJECTS_FROM_JSON(command_type) \
   if(!callback_f(req.params, resp.result, m_conn_context)) \
   { \
@@ -530,6 +566,7 @@ namespace epee {
 #define MAP_JON_RPC_CONDITIONAL(method_name, callback_f, command_type, predicate) \
     else if(auto_doc<command_type, true>(current_zone_json_uri, method_name, true, docs) && callback_name == method_name && predicate) \
 { \
+  size_t flags_ = 0; \
   call_found = true; \
   PREPARE_OBJECTS_FROM_JSON(command_type) \
   if(!callback_f(req.params, resp.result, m_conn_context)) \
@@ -557,7 +594,7 @@ namespace epee {
   rsp.error.code = -32601; \
   rsp.error.message = "Method not found"; \
   epee::serialization::store_t_to_json(static_cast<epee::json_rpc::error_response&>(rsp), response_info.m_body); \
-  LOG_PRINT_L4("[JSON_RESPONSE_BODY]: " << ENDL << query_info.m_body); \
+  LOG_PRINT_L4("[JSON_METHOD]: [" << callback_name << "]"); \
   return true; \
   }
 

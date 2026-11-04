@@ -547,9 +547,9 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
         }
         LOG_PRINT_MAGENTA("migration of m_db_per_block_gindex_incs completed successfully", LOG_LEVEL_0);
       }
-#ifndef TESTNET
 
       init_booster_hf();
+#ifndef TESTNET
 
       // MAINNET ONLY
       if (m_db_most_recent_hardfork_id == 0)
