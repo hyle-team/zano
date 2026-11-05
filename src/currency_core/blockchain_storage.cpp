@@ -7625,11 +7625,27 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
     CHECK_AND_ASSERT_MES(tx.vin.size() <= CURRENCY_TX_MAX_ALLOWED_INPUTS, false, "transaction has too many inputs = " << tx.vin.size());
     CHECK_AND_ASSERT_MES(tx.vout.size() <= CURRENCY_TX_MAX_ALLOWED_OUTS,  false, "transaction has too many outputs = " << tx.vout.size());
 
-    bool has_gw_outs = std::any_of(tx.vout.begin(), tx.vout.end(), [](const tx_out_v& o) { return o.type() == typeid(tx_out_gateway); });
+    bool has_gw_ins = false;
+    for(auto& inv : tx.vin)
+    {
+      if (inv.type() == typeid(txin_gateway))
+      {
+        has_gw_ins = true;
+        CHECK_AND_ASSERT_MES(boost::get<txin_gateway>(inv).amount != 0, false, "zero amount gw inputs are not allowed");
+      }
+    }
+    bool has_gw_outs = false;
+    for(auto& outv : tx.vout)
+    {
+      if (outv.type() == typeid(tx_out_gateway))
+      {
+        has_gw_outs = true;
+        CHECK_AND_ASSERT_MES(boost::get<tx_out_gateway>(outv).amount != 0, false, "zero amount gw outputs are not allowed");
+      }
+    }
 
     if (mode_separate)
     {
-      bool has_gw_ins  = std::any_of(tx.vin.begin(),  tx.vin.end(),  [](const txin_v& o)   { return o.type() == typeid(txin_gateway); });
       CHECK_AND_ASSERT_MES(!has_gw_ins && !has_gw_outs, false, "TX_FLAG_SIGNATURE_MODE_SEPARATE is incompatible with gw ins/outs");
     }
 
