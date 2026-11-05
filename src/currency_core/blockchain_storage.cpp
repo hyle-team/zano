@@ -7667,7 +7667,7 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
   return true;
 }
 //------------------------------------------------------------------
-// checks each gw output's asset id is registered, uses m_db_assets for main chain + alt_chain data (current_alt_block + rest of chain) + same tx ado reg
+// checks each gw input's and output's asset id is registered, uses m_db_assets for main chain + alt_chain data (current_alt_block + rest of chain) + same tx ado reg
 bool blockchain_storage::validate_tx_gw_asset_ids(const transaction& tx, uint64_t block_height, const alt_chain_type& alt_chain, const alt_block_extended_info* p_current_alt_block /* = nullptr */) const
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
@@ -7705,24 +7705,43 @@ bool blockchain_storage::validate_tx_gw_asset_ids(const transaction& tx, uint64_
     return registered_asset_id_found && asset_id == registered_asset_id;
   };
 
+  auto check_raw_asset_id_1div8 = [&](const crypto::public_key& asset_id_1div8) -> bool {
+    if (asset_id_1div8 == native_coin_asset_id_1div8)
+      return true; // good -- native coin
+    crypto::public_key asset_id{};
+    CHECK_AND_ASSERT_MES(crypto::pub_key_mul8(asset_id_1div8, asset_id), false, "pub_key_mul8 failed");
+    if (is_asset_id_registered_in_this_tx(asset_id))
+      return true; // good -- main chain same tx registration
+    if (is_asset_id_registered_in_alt_chain(asset_id))
+      return true; // good -- alt chain registered asset (inc. same tx registration)
+    // otherwise it must be in the DB (main chain reg, including the post-split assets)
+    auto ptr = m_db_assets.find(asset_id); // TODO optimization: we can build a cache for frequent asset ids in future -- sowle
+    if (!ptr)
+      return false;
+    return true;
+  };
+
+  for(size_t input_index = 0; input_index < tx.vin.size(); ++input_index)
+  {
+    if (tx.vin[input_index].type() == typeid(txin_gateway))
+    {
+      const txin_gateway& gwi = boost::get<txin_gateway>(tx.vin[input_index]);
+      if (!check_raw_asset_id_1div8(gwi.asset_id))
+      {
+        LOG_PRINT_RED_L0("gw asset_id check failed, asset_id/8: " << gwi.asset_id << ", amount: " << gwi.amount << ", input #" << input_index);
+        return false;
+      }
+    }
+  }
+
   for(size_t output_index = 0; output_index < tx.vout.size(); ++output_index)
   {
     if (tx.vout[output_index].type() == typeid(tx_out_gateway))
     {
       const tx_out_gateway& gwo = boost::get<tx_out_gateway>(tx.vout[output_index]);
-      if (gwo.asset_id == native_coin_asset_id_1div8)
-        continue; // good -- native coin
-      crypto::public_key asset_id{};
-      CHECK_AND_ASSERT_MES(crypto::pub_key_mul8(gwo.asset_id, asset_id), false, "pub_key_mul8 failed for out #" << output_index);
-      if (is_asset_id_registered_in_this_tx(asset_id))
-        continue; // good -- main chain same tx registration
-      if (is_asset_id_registered_in_alt_chain(asset_id))
-        continue; // good -- alt chain registered asset (inc. same tx registration)
-      // otherwise it must be in the DB (main chain reg)
-      auto ptr = m_db_assets.find(asset_id); // TODO optimization: we can build a cache for frequent asset ids in future -- sowle
-      if (!ptr)
+      if (!check_raw_asset_id_1div8(gwo.asset_id))
       {
-        LOG_PRINT_RED_L0("gw output #" << output_index << " has non-existing asset id: " << asset_id);
+        LOG_PRINT_RED_L0("gw asset_id check failed, asset_id/8: " << gwo.asset_id << ", amount: " << gwo.amount << ", output #" << output_index);
         return false;
       }
     }
