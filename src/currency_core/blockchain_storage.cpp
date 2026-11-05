@@ -1104,10 +1104,11 @@ bool blockchain_storage::purge_transaction_from_blockchain(const crypto::hash& t
   tx_ = tx;
 
   fee = get_tx_fee(tx_res_ptr->tx);
-  purge_transaction_keyimages_from_blockchain(tx, true);
 
-  bool res_pop_gi = pop_transaction_from_global_index(tx, tx_id);
+  bool res_pop_gi = pop_transaction_from_global_index(tx, tx_id); // unprocess outputs
   CHECK_AND_ASSERT_MES_NO_RET(res_pop_gi, "serious internal error: pop_transaction_from_global_index() failed for tx " << tx_id);
+
+  purge_transaction_keyimages_from_blockchain(tx, true); // unprocess inputs
 
   bool r = unprocess_blockchain_tx_attachments(tx, get_current_blockchain_size(), 0/*TODO: add valid timestamp here in future if need*/);
 
