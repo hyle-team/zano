@@ -379,7 +379,7 @@ namespace currency
       << ", bvc.added_to_altchain=" << bvc.m_added_to_altchain
       << ", bvc.m_marked_as_orphaned=" << bvc.m_marked_as_orphaned, LOG_LEVEL_2);
 
-    if (bvc.m_added_to_main_chain || (bvc.m_added_to_altchain && bvc.m_height_difference < 2))
+    if(bvc.m_added_to_main_chain   /* || (bvc.m_added_to_altchain && bvc.m_height_difference < 2) */)
     { 
       if (true/*!prevalidate_relayed*/)
       {
@@ -730,6 +730,14 @@ namespace currency
       LOG_PRINT_MAGENTA("Synchronized set to FALSE (" << synchronized_connections_count << " of " << total_connections_count << " conn. synced)", LOG_LEVEL_0);
       m_synchronized = false;
       m_sync_speed_calculator.reset();
+    }
+
+    if (m_core.get_blockchain_storage().get_performnce_data().epic_failure_happend)
+    {
+      // emergency stop, something went wrong with core, stop p2p network and whole daemon, report to user
+      LOG_PRINT_RED_L0("[EMERGENCY] INTERNAL CRITICAL ERROR happened in core, daemon is shutting down, please contact the team and provide them this log error message(and few screens above it to get more details). Sorry about this issue.");
+      this->m_p2p->send_stop_signal();
+      return true;
     }
 
     return m_core.on_idle();

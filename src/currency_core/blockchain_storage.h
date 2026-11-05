@@ -711,7 +711,7 @@ namespace currency
     void get_last_n_x_blocks(uint64_t n, bool pos_blocks, std::list<std::shared_ptr<const block_extended_info>>& blocks) const;
     bool prevalidate_miner_transaction(const block& b, uint64_t height, bool pos)const;
     bool rollback_blockchain_switching(std::list<block_ws_txs>& original_chain, size_t rollback_height);
-    bool add_transaction_from_block(const transaction& tx, const crypto::hash& tx_id, const crypto::hash& bl_id, uint64_t bl_height, uint64_t timestamp);
+    bool add_transaction_from_block(const transaction& tx, const crypto::hash& tx_id, const crypto::hash& bl_id, uint64_t bl_height, uint64_t timestamp, bool taken_from_pool);
     bool push_transaction_to_global_outs_index(const transaction& tx, const crypto::hash& tx_id, std::vector<uint64_t>& global_indexes, const crypto::hash& bl_id, const uint64_t bl_height);
     bool pop_transaction_from_global_index(const transaction& tx, const crypto::hash& tx_id);
     bool build_random_out_entry(uint64_t amount, size_t g_index, uint64_t mix_count, bool use_only_forced_to_mix, uint64_t height_upper_limit, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry& oen) const;
