@@ -50,3 +50,14 @@ private:
   mutable crypto::hash m_zero_out_txid;
   mutable uint64_t m_zero_out_tx_height = 0;
 };
+
+struct get_random_outs3_cache : public test_chain_unit_enchanced
+{
+  get_random_outs3_cache();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+
+private:
+  mutable uint64_t m_amount_a;
+  mutable uint64_t m_amount_b;
+};

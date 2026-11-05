@@ -367,3 +367,81 @@ bool decoy_set_on_zero_output_tx::check_decoys(currency::core& c, size_t ev_inde
 
   return true;
 }
+
+//------------------------------------------------------------------------------
+
+get_random_outs3_cache::get_random_outs3_cache()
+  : m_amount_a(0), m_amount_b(0)
+{
+  REGISTER_CALLBACK_METHOD(get_random_outs3_cache, c1);
+}
+
+bool get_random_outs3_cache::generate(std::vector<test_event_entry>& events) const
+{
+  // amount_a has exactly 2 mature outs, so up_index_limit(amount_a) == amount_b
+  m_amount_a = 123456789;
+  m_amount_b = 2;
+
+  GENERATE_ACCOUNT(miner_account);
+  GENERATE_ACCOUNT(bob_account);
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_account, test_core_time::get_time());
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_account, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 2);
+
+  std::vector<tx_destination_entry> destinations;
+  destinations.push_back(tx_destination_entry(m_amount_a, bob_account.get_public_address()));
+  destinations.push_back(tx_destination_entry(m_amount_a, bob_account.get_public_address()));
+  destinations.push_back(tx_destination_entry(m_amount_b, bob_account.get_public_address()));
+
+  std::vector<tx_source_entry> sources;
+  bool r = fill_tx_sources(sources, events, blk_0r, miner_account.get_keys(), 2 * m_amount_a + m_amount_b + TESTS_DEFAULT_FEE, 0);
+  CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources failed");
+
+  transaction tx_0{};
+  r = construct_tx(miner_account.get_keys(), sources, destinations, events, this, tx_0);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
+
+  events.push_back(tx_0);
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_1, blk_0r, miner_account, std::list<transaction>({ tx_0 }));
+
+  REWIND_BLOCKS_N(events, blk_1r, blk_1, miner_account, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 2);
+
+  DO_CALLBACK(events, "c1");
+  return true;
+}
+
+bool get_random_outs3_cache::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::request req = AUTO_VAL_INIT(req);
+  req.height_upper_limit = 0;
+  req.use_forced_mix_outs = false;
+  req.coinbase_percents = 0;
+
+  COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::offsets_distribution item_a = AUTO_VAL_INIT(item_a);
+  item_a.amount = m_amount_a;
+  item_a.global_offsets.resize(1);
+
+  COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::offsets_distribution item_b = AUTO_VAL_INIT(item_b);
+  item_b.amount = m_amount_b;
+
+  req.amounts.push_back(item_a);
+  req.amounts.push_back(item_b);
+
+  COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::response res = AUTO_VAL_INIT(res);
+
+  bool r = false;
+  try
+  {
+    r = c.get_blockchain_storage().get_random_outs_for_amounts3(req, res);
+  }
+  catch (...)
+  {
+    CHECK_AND_ASSERT_MES(false, false, "get_random_outs_for_amounts3 threw (division by zero?)");
+  }
+
+  CHECK_AND_ASSERT_MES(r, false, "get_random_outs_for_amounts3 failed");
+  CHECK_AND_ASSERT_MES(res.outs.size() == 2, false, "unexpected res.outs.size()=" << res.outs.size());
+  CHECK_AND_ASSERT_MES(res.outs[0].outs.size() == 1, false, "wrong decoys count for amount_a: " << res.outs[0].outs.size());
+  CHECK_AND_ASSERT_MES(res.outs[1].outs.empty(), false, "wrong decoys count for amount_b: " << res.outs[1].outs.size());
+
+  return true;
+}

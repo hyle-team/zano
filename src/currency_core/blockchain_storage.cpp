@@ -3221,7 +3221,7 @@ bool blockchain_storage::get_target_outs_for_amount_prezarcanum(const COMMAND_RP
   if (it_limit == amounts_to_up_index_limit_cache.end())
   {
     up_index_limit = find_end_of_allowed_index(amount);
-    amounts_to_up_index_limit_cache[up_index_limit];
+    amounts_to_up_index_limit_cache[amount] = up_index_limit;
   }
   else
   {
@@ -3233,7 +3233,7 @@ bool blockchain_storage::get_target_outs_for_amount_prezarcanum(const COMMAND_RP
   {
     std::set<size_t> used;
     //used.insert(details.own_global_index);
-    for (uint64_t j = 0; j != decoys_count || used.size() >= up_index_limit;)
+    for (uint64_t j = 0; j != decoys_count && used.size() < up_index_limit;)
     {
       size_t g_index_initial = crypto::rand<size_t>() % up_index_limit;
       size_t g_index = g_index_initial;
