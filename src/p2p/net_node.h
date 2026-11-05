@@ -198,7 +198,7 @@ namespace nodetool
     //bool get_local_handshake_data(handshake_data& hshd);
 
     bool merge_peerlist_with_local(const std::vector<peerlist_entry>& bs);
-    bool fix_time_delta(std::vector<peerlist_entry>& local_peerlist, time_t local_time, int64_t& delta);
+    //bool fix_time_delta(std::vector<peerlist_entry>& local_peerlist, time_t local_time, int64_t& delta);
 
     bool connections_maker();
     bool peer_sync_idle_maker();

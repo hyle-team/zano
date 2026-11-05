@@ -1214,7 +1214,7 @@ namespace nodetool
     return true;
   }
   //-----------------------------------------------------------------------------------
-  template<class t_payload_net_handler>
+  /* template<class t_payload_net_handler>
   bool node_server<t_payload_net_handler>::fix_time_delta(std::vector<peerlist_entry>& local_peerlist, time_t local_time, int64_t& delta)
   {
     //fix time delta
@@ -1232,7 +1232,7 @@ namespace nodetool
       be.last_seen += delta;
     }
     return true;
-  }
+  }*/
   //-----------------------------------------------------------------------------------
   template<class t_payload_net_handler>
   bool node_server<t_payload_net_handler>::handle_remote_peerlist(const std::vector<peerlist_entry>& peerlist, time_t local_time, const net_utils::connection_context_base& context)
@@ -1245,9 +1245,13 @@ namespace nodetool
     }
 
     int64_t delta = 0;
+    time_t now = time(nullptr);
     std::vector<peerlist_entry> peerlist_ = peerlist;
-    if(!fix_time_delta(peerlist_, local_time, delta))
-      return false;
+    for(auto& pe : peerlist_)
+    {
+      pe.last_seen = now;
+    }
+    
     LOG_PRINT_L2("REMOTE PEERLIST: TIME_DELTA: " << delta << ", remote peerlist size=" << peerlist_.size());
     LOG_PRINT_L3("REMOTE PEERLIST: " <<  print_peerlist_to_string(peerlist_));
     return m_peerlist.merge_peerlist(peerlist_);
