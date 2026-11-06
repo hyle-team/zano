@@ -7437,7 +7437,7 @@ size_t blockchain_storage::get_current_hardfork_id() const
 bool blockchain_storage::validate_tx_for_hardfork_specific_terms_types_HF6(const transaction& tx, const crypto::hash& tx_id, uint64_t block_height) const
 {
   size_t current_hard_fork_id = m_core_runtime_config.hard_forks.get_the_most_recent_hardfork_id_for_height(block_height);
-  return currency::validate_tx_for_hardfork_specific_terms_types_HF6(tx, tx_id, current_hard_fork_id);
+  return currency::validate_tx_for_hardfork_specific_terms_types_HF6(tx, current_hard_fork_id);
 }
 
 //TODO: this function might be removed after HF6 is activated on mainnet
@@ -8323,7 +8323,7 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
       return false;
     }
 
-    if (!validate_tx_semantic(tx, blob_size, tx_id))
+    if (!validate_tx_semantic(tx, blob_size))
     {
       LOG_PRINT_L0("Block with id: " << id << " has at least one transaction with wrong semantic, tx_id: " << tx_id);
       purge_block_data_from_blockchain(bl, tx_processed_count);
@@ -9915,7 +9915,7 @@ bool blockchain_storage::validate_alt_block_txs(const block& b, const crypto::ha
     const transaction& tx = it == abei.onboard_transactions.end() ? *tx_ptr : it->second;
 
     CHECK_AND_ASSERT_MES(tx.signatures.size() == tx.vin.size(), false, "invalid alt block tx " << tx_id << ": signatures.size() == " <<  tx.signatures.size() << ", tx.vin.size() == " << tx.vin.size());
-    CHECK_AND_ASSERT_MES(validate_tx_semantic(tx, get_object_blobsize(tx), tx_id), false, "invalid alt block tx " << tx_id << ": semantic validation failed");
+    CHECK_AND_ASSERT_MES(validate_tx_semantic(tx, get_object_blobsize(tx)), false, "invalid alt block tx " << tx_id << ": semantic validation failed");
 
     fees.push_back(get_tx_fee(tx));
 

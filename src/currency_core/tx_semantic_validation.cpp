@@ -53,7 +53,7 @@ namespace currency
     return true;
   }
   //-----------------------------------------------------------------------------------------------
-  bool validate_tx_semantic(const transaction& tx, size_t tx_blob_size, const crypto::hash& tx_id)
+  bool validate_tx_semantic(const transaction& tx, size_t tx_blob_size)
   {
     if (tx_blob_size >= CURRENCY_MAX_TRANSACTION_BLOB_SIZE)
     {
@@ -70,7 +70,7 @@ namespace currency
     if (tx.hardfork_id >= ZANO_HARDFORK_06)
     {
       // consider removing the following call, I think it is redundant -- sowle
-      if (!currency::validate_tx_for_hardfork_specific_terms_types_HF6(tx, tx_id, tx.hardfork_id))
+      if (!currency::validate_tx_for_hardfork_specific_terms_types_HF6(tx, tx.hardfork_id))
       { 
         LOG_PRINT_RED_L0("tx failed hardfork specific terms validation");
         return false;
