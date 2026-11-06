@@ -202,7 +202,8 @@ namespace command_line
   template<>
   inline bool has_arg<bool, false>(const boost::program_options::variables_map& vm, const arg_descriptor<bool, false>& arg)
   {
-    return get_arg<bool, false>(vm, arg);
+    const auto& value = vm[arg.name];
+    return !value.empty() && value.as<bool>();
   }
 
 #define ARG_DB_ENGINE_LMDB   "lmdb"
