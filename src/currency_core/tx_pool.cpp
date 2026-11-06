@@ -188,7 +188,7 @@ namespace currency
     //check key images for transaction if it is not kept by block
     if(!from_core && !kept_by_block)
     {
-      if(!validate_tx_semantic(tx, blob_size, id))
+      if(!validate_tx_semantic(tx, blob_size))
       {          
         // tx semantics check failed
         LOG_PRINT_RED_L0("Transaction " << id << " semantics check failed ");
