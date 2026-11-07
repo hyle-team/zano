@@ -30,6 +30,7 @@ namespace nodetool
     virtual bool block_ip(uint32_t adress)=0;
     virtual bool add_ip_fail(uint32_t adress)=0;
     virtual bool is_stop_signal_sent() = 0;
+    virtual void send_stop_signal() = 0;
   };
 
   template<class t_connection_context>
@@ -79,6 +80,10 @@ namespace nodetool
     virtual bool is_stop_signal_sent()
     {
       return false;
+    }
+    virtual void send_stop_signal()
+    {
+
     }
   };
 }

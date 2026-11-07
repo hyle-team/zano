@@ -561,6 +561,7 @@ namespace tools
       }
       virtual bool on_write_transaction_abort()
       {
+        size_cache_valid = false;
         m_isolation.reset_isolation_mode();
         return true;
       }

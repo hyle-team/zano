@@ -93,7 +93,7 @@ namespace nodetool
     bool run(bool sync_call = true);
     bool init(const boost::program_options::variables_map& vm);
     bool deinit();
-    bool send_stop_signal();
+    virtual void send_stop_signal();
     bool timed_wait_server_stop(size_t mseconds_wait){ return m_net_server.timed_wait_server_stop(mseconds_wait); }
 
     uint32_t get_this_peer_port(){return m_listenning_port;}
@@ -186,6 +186,7 @@ namespace nodetool
     virtual bool block_ip(uint32_t adress);
     virtual bool add_ip_fail(uint32_t address);
     virtual bool is_stop_signal_sent();
+    //virtual void send_stop_signal(); - declared in public part 
     //----------------- i_connection_filter  --------------------------------------------------------
     virtual bool is_remote_ip_allowed(uint32_t adress, bool is_incoming);
     //-----------------------------------------------------------------------------------------------

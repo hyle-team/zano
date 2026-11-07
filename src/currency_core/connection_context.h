@@ -39,6 +39,9 @@ namespace currency
     std::atomic<size_t> m_expected_NOTIFY_RESPONSE_GET_OBJECTS_count = 0;
     std::atomic<size_t> m_expected_NOTIFY_RESPONSE_CHAIN_ENTRY_count = 0;
 
+    uint64_t m_chain_entry_best_height = 0;  // highest m_last_response_height seen in this sync session
+    size_t m_chain_entry_stall_count   = 0;  // consecutive non-final responses that made no progress
+
   };
 
   struct currency_connection_context: public epee::net_utils::connection_context_base

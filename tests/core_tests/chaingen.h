@@ -124,7 +124,7 @@ struct event_visitor_settings
 
   enum settings
   {
-    set_txs_kept_by_block         = 1 << 0,
+    set_txs_kept_by_block         = 1 << 0, // subsequent tx events are not pushed to the core, they are delivered inside the next block as onboard txs (the pool is not involved)
     set_skip_txs_blobsize_check   = 1 << 1,
   };
 

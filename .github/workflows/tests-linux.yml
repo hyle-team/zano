@@ -1,0 +1,416 @@
+name: Linux tests
+
+# Builds only what the test suites need - no GUI, no daemon, no simplewallet -
+# and runs, from the build directory:
+#
+#   tests/unit_tests
+#   tests/functional_tests --crypto-tests='crypto_*'
+#   tests/coretests --multiprocess-run=4
+#
+# Triggered by every push to develop, master, or release (that is, every merge
+# into them; the branch names are matched exactly, so release_* side branches
+# are not covered), except the automated build-number bump, and by hand.
+#
+# Boost and OpenSSL are built from source exactly as in build-linux.yml - same
+# versions, b2/Configure flags, and cache key format - so once both workflows
+# run on the same runner image they share one dependency cache.
+#
+# The same three binaries can be built locally with
+#   cmake -S . -B build -DBUILD_TESTS=TRUE -DBUILD_GUI=FALSE -DSTATIC=TRUE ...
+#   cmake --build build --target unit_tests functional_tests coretests
+
+on:
+  push:
+    branches:
+      - develop
+      - master
+      - release
+    # The build-number bump that build-all.yml pushes ("=== build number: N ->
+    # N+1 ===") changes only this file, and nothing the tests exercise depends
+    # on it, so such a push does not earn an hour of runner time. A push that
+    # changes anything else still runs, whatever its commit message says.
+    paths-ignore:
+      - src/version.h.in
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One run per branch at a time. A run that is already in progress is never
+# cancelled, so every merge that started a run gets its verdict; if several
+# merges land while it runs, only the newest one waits and the ones in between
+# are dropped (their changes are covered by the newest head anyway).
+concurrency:
+  group: tests-linux-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  BOOST_VERSION: 1.84.0
+  BOOST_SHA256: cc4b893acf645c9d4b698e9a0f08ca8846aa5d6c68275c14c3e7949c24109454
+  OPENSSL_VERSION: 3.5.8
+  OPENSSL_SHA256: a8f84a39918ec6415ce765d9b429d313ba97b8143169c172e734b9514464f5b2
+
+jobs:
+  tests:
+    name: Linux ${{ matrix.arch }} (tests)
+    runs-on: ${{ matrix.runner }}
+    # Generous backstop for a cold run (Boost + OpenSSL from source, then an
+    # LTO build of three large test binaries on four cores). The test steps
+    # carry their own, much tighter, timeouts below.
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      # One entry today; kept as a matrix so the runner label and the
+      # dependency cache key cannot drift apart, and so this file lines up
+      # with build-linux.yml step for step (an arm64 row can be added the
+      # same way as there).
+      matrix:
+        include:
+          - arch: x64
+            # ubuntu-22.04 (build-linux.yml's x64 image, kept there for its
+            # glibc baseline) entered deprecation in September 2026 and is
+            # removed in April 2027. Tests have no baseline requirement, so
+            # they run on 24.04 (GCC 13.3, the compiler build-linux.yml's
+            # arm64 row already uses).
+            runner: ubuntu-24.04
+            cmake_arch: x86-64
+            boost_arch: x86
+            openssl_target: linux-x86_64
+    env:
+      DEPS_DIR: ${{ github.workspace }}/_deps-linux
+      BUILD_DIR: ${{ github.workspace }}/build-linux
+      CCACHE_DIR: ${{ github.workspace }}/_ccache
+      # See "Restore compiler cache" for why this is kept small. Level 5 is
+      # the highest zstd level the ccache manual recommends for compile-time
+      # compression; it buys a noticeably smaller cache for little CPU.
+      CCACHE_MAXSIZE: 1G
+      CCACHE_COMPRESSLEVEL: 5
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # Submodules are initialized in the next step so that the GUI front
+          # end (src/gui/qt-daemon/layout) is skipped.
+          submodules: false
+          # No history is needed: version.h is generated without the commit
+          # id (see Configure) and libmdbx's version detection only inspects
+          # HEAD. build-linux.yml fetches the full history because its
+          # binaries embed the commit id.
+          fetch-depth: 1
+          persist-credentials: false
+
+      # contrib/bitcoin-secp256k1 is only compiled when configuring with
+      # -DUSE_BITCOIN_SECP256K1_FOR_ECDSA=TRUE (the default uses OpenSSL); it
+      # is initialized anyway so that flipping that default cannot break this
+      # job. The GUI layout submodule is deliberately left out.
+      - name: Initialize dependency submodules
+        run: |
+          set -euo pipefail
+          git submodule update --init --depth 1 --jobs 3 \
+            contrib/miniupnp \
+            contrib/jwt-cpp \
+            contrib/bitcoin-secp256k1
+          git submodule status
+
+      # libicu-dev provides the static ICU archives that STATIC=TRUE links
+      # (icui18n.a, icuuc.a, icudata.a) and the ICU backend for Boost.Locale;
+      # libbacktrace.a and backtrace.h, which Boost.Stacktrace needs, ship
+      # with GCC (libgcc-13-dev, pulled in by build-essential). ccache is not
+      # part of the runner image. Nothing here needs zlib or bzip2 headers:
+      # Zano builds its own contrib/zlib and Boost.Iostreams is not built.
+      - name: Install build prerequisites
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            bzip2 \
+            ca-certificates \
+            ccache \
+            curl \
+            libicu-dev \
+            perl
+
+      # A memory peak during the build (see "Build test binaries") takes the
+      # whole runner down ("The runner has received a shutdown signal")
+      # rather than failing the compiler, and skips every later step,
+      # log upload included. Swap turns such a peak into a slowdown. Whatever
+      # swap the image ships with is replaced by one 8 GiB file on /mnt, the
+      # hosted runner's temporary disk, so it does not take space from the
+      # build directory; the image's own /mnt/swapfile, if any, is removed to
+      # give its space back.
+      - name: Set up 8 GiB swap
+        run: |
+          set -euo pipefail
+          echo "Swap before:"
+          swapon --show
+          sudo swapoff -a
+          sudo rm -f /mnt/swapfile
+          sudo fallocate -l 8G /mnt/ci-swapfile
+          sudo chmod 600 /mnt/ci-swapfile
+          sudo mkswap /mnt/ci-swapfile >/dev/null
+          sudo swapon /mnt/ci-swapfile
+          echo "Swap after:"
+          swapon --show
+          free -h
+
+      # restore/save are separate so successfully built dependencies enter the
+      # cache immediately even if a later Zano build or test step fails
+      - name: Restore Boost and OpenSSL cache
+        id: deps-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ${{ env.DEPS_DIR }}
+          # Same key format as build-linux.yml.
+          key: deps-${{ matrix.runner }}-${{ matrix.arch }}-boost${{ env.BOOST_VERSION }}-openssl${{ env.OPENSSL_VERSION }}-linux-rtstatic-v2
+
+      - name: Build Boost and OpenSSL (static)
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          jobs=$(nproc)
+          if (( jobs > 4 )); then jobs=4; fi
+
+          rm -rf "$DEPS_DIR"
+          mkdir -p "$DEPS_DIR/src"
+          cd "$DEPS_DIR/src"
+
+          openssl_archive="openssl-${OPENSSL_VERSION}.tar.gz"
+          curl --fail --location --retry 3 --output "$openssl_archive" \
+            "https://github.com/openssl/openssl/releases/download/openssl-${OPENSSL_VERSION}/${openssl_archive}"
+          echo "${OPENSSL_SHA256}  ${openssl_archive}" | sha256sum --check --strict
+          tar -xzf "$openssl_archive"
+          pushd "openssl-${OPENSSL_VERSION}"
+          ./Configure "${{ matrix.openssl_target }}" no-shared no-tests \
+            --prefix="$DEPS_DIR/openssl" \
+            --openssldir="$DEPS_DIR/openssl" \
+            --libdir=lib
+          make -s -j"$jobs"
+          make -s install_sw
+          install -m 0644 LICENSE.txt "$DEPS_DIR/openssl/LICENSE.txt"
+          popd
+
+          boost_underscore=${BOOST_VERSION//./_}
+          boost_archive="boost_${boost_underscore}.tar.bz2"
+          curl --fail --location --retry 3 --output "$boost_archive" \
+            "https://archives.boost.io/release/${BOOST_VERSION}/source/${boost_archive}"
+          echo "${BOOST_SHA256}  ${boost_archive}" | sha256sum --check --strict
+          tar -xjf "$boost_archive"
+          pushd "boost_${boost_underscore}"
+          ./bootstrap.sh \
+            --prefix="$DEPS_DIR/boost" \
+            --with-libraries=system,filesystem,thread,date_time,chrono,regex,serialization,atomic,program_options,locale,timer,log
+          # Zano's STATIC=TRUE configuration sets Boost_USE_STATIC_RUNTIME=ON.
+          ./b2 -j"$jobs" -d1 \
+            architecture="${{ matrix.boost_arch }}" \
+            address-model=64 \
+            link=static \
+            runtime-link=static \
+            threading=multi \
+            variant=release \
+            install
+          install -m 0644 LICENSE_1_0.txt "$DEPS_DIR/boost/LICENSE_1_0.txt"
+          popd
+
+          rm -rf "$DEPS_DIR/src"
+          test -f "$DEPS_DIR/boost/lib/libboost_system.a"
+          test -f "$DEPS_DIR/openssl/lib/libcrypto.a"
+
+      - name: Verify Boost and OpenSSL installation
+        run: |
+          set -euo pipefail
+          test -f "$DEPS_DIR/boost/lib/libboost_system.a"
+          test -f "$DEPS_DIR/boost/LICENSE_1_0.txt"
+          grep -R --include='libboost_system-variant-*.cmake' -F '# runtime-link=static' \
+            "$DEPS_DIR/boost/lib/cmake/boost_system-${BOOST_VERSION}"
+          test -f "$DEPS_DIR/openssl/lib/libcrypto.a"
+          test -f "$DEPS_DIR/openssl/LICENSE.txt"
+
+      - name: Save Boost and OpenSSL cache
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ${{ env.DEPS_DIR }}
+          key: ${{ steps.deps-cache.outputs.cache-primary-key }}
+
+      # ccache keeps the second and later runs to roughly the link time plus
+      # the files a merge actually touched.
+      #
+      # The repository's cache quota (10 GB, least-recently-used eviction) is
+      # shared with the release workflows' Boost/OpenSSL/Qt caches, which take
+      # an hour or more to rebuild cold. So this cache is deliberately small
+      # (CCACHE_MAXSIZE) and saved at most once per branch and ISO week: the
+      # first run of a week saves under the week's key, later runs in that
+      # week restore it (exact hit, nothing saved) and only recompile what
+      # changed since. Older weeks age out through LRU and GitHub's 7-day
+      # unused-cache eviction. The restore-keys fall back to the newest cache
+      # of this branch, then of any branch visible to this run (the default
+      # branch's caches are visible everywhere).
+      - name: Resolve compiler cache key
+        id: stamp
+        run: echo "week=$(date -u +%G-W%V)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore compiler cache
+        id: ccache-restore
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-tests-linux-${{ matrix.arch }}-${{ github.ref_name }}-${{ steps.stamp.outputs.week }}
+          restore-keys: |
+            ccache-tests-linux-${{ matrix.arch }}-${{ github.ref_name }}-
+            ccache-tests-linux-${{ matrix.arch }}-
+
+      # COMMIT_ID_IN_VERSION=OFF writes a constant version.h instead of one
+      # that embeds the commit id. version.h is included (via the protocol
+      # handler and net_node headers) by every core_tests translation unit and
+      # by wallet2.cpp, blockchain_storage.cpp and the RPC server, so with the
+      # commit id in it the heaviest files would miss the compiler cache on
+      # every single run. Nothing under tests/ reads the version macros.
+      - name: Configure (CMake, Release, tests only)
+        run: |
+          set -euo pipefail
+          cmake -S . -B "$BUILD_DIR" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+            -DBUILD_GUI=FALSE \
+            -DBUILD_TESTS=TRUE \
+            -DUSE_PCH=FALSE \
+            -DSTATIC=TRUE \
+            -DARCH="${{ matrix.cmake_arch }}" \
+            -DCOMMIT_ID_IN_VERSION=OFF \
+            -DBOOST_ROOT="$DEPS_DIR/boost" \
+            -DBOOST_LIBRARYDIR="$DEPS_DIR/boost/lib" \
+            -DOPENSSL_ROOT_DIR="$DEPS_DIR/openssl" \
+            -DOPENSSL_USE_STATIC_LIBS=TRUE \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+
+      - name: Build test binaries
+        id: build
+        run: |
+          set -euo pipefail
+          # One compile job per 4 GiB of RAM, rounded to the nearest (the
+          # standard runner reports a little under 16 GiB and gets 4), capped
+          # at the CPU count, so that several -O3 -g3 compiles of the heaviest
+          # translation units cannot exhaust the runner. The three executables
+          # are linked one at a time on purpose: each link runs LTO over every
+          # Zano library, and three of those at once would not fit in 16 GiB.
+          #
+          # coretests is compiled with at most two jobs. Its translation units
+          # are the heaviest of all (chaingen_main.cpp pulls in every test
+          # header), and with four of them compiling at once the runner ran
+          # out of resources and shut down mid-build. unit_tests has already
+          # built every library coretests links, so only coretests' own
+          # sources pay for the lower parallelism.
+          mem_gib=$(( $(getconf _PHYS_PAGES) * $(getconf PAGE_SIZE) / (1024 * 1024 * 1024) ))
+          jobs=$(( (mem_gib + 2) / 4 ))
+          if (( jobs < 1 )); then jobs=1; fi
+          if (( jobs > $(nproc) )); then jobs=$(nproc); fi
+          coretests_jobs=$(( jobs < 2 ? jobs : 2 ))
+          echo "Building with $jobs parallel jobs, $coretests_jobs for coretests ($(nproc) CPUs, ${mem_gib} GiB RAM)"
+
+          ccache --zero-stats >/dev/null
+          for target in unit_tests functional_tests; do
+            cmake --build "$BUILD_DIR" --parallel "$jobs" --target "$target"
+          done
+          cmake --build "$BUILD_DIR" --parallel "$coretests_jobs" --target coretests
+          ccache --show-stats
+
+          # Only the test targets and the libraries they need were requested;
+          # make sure no application binary slipped into the build.
+          for unwanted in zanod simplewallet connectivity_tool gateway_rpc_proxy Zano; do
+            if [[ -e "$BUILD_DIR/src/$unwanted" ]]; then
+              echo "::error::$unwanted was built although only the test targets were requested"
+              exit 1
+            fi
+          done
+          for binary in unit_tests functional_tests coretests; do
+            test -x "$BUILD_DIR/tests/$binary"
+          done
+
+      # Saved right after the build (not at the end) so that a test failure
+      # does not cost the compile cache. Skipped when the build step never ran
+      # (nothing new to save) and when this week's key already exists.
+      - name: Save compiler cache
+        if: ${{ !cancelled() && steps.build.outcome != 'skipped' && steps.ccache-restore.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ${{ steps.ccache-restore.outputs.cache-primary-key }}
+
+      # The three suites run from the build directory, exactly as the
+      # maintainers run them by hand. Each later suite still runs when an
+      # earlier one fails (but not when the build failed), so one run reports
+      # every failing suite rather than just the first. Each step has its own
+      # timeout: a hung suite then fails that step and the log upload below
+      # still happens, whereas hitting the job timeout cancels the job and
+      # skips everything after it. The limits are several times the measured
+      # durations (unit tests ~2 min, crypto tests ~1-2 min, coretests ~6-10
+      # min with four workers).
+
+      - name: Run unit tests
+        id: unit
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        timeout-minutes: 30
+        working-directory: ${{ env.BUILD_DIR }}
+        run: tests/unit_tests
+
+      - name: Run crypto tests
+        id: crypto
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        timeout-minutes: 30
+        working-directory: ${{ env.BUILD_DIR }}
+        run: tests/functional_tests --crypto-tests='crypto_*'
+
+      # Known hazard of --multiprocess-run itself, not of this workflow: the
+      # wallet_true_rpc_pos_mining tests are the only core tests that reach
+      # their core over real HTTP RPC, on the fixed port 127.0.0.1:33777
+      # (tests/core_tests/wallet_tests_basic.h), reusing any listener already
+      # there. If two workers run its hardfork variants at the same moment,
+      # one wallet talks to the other worker's core. An isolated failure of
+      # exactly that test with an RPC/sync error is therefore worth a re-run
+      # before it is blamed on the merged change.
+      - name: Run core tests
+        id: core
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        timeout-minutes: 60
+        working-directory: ${{ env.BUILD_DIR }}
+        run: tests/coretests --multiprocess-run=4
+
+      # unit_tests logs to unittests_log/, functional_tests and coretests log
+      # next to their executables (build-linux/tests/*.log), and the coretests
+      # parent collects each worker's stdout and JSON report under
+      # chaingen_runs/w<N>/. The worker data directories (blockchain DBs) in
+      # chaingen_runs are deliberately not uploaded. Also runs on cancellation
+      # so that a run stopped by hand or by the job timeout keeps whatever the
+      # workers had written so far.
+      - name: Upload test logs
+        if: ${{ failure() || cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: linux-${{ matrix.arch }}-test-logs-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            build-linux/tests/*.log
+            build-linux/unittests_log/
+            build-linux/chaingen_runs/**/*.log
+            build-linux/chaingen_runs/**/*.json
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Write workflow summary
+        if: ${{ always() }}
+        run: |
+          {
+            echo "### Linux ${{ matrix.arch }} tests - \`${GITHUB_REF_NAME}\` @ \`${GITHUB_SHA::7}\`"
+            echo
+            echo "| Step | Command | Result |"
+            echo "| --- | --- | --- |"
+            echo "| Build | \`cmake --build --target unit_tests functional_tests coretests\` | ${{ steps.build.outcome }} |"
+            echo "| Unit tests | \`tests/unit_tests\` | ${{ steps.unit.outcome }} |"
+            echo "| Crypto tests | \`tests/functional_tests --crypto-tests='crypto_*'\` | ${{ steps.crypto.outcome }} |"
+            echo "| Core tests | \`tests/coretests --multiprocess-run=4\` | ${{ steps.core.outcome }} |"
+          } >> "$GITHUB_STEP_SUMMARY"

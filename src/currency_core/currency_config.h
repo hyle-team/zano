@@ -115,6 +115,7 @@
 #define BLOCKS_SYNCHRONIZING_DEFAULT_SIZE               2000000   //by default keep synchronizing packets not bigger then 2MB
 #define CURRENCY_PROTOCOL_MAX_BLOCKS_REQUEST_COUNT      500     
 #define CURRENCY_PROTOCOL_MAX_TXS_REQUEST_COUNT         500    
+#define CURRENCY_PROTOCOL_MAX_STALLED_CHAIN_ENTRIES     2
 #define TX_HASHES_IN_BLOCK_MAX_COUNT                    5000   // maximum number of tx hashes in a block
 #define CURRENCY_NOTIFY_REQUEST_CHAIN_MAX_BLOCKS_COUNT  100    // maximum number of blocks in a NOTIFY_REQUEST_CHAIN request           
 

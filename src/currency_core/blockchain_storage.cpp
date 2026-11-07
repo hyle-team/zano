@@ -1135,10 +1135,13 @@ bool blockchain_storage::purge_transaction_from_blockchain(const crypto::hash& t
   tx_ = tx;
 
   fee = get_tx_fee(tx_res_ptr->tx);
-  purge_transaction_keyimages_from_blockchain(tx, true);
 
-  bool res_pop_gi = pop_transaction_from_global_index(tx, tx_id);
+  bool res_pop_gi = pop_transaction_from_global_index(tx, tx_id); // unprocess outputs
   CHECK_AND_ASSERT_MES_NO_RET(res_pop_gi, "serious internal error: pop_transaction_from_global_index() failed for tx " << tx_id);
+
+  bool res_ki = purge_transaction_keyimages_from_blockchain(tx, true);  // reverses the input visitor (applied before outputs)
+  CHECK_AND_ASSERT_MES(res_ki, false, "purge_transaction_keyimages_from_blockchain failed for tx " << tx_id);
+
 
   bool r = unprocess_blockchain_tx_attachments(tx, get_current_blockchain_size(), 0/*TODO: add valid timestamp here in future if need*/);
 
@@ -1182,11 +1185,22 @@ bool blockchain_storage::purge_block_data_from_blockchain(const block& bl, size_
   {
     transaction tx = AUTO_VAL_INIT(tx);
     res = purge_transaction_from_blockchain(bl.tx_hashes[(processed_tx_count -1)- count], fee, tx) && res;
+    if (!res)
+    {
+      m_performance_data.epic_failure_happend = true;
+      return res;
+    }
+      
+
     fee_total += fee;
     onboard_transactions[bl.tx_hashes[(processed_tx_count - 1) - count]] = tx;
   }
   transaction tx = AUTO_VAL_INIT(tx);
   res = purge_transaction_from_blockchain(get_transaction_hash(bl.miner_tx), fee, tx) && res;
+  if (!res)
+  {
+    m_performance_data.epic_failure_happend = true;
+  }
   return res;
 }
 //------------------------------------------------------------------
@@ -1515,11 +1529,28 @@ bool blockchain_storage::switch_to_alternative_blockchain(alt_chain_type& alt_ch
     auto ch_ent = *alt_ch_iter;
     block_verification_context bvc = boost::value_initialized<block_verification_context>();
     bvc.m_onboard_transactions = ch_ent->second.onboard_transactions;
-    bool r = handle_block_to_main_chain(ch_ent->second.bl, bvc);
-    if(!r || !bvc.m_added_to_main_chain)
+    bool r = false;
+    bool thrown                    = false;
+    try
+    {
+      r = handle_block_to_main_chain(ch_ent->second.bl, bvc);
+    }
+    catch(const std::bad_alloc&)
+    {
+      throw;
+    }
+    catch(const std::exception& e)
+    {
+      LOG_ERROR("exception while connecting alt block " << get_block_hash(ch_ent->second.bl) << ": " << e.what());
+      thrown = true;
+    }
+    if(thrown || !r || !bvc.m_added_to_main_chain)
     {
       LOG_PRINT_RED("Failed to switch to alternative blockchain", LOG_LEVEL_0);
-      rollback_blockchain_switching(disconnected_chain, split_height);
+      if(!thrown)
+      {
+        rollback_blockchain_switching(disconnected_chain, split_height);  // the DB tx is aborted by add_new_block anyway; after a throw the failed block's partial state makes re-applying the old chain unsafe
+      }
       LOG_PRINT_L0("The block was inserted as invalid while connecting new alternative chain,  block_id: " << get_block_hash(ch_ent->second.bl));
 
       for(; alt_ch_iter != alt_chain.end(); ++alt_ch_iter)
@@ -6143,27 +6174,38 @@ bool blockchain_storage::gateway_get_address_history(const currency::gateway_add
   return true;
 }
 
-bool blockchain_storage::add_transaction_from_block(const transaction& tx, const crypto::hash& tx_id, const crypto::hash& bl_id, uint64_t bl_height, uint64_t timestamp)
+bool blockchain_storage::add_transaction_from_block(const transaction& tx, const crypto::hash& tx_id, const crypto::hash& bl_id, uint64_t bl_height, uint64_t timestamp, bool taken_from_pool)
 {
-  bool need_to_profile = !is_coinbase(tx);
+  bool tx_validated = false;
+  bool is_coinbase_ = is_coinbase(tx);
+  bool need_to_profile = !is_coinbase_;
+
+  auto a = epee::misc_utils::create_scope_leave_handler([&]()
+    {
+      if (taken_from_pool && !tx_validated && !is_coinbase_)
+      {
+        m_tx_pool.add_transaction_to_black_list(tx);
+      }
+    });
+  
   TIME_MEASURE_START_PD(tx_append_rl_wait);
   CRITICAL_REGION_LOCAL(m_read_lock);
   TIME_MEASURE_FINISH_PD_COND(need_to_profile, tx_append_rl_wait);
   
   TIME_MEASURE_START_PD(tx_append_is_expired);
-  CHECK_AND_ASSERT_MES(!is_tx_expired(tx), false, "Transaction can't be added to the blockchain since it's already expired. tx expiration time: " << get_tx_expiration_time(tx) << ", blockchain median time: " << get_tx_expiration_median());
+  CHECK_AND_ASSERT_THROW_MES(!is_tx_expired(tx), "Transaction can't be added to the blockchain since it's already expired. tx expiration time: " << get_tx_expiration_time(tx) << ", blockchain median time: " << get_tx_expiration_median());
   TIME_MEASURE_FINISH_PD_COND(need_to_profile, tx_append_is_expired);
 
-  CHECK_AND_ASSERT_MES(validate_tx_for_hardfork_specific_terms(tx, tx_id, bl_height), false, "tx " << tx_id << ": hardfork-specific validation failed");
-  CHECK_AND_ASSERT_MES(validate_tx_gw_asset_ids_against_blockchain_state(tx, tx_id, bl_height), false, "tx " << tx_id << ": gateway asset id validation failed");
+  CHECK_AND_ASSERT_THROW_MES(validate_tx_for_hardfork_specific_terms(tx, tx_id, bl_height), "tx " << tx_id << ": hardfork-specific validation failed");
+  CHECK_AND_ASSERT_THROW_MES(validate_tx_gw_asset_ids(tx, bl_height), "tx " << tx_id << ": gateway asset id validation failed");
 
   TIME_MEASURE_START_PD(tx_process_extra);
   bool r = process_blockchain_tx_extra(tx, tx_id, bl_height);
-  CHECK_AND_ASSERT_MES(r, false, "failed to process_blockchain_tx_extra");
+  CHECK_AND_ASSERT_THROW_MES(r, "failed to process_blockchain_tx_extra");
   TIME_MEASURE_FINISH_PD_COND(need_to_profile, tx_process_extra);
 
   r = process_tx_gateway_history(tx_id, tx);
-  CHECK_AND_ASSERT_MES(r, false, "failed to process_tx_gateway_history");
+  CHECK_AND_ASSERT_THROW_MES(r, "failed to process_tx_gateway_history");
 
   TIME_MEASURE_START_PD(tx_process_attachment);
   process_blockchain_tx_attachments(tx, bl_height, bl_id, timestamp);
@@ -6174,15 +6216,8 @@ bool blockchain_storage::add_transaction_from_block(const transaction& tx, const
   for(const txin_v& in : tx.vin)
   {
     if(!boost::apply_visitor(add_transaction_input_visitor(*this, m_db_spent_keys, tx_id, bl_id, bl_height, max_mixins_count), in))
-    {
-      LOG_ERROR("critical internal error: add_transaction_input_visitor failed. but key_images should be already checked");
-      purge_transaction_keyimages_from_blockchain(tx, false);
-      bool r = unprocess_blockchain_tx_extra(tx, bl_height, tx_id);
-      CHECK_AND_ASSERT_MES(r, false, "failed to unprocess_blockchain_tx_extra");
-      
-      unprocess_blockchain_tx_attachments(tx, bl_height, timestamp);
-
-      return false;
+    {      
+      CHECK_AND_ASSERT_THROW_MES(false, "critical internal error: add_transaction_input_visitor failed. but key_images should be already checked");   
     }
   }
   TIME_MEASURE_FINISH_PD_COND(need_to_profile, tx_process_inputs);
@@ -6196,13 +6231,7 @@ bool blockchain_storage::add_transaction_from_block(const transaction& tx, const
   auto tx_entry_ptr = m_db_transactions.get(tx_id);
   if (tx_entry_ptr)
   {
-    LOG_ERROR("critical internal error: tx with id: " << tx_id << " in block id: " << bl_id << " already in blockchain");
-    purge_transaction_keyimages_from_blockchain(tx, true);
-    bool r = unprocess_blockchain_tx_extra(tx, bl_height, tx_id);
-    CHECK_AND_ASSERT_MES(r, false, "failed to unprocess_blockchain_tx_extra");
-
-    unprocess_blockchain_tx_attachments(tx, bl_height, timestamp);
-    return false;
+    CHECK_AND_ASSERT_THROW_MES(false, "critical internal error: tx with id: " << tx_id << " in block id: " << bl_id << " already in blockchain");   
   }
   TIME_MEASURE_FINISH_PD_COND(need_to_profile, tx_check_exist);
 
@@ -6214,7 +6243,7 @@ bool blockchain_storage::add_transaction_from_block(const transaction& tx, const
   ch_e.m_spent_flags.resize(tx.vout.size(), false);
   ch_e.tx = tx;
   r = push_transaction_to_global_outs_index(tx, tx_id, ch_e.m_global_output_indexes, bl_id, bl_height);
-  CHECK_AND_ASSERT_MES(r, false, "failed to return push_transaction_to_global_outs_index tx id " << tx_id);
+  CHECK_AND_ASSERT_THROW_MES(r, "failed to return push_transaction_to_global_outs_index tx id " << tx_id);
   TIME_MEASURE_FINISH_PD_COND(need_to_profile, tx_push_global_index);
   
   //store everything to db
@@ -6224,6 +6253,7 @@ bool blockchain_storage::add_transaction_from_block(const transaction& tx, const
 
   TIME_MEASURE_START_PD(tx_print_log);
   static const std::string hidden("hidden");
+  tx_validated = true;
   LOG_PRINT_L1("Added tx to blockchain: " << tx_id << " via block at " << bl_height << " id " << print16(bl_id)
     << ", ins: " << tx.vin.size() << ", outs: " << tx.vout.size()
     << ", outs sum: " << (tx.version > TRANSACTION_VERSION_PRE_HF4 ? hidden : print_money_brief(get_outs_money_amount(tx)))
@@ -7550,7 +7580,7 @@ size_t blockchain_storage::get_current_hardfork_id() const
 bool blockchain_storage::validate_tx_for_hardfork_specific_terms_types_HF6(const transaction& tx, const crypto::hash& tx_id, uint64_t block_height) const
 {
   size_t current_hard_fork_id = m_core_runtime_config.hard_forks.get_the_most_recent_hardfork_id_for_height(block_height);
-  return currency::validate_tx_for_hardfork_specific_terms_types_HF6(tx, tx_id, current_hard_fork_id);
+  return currency::validate_tx_for_hardfork_specific_terms_types_HF6(tx, current_hard_fork_id);
 }
 
 //TODO: this function might be removed after HF6 is activated on mainnet
@@ -7768,11 +7798,27 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
     CHECK_AND_ASSERT_MES(tx.vin.size() <= CURRENCY_TX_MAX_ALLOWED_INPUTS, false, "transaction has too many inputs = " << tx.vin.size());
     CHECK_AND_ASSERT_MES(tx.vout.size() <= CURRENCY_TX_MAX_ALLOWED_OUTS,  false, "transaction has too many outputs = " << tx.vout.size());
 
-    bool has_gw_outs = std::any_of(tx.vout.begin(), tx.vout.end(), [](const tx_out_v& o) { return o.type() == typeid(tx_out_gateway); });
+    bool has_gw_ins = false;
+    for(auto& inv : tx.vin)
+    {
+      if (inv.type() == typeid(txin_gateway))
+      {
+        has_gw_ins = true;
+        CHECK_AND_ASSERT_MES(boost::get<txin_gateway>(inv).amount != 0, false, "zero amount gw inputs are not allowed");
+      }
+    }
+    bool has_gw_outs = false;
+    for(auto& outv : tx.vout)
+    {
+      if (outv.type() == typeid(tx_out_gateway))
+      {
+        has_gw_outs = true;
+        CHECK_AND_ASSERT_MES(boost::get<tx_out_gateway>(outv).amount != 0, false, "zero amount gw outputs are not allowed");
+      }
+    }
 
     if (mode_separate)
     {
-      bool has_gw_ins  = std::any_of(tx.vin.begin(),  tx.vin.end(),  [](const txin_v& o)   { return o.type() == typeid(txin_gateway); });
       CHECK_AND_ASSERT_MES(!has_gw_ins && !has_gw_outs, false, "TX_FLAG_SIGNATURE_MODE_SEPARATE is incompatible with gw ins/outs");
     }
 
@@ -7793,49 +7839,81 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
   return true;
 }
 //------------------------------------------------------------------
-// checks each gw output's asset id is registered, uses m_db_assets so main chain only
-bool blockchain_storage::validate_tx_gw_asset_ids_against_blockchain_state(const transaction& tx, const crypto::hash& tx_id, uint64_t block_height) const
+// checks each gw input's and output's asset id is registered, uses m_db_assets for main chain + alt_chain data (current_alt_block + rest of chain) + same tx ado reg
+bool blockchain_storage::validate_tx_gw_asset_ids(const transaction& tx, uint64_t block_height, const alt_chain_type& alt_chain, const alt_block_extended_info* p_current_alt_block /* = nullptr */) const
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
 
   if (!m_core_runtime_config.is_hardfork_active_for_height(ZANO_HARDFORK_06, block_height))
     return true; // before HF6 there are no gw outs to check
 
-  // take into account registering asset (in a deferred fashion)
-  bool has_asset_register_operation = false, ado_checked = false;
-  crypto::public_key ado_asset_id{};
-  auto check_ado = [&]() -> bool {
-    if (ado_checked)
+  auto is_asset_id_registered_in_alt_block = [&](const crypto::public_key& asset_id, const alt_block_extended_info& current_alt_block) -> bool {
+    for(const crypto::public_key& alt_block_asset_id : current_alt_block.registered_asset_ids)
+      if (asset_id == alt_block_asset_id)
+        return true;
+    return false;
+  };
+
+  auto is_asset_id_registered_in_alt_chain = [&](const crypto::public_key& asset_id) -> bool {
+    // current alt block isn't already in the alt_chain, s.a. validate_alt_block_txs()
+    if (p_current_alt_block && is_asset_id_registered_in_alt_block(asset_id, *p_current_alt_block))
       return true;
-    asset_descriptor_operation ado{};
-    if (get_type_in_variant_container(tx.extra, ado))
+    for(const auto& it_abei : alt_chain)
     {
-      if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER)
-      {
-        CHECK_AND_ASSERT_MES(get_or_calculate_asset_id(ado, nullptr, &ado_asset_id), false, "validate_tx_gw_asset_ids_against_blockchain_state: get_or_calculate_asset_id failed");
-        has_asset_register_operation = true;
-      }
+      if (is_asset_id_registered_in_alt_block(asset_id, it_abei->second))
+        return true;
     }
-    ado_checked = true;
+    return false;
+  };
+
+  crypto::public_key registered_asset_id{};
+  bool registered_asset_id_checked = false, registered_asset_id_found = false;
+  auto is_asset_id_registered_in_this_tx = [&](const crypto::public_key& asset_id) -> bool {
+    if (!registered_asset_id_checked)
+    {
+      registered_asset_id_found = (p_current_alt_block == nullptr && get_registered_asset_id_from_tx(tx, registered_asset_id)); // current_alt_block already has it in registered_asset_ids if present
+      registered_asset_id_checked = true;
+    }
+    return registered_asset_id_found && asset_id == registered_asset_id;
+  };
+
+  auto check_raw_asset_id_1div8 = [&](const crypto::public_key& asset_id_1div8) -> bool {
+    if (asset_id_1div8 == native_coin_asset_id_1div8)
+      return true; // good -- native coin
+    crypto::public_key asset_id{};
+    CHECK_AND_ASSERT_MES(crypto::pub_key_mul8(asset_id_1div8, asset_id), false, "pub_key_mul8 failed");
+    if (is_asset_id_registered_in_this_tx(asset_id))
+      return true; // good -- main chain same tx registration
+    if (is_asset_id_registered_in_alt_chain(asset_id))
+      return true; // good -- alt chain registered asset (inc. same tx registration)
+    // otherwise it must be in the DB (main chain reg, including the post-split assets)
+    auto ptr = m_db_assets.find(asset_id); // TODO optimization: we can build a cache for frequent asset ids in future -- sowle
+    if (!ptr)
+      return false;
     return true;
   };
+
+  for(size_t input_index = 0; input_index < tx.vin.size(); ++input_index)
+  {
+    if (tx.vin[input_index].type() == typeid(txin_gateway))
+    {
+      const txin_gateway& gwi = boost::get<txin_gateway>(tx.vin[input_index]);
+      if (!check_raw_asset_id_1div8(gwi.asset_id))
+      {
+        LOG_PRINT_RED_L0("gw asset_id check failed, asset_id/8: " << gwi.asset_id << ", amount: " << gwi.amount << ", input #" << input_index);
+        return false;
+      }
+    }
+  }
 
   for(size_t output_index = 0; output_index < tx.vout.size(); ++output_index)
   {
     if (tx.vout[output_index].type() == typeid(tx_out_gateway))
     {
       const tx_out_gateway& gwo = boost::get<tx_out_gateway>(tx.vout[output_index]);
-      if (gwo.asset_id == native_coin_asset_id_1div8)
-        continue; // good -- native coin
-      crypto::public_key asset_id{};
-      CHECK_AND_ASSERT_MES(crypto::pub_key_mul8(gwo.asset_id, asset_id), false, "pub_key_mul8 failed for out #" << output_index);
-      CHECK_AND_ASSERT_TRUE(check_ado());
-      if (has_asset_register_operation && asset_id == ado_asset_id)
-        continue; // good -- ado registered asset
-      auto ptr = m_db_assets.find(asset_id); // TODO optimization: we can build a cache for frequent asset ids in future -- sowle
-      if (!ptr)
+      if (!check_raw_asset_id_1div8(gwo.asset_id))
       {
-        LOG_PRINT_RED_L0("gw output #" << output_index << " has non-existing asset id: " << asset_id);
+        LOG_PRINT_RED_L0("gw asset_id check failed, asset_id/8: " << gwo.asset_id << ", amount: " << gwo.amount << ", output #" << output_index);
         return false;
       }
     }
@@ -8333,7 +8411,7 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
   block_fees.reserve(bl.tx_hashes.size());
   //process transactions
   TIME_MEASURE_START_PD(all_txs_insert_time_5);
-  if (!add_transaction_from_block(bl.miner_tx, get_transaction_hash(bl.miner_tx), id, get_current_blockchain_size(), get_block_datetime(bl)))
+  if (!add_transaction_from_block(bl.miner_tx, get_transaction_hash(bl.miner_tx), id, get_current_blockchain_size(), get_block_datetime(bl), false))
   {
     LOG_PRINT_L0("Block with id: " << id << " failed to add miner transaction to the blockchain storage");
     bvc.m_verification_failed = true;
@@ -8354,6 +8432,19 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
   std::list<crypto::key_image> block_summary_kimages;
 
   std::vector<zc_outs_range_proofs_with_commitments> range_proofs_agregated;
+  std::list<transaction> txs_taken_from_pool;
+  auto a = epee::misc_utils::create_scope_leave_handler([&]()
+    {
+      if (!bvc.m_added_to_main_chain)
+      {
+        for(auto& t : txs_taken_from_pool)
+        {
+          tx_verification_context tvc = AUTO_VAL_INIT(tvc);
+          m_tx_pool.add_tx(t, tvc, true, true);
+        }
+      }
+    }
+  );
 
   for(const crypto::hash& tx_id : bl.tx_hashes)
   {
@@ -8363,6 +8454,9 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
 
     bool taken_from_cache = get_tx_from_cache(tx_id, bvc.m_onboard_transactions, tx, blob_size, fee);
     bool taken_from_pool = m_tx_pool.take_tx(tx_id, tx, blob_size, fee);
+    if(taken_from_pool)
+      txs_taken_from_pool.push_back(tx);
+
     if(!taken_from_cache && !taken_from_pool)
     {
       LOG_PRINT_L0("Block with id: " << id  << " has at least one unknown transaction with id: " << tx_id);
@@ -8372,7 +8466,7 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
       return false;
     }
 
-    if (!validate_tx_semantic(tx, blob_size, tx_id))
+    if (!validate_tx_semantic(tx, blob_size))
     {
       LOG_PRINT_L0("Block with id: " << id << " has at least one transaction with wrong semantic, tx_id: " << tx_id);
       purge_block_data_from_blockchain(bl, tx_processed_count);
@@ -8443,7 +8537,7 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
     uint64_t actual_timestamp = get_block_datetime(bl);
     TIME_MEASURE_FINISH_PD(tx_prapare_append);
     TIME_MEASURE_START_PD(tx_append_time);
-    if(!add_transaction_from_block(tx, tx_id, id, current_bc_size, actual_timestamp))
+    if(!add_transaction_from_block(tx, tx_id, id, current_bc_size, actual_timestamp, taken_from_pool))
     {
        LOG_PRINT_L0("Block " << id << " contains tx " << tx_id << " that can't be added to the blockchain storage");
        if (taken_from_pool)
@@ -9035,7 +9129,14 @@ bool blockchain_storage::truncate_blockchain(uint64_t to_blockchain_size)
   while (get_current_blockchain_size() > to_blockchain_size)
   {
     transactions_map ot;
-    pop_block_from_blockchain(ot);
+    bool r = pop_block_from_blockchain(ot);
+    if (!r)
+    {
+      LOG_ERROR("Failed to pop block from blockchain");
+      db_tx_ptr->abort_transaction();
+      m_performance_data.epic_failure_happend = true;
+      return false;
+    }
 
     if (epee::misc_utils::get_tick_count() - ticks_last_print > 1000)
     {
@@ -9870,6 +9971,13 @@ bool blockchain_storage::update_alt_out_indexes_for_tx_in_block(const transactio
   return true;
 }
 //------------------------------------------------------------------
+void blockchain_storage::update_asset_id_registration_for_tx_in_block(const transaction& tx, alt_block_extended_info& abei) const
+{
+  crypto::public_key registered_asset_id = null_pkey;
+  if (get_registered_asset_id_from_tx(tx, registered_asset_id))
+    abei.registered_asset_ids.push_back(registered_asset_id);
+}
+//------------------------------------------------------------------
 bool blockchain_storage::validate_alt_block_txs(const block& b, const crypto::hash& id, std::unordered_set<crypto::key_image>& collected_keyimages, alt_block_extended_info& abei, const alt_chain_type& alt_chain, uint64_t split_height, uint64_t& ki_lookup_time_total) const
 {
   uint64_t height = abei.height;
@@ -9939,6 +10047,7 @@ bool blockchain_storage::validate_alt_block_txs(const block& b, const crypto::ha
     }
   }
   update_alt_out_indexes_for_tx_in_block(b.miner_tx, abei);
+  update_asset_id_registration_for_tx_in_block(b.miner_tx, abei);
 
   CHECK_AND_ASSERT_MES(validate_tx_for_hardfork_specific_terms(b.miner_tx, null_hash, height), false, "miner tx hardfork-specific validation failed");
 
@@ -9954,7 +10063,7 @@ bool blockchain_storage::validate_alt_block_txs(const block& b, const crypto::ha
     const transaction& tx = it == abei.onboard_transactions.end() ? *tx_ptr : it->second;
 
     CHECK_AND_ASSERT_MES(tx.signatures.size() == tx.vin.size(), false, "invalid alt block tx " << tx_id << ": signatures.size() == " <<  tx.signatures.size() << ", tx.vin.size() == " << tx.vin.size());
-    CHECK_AND_ASSERT_MES(validate_tx_semantic(tx, get_object_blobsize(tx), tx_id), false, "invalid alt block tx " << tx_id << ": semantic validation failed");
+    CHECK_AND_ASSERT_MES(validate_tx_semantic(tx, get_object_blobsize(tx)), false, "invalid alt block tx " << tx_id << ": semantic validation failed");
 
     fees.push_back(get_tx_fee(tx));
 
@@ -9989,9 +10098,13 @@ bool blockchain_storage::validate_alt_block_txs(const block& b, const crypto::ha
 
     CHECK_AND_ASSERT_MES(validate_tx_for_hardfork_specific_terms(tx, tx_id, height), false, "tx " << tx_id << ": hardfork-specific validation failed");
     
-    // Updating abei (and not updating alt_chain) during this cycle is safe because txs in the same block can't reference one another,
+    // Updating out indices in abei (and not updating alt_chain) during this cycle is safe because txs in the same block can't reference one another,
     // so only valid references are either to previous alt blocks (accessed via alt_chain) or to main chain blocks.
     update_alt_out_indexes_for_tx_in_block(tx, abei);
+    update_asset_id_registration_for_tx_in_block(tx, abei);
+
+    // gw asset ids are validated only for non-coinbase txs here due to HF6 gw no-coinbase rule -- sowle
+    CHECK_AND_ASSERT_MES(validate_tx_gw_asset_ids(tx, height, alt_chain, &abei), false, "alt block tx " << tx_id << ": gateway asset id validation failed");
   }
 
   abei.this_block_tx_fee_median = epee::misc_utils::median(fees);

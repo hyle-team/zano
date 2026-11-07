@@ -194,7 +194,7 @@ namespace currency
         error = "Transaction does not satisfy current hardfork rules";
         return false;
       }
-      if (!validate_tx_semantic(tx, tx_blob.size(), tx_id))
+      if (!validate_tx_semantic(tx, tx_blob.size()))
       {
         error = "Transaction semantic validation failed";
         return false;
