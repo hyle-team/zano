@@ -45,9 +45,9 @@
 #include "common/variant_helper.h"
 
 
-MARK_AS_POD_C11(crypto::key_image);
+//MARK_AS_POD_C11(crypto::key_image);
 typedef std::pair<crypto::hash, uint64_t> macro_alias_1;
-MARK_AS_POD_C11(macro_alias_1);
+//MARK_AS_POD_C11(macro_alias_1);
 
 #undef LOG_DEFAULT_CHANNEL 
 #define LOG_DEFAULT_CHANNEL "core"

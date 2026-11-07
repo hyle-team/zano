@@ -223,6 +223,8 @@ namespace currency
     context.m_state = currency_connection_context::state_synchronizing;
     context.m_remote_blockchain_size = hshd.current_height;
     context.m_priv.m_last_fetched_block_ids.clear();
+    context.m_priv.m_chain_entry_best_height = 0;
+    context.m_priv.m_chain_entry_stall_count = 0;
     //let the socket to send response to handshake, but request callback, to let send request data after response
     LOG_PRINT_L3("requesting callback");
     ++context.m_priv.m_callback_request_count;
@@ -391,6 +393,8 @@ namespace currency
     {
       context.m_state = currency_connection_context::state_synchronizing;
       context.m_priv.m_last_fetched_block_ids.clear();
+      context.m_priv.m_chain_entry_best_height = 0;
+      context.m_priv.m_chain_entry_stall_count = 0;
       NOTIFY_REQUEST_CHAIN::request r = boost::value_initialized<NOTIFY_REQUEST_CHAIN::request>();
       m_core.get_short_chain_history(r.block_ids);
       LOG_PRINT_MAGENTA("State changed to state_synchronizing.", LOG_LEVEL_2);
@@ -1068,7 +1072,7 @@ namespace currency
       m_p2p->add_ip_fail(context.m_remote_ip);
       return 1;
     }
-
+    /*
     if(!m_core.have_block(arg.m_block_ids.front().h))
     {
       LOG_ERROR_CCONTEXT("sent m_block_ids starting from unknown id: "
@@ -1077,7 +1081,33 @@ namespace currency
       m_p2p->add_ip_fail(context.m_remote_ip);
       return 1;
     }
-    
+    */
+
+    //
+    block_extended_info front_bei = AUTO_VAL_INIT(front_bei);
+    bool res = m_core.get_blockchain_storage().get_block_extended_info_by_hash(arg.m_block_ids.front().h, front_bei);
+    if(!res || front_bei.height != arg.start_height)
+    {
+      LOG_ERROR_CCONTEXT("NOTIFY_RESPONSE_CHAIN_ENTRY: block not found(" << res << ") or start_height " << arg.start_height
+                                                                      << " does not match height of first id, dropping connection");
+      m_p2p->drop_connection(context);
+      m_p2p->add_ip_fail(context.m_remote_ip);
+      return 1;
+    }
+
+    //a non-final response must be a full batch
+    bool is_final = arg.start_height + arg.m_block_ids.size() == arg.total_height;
+    if(!is_final && arg.m_block_ids.size() < BLOCKS_IDS_SYNCHRONIZING_DEFAULT_COUNT)
+    {
+      LOG_ERROR_CCONTEXT("NOTIFY_RESPONSE_CHAIN_ENTRY: short non-final response (" << arg.m_block_ids.size()
+          << " ids, total_height=" << arg.total_height << "), dropping connection");
+      m_p2p->drop_connection(context);
+      m_p2p->add_ip_fail(context.m_remote_ip);
+      return 1;
+    }
+
+
+
     context.m_remote_blockchain_size = arg.total_height;
     context.m_last_response_height = arg.start_height + arg.m_block_ids.size()-1;
     if(context.m_last_response_height > context.m_remote_blockchain_size)
@@ -1100,15 +1130,35 @@ namespace currency
     }
 
     uint64_t height = arg.start_height;
+    size_t new_needed = 0;
     BOOST_FOREACH(auto& bl_details, arg.m_block_ids)
     {
-      if (!m_core.have_block(bl_details.h))
+      if(!m_core.have_block(bl_details.h))
       {
         context.m_priv.m_needed_objects.push_back(bl_details);
+        ++new_needed;
       }
-
       context.m_priv.m_last_fetched_block_ids.push_new_block_id(bl_details.h, height);
       height++;
+    }
+
+    // (2) a non-final response must bring new ids or advance the height
+    if(new_needed == 0 && !is_final && context.m_last_response_height <= context.m_priv.m_chain_entry_best_height)
+    {
+      if(++context.m_priv.m_chain_entry_stall_count > CURRENCY_PROTOCOL_MAX_STALLED_CHAIN_ENTRIES)
+      {
+        LOG_ERROR_CCONTEXT("NOTIFY_RESPONSE_CHAIN_ENTRY: " << context.m_priv.m_chain_entry_stall_count
+                                                           << " consecutive responses without progress, dropping connection");
+        m_p2p->drop_connection(context);
+        m_p2p->add_ip_fail(context.m_remote_ip);
+        return 1;
+      }
+    }
+    else
+    {
+      context.m_priv.m_chain_entry_stall_count = 0;
+      if(context.m_last_response_height > context.m_priv.m_chain_entry_best_height)
+        context.m_priv.m_chain_entry_best_height = context.m_last_response_height;
     }
 
     request_missing_objects(context, false);
