@@ -748,8 +748,16 @@ namespace currency
 
     if (m_core.get_blockchain_storage().get_performnce_data().epic_failure_happend)
     {
-      // emergency stop, something went wrong with core, stop p2p network and whole daemon, report to user
-      LOG_PRINT_RED_L0("[EMERGENCY] INTERNAL CRITICAL ERROR happened in core, daemon is shutting down, please contact the team and provide them this log error message(and few screens above it to get more details). Sorry about this issue.");
+      auto& pd = m_core.get_blockchain_storage().get_performnce_data();
+      if(pd.unsupported_hardfork_id)
+      {
+        LOG_PRINT_RED_L0("[EMERGENCY] Hardfork " << pd.unsupported_hardfork_id << " is active but not supported by this build. Please update to the latest version.");
+      }
+      else
+      {
+        LOG_PRINT_RED_L0("[EMERGENCY] INTERNAL CRITICAL ERROR happened in core, please contact the team and present them the last few screens of the logs.");
+      }
+
       this->m_p2p->send_stop_signal();
       return true;
     }

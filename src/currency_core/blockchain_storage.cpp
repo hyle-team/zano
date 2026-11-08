@@ -548,7 +548,11 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
         LOG_PRINT_MAGENTA("migration of m_db_per_block_gindex_incs completed successfully", LOG_LEVEL_0);
       }
 
-      init_booster_hf();
+      if (!need_reinit && !init_booster_hf())
+      {
+        LOG_PRINT_RED_L0("Failed to init booster hardfork");
+        return false;
+      }
 #ifndef TESTNET
 
       // MAINNET ONLY
@@ -649,6 +653,12 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
     add_new_block(bl, bvc);
     CHECK_AND_ASSERT_MES(!bvc.m_verification_failed, false, "Failed to add genesis block to blockchain");
     LOG_PRINT_MAGENTA("Storage initialized with genesis", LOG_LEVEL_0);
+    
+    if(!init_booster_hf())  // a fresh DB is booster-aware from the start
+    {
+      LOG_PRINT_RED_L0("Failed to init booster hardfork");
+      return false;
+    }
   } 
 
   // check last hardfork activation compliance (in case of emergency hardfork)
@@ -864,6 +874,10 @@ bool blockchain_storage::init_booster_hf()
   {
     hf_booster_load_hardforks_from_db();
   }
+
+  if(!check_hf_compliance_on_current_height())
+    return false;
+
   return true;
 }
 //------------------------------------------------------------------
@@ -5765,7 +5779,7 @@ bool blockchain_storage::pop_gw_address_operation(const gateway_address_descript
 //------------------------------------------------------------------
 bool blockchain_storage::hf_booster_store_hardforks_to_db()
 {
-  for(uint64_t hf_id = 0; hf_id <= m_core_runtime_config.hard_forks.last_supported_hardfork_id; hf_id++)
+  for(uint64_t hf_id = 0; hf_id < m_core_runtime_config.hard_forks.m_total_count; hf_id++)
   {
     m_db_hardfork_updates.set(hf_id, std::list<uint64_t>(1, m_core_runtime_config.hard_forks.get_height_the_hardfork_active_after(hf_id)));
   }
@@ -5774,7 +5788,7 @@ bool blockchain_storage::hf_booster_store_hardforks_to_db()
 //------------------------------------------------------------------
 bool blockchain_storage::hf_booster_load_hardforks_from_db()
 {
-  for(uint64_t hf_id = 0; hf_id <= m_core_runtime_config.hard_forks.last_supported_hardfork_id; hf_id++)
+  for(uint64_t hf_id = 0; hf_id < m_core_runtime_config.hard_forks.m_total_count; hf_id++)
   {
     auto hf_ptr = m_db_hardfork_updates.find(hf_id);
     if(hf_ptr && hf_ptr->size())
@@ -5800,7 +5814,14 @@ bool blockchain_storage::put_hf_booster_update(const transaction& tx, const cryp
   // check against minimal distance allowed betwen hf height and current height and other conditions
   CHECK_AND_ASSERT_THROW_MES(update.hf_new_activation_height > get_current_blockchain_size(), "hf_booster_update: update.hf_new_activation_height > get_current_blockchain_size() failed");
   CHECK_AND_ASSERT_THROW_MES(update.hf_new_activation_height - get_current_blockchain_size() > m_core_runtime_config.minimal_distance_between_boost_and_hf, "hf_booster_update: minimal_distance_between_boost_and_hf condition is not fit");
-  CHECK_AND_ASSERT_THROW_MES(!m_core_runtime_config.is_hardfork_active_for_height(update.hf_id, get_current_blockchain_size()), "hf_booster_update: hf_id is already active");
+  if (update.hf_id < m_core_runtime_config.hard_forks.m_total_count)
+  {
+    // if we aware of the hardfork, then we check that it is not yet active, otherwise we just put it to DB
+    CHECK_AND_ASSERT_THROW_MES(!m_core_runtime_config.is_hardfork_active_for_height(update.hf_id, get_current_blockchain_size()), "hf_booster_update: hf_id is already active");
+  }
+
+  
+  //if this build not aware of this hf, then prev value in db would be not then one as with known
 
   //signature verified, now need to push this info into db, against 
   std::list<uint64_t> hf_heights;
@@ -5812,12 +5833,21 @@ bool blockchain_storage::put_hf_booster_update(const transaction& tx, const cryp
   // if there as no prev record, then we'll put original default activation height into the list, so we can rollback to it if needed
   if (!hf_heights.size())
   {
-    hf_heights.push_back(m_core_runtime_config.hard_forks.get_height_the_hardfork_active_after(update.hf_id));
+    if (update.hf_id < m_core_runtime_config.hard_forks.m_total_count)
+    {
+      hf_heights.push_back(m_core_runtime_config.hard_forks.get_height_the_hardfork_active_after(update.hf_id));
+    }
+    else
+    {
+      LOG_PRINT_RED_L0("Warning: hf_booster_update: hf_id " << update.hf_id << " is not known to this build, so we can't get default activation height for it, will put as default uint64_t max, and we'll still store the new activation height into db");
+      hf_heights.push_back(std::numeric_limits<uint64_t>::max());
+    }
+    
   }
   hf_heights.push_back(update.hf_new_activation_height);
   m_db_hardfork_updates.set(update.hf_id, hf_heights);
   // update structure in memory
-  m_core_runtime_config.hard_forks.set_hardfork_height(update.hf_id, update.hf_new_activation_height);
+  m_core_runtime_config.hard_forks.set_hardfork_height_if_exist(update.hf_id, update.hf_new_activation_height);
   return true;
 }
 //------------------------------------------------------------------
@@ -5845,19 +5875,20 @@ bool blockchain_storage::pop_hf_booster_update(const transaction& tx, const cryp
   CHECK_AND_ASSERT_MES(hf_heights.back() == update.hf_new_activation_height, false, "pop_hf_booster_update: last hf_height mismatch for hf_id " << update.hf_id << ", expected: " << update.hf_new_activation_height << ", actual: " << hf_heights.back());
   hf_heights.pop_back();
   if(hf_heights.size())
+  {    
     m_db_hardfork_updates.set(update.hf_id, hf_heights);
-  else
-    m_db_hardfork_updates.erase(update.hf_id);
-  // update structure in memory
-  if(hf_heights.size())
-    m_core_runtime_config.hard_forks.set_hardfork_height(update.hf_id, hf_heights.back());
+  }
   else
   {
-    // can't ever happen, but just in case, set to default value
-    LOG_ERROR("pop_hf_booster_update: no hf_heights found for hf_id " << update.hf_id);
-    core_runtime_config tmp = get_default_core_runtime_config();
-    m_core_runtime_config.hard_forks.set_hardfork_height(update.hf_id, tmp.hard_forks.get_height_the_hardfork_active_after(update.hf_id));
+    //this should never happen, as every new hf_booster comes with 2 pushes - default (max uint64_t) + the one that arrived 
+    LOG_ERROR("[Internal error]: Pop hb_booster with no items to pop");
+    return false;
   }
+
+  if(update.hf_id < m_core_runtime_config.hard_forks.m_total_count)
+    m_core_runtime_config.hard_forks.set_hardfork_height(update.hf_id, hf_heights.back());
+
+
   return true;
 }
 //------------------------------------------------------------------
@@ -8291,11 +8322,58 @@ bool get_tx_from_cache(const crypto::hash& tx_id, transactions_map& tx_cache, tr
   return true;
 }
 //------------------------------------------------------------------
+bool blockchain_storage::check_hf_compliance_on_current_height()
+{
+  const uint64_t max_hf_count = 10000;
+
+
+  uint64_t h = this->get_current_blockchain_size();
+  if(h == 0)
+    return true;
+
+  std::vector<uint64_t> hf_heights_from_db;
+  for (uint64_t i = 0; i != max_hf_count; i++)
+  {
+    auto ptr_list = m_db_hardfork_updates.get(i);
+    if(!ptr_list)
+      break;
+    hf_heights_from_db.push_back(ptr_list->back());
+  }
+
+  auto get_the_most_recent_hardfork_id_for_height = [&](uint64_t h) -> uint64_t
+  {
+    if(!hf_heights_from_db.size())
+      return 0;
+    for(size_t hid = hf_heights_from_db.size() - 1; hid != 0; --hid)  // 0 is not including
+    {
+      if(h > hf_heights_from_db[hid])
+        return hid;
+    }
+    return 0;
+  };
+
+  size_t hardfork_id_for_next_block = get_the_most_recent_hardfork_id_for_height(h);
+
+  if(hardfork_id_for_next_block > m_core_runtime_config.hard_forks.last_supported_hardfork_id)
+  {
+    LOG_ERROR("[IMPORTANT] Hardfork " << hardfork_id_for_next_block << " is not supported by this version of the software, but it's been activateded by hf booster. Please upgrade to a newer version or contact the team if you sure that you are on the latest version.");
+    this->m_performance_data.epic_failure_happend = true;
+    m_performance_data.unsupported_hardfork_id    = hardfork_id_for_next_block;
+    return false;
+  }
+  return true;
+}
+//------------------------------------------------------------------
 bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypto::hash& id, block_verification_context& bvc)
 {
   TIME_MEASURE_START_PD_MS(block_processing_time_0_ms);
   CRITICAL_REGION_LOCAL(m_read_lock);
   TIME_MEASURE_START_PD(block_processing_time_1);
+
+  if (!check_hf_compliance_on_current_height())
+  {
+    return false;
+  }
 
   uint64_t height = get_current_blockchain_size(); // height <-> block height correspondence is validated in prevalidate_miner_transaction()
 

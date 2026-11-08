@@ -2073,6 +2073,7 @@ bool hard_fork_6_asset_descriptor_limits::generate(std::vector<test_event_entry>
   size_t latest_hardfork = ZANO_HARDFORKS_TOTAL - 1; // test up to the latest hardfork
 
   m_hardforks.clear();
+  m_hardforks.last_supported_hardfork_id = latest_hardfork;  // it schedules the latest known hardfork, so the build must be ready for it
   m_hardforks.set_hardfork_height(ZANO_HARDFORK_04_ZARCANUM, 1);
   m_hardforks.set_hardfork_height(ZANO_HARDFORK_05, 1);
   m_hardforks.set_hardfork_height(latest_hardfork,  26);

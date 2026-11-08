@@ -121,6 +121,7 @@ namespace currency
       
       //TODO: move this to suitable place or remove it all
       std::atomic<bool> epic_failure_happend;
+      std::atomic<uint64_t> unsupported_hardfork_id = 0;  // 0: none
       tools::db::stat_info si;
     };
 
@@ -420,6 +421,7 @@ namespace currency
     bool validate_asset_operation_hf4(asset_op_verification_context& avc) const;
     bool validate_asset_operation_hf5(asset_op_verification_context& avc) const;
     bool validate_asset_operation(asset_op_verification_context& avc, uint64_t height) const;
+    bool check_hf_compliance_on_current_height();
 
     void set_core_runtime_config(const core_runtime_config& pc);
     const core_runtime_config& get_core_runtime_config()const;

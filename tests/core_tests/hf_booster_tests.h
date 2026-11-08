@@ -29,8 +29,9 @@ struct hf_booster_test_base : public wallet_test
 protected:
   struct booster_tx_options
   {
-    const crypto::secret_key* p_signer_sec = nullptr;                   // nullptr: sign with the maintainer key
-    const crypto::public_key* p_bind_to_pub_key = nullptr;              // nullptr: bind to the tx one-time pub key (correct binding)
+    booster_tx_options() : p_signer_sec(nullptr), p_bind_to_pub_key(nullptr) {} // GCC rejects default member initializers here (used in a default argument below)
+    const crypto::secret_key* p_signer_sec;                   // nullptr: sign with the maintainer key
+    const crypto::public_key* p_bind_to_pub_key;              // nullptr: bind to the tx one-time pub key (correct binding)
   };
 
   bool make_booster_tx(const std::vector<test_event_entry>& events, const currency::block& blk_head, const currency::hard_forks_descriptor& hf,

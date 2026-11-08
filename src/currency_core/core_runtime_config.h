@@ -20,6 +20,7 @@ namespace currency
 
     hard_forks_descriptor();
     void clear();
+    void set_hardfork_height_if_exist(size_t hardfork_id, uint64_t height_the_hardfork_is_active_after);
     void set_hardfork_height(size_t hardfork_id, uint64_t height_the_hardfork_is_active_after);
 
     bool is_hardfork_active_for_height(size_t hardfork_id, uint64_t height) const;

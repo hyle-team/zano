@@ -1334,8 +1334,8 @@ namespace currency
     CHECK_AND_ASSERT_MES(r, false, "Failed to verify schnorr signature on submit_hf_booster");
 
     // now as signature is correct, we can make assumptions that this is legitimate tx if we are aware of this hardfork
-    CHECK_AND_ASSERT_MES(core_runtime_config.hard_forks.m_total_count > hfu.hf_id, false, "Unknown hf_id on put_hf_booster_update: " << hfu.hf_id << ENDL << ", THIS BUILD MIGHT BE OUT OF DATE AND NEED TO UPDATE TO LATEST ONE");
-    CHECK_AND_ASSERT_MES(hfu.hf_id <= core_runtime_config.hard_forks.last_supported_hardfork_id, false, "Hardfork ID is above last supported hardfork id: " << hfu.hf_id << " > " << core_runtime_config.hard_forks.last_supported_hardfork_id << ", THIS BUILD MIGHT BE OUT OF DATE AND NEED TO UPDATE TO LATEST ONE");
+    //CHECK_AND_ASSERT_MES(core_runtime_config.hard_forks.m_total_count > hfu.hf_id, false, "Unknown hf_id on put_hf_booster_update: " << hfu.hf_id << ENDL << ", THIS BUILD MIGHT BE OUT OF DATE AND NEED TO UPDATE TO LATEST ONE");
+    //CHECK_AND_ASSERT_MES(hfu.hf_id <= core_runtime_config.hard_forks.last_supported_hardfork_id, false, "Hardfork ID is above last supported hardfork id: " << hfu.hf_id << " > " << core_runtime_config.hard_forks.last_supported_hardfork_id << ", THIS BUILD MIGHT BE OUT OF DATE AND NEED TO UPDATE TO LATEST ONE");
     return true;
   }
   //---------------------------------------------------------------

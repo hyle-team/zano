@@ -22,6 +22,12 @@ namespace currency
     m_height_the_hardfork_n_active_after.fill(CURRENCY_MAX_BLOCK_NUMBER);
   }
 
+  void hard_forks_descriptor::set_hardfork_height_if_exist(size_t hardfork_id, uint64_t height_the_hardfork_is_active_after)
+  {
+    if(hardfork_id < m_total_count)
+      set_hardfork_height(hardfork_id, height_the_hardfork_is_active_after);
+  }
+
   void hard_forks_descriptor::set_hardfork_height(size_t hardfork_id, uint64_t height_the_hardfork_is_active_after)
   {
     CHECK_AND_ASSERT_THROW_MES(hardfork_id < m_total_count, "invalid hardfork id: " << hardfork_id);
