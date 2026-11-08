@@ -25,6 +25,7 @@ struct hf_booster_test_base : public wallet_test
   currency::core_runtime_config get_runtime_info_for_core() const; // the replay engine applies it after every core (re)init
   bool configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
   bool check_hf8_height(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events); // params: uint64_t expected "active after" height of HF8
+  bool check_unsupported_hardfork_id(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events); // params: uint64_t expected unsupported_hardfork_id, non-zero also means the stop flag is set
 
 protected:
   struct booster_tx_options
@@ -59,15 +60,32 @@ struct hf_booster_reorg_after_activation : public hf_booster_test_base
   bool generate(std::vector<test_event_entry>& events) const;
 };
 
-// A block with a valid booster and another bad tx is rejected: both the exception path (bad booster signature)
-// and the regular path (double spend) must leave the schedule untouched.
+// A block with a valid booster and another bad tx is rejected, and the valid booster leaves no trace: a booster with
+// a height in the past and a double spend before HF8, a booster with a bad signature after HF8. Before HF8 a bad
+// signature is ignored instead and the block is valid.
 struct hf_booster_rollback_on_invalid_block : public hf_booster_test_base
 {
   bool generate(std::vector<test_event_entry>& events) const;
 };
 
-// Boosters that must not be accepted: wrong signer, wrong key binding, bad heights, unknown or active hardfork.
+// Bad boosters: bad heights make a block invalid; a wrong signer, a wrong key binding or an id below HF8 are rejected by
+// the tx pool, ignored in a block before HF8 and make it invalid after HF8; an unknown id is recorded only.
 struct hf_booster_invalid_boosters_rejected : public hf_booster_test_base
+{
+  bool generate(std::vector<test_event_entry>& events) const;
+};
+
+// A build that knows HF8 but is not ready for it (last_supported_hardfork_id = 7): it follows a booster for HF8 until the
+// activation, then refuses the first HF8 block and raises the stop flag.
+struct hf_booster_unsupported_hf_halts : public hf_booster_test_base
+{
+  hf_booster_unsupported_hf_halts();
+  bool generate(std::vector<test_event_entry>& events) const;
+};
+
+// A correctly signed booster for a hardfork id this build does not know is recorded only, and the node refuses the first
+// block for which that hardfork is active. Also registered in the blockchain save/load mode: the record survives restarts.
+struct hf_booster_unknown_hf_halts : public hf_booster_test_base
 {
   bool generate(std::vector<test_event_entry>& events) const;
 };

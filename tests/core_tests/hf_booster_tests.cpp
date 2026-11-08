@@ -17,6 +17,7 @@ namespace
   const uint64_t hf_booster_test_min_distance_between_boost_and_hf = 5;
   const uint64_t hf_booster_test_hf8_initial_active_after_height   = 100;  // the first HF8 block is expected to have height 26  
   const uint64_t hf_booster_test_hf8_override_active_after_height   = 25; // the first HF8 block is expected to have height 26
+  const uint64_t hf_booster_test_unknown_hf_far_height              = 10000; // for recorded boosters of an unknown id: never reached, it would stop the node
 }
 
 //------------------------------------------------------------------------------
@@ -191,6 +192,7 @@ hf_booster_test_base::hf_booster_test_base()
 {
   REGISTER_CALLBACK_METHOD(hf_booster_test_base, configure_core);
   REGISTER_CALLBACK_METHOD(hf_booster_test_base, check_hf8_height);
+  REGISTER_CALLBACK_METHOD(hf_booster_test_base, check_unsupported_hardfork_id);
 
   m_hardforks.clear();
   m_hardforks.set_hardfork_height(ZANO_HARDFORK_07, 1);
@@ -226,6 +228,19 @@ bool hf_booster_test_base::check_hf8_height(currency::core& c, size_t ev_index, 
 
   uint64_t actual = c.get_blockchain_storage().get_core_runtime_config().hard_forks.get_height_the_hardfork_active_after(ZANO_HARDFORK_08);
   CHECK_AND_ASSERT_MES(actual == expected, false, "HF8 is scheduled after height " << actual << ", expected: " << expected << " (top block height: " << c.get_top_block_height() << ")");
+  return true;
+}
+
+bool hf_booster_test_base::check_unsupported_hardfork_id(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  uint64_t expected = 0;
+  const std::string& params = boost::get<callback_entry>(events[ev_index]).callback_params;
+  CHECK_AND_ASSERT_MES(epee::string_tools::hex_to_pod(params, expected), false, "hex_to_pod failed, params = " << params);
+
+  const auto& pd = c.get_blockchain_storage().get_performnce_data();
+  uint64_t actual = pd.unsupported_hardfork_id;
+  CHECK_AND_ASSERT_MES(actual == expected, false, "unsupported_hardfork_id is " << actual << ", expected: " << expected);
+  CHECK_AND_ASSERT_MES(expected == 0 || pd.epic_failure_happend, false, "an unsupported hardfork is recorded, but the stop flag is not set");
   return true;
 }
 
@@ -408,11 +423,14 @@ bool hf_booster_reorg_after_activation::generate(std::vector<test_event_entry>& 
 
 bool hf_booster_rollback_on_invalid_block::generate(std::vector<test_event_entry>& events) const
 {
-  // Test idea: a block carries a valid booster followed by a bad tx. The block is rejected, and the booster
-  // must not leave any trace in the schedule, no matter how the bad tx fails:
-  // A) a booster with a bad maintainer signature
+  // Test idea: a block carries a valid booster and a bad tx. The block is rejected, and the valid booster must not
+  // leave any trace, no matter how the bad tx fails:
+  // A) a booster with a height in the past (before HF8 only a bad signature or key binding is ignored, see C)
   // B) a double spend
-  // Afterwards the same valid booster alone is accepted and HF8 activates at its height.
+  // C) before HF8 a booster with a bad signature is ignored: that block is valid and its valid booster is applied
+  // D) after HF8 a booster with a bad signature makes the block invalid. The valid booster next to it is for an id this
+  //    build does not know (the only kind that is not active yet), so it would be recorded in the DB only: the chain
+  //    crossing its height shows it was not, as a recorded one stops the node there
   HF_BOOSTER_CHAIN_PROLOGUE(blk_1r);                                                                 // 21
   const uint64_t h1 = 35;
 
@@ -437,7 +455,17 @@ bool hf_booster_rollback_on_invalid_block::generate(std::vector<test_event_entry
   DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_2));
   DO_CALLBACK_PARAMS(events, "check_hf8_height", hf_booster_test_hf8_initial_active_after_height);
 
-  // A) valid booster + booster with a bad signature (built after tx_good was pushed, so it spends another miner output)
+  // A) valid booster + booster with a height in the past (built after tx_good was pushed, so it spends another miner output)
+  transaction tx_past{};
+  CHECK_AND_ASSERT_MES(make_booster_tx(events, blk_2, generator.get_hardforks(), miner_acc, ZANO_HARDFORK_08, 10, tx_past), false, "make_booster_tx failed");
+  HF_BOOSTER_ADD_TX_AS_KEPT_BY_BLOCK(tx_good);
+  HF_BOOSTER_ADD_TX_AS_KEPT_BY_BLOCK(tx_past);
+  DO_CALLBACK(events, "mark_invalid_block");
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_3y, blk_2, miner_acc, std::list<transaction>({ tx_good, tx_past }));
+  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_2));
+  DO_CALLBACK_PARAMS(events, "check_hf8_height", hf_booster_test_hf8_initial_active_after_height);
+
+  // C) valid booster + booster with a bad signature, before HF8: the bad one is ignored, the block is valid
   keypair bogus_keys = keypair::generate();
   booster_tx_options bad_sig_opt{};
   bad_sig_opt.p_signer_sec = &bogus_keys.sec;
@@ -445,14 +473,8 @@ bool hf_booster_rollback_on_invalid_block::generate(std::vector<test_event_entry
   CHECK_AND_ASSERT_MES(make_booster_tx(events, blk_2, generator.get_hardforks(), miner_acc, ZANO_HARDFORK_08, 40, tx_bad, bad_sig_opt), false, "make_booster_tx failed");
   HF_BOOSTER_ADD_TX_AS_KEPT_BY_BLOCK(tx_good);
   HF_BOOSTER_ADD_TX_AS_KEPT_BY_BLOCK(tx_bad);
-  DO_CALLBACK(events, "mark_invalid_block");
-  MAKE_NEXT_BLOCK_TX_LIST(events, blk_3y, blk_2, miner_acc, std::list<transaction>({ tx_good, tx_bad }));
-  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_2));
-  DO_CALLBACK_PARAMS(events, "check_hf8_height", hf_booster_test_hf8_initial_active_after_height);
-
-  // the valid booster alone is fine
-  ADD_CUSTOM_EVENT(events, tx_good);
-  MAKE_NEXT_BLOCK_TX1(events, blk_3, blk_2, miner_acc, tx_good);                                     // 23
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_3, blk_2, miner_acc, std::list<transaction>({ tx_good, tx_bad }));  // 23
+  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_3));
   DO_CALLBACK_PARAMS(events, "check_hf8_height", h1);
 
   generator.set_hardfork_height(ZANO_HARDFORK_08, h1);
@@ -461,6 +483,21 @@ bool hf_booster_rollback_on_invalid_block::generate(std::vector<test_event_entry
   MAKE_NEXT_BLOCK(events, blk_4, blk_3r, miner_acc);                                                 // 36, the first HF8 block
   DO_CALLBACK_PARAMS(events, "check_hf8_height", h1);
 
+  // D) after HF8: valid booster + booster with a bad signature, both for an id this build does not know
+  const uint64_t h9 = get_block_height(blk_4) + 1 + hf_booster_test_min_distance_between_boost_and_hf + 5; // 47
+  transaction tx_good9{}, tx_bad9{};
+  CHECK_AND_ASSERT_MES(make_booster_tx(events, blk_4, generator.get_hardforks(), miner_acc, ZANO_HARDFORKS_TOTAL, h9, tx_good9), false, "make_booster_tx failed");
+  HF_BOOSTER_ADD_TX_AS_KEPT_BY_BLOCK(tx_good9);
+  CHECK_AND_ASSERT_MES(make_booster_tx(events, blk_4, generator.get_hardforks(), miner_acc, ZANO_HARDFORKS_TOTAL, h9, tx_bad9, bad_sig_opt), false, "make_booster_tx failed");
+  HF_BOOSTER_ADD_TX_AS_KEPT_BY_BLOCK(tx_bad9);
+  DO_CALLBACK(events, "mark_invalid_block");
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_5x, blk_4, miner_acc, std::list<transaction>({ tx_good9, tx_bad9 }));
+  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_4));
+
+  // had tx_good9 been recorded, the node would refuse the block at h9 + 1
+  REWIND_BLOCKS_N(events, blk_4r, blk_4, miner_acc, h9 - get_block_height(blk_4) + 1);              // 37..48
+  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_4r));
+
   return true;
 }
 
@@ -468,37 +505,17 @@ bool hf_booster_rollback_on_invalid_block::generate(std::vector<test_event_entry
 
 bool hf_booster_invalid_boosters_rejected::generate(std::vector<test_event_entry>& events) const
 {
-  // Test idea: boosters that must be rejected. A block carrying one is invalid and leaves the schedule untouched.
-  // The one with a foreign signature must be rejected by the tx pool as well.
+  // Test idea: how each kind of bad booster is treated.
+  // 1) a booster that fails its height checks makes the block invalid, before HF8 as well
+  // 2) a foreign signature, a wrong key binding and an id below HF8 fail the signature check: the tx pool rejects
+  //    them, and before HF8 a block that carries one is valid, the booster is ignored
+  // 3) a correctly signed booster for an id this build does not know is recorded only, the known schedule stays
+  // 4) after HF8 every kind of 2), and a booster for an already active hardfork, makes the block invalid
   HF_BOOSTER_CHAIN_PROLOGUE(blk_1r);                                                                 // 21
   const uint64_t next_height = get_block_height(blk_1r) + 1;                                         // 22, where a booster would get in
   const uint64_t too_close_height = next_height + hf_booster_test_min_distance_between_boost_and_hf; // 27, distance is not strictly greater
-  const uint64_t closest_height = too_close_height + 1;                                              // 28
 
-  // a foreign signature
-  keypair bogus_keys = keypair::generate();
-  booster_tx_options bad_sig_opt{};
-  bad_sig_opt.p_signer_sec = &bogus_keys.sec;
-  transaction tx_bad_sig{};
-  CHECK_AND_ASSERT_MES(make_booster_tx(events, blk_1r, generator.get_hardforks(), alice_acc, ZANO_HARDFORK_08, 40, tx_bad_sig, bad_sig_opt), false, "make_booster_tx failed");
-  HF_BOOSTER_ADD_TX_AS_KEPT_BY_BLOCK(tx_bad_sig);
-  DO_CALLBACK(events, "mark_invalid_block");
-  MAKE_NEXT_BLOCK_TX1(events, blk_2a, blk_1r, miner_acc, tx_bad_sig);
-  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_1r));
-  DO_CALLBACK_PARAMS(events, "check_hf8_height", hf_booster_test_hf8_initial_active_after_height);
-
-  // bound to a key that is not the tx key
-  keypair foreign_tx_key = keypair::generate();
-  booster_tx_options wrong_key_opt{};
-  wrong_key_opt.p_bind_to_pub_key = &foreign_tx_key.pub;
-  transaction tx_wrong_key{};
-  CHECK_AND_ASSERT_MES(make_booster_tx(events, blk_1r, generator.get_hardforks(), miner_acc, ZANO_HARDFORK_08, 40, tx_wrong_key, wrong_key_opt), false, "make_booster_tx failed");
-  HF_BOOSTER_ADD_TX_AS_KEPT_BY_BLOCK(tx_wrong_key);
-  DO_CALLBACK(events, "mark_invalid_block");
-  MAKE_NEXT_BLOCK_TX1(events, blk_2b, blk_1r, miner_acc, tx_wrong_key);
-  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_1r));
-  DO_CALLBACK_PARAMS(events, "check_hf8_height", hf_booster_test_hf8_initial_active_after_height);
-
+  // 1) all of these branch off blk_1r and are rejected, so blk_1r stays the top block
   // the height is too close to the booster block
   transaction tx_too_close{};
   CHECK_AND_ASSERT_MES(make_booster_tx(events, blk_1r, generator.get_hardforks(), miner_acc, ZANO_HARDFORK_08, too_close_height, tx_too_close), false, "make_booster_tx failed");
@@ -517,42 +534,154 @@ bool hf_booster_invalid_boosters_rejected::generate(std::vector<test_event_entry
   DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_1r));
   DO_CALLBACK_PARAMS(events, "check_hf8_height", hf_booster_test_hf8_initial_active_after_height);
 
-  // unknown hardfork id
-  transaction tx_unknown_hf{};
-  CHECK_AND_ASSERT_MES(make_booster_tx(events, blk_1r, generator.get_hardforks(), miner_acc, ZANO_HARDFORKS_TOTAL, 40, tx_unknown_hf), false, "make_booster_tx failed");
-  HF_BOOSTER_ADD_TX_AS_KEPT_BY_BLOCK(tx_unknown_hf);
-  DO_CALLBACK(events, "mark_invalid_block");
-  MAKE_NEXT_BLOCK_TX1(events, blk_2e, blk_1r, miner_acc, tx_unknown_hf);
-  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_1r));
-  DO_CALLBACK_PARAMS(events, "check_hf8_height", hf_booster_test_hf8_initial_active_after_height);
+  // 2) each one: rejected by the tx pool, then valid in a block as an ignored booster; the blocks are chained
+  keypair bogus_keys = keypair::generate();
+  booster_tx_options bad_sig_opt{};
+  bad_sig_opt.p_signer_sec = &bogus_keys.sec;
+  keypair foreign_tx_key = keypair::generate();
+  booster_tx_options wrong_key_opt{};
+  wrong_key_opt.p_bind_to_pub_key = &foreign_tx_key.pub;
 
-  // an already active hardfork
-  transaction tx_active_hf{};
-  CHECK_AND_ASSERT_MES(make_booster_tx(events, blk_1r, generator.get_hardforks(), miner_acc, ZANO_HARDFORK_07, 40, tx_active_hf), false, "make_booster_tx failed");
-  HF_BOOSTER_ADD_TX_AS_KEPT_BY_BLOCK(tx_active_hf);
-  DO_CALLBACK(events, "mark_invalid_block");
-  MAKE_NEXT_BLOCK_TX1(events, blk_2f, blk_1r, miner_acc, tx_active_hf);
-  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_1r));
-  DO_CALLBACK_PARAMS(events, "check_hf8_height", hf_booster_test_hf8_initial_active_after_height);
-
-  // the tx pool must not accept boosters that can never be valid, otherwise every block template would carry one
+  // a foreign signature
+  transaction tx_bad_sig{};
+  CHECK_AND_ASSERT_MES(make_booster_tx(events, blk_1r, generator.get_hardforks(), alice_acc, ZANO_HARDFORK_08, 40, tx_bad_sig, bad_sig_opt), false, "make_booster_tx failed");
   DO_CALLBACK(events, "mark_invalid_tx");
   ADD_CUSTOM_EVENT(events, tx_bad_sig);
   DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(0));
+  HF_BOOSTER_ADD_TX_AS_KEPT_BY_BLOCK(tx_bad_sig);
+  MAKE_NEXT_BLOCK_TX1(events, blk_2, blk_1r, miner_acc, tx_bad_sig);                                 // 22
+  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_2));
+  DO_CALLBACK_PARAMS(events, "check_hf8_height", hf_booster_test_hf8_initial_active_after_height);
+
+  // bound to a key that is not the tx key
+  transaction tx_wrong_key{};
+  CHECK_AND_ASSERT_MES(make_booster_tx(events, blk_2, generator.get_hardforks(), miner_acc, ZANO_HARDFORK_08, 40, tx_wrong_key, wrong_key_opt), false, "make_booster_tx failed");
   DO_CALLBACK(events, "mark_invalid_tx");
   ADD_CUSTOM_EVENT(events, tx_wrong_key);
   DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(0));
+  HF_BOOSTER_ADD_TX_AS_KEPT_BY_BLOCK(tx_wrong_key);
+  MAKE_NEXT_BLOCK_TX1(events, blk_3, blk_2, miner_acc, tx_wrong_key);                                // 23
+  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_3));
+  DO_CALLBACK_PARAMS(events, "check_hf8_height", hf_booster_test_hf8_initial_active_after_height);
+
+  // a hardfork id below HF8 (boosters exist from HF8 on)
+  transaction tx_low_hf{};
+  CHECK_AND_ASSERT_MES(make_booster_tx(events, blk_3, generator.get_hardforks(), miner_acc, ZANO_HARDFORK_07, 40, tx_low_hf), false, "make_booster_tx failed");
+  DO_CALLBACK(events, "mark_invalid_tx");
+  ADD_CUSTOM_EVENT(events, tx_low_hf);
+  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(0));
+  HF_BOOSTER_ADD_TX_AS_KEPT_BY_BLOCK(tx_low_hf);
+  MAKE_NEXT_BLOCK_TX1(events, blk_4, blk_3, miner_acc, tx_low_hf);                                   // 24
+  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_4));
+  DO_CALLBACK_PARAMS(events, "check_hf8_height", hf_booster_test_hf8_initial_active_after_height);
+
+  // 3) an unknown hardfork id, correctly signed: the pool takes it, the block is valid, the known schedule stays.
+  //    Far away, because a recorded unknown hardfork stops the node at its activation
+  transaction tx_unknown_hf{};
+  CHECK_AND_ASSERT_MES(make_booster_tx(events, blk_4, generator.get_hardforks(), miner_acc, ZANO_HARDFORKS_TOTAL, hf_booster_test_unknown_hf_far_height, tx_unknown_hf), false, "make_booster_tx failed");
+  ADD_CUSTOM_EVENT(events, tx_unknown_hf);
+  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(1));
+  MAKE_NEXT_BLOCK_TX1(events, blk_5, blk_4, miner_acc, tx_unknown_hf);                               // 25
+  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_5));
+  DO_CALLBACK_PARAMS(events, "check_hf8_height", hf_booster_test_hf8_initial_active_after_height);
 
   // the closest allowed height is accepted
+  const uint64_t closest_height = get_block_height(blk_5) + 1 + hf_booster_test_min_distance_between_boost_and_hf + 1; // 32
   transaction tx_closest{};
-  CHECK_AND_ASSERT_MES(make_booster_tx(events, blk_1r, generator.get_hardforks(), miner_acc, ZANO_HARDFORK_08, closest_height, tx_closest), false, "make_booster_tx failed");
+  CHECK_AND_ASSERT_MES(make_booster_tx(events, blk_5, generator.get_hardforks(), miner_acc, ZANO_HARDFORK_08, closest_height, tx_closest), false, "make_booster_tx failed");
   ADD_CUSTOM_EVENT(events, tx_closest);
-  MAKE_NEXT_BLOCK_TX1(events, blk_2, blk_1r, miner_acc, tx_closest);                                 // 22
+  MAKE_NEXT_BLOCK_TX1(events, blk_6, blk_5, miner_acc, tx_closest);                                  // 26
   DO_CALLBACK_PARAMS(events, "check_hf8_height", closest_height);
 
   generator.set_hardfork_height(ZANO_HARDFORK_08, closest_height);
-  REWIND_BLOCKS_N(events, blk_2r, blk_2, miner_acc, closest_height - get_block_height(blk_2) + 1);   // 23..29, 29 is the first HF8 block
+  REWIND_BLOCKS_N(events, blk_6r, blk_6, miner_acc, closest_height - get_block_height(blk_6) + 1);   // 27..33, 33 is the first HF8 block
   DO_CALLBACK_PARAMS(events, "check_hardfork_active", static_cast<size_t>(ZANO_HARDFORK_08));
 
+  // 4) after HF8 all of these make the block invalid; all branch off blk_6r
+  transaction tx_bad_sig_8{};
+  CHECK_AND_ASSERT_MES(make_booster_tx(events, blk_6r, generator.get_hardforks(), miner_acc, ZANO_HARDFORKS_TOTAL, hf_booster_test_unknown_hf_far_height, tx_bad_sig_8, bad_sig_opt), false, "make_booster_tx failed");
+  HF_BOOSTER_ADD_TX_AS_KEPT_BY_BLOCK(tx_bad_sig_8);
+  DO_CALLBACK(events, "mark_invalid_block");
+  MAKE_NEXT_BLOCK_TX1(events, blk_7a, blk_6r, miner_acc, tx_bad_sig_8);
+  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_6r));
+
+  transaction tx_wrong_key_8{};
+  CHECK_AND_ASSERT_MES(make_booster_tx(events, blk_6r, generator.get_hardforks(), miner_acc, ZANO_HARDFORKS_TOTAL, hf_booster_test_unknown_hf_far_height, tx_wrong_key_8, wrong_key_opt), false, "make_booster_tx failed");
+  HF_BOOSTER_ADD_TX_AS_KEPT_BY_BLOCK(tx_wrong_key_8);
+  DO_CALLBACK(events, "mark_invalid_block");
+  MAKE_NEXT_BLOCK_TX1(events, blk_7b, blk_6r, miner_acc, tx_wrong_key_8);
+  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_6r));
+
+  transaction tx_low_hf_8{};
+  CHECK_AND_ASSERT_MES(make_booster_tx(events, blk_6r, generator.get_hardforks(), miner_acc, ZANO_HARDFORK_07, hf_booster_test_unknown_hf_far_height, tx_low_hf_8), false, "make_booster_tx failed");
+  HF_BOOSTER_ADD_TX_AS_KEPT_BY_BLOCK(tx_low_hf_8);
+  DO_CALLBACK(events, "mark_invalid_block");
+  MAKE_NEXT_BLOCK_TX1(events, blk_7c, blk_6r, miner_acc, tx_low_hf_8);
+  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_6r));
+
+  // an already active hardfork
+  transaction tx_active_hf{};
+  CHECK_AND_ASSERT_MES(make_booster_tx(events, blk_6r, generator.get_hardforks(), miner_acc, ZANO_HARDFORK_08, hf_booster_test_unknown_hf_far_height, tx_active_hf), false, "make_booster_tx failed");
+  HF_BOOSTER_ADD_TX_AS_KEPT_BY_BLOCK(tx_active_hf);
+  DO_CALLBACK(events, "mark_invalid_block");
+  MAKE_NEXT_BLOCK_TX1(events, blk_7d, blk_6r, miner_acc, tx_active_hf);
+  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_6r));
+  DO_CALLBACK_PARAMS(events, "check_hf8_height", closest_height);
+
+  return true;
+}
+
+//------------------------------------------------------------------------------
+
+hf_booster_unsupported_hf_halts::hf_booster_unsupported_hf_halts()
+{
+  m_hardforks.last_supported_hardfork_id = ZANO_HARDFORK_07; // knows HF8 (ZANO_HARDFORKS_TOTAL = 9) but is not ready for it
+}
+
+bool hf_booster_unsupported_hf_halts::generate(std::vector<test_event_entry>& events) const
+{
+  // Test idea: a build that is not ready for HF8 still applies a booster for it, so it follows the same schedule as
+  // upgraded nodes until the activation. The first HF8 block is refused, and the stop flag names HF8.
+  HF_BOOSTER_CHAIN_PROLOGUE(blk_1r);                                                                 // 21
+  const uint64_t hf8_height = 30;
+  transaction tx_b8{};
+  CHECK_AND_ASSERT_MES(make_booster_tx(events, blk_1r, generator.get_hardforks(), miner_acc, ZANO_HARDFORK_08, hf8_height, tx_b8), false, "make_booster_tx failed");
+  ADD_CUSTOM_EVENT(events, tx_b8);
+  MAKE_NEXT_BLOCK_TX1(events, blk_2, blk_1r, miner_acc, tx_b8);                                      // 22
+  DO_CALLBACK_PARAMS(events, "check_hf8_height", hf8_height);                                        // the not-ready build schedules it
+
+  REWIND_BLOCKS_N(events, blk_2r, blk_2, miner_acc, hf8_height - get_block_height(blk_2));          // 23..30
+  DO_CALLBACK_PARAMS(events, "check_hf8_height", hf8_height);
+  DO_CALLBACK_PARAMS(events, "check_unsupported_hardfork_id", static_cast<uint64_t>(0));            // no stop yet
+  generator.set_hardfork_height(ZANO_HARDFORK_08, hf8_height);
+  MAKE_NEXT_BLOCK(events, blk_3, blk_2r, miner_acc);                                                 // 31, the first HF8 block
+  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_2r));                           // refused
+  DO_CALLBACK_PARAMS(events, "check_unsupported_hardfork_id", static_cast<uint64_t>(ZANO_HARDFORK_08));
+  return true;
+}
+
+//------------------------------------------------------------------------------
+
+bool hf_booster_unknown_hf_halts::generate(std::vector<test_event_entry>& events) const
+{
+  // Test idea: a correctly signed booster for an id this build does not know (ZANO_HARDFORKS_TOTAL) is recorded without
+  // touching the known schedule, and the first block for which that hardfork is active is refused.
+  // Blockchain save/load layout (the core restarts before events 7, 14, ..., 49): the booster block is event 29, the
+  // blocks 23..40 are events 32..49, so the last restart happens with the top block at 39. A restart with the top block
+  // at 40 would correctly refuse to start (the next block falls under the unknown hardfork), which the harness reports
+  // as a failure, so the activation must stay inside the last chunk.
+  HF_BOOSTER_CHAIN_PROLOGUE(blk_1r);                                                                 // 21, events 0..27
+  const uint64_t unknown_hf_height = 40;
+  transaction tx_unknown{};
+  CHECK_AND_ASSERT_MES(make_booster_tx(events, blk_1r, generator.get_hardforks(), miner_acc, ZANO_HARDFORKS_TOTAL, unknown_hf_height, tx_unknown), false, "make_booster_tx failed");
+  ADD_CUSTOM_EVENT(events, tx_unknown);                                                              // 28
+  MAKE_NEXT_BLOCK_TX1(events, blk_2, blk_1r, miner_acc, tx_unknown);                                 // 22, event 29, recorded only
+  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_2));                            // 30
+  DO_CALLBACK_PARAMS(events, "check_hf8_height", hf_booster_test_hf8_initial_active_after_height);   // 31, the known schedule stays
+  REWIND_BLOCKS_N(events, blk_2r, blk_2, miner_acc, unknown_hf_height - get_block_height(blk_2));   // 23..40, events 32..49
+  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_2r));                           // 50
+  MAKE_NEXT_BLOCK(events, blk_3, blk_2r, miner_acc);                                                 // 41, event 51: the unknown hardfork is active for it
+  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_2r));                           // 52, refused
+  DO_CALLBACK_PARAMS(events, "check_unsupported_hardfork_id", static_cast<uint64_t>(ZANO_HARDFORKS_TOTAL)); // 53
   return true;
 }

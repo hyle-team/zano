@@ -1421,6 +1421,9 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY(hf_booster_reorg_after_activation);
     GENERATE_AND_PLAY(hf_booster_rollback_on_invalid_block);
     GENERATE_AND_PLAY(hf_booster_invalid_boosters_rejected);
+    GENERATE_AND_PLAY(hf_booster_unsupported_hf_halts);
+    GENERATE_AND_PLAY(hf_booster_unknown_hf_halts);
+    GENERATE_AND_PLAY_INTERMITTED_BY_BLOCKCHAIN_SAVELOAD(hf_booster_unknown_hf_halts);
 
     // GW address alt-chain tests
     GENERATE_AND_PLAY(gw_addr_altchain_spend_in_both_chains);
