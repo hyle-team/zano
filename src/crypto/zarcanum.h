@@ -373,4 +373,59 @@ namespace crypto
     const vector_UG_aggregation_proof& sig, uint8_t* p_err = nullptr) noexcept;
 
 
+  // proof of knowledge of x such that A_i = x * G_i for generators {G_i}
+  struct chaum_pedersen_proof
+  {
+    scalar_t  c;
+    scalar_t  y;
+  };
+
+  template<typename generator_a_t, typename generator_b_t>
+  inline bool generate_chaum_pedersen_proof(const hash& m, const point_t& A, const point_t& B, const generator_a_t& Ga, const generator_b_t& Gb, const scalar_t& secret_x, chaum_pedersen_proof& result)
+  {
+#ifndef NDEBUG
+    if (A != secret_x * Ga || B != secret_x * Gb)
+      return false;
+#endif
+    scalar_t r = scalar_t::random();
+    point_t Ra = r * Ga;
+    point_t Rb = r * Gb;
+    hash_helper_t::hs_t hsc(7);
+    hsc.add_hash(m);
+    hsc.add_point(A);
+    hsc.add_point(B);
+    hsc.add_point(Ga);
+    hsc.add_point(Gb);
+    hsc.add_point(Ra);
+    hsc.add_point(Rb);
+    result.c = hsc.calc_hash();
+    result.y.assign_mulsub(result.c, secret_x, r); // y = r - c * secret_x
+    return true;
+  }
+
+  // note: prime order of all points assumed and this is caller's responsibility -- sowle
+  template<typename generator_a_t, typename generator_b_t>
+  inline bool verify_chaum_pedersen_proof(const hash& m, const point_t& A, const point_t& B, const generator_a_t& Ga, const generator_b_t& Gb, const chaum_pedersen_proof& proof) noexcept
+  {
+    try
+    {
+      if (!proof.c.is_reduced() || !proof.y.is_reduced())
+        return false;
+      hash_helper_t::hs_t hsc(7);
+      hsc.add_hash(m);
+      hsc.add_point(A);
+      hsc.add_point(B);
+      hsc.add_point(Ga);
+      hsc.add_point(Gb);
+      hsc.add_point(proof.y * Ga + proof.c * point_t(A));
+      hsc.add_point(proof.y * Gb + proof.c * point_t(B));
+      return proof.c == hsc.calc_hash();
+    }
+    catch(...)
+    {
+      return false;
+    }
+  }
+
+
 } // namespace crypto

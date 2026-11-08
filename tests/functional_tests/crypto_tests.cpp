@@ -1818,6 +1818,89 @@ TEST(crypto, double_schnorr_sig)
   return true;
 }
 
+template<typename T0, typename T1>
+bool test_chaum_pedersen_impl(const hash& m, const T0& G0, const T1& G1)
+{
+  chaum_pedersen_proof_s cpp{};
+  scalar_t x = scalar_t::random();
+  point_t B_pt = x * G0;
+
+  // <G0, G0>
+  point_t A_pt = x * G0;
+  ASSERT_TRUE(generate_chaum_pedersen_proof(m, A_pt, B_pt, G0, G0, x, cpp));
+  ASSERT_TRUE(verify_chaum_pedersen_proof(m, A_pt, B_pt, G0, G0, cpp));
+  ASSERT_FALSE(verify_chaum_pedersen_proof(m, A_pt, B_pt, G1, G0, cpp)); // wrong Ga
+
+  // <G1, G0>
+  A_pt = x * G1;
+  ASSERT_TRUE(generate_chaum_pedersen_proof(m, A_pt, B_pt, G1, G0, x, cpp));
+  ASSERT_TRUE(verify_chaum_pedersen_proof(m, A_pt, B_pt, G1, G0, cpp));
+  ASSERT_FALSE(verify_chaum_pedersen_proof(m, A_pt, B_pt, G0, G0, cpp)); // wrong Ga
+
+  ASSERT_FALSE(verify_chaum_pedersen_proof(currency::null_hash, A_pt, B_pt, G1, G0, cpp));
+
+  // non-reduced scalars are rejected
+  chaum_pedersen_proof_s bad_cpp = cpp;
+  bad_cpp.c = c_scalar_Pm1;
+  ASSERT_FALSE(bad_cpp.c.is_reduced());
+  ASSERT_FALSE(verify_chaum_pedersen_proof(m, A_pt, B_pt, G1, G0, bad_cpp));
+  bad_cpp = cpp;
+  bad_cpp.y = c_scalar_Pm1;
+  ASSERT_FALSE(bad_cpp.y.is_reduced());
+  ASSERT_FALSE(verify_chaum_pedersen_proof(m, A_pt, B_pt, G1, G0, bad_cpp));
+
+  // reduced but wrong y
+  bad_cpp = cpp;
+  bad_cpp.y += c_scalar_1;
+  ASSERT_TRUE(bad_cpp.y.is_reduced());
+  ASSERT_FALSE(verify_chaum_pedersen_proof(m, A_pt, B_pt, G1, G0, bad_cpp));
+
+  // proof for (A, B) doesn't verify for (B, A)
+  ASSERT_FALSE(verify_chaum_pedersen_proof(m, B_pt, A_pt, G1, G0, cpp));
+
+  // c + L is non-canonical
+  bad_cpp = cpp;
+  mp::uint256_t c_mp = bad_cpp.c.as_boost_mp_type<mp::uint256_t>();
+  c_mp += c_scalar_L.as_boost_mp_type<mp::uint256_t>();
+  memcpy(bad_cpp.c.data(), c_mp.backend().limbs(), sizeof(scalar_t));
+  ASSERT_FALSE(bad_cpp.c.is_reduced());
+  scalar_t tmp(bad_cpp.c);
+  tmp.reduce();
+  ASSERT_EQ(tmp, cpp.c);
+  ASSERT_FALSE(verify_chaum_pedersen_proof(m, A_pt, B_pt, G1, G0, bad_cpp));
+  bad_cpp.c.reduce();
+  ASSERT_TRUE( verify_chaum_pedersen_proof(m, A_pt, B_pt, G1, G0, bad_cpp));
+
+  // binary serialization
+  std::string blob = t_serializable_object_to_blob(cpp);
+  generate_random_bytes(sizeof cpp, &cpp);
+  ASSERT_TRUE(t_unserializable_object_from_blob(cpp, blob));
+  ASSERT_TRUE(verify_chaum_pedersen_proof(m, A_pt, B_pt, G1, G0, cpp));
+
+  // boost serialization
+  ASSERT_TRUE(tools::serialize_obj_to_buff(cpp, blob));
+  generate_random_bytes(sizeof cpp, &cpp);
+  ASSERT_TRUE(tools::unserialize_obj_from_buff(cpp, blob));
+  ASSERT_TRUE(verify_chaum_pedersen_proof(m, A_pt, B_pt, G1, G0, cpp));
+  return true;
+}
+
+TEST(crypto, chaum_pedersen)
+{
+  scalar_t s_rnd = scalar_t::random();
+  hash m = *(crypto::hash*)(&s_rnd);
+  for(size_t i = 0; i < 100; ++i)
+  {
+    ASSERT_TRUE(test_chaum_pedersen_impl(m, c_point_G, c_point_X));
+    point_t random_G0 = hash_helper_t::hp(s_rnd + scalar_t(i));
+    point_t random_G1 = hash_helper_t::hp(random_G0);
+    ASSERT_TRUE(test_chaum_pedersen_impl(m, random_G0, random_G1));
+  }
+
+  return true;
+}
+
+
 
 TEST(crypto, point_negation)
 {

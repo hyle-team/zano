@@ -220,6 +220,19 @@ namespace crypto
     END_BOOST_SERIALIZATION()
   };
 
+  struct chaum_pedersen_proof_s : public chaum_pedersen_proof
+  {
+    BEGIN_SERIALIZE_OBJECT()
+      FIELD(c)
+      FIELD(y)
+    END_SERIALIZE()
+
+    BEGIN_BOOST_SERIALIZATION()
+      BOOST_SERIALIZE(c)
+      BOOST_SERIALIZE(y)
+    END_BOOST_SERIALIZATION()
+  };
+
   struct BGE_proof_s : public BGE_proof
   {
     BEGIN_SERIALIZE_OBJECT()
