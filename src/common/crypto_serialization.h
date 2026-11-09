@@ -256,22 +256,44 @@ namespace crypto
 
   // helper functions
 
-  // plain serialization for generic_schnorr_sig_s as hex-encoded 64-bytes string, consisting of two 32-bytes integers (c, y)
-  inline std::string generic_schnorr_sig_s_to_hex_string(const generic_schnorr_sig_s& s) 
+  
+  template<typename T>
+  inline std::string generic_cy_sig_to_hex_string(const T& s)
   {
     return crypto::pod_to_hex(s.c) + crypto::pod_to_hex(s.y);
   }
-
-  inline generic_schnorr_sig_s generic_schnorr_sig_s_from_hex_string(const std::string& hex_str)
+  template<typename T>
+  inline T generic_cy_sig_from_hex_string(const std::string& hex_str)
   {
-    generic_schnorr_sig_s result{};
+    T result{};
     if (hex_str.size() != 2 * (sizeof(result.c) + sizeof(result.y)))
       return result;
     crypto::parse_tpod_from_hex_string(hex_str.substr(0, 2 * sizeof(result.c)), result.c);
     crypto::parse_tpod_from_hex_string(hex_str.substr(2 * sizeof(result.c)), result.y);
     return result;
   }
+  
+  // plain serialization for generic_schnorr_sig_s as hex-encoded 64-bytes string, consisting of two 32-bytes integers (c, y)
+  inline std::string generic_schnorr_sig_s_to_hex_string(const generic_schnorr_sig_s& s) 
+  {
+    return generic_cy_sig_to_hex_string(s);
+  }
 
+  inline generic_schnorr_sig_s generic_schnorr_sig_s_from_hex_string(const std::string& hex_str)
+  {
+    return generic_cy_sig_from_hex_string<generic_schnorr_sig_s>(hex_str);
+  }
+
+  // plain serialization for chaum_pedersen_proof_s as hex-encoded 64-bytes string, consisting of two 32-bytes integers (c, y)
+  inline std::string chaum_pedersen_proof_s_to_hex_string(const chaum_pedersen_proof_s& s) 
+  {
+    return generic_cy_sig_to_hex_string(s);
+  }
+
+  inline chaum_pedersen_proof_s chaum_pedersen_proof_s_from_hex_string(const std::string& hex_str)
+  {
+    return generic_cy_sig_from_hex_string<chaum_pedersen_proof_s>(hex_str);
+  }
 
 } // namespace crypto
 

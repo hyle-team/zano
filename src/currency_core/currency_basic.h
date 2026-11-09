@@ -1495,7 +1495,7 @@ SET_VARIANT_TAGS(crypto::generic_schnorr_sig_s, 70, "generic_schnorr_sig_s");
 SET_VARIANT_TAGS(currency::zc_gw_balance_proof, 77, "zc_gw_balance_proof");
 
 SET_VARIANT_TAGS(currency::etc_coinbase_block_cumulative_size, 78, "etc_coinbase_block_cumulative_size");
-
+SET_VARIANT_TAGS(crypto::chaum_pedersen_proof_s, 79, "chaum_pedersen_proof_s");
 
 
 
