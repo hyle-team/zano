@@ -9298,25 +9298,21 @@ bool wallet2::extract_hf6_snapshot(wallet_public::wallet_hf6_snapshot_t& ws, std
     const crypto::public_key P = out_get_pub_key(td.output());
     WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(ephemeral.pub == P && ki == td.m_key_image, "ephemeral/key image mismatch for transfer " << transfer_index);
 
-    wallet_public::wh6s_output_t o{};
+    wallet_public::wh6s_output_t& o = ws.outputs.emplace_back();
     o.gindex      = td.m_global_output_index;
     o.index       = td.m_internal_output_index;
     o.ki          = ki;
     o.bare_amount = td.amount_for_global_output_index(); // plaintext amount for bare, 0 for ZC
 
-    // kiss: prove knowledge of x with  ki - P = x*(Hp(P) - G).  m = Hs(spend_pub | view_pub | P | ki)
-    const crypto::point_t G_gen = crypto::hash_helper_t::hp(P) - crypto::c_point_G;
-    const crypto::point_t A     = crypto::point_t(ki) - crypto::point_t(P);
+    // kiss: prove knowledge of x with ki = x * Hp(P) and P = x * G,  m = Hs(domain | spend_pub | view_pub | gindex)
     crypto::hash_helper_t::hs_t hsc(4);
+    hsc.add_32_chars(CRYPTO_HDS_WALLET_SNAPSHOT_KISS_PROOF);
     hsc.add_pub_key(keys.account_address.spend_public_key);
     hsc.add_pub_key(keys.account_address.view_public_key);
-    hsc.add_pub_key(P);
-    hsc.add_key_image(ki);
+    hsc.add_scalar(crypto::scalar_t(o.gindex));
     const crypto::hash m = hsc.calc_hash_no_reduce();
-    r = crypto::generate_schnorr_sig_custom_generator(m, A, crypto::scalar_t(ephemeral.sec), o.kiss, G_gen);
-    WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(r, "generate_schnorr_sig_custom_generator failed for transfer " << transfer_index);
-
-    ws.outputs.push_back(o);
+    r = crypto::generate_chaum_pedersen_proof(m, crypto::point_t(ki), crypto::point_t(P), crypto::hash_helper_t::hp(P), crypto::c_point_G, crypto::scalar_t(ephemeral.sec), o.kiss);
+    WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(r, "generate_chaum_pedersen_proof failed for transfer " << transfer_index);
 
     const uint64_t percent = total ? (100 * ++done) / total : 100;
     if (percent != last_percent)

@@ -2379,18 +2379,18 @@ namespace tools::wallet_public
   //
   struct wh6s_output_t
   {
-    uint64_t                      bare_amount; // 0 for ZC
-    uint64_t                      gindex;
-    uint64_t                      index;
-    crypto::key_image             ki;
-    crypto::generic_schnorr_sig_s kiss;  // proof of knowing DL {x : ki - P = x * (Hp(P) - G)}, to tie P and ki
+    uint64_t                        bare_amount; // 0 for ZC
+    uint64_t                        gindex;
+    uint64_t                        index;
+    crypto::key_image               ki;
+    crypto::chaum_pedersen_proof_s  kiss;  // proof of knowing DL {x : ki = x * Hp(P), P = x * G}, to tie P and ki
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(bare_amount)
       KV_SERIALIZE(gindex)
       KV_SERIALIZE(index)
       KV_SERIALIZE_POD_AS_HEX_STRING(ki)
-      KV_SERIALIZE_CUSTOM(kiss, std::string, crypto::generic_schnorr_sig_s_to_hex_string, crypto::generic_schnorr_sig_s_from_hex_string)
+      KV_SERIALIZE_CUSTOM(kiss, std::string, crypto::chaum_pedersen_proof_s_to_hex_string, crypto::chaum_pedersen_proof_s_from_hex_string)
     END_KV_SERIALIZE_MAP()
   };
 

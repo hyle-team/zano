@@ -9848,7 +9848,7 @@ tools::wallet_public::wallet_hf6_snapshot_check_result_t blockchain_storage::pro
         return false;
       }
 
-      // kiss proves knowledge of x:  ki - P = x*(Hp(P) - G)  =>  ki is the genuine key image of P.
+      // kiss proves knowledge of x:  ki = x * Hp(P) and P = x * G  =>  ki is the genuine key image of P.
       const crypto::key_image& ki = so.ki;
       crypto::point_t P_pt;
       crypto::point_t ki_pt;
@@ -9858,15 +9858,21 @@ tools::wallet_public::wallet_hf6_snapshot_check_result_t blockchain_storage::pro
         scan_err = "invalid P or ki point at gindex=" + std::to_string(gindex);
         return false;
       }
-      const crypto::point_t G_gen = crypto::hash_helper_t::hp(P) - crypto::c_point_G;
-      const crypto::public_key A  = (ki_pt - P_pt).to_public_key();
+      if (!P_pt.is_in_main_subgroup() || !ki_pt.is_in_main_subgroup())
+      {
+        scan_ok = false;
+        scan_err = "main subgroup check for P or ki point failed at gindex=" + std::to_string(gindex);
+        return false;
+      }
+
       crypto::hash_helper_t::hs_t hsc_m(4);
+      hsc_m.add_32_chars(CRYPTO_HDS_WALLET_SNAPSHOT_KISS_PROOF);
       hsc_m.add_pub_key(addr.spend_public_key);
       hsc_m.add_pub_key(addr.view_public_key);
-      hsc_m.add_pub_key(P);
-      hsc_m.add_key_image(ki);
-      const crypto::hash m = hsc_m.calc_hash_no_reduce();   // m = Hs(spend_pub | view_pub | P | ki)
-      if (!crypto::verify_schnorr_sig_custom_generator(m, A, G_gen, so.kiss))
+      hsc_m.add_scalar(crypto::scalar_t(gindex));
+      const crypto::hash m = hsc_m.calc_hash_no_reduce(); // m = H(domain | spend_pub | view_pub | gindex)
+
+      if (!crypto::verify_chaum_pedersen_proof(m, ki_pt, P_pt, crypto::hash_helper_t::hp(P), crypto::c_point_G, so.kiss))
       {
         scan_ok = false;
         scan_err = "kiss key-image proof verification failed at gindex=" + std::to_string(gindex);
