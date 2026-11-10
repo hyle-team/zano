@@ -196,13 +196,6 @@ bool pos_mining_with_decoys::c1(currency::core& c, size_t ev_index, const std::v
       : tools::core_fast_rpc_proxy(proxy)
     {}
 
-    bool call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::request& req,
-      COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::response& rsp) override
-    {
-      ++rpc3_calls;
-      return tools::core_fast_rpc_proxy::call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3(req, rsp);
-    }
-
     bool call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request& req,
       COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::response& rsp) override
     {
@@ -211,7 +204,6 @@ bool pos_mining_with_decoys::c1(currency::core& c, size_t ev_index, const std::v
       return tools::core_fast_rpc_proxy::call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4(req, rsp);
     }
 
-    size_t rpc3_calls = 0;
     size_t rpc4_calls = 0;
     COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request last_request{};
   };
@@ -248,7 +240,6 @@ bool pos_mining_with_decoys::c1(currency::core& c, size_t ev_index, const std::v
 
   auto check_staking_request = [&](size_t expected_calls, uint64_t amount) -> bool
   {
-    CHECK_AND_ASSERT_EQ(rpc_proxy->rpc3_calls, 0);
     CHECK_AND_ASSERT_EQ(rpc_proxy->rpc4_calls, expected_calls);
     const auto& req = rpc_proxy->last_request;
     CHECK_AND_ASSERT_EQ(req.look_up_strategy, std::string(LOOK_UP_STRATEGY_POS_COINBASE));
@@ -328,7 +319,6 @@ bool pos_mining_with_decoys::c1(currency::core& c, size_t ev_index, const std::v
   dan_wlt->refresh();
   r = dan_wlt->try_mint_pos(m_accounts[DAN_ACC_IDX].get_public_address());
   CHECK_AND_ASSERT_MES(r, false, "try_mint_pos failed");
-  CHECK_AND_ASSERT_EQ(rpc_proxy->rpc3_calls, 0);
   CHECK_AND_ASSERT_EQ(rpc_proxy->rpc4_calls, 3); // auditable staking must not request decoys
 
   {
