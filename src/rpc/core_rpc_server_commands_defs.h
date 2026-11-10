@@ -701,7 +701,7 @@ namespace currency
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(batches)                 DOC_DSCR("List of request batches, each containing an amount and corresponding heights to be processed.") DOC_EXMP_AUTO(1) DOC_END
         KV_SERIALIZE(height_upper_limit)      DOC_DSCR("Maximum blockchain height for height-based batches. If nonzero, decoys must be at this height or older. Ignored for bare index batches.") DOC_EXMP(2555000) DOC_END
-        KV_SERIALIZE(look_up_strategy)        DOC_DSCR("LOOK_UP_STRATEGY_REGULAR_TX or LOOK_UP_STRATEGY_POS_COINBASE") DOC_EXMP("LOOK_UP_STRATEGY_REGULAR_TX") DOC_END
+        KV_SERIALIZE(look_up_strategy)        DOC_DSCR("LOOK_UP_STRATEGY_REGULAR_TX or LOOK_UP_STRATEGY_POS_COINBASE, for indexed bare batches POS_COINBASE applies the daemons PoS height limit") DOC_EXMP("LOOK_UP_STRATEGY_REGULAR_TX") DOC_END
 
       END_KV_SERIALIZE_MAP()
     };
