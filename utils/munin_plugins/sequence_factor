@@ -1,0 +1,18 @@
+#!/bin/bash
+
+case $1 in
+   config)
+        cat <<'EOM'
+graph_title sequence
+graph_vlabel sequence
+graph_category daemon
+pos_sequence_factor.label pos_sequence_factor
+pow_sequence_factor.label pow_sequence_factor
+EOM
+        exit 0;;
+esac
+
+printf "pos_sequence_factor.value "
+connectivity_tool --ip=127.0.0.1 --rpc-port=$ZANO_RPC_PORT --timeout=1000 --rpc-get-daemon-info --getinfo-flags-hex="0x0000000000002000" | grep pos_sequence_factor | cut -d ' ' -f2
+printf "pow_sequence_factor.value "
+connectivity_tool --ip=127.0.0.1 --rpc-port=$ZANO_RPC_PORT --timeout=1000 --rpc-get-daemon-info --getinfo-flags-hex="0x0000000000004000" | grep pow_sequence_factor | cut -d ' ' -f2

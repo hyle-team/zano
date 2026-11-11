@@ -1,0 +1,17 @@
+#!/bin/bash
+
+case $1 in
+   config)
+        cat <<'EOM'
+graph_args --alt-autoscale
+graph_title pos_block_ts_shift_vs_actual
+graph_vlabel seconds
+graph_category daemon
+pos_block_ts_shift_vs_actual.label pos_block_ts_shift_vs_actual
+
+EOM
+        exit 0;;
+esac
+
+printf "pos_block_ts_shift_vs_actual.value "
+connectivity_tool --ip=127.0.0.1 --rpc-port=$ZANO_RPC_PORT --timeout=1000 --rpc-get-daemon-info --getinfo-flags-hex="0x0000000000020000" | grep pos_block_ts_shift_vs_actual | cut -d ' ' -f2

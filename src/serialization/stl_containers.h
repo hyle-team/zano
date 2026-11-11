@@ -1,0 +1,403 @@
+// Copyright (c) 2014-2017 The The Louisdor Project
+// Copyright (c) 2012-2013 The Cryptonote developers
+// Copyright (c) 2014-2026 Zano Project
+// Distributed under the MIT/X11 software license, see the accompanying
+// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+
+#pragma once
+
+#include <set>
+#include <vector>
+#include <list>
+
+
+#define SANITY_CHECK_MAX_RESERVATION_RAM                    10000000 
+
+
+//#include "serialization.h"
+//template <template <bool> class Archive, class T>
+//bool do_serialize(Archive<false> &ar, std::vector<T> &v);
+//template <template <bool> class Archive, class T>
+//bool do_serialize(Archive<true> &ar, std::vector<T> &v);
+
+namespace serialization
+{
+  namespace detail
+  {
+    template <typename Archive, class T>
+    bool serialize_container_element(Archive& ar, T& e)
+    {
+      return ::do_serialize(ar, e);
+    }
+
+    template <typename Archive>
+    bool serialize_container_element(Archive& ar, uint64_t& e)
+    {
+      ar.serialize_varint(e);
+      return true;
+    }
+  }
+}
+
+//template <template <bool> class Archive, class T>
+template<class Archive, class T,
+  typename std::enable_if<!Archive::is_saving::value, int>::type = 0>
+bool do_serialize(Archive& ar, std::vector<T> &v)
+{
+  size_t cnt = 0;
+  ar.begin_array(cnt);
+  if (!ar.stream().good())
+    return false;
+  v.clear();
+
+  // very basic sanity check
+  if (ar.remaining_bytes() < cnt) {
+    ar.stream().setstate(std::ios::failbit);
+    return false;
+  }
+
+  if (serialization_budget_strict(ar))
+  {
+    // Strict: charge the exact reservation and element count before it is
+    // made; reserving exactly avoids growth reallocations.
+    if (!serialization_budget_charge(ar, cnt, sizeof(T), cnt))
+      return false;
+    v.reserve(cnt);
+  }
+  else if (sizeof(T) * cnt < SANITY_CHECK_MAX_RESERVATION_RAM)
+  {
+    v.reserve(cnt);
+  }
+
+
+
+  for (size_t i = 0; i < cnt; i++) {
+    if (i > 0)
+      ar.delimit_array();
+
+    T t = T();
+    if (!::serialization::detail::serialize_container_element(ar, t))
+      return false;
+    if (!ar.stream().good())
+      return false;
+    // Strict: moved, so nested storage (already charged) is requested once.
+    if (serialization_budget_strict(ar))
+      v.push_back(std::move(t));
+    else
+      v.push_back(t);
+  }
+  ar.end_array();
+  return true;
+}
+
+namespace serialization
+{
+  namespace detail
+  {
+    // Strict budgets model only vectors, strings, variants and optionals (the
+    // transaction/block graph). Node-based containers are refused fail-closed
+    // in strict mode rather than approximated; default archives are unaffected.
+    template <class Archive>
+    bool refuse_unbudgeted_container(Archive& ar)
+    {
+      if (!serialization_budget_strict(ar))
+        return false;
+      ar.stream().setstate(std::ios::failbit);
+      return true;
+    }
+  }
+}
+
+template<class Archive, class T,
+  typename std::enable_if<Archive::is_saving::value, int>::type = 0>
+bool do_serialize(Archive &ar, std::vector<T> &v)
+{
+  size_t cnt = v.size();
+  ar.begin_array(cnt);
+  for (size_t i = 0; i < cnt; i++) {
+    if (!ar.stream().good())
+      return false;
+    if (i > 0)
+      ar.delimit_array();
+    if(!::serialization::detail::serialize_container_element(ar, v[i]))
+      return false;
+    if (!ar.stream().good())
+      return false;
+  }
+  ar.end_array();
+  return true;
+}
+
+template <template <bool> class Archive, class T>
+bool do_serialize(Archive<false> &ar, std::list<T> &v)
+{
+  size_t cnt = 0;
+  ar.begin_array(cnt);
+  if (!ar.stream().good())
+    return false;
+  v.clear();
+
+  // very basic sanity check
+  if (ar.remaining_bytes() < cnt) {
+    ar.stream().setstate(std::ios::failbit);
+    return false;
+  }
+  if (::serialization::detail::refuse_unbudgeted_container(ar))
+    return false;
+
+  for (size_t i = 0; i < cnt; i++) {
+    if (i > 0)
+      ar.delimit_array();
+    v.push_back(T());
+    if (!::serialization::detail::serialize_container_element(ar, v.back()))
+      return false;
+    if (!ar.stream().good())
+      return false;
+  }
+  ar.end_array();
+  return true;
+}
+
+template <template <bool> class Archive, class T>
+bool do_serialize(Archive<true> &ar, std::list<T> &v)
+{
+  size_t cnt = v.size();
+  ar.begin_array(cnt);
+  for (auto it = v.begin(); it != v.end(); it++)
+  {
+    if (!ar.stream().good())
+      return false;
+    if (it != v.begin())
+      ar.delimit_array();
+    if (!::serialization::detail::serialize_container_element(ar, *it))
+      return false;
+    if (!ar.stream().good())
+      return false;
+  }
+  ar.end_array();
+  return true;
+}
+
+template <template <bool> class Archive, class T>
+bool do_serialize(Archive<false> &ar, std::set<T> &v)
+{
+  size_t cnt = 0;
+  ar.begin_array(cnt);
+  if (!ar.stream().good())
+    return false;
+  v.clear();
+
+  // very basic sanity check
+  if (ar.remaining_bytes() < cnt) {
+    ar.stream().setstate(std::ios::failbit);
+    return false;
+  }
+  if (::serialization::detail::refuse_unbudgeted_container(ar))
+    return false;
+
+  for (size_t i = 0; i < cnt; i++) {
+    if (i > 0)
+      ar.delimit_array();
+    T t = T();
+
+    if (!::serialization::detail::serialize_container_element(ar, t))
+      return false;
+    if (!ar.stream().good())
+      return false;
+    v.insert(t);
+  }
+  ar.end_array();
+  return true;
+}
+
+template <template <bool> class Archive, class T>
+bool do_serialize(Archive<true> &ar, std::set<T> &v)
+{
+  size_t cnt = v.size();
+  ar.begin_array(cnt);
+  for (auto it = v.begin(); it != v.end(); it++)
+  {
+    if (!ar.stream().good())
+      return false;
+    if (it != v.begin())
+      ar.delimit_array();
+    //TODO: refactoring needed to remove const_cast 
+    if (!::serialization::detail::serialize_container_element(ar, const_cast<std::string&>(*it)))
+      return false;
+    if (!ar.stream().good())
+      return false;
+  }
+  ar.end_array();
+  return true;
+}
+
+template <template <bool> class Archive, class T, class K>
+bool do_serialize(Archive<false>& ar, std::unordered_map<K, T>& v)
+{
+  size_t cnt = 0;
+  ar.begin_array(cnt);
+  if (!ar.stream().good())
+    return false;
+  v.clear();
+
+  // very basic sanity check
+  if (ar.remaining_bytes() < cnt) {
+    ar.stream().setstate(std::ios::failbit);
+    return false;
+  }
+  if (::serialization::detail::refuse_unbudgeted_container(ar))
+    return false;
+
+  for (size_t i = 0; i < cnt; i++)
+  {
+    if (i > 0)
+      ar.delimit_array();
+    
+    typename std::unordered_map<K, T>::value_type vt{};
+    
+    const K& k = vt.first;
+    T& t = vt.second;
+    if (!::do_serialize(ar, const_cast<K&>(k)))
+      return false;
+    if (!ar.stream().good())
+      return false;
+
+    if (!::do_serialize(ar, t))
+      return false;
+    if (!ar.stream().good())
+      return false;
+
+    auto res = v.insert(vt);
+    if(res.second == false)
+      return false;
+  }
+  ar.end_array();
+  return true;
+}
+
+template <template <bool> class Archive, class T, class K>
+bool do_serialize(Archive<true>& ar, std::unordered_map<K, T>& v_)
+{
+  std::list<std::pair<K, T>> v(v_.begin(), v_.end());
+
+  v.sort([](const std::pair<K, T>& a, const std::pair<K, T>& b) -> bool { return a.first < b.first; });
+
+  size_t cnt = v.size();
+  ar.begin_array(cnt);
+  for (auto it = v.begin(); it != v.end(); it++)
+  {
+    if (!ar.stream().good())
+      return false;
+    if (it != v.begin())
+      ar.delimit_array();
+    //TODO: refactoring needed to remove const_cast 
+    if (!::do_serialize(ar, const_cast<K&>(it->first)))
+      return false;
+    if (!ar.stream().good())
+      return false;
+
+    //TODO: refactoring needed to remove const_cast 
+    if (!do_serialize(ar, const_cast<T&>(it->second)))
+      return false;
+    if (!ar.stream().good())
+      return false;
+
+
+  }
+  ar.end_array();
+  return true;
+}
+
+
+template <template <bool> class Archive, class A, class B>
+bool do_serialize(Archive<false> &ar, std::pair<A, B> &v)
+{
+  if (!::serialization::detail::serialize_container_element(ar, v.first))
+    return false;
+  if (!ar.stream().good())
+    return false;
+
+  if (!::serialization::detail::serialize_container_element(ar, v.second))
+    return false;
+  if (!ar.stream().good())
+    return false;
+
+  return true;
+}
+
+template <template <bool> class Archive, class A, class B>
+bool do_serialize(Archive<true> &ar, std::pair<A, B> &v)
+{
+  if (!::serialization::detail::serialize_container_element(ar, v.first))
+    return false;
+  if (!ar.stream().good())
+    return false;
+
+  if (!::serialization::detail::serialize_container_element(ar, v.second))
+    return false;
+  if (!ar.stream().good())
+    return false;
+
+  return true;
+}
+
+// we do specialization for std::vector<bool> cz it 
+
+// template <template <bool> class Archive>
+// bool do_serialize(Archive<false> &ar, std::vector<bool> &v)
+// {
+//   size_t cnt;
+//   ar.begin_array(cnt);
+//   if (!ar.stream().good())
+//     return false;
+//   v.clear();
+// 
+//   // very basic sanity check
+//   if (ar.remaining_bytes() < cnt) {
+//     ar.stream().setstate(std::ios::failbit);
+//     return false;
+//   }
+// 
+//   v.reserve(cnt);
+//   for (size_t i = 0; i < cnt; i++) {
+//     if (i > 0)
+//       ar.delimit_array();
+//     v.resize(i + 1);
+//     if (!::serialization::detail::serialize_container_element(ar, v[i]))
+//       return false;
+//     if (!ar.stream().good())
+//       return false;
+//   }
+//   ar.end_array();
+//   return true;
+// }
+
+template <template <bool> class Archive>
+bool do_serialize(Archive<true> &ar, std::vector<bool> &v)
+{
+  size_t cnt = v.size();
+  ar.begin_array(cnt);
+  for (size_t i = 0; i < cnt; i++) {
+    if (!ar.stream().good())
+      return false;
+    if (i > 0)
+      ar.delimit_array();
+
+    bool local_b = static_cast<bool>(v[i]);
+    if (!::serialization::detail::serialize_container_element(ar, local_b))
+      return false;
+    if (!ar.stream().good())
+      return false;
+  }
+  ar.end_array();
+  return true;
+}
+
+template<typename Archive, typename T>
+struct serializer<Archive, std::vector<T>>
+{
+  static bool serialize(Archive& ar, std::vector<T>& v)
+  {
+    return ::do_serialize(ar, v);
+  }
+};

@@ -1,0 +1,18 @@
+#!/bin/bash
+
+case $1 in
+   config)
+        cat <<'EOM'
+graph_title block_size
+graph_vlabel block_size
+graph_category daemon
+current_max_allowed_block_size.label current_max_allowed_block_size
+last_block_size.label last_block_size
+EOM
+        exit 0;;
+esac
+
+printf "last_block_size.value "
+connectivity_tool --ip=127.0.0.1 --rpc-port=$ZANO_RPC_PORT --timeout=1000 --rpc-get-daemon-info --getinfo-flags-hex="0x0000000000000800" | grep last_block_size| cut -d ' ' -f2
+printf "current_max_allowed_block_size.value "
+connectivity_tool --ip=127.0.0.1 --rpc-port=$ZANO_RPC_PORT --timeout=1000 --rpc-get-daemon-info --getinfo-flags-hex="0x0000000000000000" | grep current_max_allowed_block_size| cut -d ' ' -f2

@@ -1,0 +1,20 @@
+{
+  "jsonrpc": "2.0",
+  "id": 0,
+  "method": "transfer",
+  "params": {
+    "destinations": [
+      {
+        "amount": 1000000000,
+        "address": "ZxCkEgHf3ci8hgBfboZeCENaYrHBYZ1bLFi5cgWvn4WJLaxfgs4kqG6cJi9ai2zrXWSCpsvRXit14gKjeijx6YPC1zT8rneEf"
+      }
+    ],
+    "push_payer": true,
+    "hide_receiver": false,
+    "service_entries_permanent": false,
+    "fee": 1000000000000,
+    "mixin": 10,
+    "comment": "",
+    "service_entries": []
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "jsonrpc": "2.0",
+  "id": 0,
+  "method": "register_alias",
+  "params": {
+    "al": {
+      "alias": "zinazinazina",
+      "address": "ZxDFNTq2Qf3FPvHakortVe3HxQBXwWNkWZydqfksgv9NRh1Z5b4tE91geYbmPn4JEoNxTMbj8Wj6R4v3fhV6K4Qh36hLacW1w",
+      "tracking_key": "",
+      "comment": ""
+    },
+    "authority_key": ""
+  }
+}

@@ -1,0 +1,15 @@
+#!/bin/bash
+
+case $1 in
+   config)
+        cat <<'EOM'
+graph_title poolstate_mdbx_data_file_size
+graph_vlabel poolstate_mdbx_data_file_size
+graph_category daemon
+poolstate_mdbx_data_file_size.label poolstate_mdbx_data_file_size 
+EOM
+        exit 0;;
+esac
+
+printf "poolstate_mdbx_data_file_size.value "
+sudo ls -l /root/.Zano/poolstate_mdbx_v1/mdbx.dat | cut -d" " -f5

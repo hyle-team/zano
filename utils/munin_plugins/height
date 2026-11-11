@@ -1,0 +1,16 @@
+#!/bin/bash
+
+case $1 in
+   config)
+        cat <<'EOM'
+graph_title Height
+graph_vlabel height
+graph_category daemon
+height.label height
+height.type COUNTER
+EOM
+        exit 0;;
+esac
+
+printf "height.value "
+connectivity_tool --ip=127.0.0.1 --rpc-port=$ZANO_RPC_PORT --timeout=1000 --rpc-get-daemon-info --getinfo-flags-hex="0x0000000000000000" | grep height | cut -d ' ' -f2

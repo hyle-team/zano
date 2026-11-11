@@ -1,0 +1,15 @@
+#!/bin/bash
+
+case $1 in
+   config)
+        cat <<'EOM'
+graph_title market
+graph_vlabel offers_count
+graph_category daemon
+offers_count.label offers_count
+EOM
+        exit 0;;
+esac
+
+printf "offers_count.value "
+connectivity_tool --ip=127.0.0.1 --rpc-port=$ZANO_RPC_PORT --timeout=1000 --rpc-get-daemon-info --getinfo-flags-hex="0x0000000000010000" | grep market_size| cut -d ' ' -f2

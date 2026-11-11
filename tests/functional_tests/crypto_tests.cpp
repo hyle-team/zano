@@ -1,0 +1,2443 @@
+// Copyright (c) 2020-2026 Zano Project
+// Copyright (c) 2020-2026 sowle (val@zano.org, crypto.sowle@gmail.com)
+// Distributed under the MIT/X11 software license, see the accompanying
+// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+
+#define USE_INSECURE_RANDOM_RPNG_ROUTINES // turns on random manupulation for tests
+#include <utility>
+#include <boost/multiprecision/cpp_int.hpp>
+#include "crypto/crypto.h"
+#include "epee/include/misc_log_ex.h"
+#include "epee/include/profile_tools.h"
+#include "include_base_utils.h"
+#include "common/crypto_stream_operators.h"
+#include "common/varint.h"
+#include "common/boost_serialization_helper.h"
+#include "currency_core/difficulty.h"
+#include "currency_core/currency_basic.h"
+
+#include "crypto/crypto-sugar.h"
+#include "crypto/range_proofs.h"
+#include "../core_tests/random_helper.h"
+#include "crypto_torsion_elements.h"
+#include "crypto/eth_signature.h"
+#include "crypto/sha512.h"
+
+using namespace crypto;
+
+// out = z ^ s (mod l)
+void sc_exp(unsigned char* out, const unsigned char* z, const unsigned char* s)
+{
+  sc_0(out);
+  out[0] = 1;
+  if (sc_isnonzero(s) == 0)
+  {
+    return;
+  }
+
+  // calc position of the most significant bit of s
+  size_t msb_s = 0;
+  for (size_t i = 31; i != SIZE_MAX; --i)
+  {
+    if (s[i] != 0)
+    {
+      msb_s = 8 * i;
+      uint8_t t = s[i] >> 1;
+      while (t)
+      {
+        t >>= 1;
+        ++msb_s;
+      }
+      break;
+    }
+  }
+
+  for (size_t i = msb_s; i != SIZE_MAX; --i)
+  {
+    sc_mul(out, out, out);
+    //std::cout << "sc_mul(out, out, out);" << std::endl;
+    uint8_t bit = (s[i / 8] >> (i % 8)) & 1;
+    if (bit)
+    {
+      sc_mul(out, out, z);
+      //std::cout << "sc_mul(out, out, z);" << std::endl;
+    }
+  }
+}
+
+/*
+ Input:
+ s[0]+256*s[1]+...+256^31*s[31] = s
+ a[0]+256*a[1]+...+256^31*a[31] = a
+ n
+ *
+ Output:
+ s[0]+256*s[1]+...+256^31*s[31] = a * s^(2^n) mod l
+ where l = 2^252 + 27742317777372353535851937790883648493.
+ Overwrites s in place.
+ */
+
+static inline void
+sc_sqmul(unsigned char s[32], const int n, const unsigned char a[32])
+{
+  int i;
+  for (i = 0; i < n; ++i)
+    sc_mul(s, s, s);
+  sc_mul(s, s, a);
+}
+
+// out = z ^ -1 (= z ^ (L - 2) according to Fermat little theorem)
+void sc_invert2(unsigned char* out, const unsigned char* z)
+{
+  memcpy(out, z, 32);
+  for (size_t i = 0; i < 128; ++i)
+    sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, out);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, out);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, out);
+  sc_mul(out, out, out);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, out);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, out);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, out);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, out);
+  sc_mul(out, out, out);
+  sc_mul(out, out, out);
+  sc_mul(out, out, out);
+  sc_mul(out, out, out);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, out);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, out);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, out);
+  sc_mul(out, out, out);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, out);
+  sc_mul(out, out, out);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, out);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, out);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, out);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+  sc_mul(out, out, out);
+  sc_mul(out, out, z);
+}
+
+extern void *sha3(const void *in, size_t inlen, void *md, int mdlen);
+
+
+uint64_t rand_in_range(uint64_t from_including, uint64_t to_not_including)
+{
+  uint64_t result = 0;
+  crypto::generate_random_bytes(sizeof result, &result);
+  return from_including + result % (to_not_including - from_including);
+}
+
+
+
+
+static const fe scalar_L_fe = { 16110573, 10012311, -6632702, 16062397, 5471207, 0, 0, 0, 0, 4194304 };
+
+
+
+
+
+
+//
+// test helpers
+//
+
+inline std::ostream& operator<<(std::ostream& ss, const fe &f)
+{
+  constexpr size_t fe_index_max = (sizeof f / sizeof f[0]) - 1;
+  ss << "{";
+  for (size_t i = 0; i < fe_index_max; ++i)
+    ss << f[i] << ", ";
+  return ss << f[fe_index_max] << "}";
+}
+
+point_t point_from_str(const std::string& str)
+{
+  crypto::public_key pk;
+  if (!epee::string_tools::parse_tpod_from_hex_string(str, pk))
+    throw std::runtime_error("couldn't parse pub key");
+
+  point_t result;
+  if (!result.from_public_key(pk))
+    throw std::runtime_error("invalid pub key");
+
+  return result;
+}
+
+scalar_t scalar_from_str(const std::string& str)
+{
+  crypto::secret_key sk;
+  if (!epee::string_tools::parse_tpod_from_hex_string(str, sk))
+    throw std::runtime_error("couldn't parse sec key");
+
+  scalar_t result;
+  result.from_secret_key(sk);
+  if (result > c_scalar_Lm1)
+    throw std::runtime_error("sec key scalar >= L");
+
+  return result;
+}
+
+crypto::hash hash_from_str(const std::string& str)
+{
+  crypto::hash hash;
+  if (!epee::string_tools::parse_tpod_from_hex_string(str, hash))
+    throw std::runtime_error("couldn't parse hash");
+
+  return hash;
+}
+
+std::string point_to_str(const point_t& point)
+{
+  crypto::public_key pk = point.to_public_key();
+  return epee::string_tools::pod_to_hex(pk);
+}
+
+std::string scalar_to_str(const scalar_t& scalar)
+{
+  return epee::string_tools::pod_to_hex(scalar);
+}
+
+bool generate_test_ring_and_sec_keys(size_t N, size_t L, std::vector<point_t>& ring, std::vector<scalar_t>& secret_keys,
+  std::vector<size_t>& ring_mapping, std::vector<point_t>& key_images)
+{
+  secret_keys.resize(L);
+  for (size_t i = 0; i < L; ++i)
+    secret_keys[i].make_random();
+
+  std::vector<point_t> fake_pub_keys(N / 2 - L);
+  for (size_t i = 0; i < fake_pub_keys.size(); ++i)
+    fake_pub_keys[i] = hash_helper_t::hp(i * c_point_G);
+
+  ring_mapping.resize(N / 2);
+  for (size_t i = 0; i < N / 2; ++i)
+    ring_mapping[i] = i;
+
+  std::shuffle(ring_mapping.begin(), ring_mapping.end(), crypto::uniform_random_bit_generator());
+
+  ring.resize(N / 2);
+  for (size_t i = 0; i < ring.size(); ++i)
+  {
+    if (i < L)
+    {
+      // own keys
+      ring[ring_mapping[i]] = secret_keys[i] * c_point_G;
+    }
+    else
+    {
+      // fake keys
+      ring[ring_mapping[i]] = fake_pub_keys[i - L];
+    }
+  }
+
+  ring_mapping.resize(L);
+
+  key_images.resize(L);
+  for (size_t i = 0; i < L; ++i)
+    key_images[i] = hash_helper_t::hp(ring[ring_mapping[i]]) / secret_keys[i];
+
+  return true;
+}
+
+bool generate_test_ring_and_sec_keys(size_t N, size_t L, std::vector<crypto::public_key>& ring, std::vector<crypto::secret_key>& secret_keys,
+  std::vector<size_t>& ring_mapping, std::vector<crypto::key_image> & key_images)
+{
+  secret_keys.resize(L);
+  for (size_t i = 0; i < L; ++i)
+    secret_keys[i] = scalar_t::random().as_secret_key();
+
+  std::vector<point_t> fake_pub_keys(N / 2 - L);
+  for (size_t i = 0; i < fake_pub_keys.size(); ++i)
+    fake_pub_keys[i] = hash_helper_t::hp(i * c_point_G);
+
+  ring_mapping.resize(N / 2);
+  for (size_t i = 0; i < N / 2; ++i)
+    ring_mapping[i] = i;
+
+  std::shuffle(ring_mapping.begin(), ring_mapping.end(), crypto::uniform_random_bit_generator());
+
+  ring.resize(N / 2);
+  for (size_t i = 0; i < ring.size(); ++i)
+  {
+    if (i < L)
+    {
+      // own keys
+      ring[ring_mapping[i]] = (secret_keys[i] * c_point_G).to_public_key();
+    }
+    else
+    {
+      // fake keys
+      ring[ring_mapping[i]] = fake_pub_keys[i - L].to_public_key();
+    }
+  }
+
+  ring_mapping.resize(L);
+
+  key_images.resize(L);
+  for (size_t i = 0; i < L; ++i)
+    key_images[i] = (hash_helper_t::hp(ring[ring_mapping[i]]) / secret_keys[i]).to_key_image();
+
+  return true;
+}
+
+uint64_t hash_64(const void* data, size_t size)
+{
+  crypto::hash h = crypto::cn_fast_hash(data, size);
+  uint64_t* phash_as_array = (uint64_t*)&h;
+  return phash_as_array[0] ^ phash_as_array[1] ^ phash_as_array[2] ^ phash_as_array[3];
+}
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+
+
+/*
+* tiny facade to gtest-alike interface to make simplier further tests transfer to unit_tests
+*/
+#define TEST(test_name_a, test_name_b) \
+  static bool test_name_a ## _ ## test_name_b(); \
+  static test_keeper_t test_name_a ## _ ## test_name_b ## _ ## keeper(STR(COMBINE(test_name_a ## _, test_name_b)), & test_name_a ## _ ## test_name_b); \
+  static bool test_name_a ## _ ## test_name_b()
+#define ASSERT_TRUE(expr)  CHECK_AND_ASSERT_MES(expr,             false, "This is not true: " #expr << " @ " << LOCATION_SS)
+#define ASSERT_FALSE(expr) CHECK_AND_ASSERT_MES((expr) == false,  false, "This is not false: " #expr << " @ " << LOCATION_SS)
+#define ASSERT_EQ(a, b)    CHECK_AND_ASSERT_MES(a == b,           false, #a " != " #b "\n    " << a << " != " << b << " @ " << LOCATION_SS)
+#define ASSERT_NEQ(a, b)   CHECK_AND_ASSERT_MES(a != b,           false, #a " == " #b "\n    " << a << " @ " << LOCATION_SS)
+
+typedef bool(*bool_func_ptr_t)();
+static std::vector<std::pair<std::string, bool_func_ptr_t>> g_tests;
+struct test_keeper_t
+{
+  test_keeper_t(const char* name, bool_func_ptr_t func_p)
+  {
+    g_tests.push_back(std::make_pair(name, func_p));
+  }
+};
+
+
+
+//
+// Tests
+//
+
+TEST(crypto, constants)
+{
+  //
+  // field elements
+  //
+  scalar_t zero = {0, 0, 0, 0};
+  scalar_t one  = {1, 0, 0, 0};
+  ASSERT_TRUE(zero.is_zero());
+  ASSERT_FALSE(one.is_zero());
+  ASSERT_TRUE(one > zero);
+  scalar_t r = scalar_t::random();
+  ASSERT_EQ(r * zero, zero);
+  ASSERT_EQ(r * one, r);
+  ASSERT_EQ(c_scalar_0, zero);
+  ASSERT_EQ(c_scalar_1, one);
+
+  ASSERT_EQ(c_scalar_2p64 - c_scalar_1, scalar_t(UINT64_MAX));
+  ASSERT_EQ(c_scalar_2p64, scalar_t(UINT64_MAX) + c_scalar_1);
+  ASSERT_EQ(c_scalar_2p64, scalar_t::power_of_2(64));
+
+  ASSERT_EQ(zero + c_scalar_L, zero);
+  ASSERT_EQ(c_scalar_L + zero, zero);
+  ASSERT_EQ(r + c_scalar_L, r);
+  ASSERT_EQ(c_scalar_L + r, r);
+
+  ASSERT_EQ(c_scalar_Lm1 + c_scalar_1, c_scalar_0);
+  ASSERT_EQ(c_scalar_0 - c_scalar_1, c_scalar_Lm1);
+
+  ASSERT_EQ(c_scalar_P.as_boost_mp_type<mp::uint256_t>(), scalar_t::power_of_2(255).as_boost_mp_type<mp::uint256_t>() - 19);
+
+  ASSERT_EQ(c_scalar_P.as_boost_mp_type<mp::uint256_t>() - c_scalar_Pm1.as_boost_mp_type<mp::uint256_t>(), mp::uint256_t(1));
+  ASSERT_EQ(c_scalar_Pm1 + r, c_scalar_P - c_scalar_1 + r);
+
+  ASSERT_EQ(c_scalar_256m1.as_boost_mp_type<mp::uint256_t>(), scalar_t::power_of_2(255).as_boost_mp_type<mp::uint512_t>() * 2 - 1);
+
+  ASSERT_EQ(c_scalar_1div8 * scalar_t(8), c_scalar_1);
+  ASSERT_NEQ(c_scalar_1div8, c_scalar_1);
+  ASSERT_NEQ(c_scalar_1div8 * scalar_t(2), c_scalar_1);
+  ASSERT_NEQ(c_scalar_1div8 * scalar_t(4), c_scalar_1);
+
+  LOG_PRINT_L0("0         = " << c_scalar_0       << " = { " << pod_to_hex_comma_separated_uint64(c_scalar_0) << " }");
+  LOG_PRINT_L0("1         = " << c_scalar_1       << " = { " << pod_to_hex_comma_separated_uint64(c_scalar_1) << " }");
+  LOG_PRINT_L0("2^64      = " << c_scalar_2p64    << " = { " << pod_to_hex_comma_separated_uint64(c_scalar_2p64) << " }");
+  LOG_PRINT_L0("L         = " << c_scalar_L       << " = { " << pod_to_hex_comma_separated_uint64(c_scalar_L) << " }");
+  LOG_PRINT_L0("L - 1     = " << c_scalar_Lm1     << " = { " << pod_to_hex_comma_separated_uint64(c_scalar_Lm1) << " }");
+  LOG_PRINT_L0("P         = " << c_scalar_P       << " = { " << pod_to_hex_comma_separated_uint64(c_scalar_P) << " }");
+  LOG_PRINT_L0("P - 1     = " << c_scalar_Pm1     << " = { " << pod_to_hex_comma_separated_uint64(c_scalar_Pm1) << " }");
+  LOG_PRINT_L0("2^256 - 1 = " << c_scalar_256m1   << " = { " << pod_to_hex_comma_separated_uint64(c_scalar_256m1) << " }");
+  LOG_PRINT_L0("1/8       = " << c_scalar_1div8   << " = { " << pod_to_hex_comma_separated_uint64(c_scalar_1div8) << " }");
+  LOG_PRINT_L0(ENDL);
+
+
+  //
+  // group elements
+  //
+
+  // calculate all generators manually using on external constants
+  point_t p_0{};
+  ge_p3_0(&p_0.m_p3);
+
+  point_t G{};
+  ge_scalarmult_base(&G.m_p3, c_scalar_1.data());
+
+  point_t H   = hash_helper_t::hp(G);
+  point_t H2  = hash_helper_t::hp("H2_generator");
+  point_t U   = hash_helper_t::hp("U_generator");
+  point_t X   = hash_helper_t::hp("X_generator");
+  point_t HpG = H + G;
+  point_t HmG = H - G;
+  point_t Hd8 = c_scalar_1div8 * H;
+  
+  ASSERT_EQ(scalar_t(8) * Hd8, H);
+
+  // print them
+  LOG_PRINT_L0("0     = " << p_0  << " = { " << p_0.to_comma_separated_int32_str() << " }");
+  LOG_PRINT_L0("G     = " << G    << " = { " << G.to_comma_separated_int32_str() << " }");
+  LOG_PRINT_L0("H     = " << H    << " = { " << H.to_comma_separated_int32_str() << " }");
+  LOG_PRINT_L0("      = { " << pod_to_comma_separated_chars(H.to_public_key()) << " }");
+  LOG_PRINT_L0("H2    = " << H2   << " = { " << H2.to_comma_separated_int32_str() << " }");
+  LOG_PRINT_L0("U     = " << U    << " = { " << U.to_comma_separated_int32_str() << " }");
+  LOG_PRINT_L0("X     = " << X    << " = { " << X.to_comma_separated_int32_str() << " }");
+  LOG_PRINT_L0("H+G   = " << HpG  << " = { " << HpG.to_comma_separated_int32_str() << " }");
+  LOG_PRINT_L0("H-G   = " << HmG  << " = { " << HmG.to_comma_separated_int32_str() << " }");
+  LOG_PRINT_L0("H / 8 = " << Hd8  << " = { " << pod_to_hex_comma_separated_bytes(Hd8.to_public_key()) << " }");
+  LOG_PRINT_L0("      = { " << pod_to_comma_separated_chars(Hd8.to_public_key()) << " }");
+
+  // check constants
+  ASSERT_EQ(p_0,    c_point_0);
+  ASSERT_EQ(G,      c_point_G);
+  ASSERT_EQ(H,      c_point_H);
+  ASSERT_EQ(H2,     c_point_H2);
+  ASSERT_EQ(U,      c_point_U);
+  ASSERT_EQ(X,      c_point_X);
+  ASSERT_EQ(HpG,    c_point_H_plus_G);
+  ASSERT_EQ(HmG,    c_point_H_minus_G);
+
+  ASSERT_EQ(currency::native_coin_asset_id,    c_point_H.to_public_key());
+  ASSERT_EQ(currency::native_coin_asset_id_pt, c_point_H);
+  ASSERT_EQ(currency::native_coin_asset_id_pt.to_public_key(), currency::native_coin_asset_id);
+  ASSERT_EQ(currency::native_coin_asset_id_1div8, Hd8.to_public_key());
+
+  return true;
+}
+
+
+
+TEST(crypto, ge_scalarmult_vartime_p3)
+{
+  // make sure that my ge_scalarmult_vartime_p3 gives the same result as ge_scalarmul_p3
+
+  size_t N = 5000;
+  std::vector<point_t> points;
+  points.push_back(0 * c_point_G);
+  points.push_back(1 * c_point_G);
+  points.push_back(c_scalar_Lm1 * c_point_G);
+  points.push_back(c_scalar_L * c_point_G);
+  points.push_back((c_scalar_L + 1) * c_point_G);
+  size_t i = points.size();
+  points.resize(N); // should have kept previously added points
+  ASSERT_EQ(points[0], points[3]);
+  ASSERT_EQ(points[1], points[4]);
+
+  for (; i < points.size(); ++i)
+  {
+    if (i & 1)
+      points[i] = scalar_t::random() * c_point_G;
+    else
+      points[i] = hash_helper_t::hp(points[i - 1]);
+  }
+
+  for (size_t j = 0; j < points.size(); ++j)
+  {
+    scalar_t r;
+    r.make_random();
+
+    point_t A;
+    ge_scalarmult_p3(&A.m_p3, r.data(), &points[j].m_p3);
+
+    point_t B;
+    ge_scalarmult_vartime_p3(&B.m_p3, r.data(), &points[j].m_p3);
+
+    ASSERT_EQ(A, B);
+  }
+
+  return true;
+}
+
+size_t find_pos_hash(const boost::multiprecision::uint256_t& L_div_D, const currency::wide_difficulty_type& D, const uint64_t amount,
+  uint64_t& kernel, scalar_t& d0, uint64_t& d1)
+{
+  static const boost::multiprecision::uint256_t c_L_w = c_scalar_L.as_boost_mp_type<boost::multiprecision::uint256_t>();
+
+  crypto::generate_random_bytes(sizeof kernel, &kernel);
+
+  const boost::multiprecision::uint512_t L_div_D_mul_v = boost::multiprecision::uint512_t(L_div_D) * amount;
+  scalar_t L_div_D_mul_v_sc;
+  if (L_div_D_mul_v < c_L_w)
+    L_div_D_mul_v_sc = scalar_t(L_div_D_mul_v); // here we assured that L_div_D_mul_v < 2**256
+  else
+    L_div_D_mul_v_sc = scalar_t(c_L_w); // too small D or too big amount, so any h would go
+
+  size_t i = 0;
+  for (; i < 1000000; ++i)
+  {
+    scalar_t h = hash_helper_t::hs(&kernel, sizeof kernel);
+    if (h < L_div_D_mul_v_sc)
+    {
+      // found!
+      boost::multiprecision::uint512_t h_w = h.as_boost_mp_type<boost::multiprecision::uint512_t>();
+      boost::multiprecision::uint512_t d0_w = h_w / amount * D;
+      ASSERT_TRUE(d0_w < c_L_w);
+      d0 = scalar_t(d0_w);
+
+      boost::multiprecision::uint512_t ddv = (d0_w / D) * amount;
+      ASSERT_TRUE(h_w < ddv);
+      if (h_w == ddv)
+      {
+        ASSERT_TRUE(false);
+      }
+
+      boost::multiprecision::uint512_t d1_w = ddv - h_w;
+      ASSERT_TRUE(d1_w <= UINT64_MAX);
+
+      d1 = d1_w.convert_to<uint64_t>();
+      break;
+    }
+    ++kernel;
+  }
+
+  return i;
+}
+
+TEST(crypto, pos)
+{
+  //scalar_t D = 10000000000000001u;
+  [[maybe_unused]] scalar_t D = 13042196742415129u; // prime number
+  [[maybe_unused]] currency::wide_difficulty_type D_w = D.as_boost_mp_type<boost::multiprecision::uint256_t>().convert_to<currency::wide_difficulty_type>();
+  [[maybe_unused]] uint64_t amount = 1000000000000;
+  [[maybe_unused]] size_t count_old = 0;
+  [[maybe_unused]] size_t count_new = 0;
+  [[maybe_unused]] size_t count_3 = 0;
+  scalar_t x;
+  x.make_random();
+
+  const boost::multiprecision::uint512_t c_2_pow_256_m1(std::numeric_limits<boost::multiprecision::uint256_t>::max());
+
+
+  const boost::multiprecision::uint256_t c_L_w = c_scalar_L.as_boost_mp_type<boost::multiprecision::uint256_t>();
+  const boost::multiprecision::uint256_t c_L_div_D_w = c_L_w / D_w;
+  [[maybe_unused]] boost::multiprecision::uint512_t h_tres = c_L_div_D_w * amount;
+
+  [[maybe_unused]] currency::wide_difficulty_type final_diff = D_w / amount;
+
+  [[maybe_unused]] boost::multiprecision::uint512_t Lv = boost::multiprecision::uint512_t(c_L_w) * amount;
+
+  constexpr uint64_t c_coin = 1000000000000;
+  [[maybe_unused]] const uint64_t amounts[] = {
+    c_coin / 100,
+    c_coin / 50,
+    c_coin / 20,
+    c_coin / 10,
+    c_coin / 5,
+    c_coin / 2,
+    c_coin * 1,
+    c_coin * 2,
+    c_coin * 5,
+    c_coin * 10,
+    c_coin * 20,
+    c_coin * 50,
+    c_coin * 100,
+    c_coin * 200,
+    c_coin * 500,
+    c_coin * 1000,
+    c_coin * 2000,
+    c_coin * 5000,
+    c_coin * 10000,
+    c_coin * 20000,
+    c_coin * 50000,
+    c_coin * 100000,
+    c_coin * 200000,
+    c_coin * 500000
+  };
+
+  [[maybe_unused]] uint64_t kernel = 0;
+  [[maybe_unused]] scalar_t d0 = 0;
+  [[maybe_unused]] uint64_t d1 = 0;
+
+
+  /*
+  for (size_t i = 0, size = sizeof pos_diffs / sizeof pos_diffs[0]; i < size; ++i)
+  {
+    auto& D = pos_diffs[i].difficulty;
+    boost::multiprecision::uint256_t L_dvi_D = c_L_w / D;
+
+    for (size_t j = 0, size_j = sizeof amounts / sizeof amounts[0]; j < size_j; ++j)
+    {
+      uint64_t amount = rand_in_range(amounts[j], amounts[j] + amounts[j] / 10);
+      size_t iter = find_pos_hash(L_dvi_D, D, amount, kernel, d0, d1);
+      LOG_PRINT_L0(i << ", " << amount << ", " << iter);
+    }
+  }
+  */
+
+  return true;
+}
+
+struct sig_check_t
+{
+  crypto::hash prefix_hash;
+  crypto::key_image ki;
+  std::vector<crypto::public_key> pub_keys;
+  std::vector<const crypto::public_key*> pub_keys_p;
+  crypto::secret_key xi;
+  size_t secret_key_index;
+  std::vector<crypto::signature> sigs;
+
+  sig_check_t()
+  {}
+
+  void prepare_random_data(size_t decoy_set_size)
+  {
+    crypto::public_key Pi;
+    crypto::generate_keys(Pi, xi);
+
+    crypto::generate_random_bytes(sizeof prefix_hash, &prefix_hash);
+
+    for (size_t i = 0; i + 1 < decoy_set_size; ++i)
+    {
+      crypto::public_key p;
+      crypto::secret_key s;
+      crypto::generate_keys(p, s);
+      pub_keys.push_back(p);
+    }
+
+    secret_key_index = rand_in_range(0, pub_keys.size());
+    pub_keys.insert(pub_keys.begin() + secret_key_index, Pi);
+
+    for (auto& pk : pub_keys)
+      pub_keys_p.push_back(&pk);
+
+    crypto::generate_key_image(Pi, xi, ki);
+
+    sigs.resize(pub_keys.size());
+  }
+
+  void generate()
+  {
+    crypto::generate_ring_signature(prefix_hash, ki, pub_keys_p, xi, secret_key_index, sigs.data());
+  }
+
+  bool check()
+  {
+    return crypto::check_ring_signature(prefix_hash, ki, pub_keys_p, sigs.data());
+  }
+};
+
+
+TEST(crypto, ring_sigs)
+{
+  return true;
+  size_t n = 1000;
+  size_t decoy_set_size = 8;
+
+  std::cout << "using decoy set with size = " << decoy_set_size << std::endl;
+
+  std::vector<sig_check_t> sigs;
+  sigs.resize(n);
+
+  for (size_t i = 0; i < sigs.size(); ++i)
+    sigs[i].prepare_random_data(decoy_set_size);
+
+  std::cout << n << " random sigs prepared" << std::endl;
+
+  bool r = true;
+
+  TIME_MEASURE_START(gen_mcs);
+  for (size_t i = 0; i < sigs.size(); ++i)
+  {
+    sigs[i].generate();
+  }
+  TIME_MEASURE_FINISH(gen_mcs);
+
+  std::cout << n << " random sigs generated in " << gen_mcs / 1000 << " s" << std::endl;
+
+  TIME_MEASURE_START(check_mcs);
+  for (size_t i = 0; i < sigs.size(); ++i)
+  {
+    if (!sigs[i].check())
+    {
+      r = false;
+      break;
+    }
+  }
+  TIME_MEASURE_FINISH(check_mcs);
+
+  ASSERT_TRUE(r);
+
+  std::cout << n << " random sigs checked:" << std::endl;
+  std::cout << "    " << std::right << std::setw(8) << gen_mcs / 1000 << " ms for generation total" << std::endl;
+  std::cout << "    " << std::right << std::setw(8) << std::fixed << std::setprecision(1) << double(gen_mcs) / n << " mcs for generating per one signature" << std::endl;
+  std::cout << "    " << std::right << std::setw(8) << check_mcs / 1000 << " ms for checking total" << std::endl;
+  std::cout << "    " << std::right << std::setw(8) << std::fixed << std::setprecision(1) << double(check_mcs) / n << " mcs for checking per one signature" << std::endl;
+
+  return true;
+}
+
+TEST(crypto, keys)
+{
+  // keypair: sk: 407b3b73df8f11737494bdde6ca47a42e1b537390aec2fa781a2d170335c440f
+  //          pk: 1b546af91d31fdb1c476fd62fbb65b6fd5ed47804185fc77d48bc4cc00f47ef0
+
+  bool r = false;
+  crypto::public_key pk;
+  r = epee::string_tools::parse_tpod_from_hex_string("1b546af91d31fdb1c476fd62fbb65b6fd5ed47804185fc77d48bc4cc00f47ef0", pk);
+  ASSERT_TRUE(r);
+
+  crypto::secret_key sk;
+  r = epee::string_tools::parse_tpod_from_hex_string("407b3b73df8f11737494bdde6ca47a42e1b537390aec2fa781a2d170335c440f", sk);
+  ASSERT_TRUE(r);
+
+  crypto::public_key pk2;
+  r = crypto::secret_key_to_public_key(sk, pk2);
+  ASSERT_TRUE(r);
+
+  std::cout << pk << std::endl;
+  std::cout << pk2 << std::endl;
+
+  ASSERT_EQ(pk, pk2);
+  ASSERT_TRUE(crypto::check_key(pk));
+  ASSERT_TRUE(crypto::check_key(pk2));
+
+  std::cout << std::endl;
+
+  crypto::generate_keys(pk, sk);
+  r = crypto::secret_key_to_public_key(sk, pk2);
+  ASSERT_TRUE(r);
+
+  ASSERT_EQ(pk, pk2);
+
+  ASSERT_TRUE(crypto::check_key(pk));
+  ASSERT_TRUE(crypto::check_key(pk2));
+
+  return true;
+}
+
+
+TEST(crypto, scalar_basics)
+{
+  ASSERT_EQ(c_scalar_1.muladd(c_scalar_0, c_scalar_0), c_scalar_0);
+
+  ASSERT_EQ(-c_scalar_1, c_scalar_Lm1);
+  ASSERT_EQ(-c_scalar_1, scalar_t(0) - c_scalar_1);
+  ASSERT_EQ(-c_scalar_0, c_scalar_0);
+  ASSERT_EQ(-c_scalar_Lm1, c_scalar_1);
+
+  scalar_t z = 0;
+  for (size_t j = 0; j < 1000; ++j)
+  {
+    z.make_random();
+    ASSERT_FALSE(z.is_zero());
+    ASSERT_TRUE(z.is_reduced());
+    ASSERT_TRUE(z > z - 1);
+    ASSERT_TRUE(z < z + 1);
+    ASSERT_TRUE(z.muladd(c_scalar_1, c_scalar_0) == z);
+    ASSERT_TRUE(z.muladd(c_scalar_0, c_scalar_1) == c_scalar_1);
+    ASSERT_TRUE(z.muladd(z, z) == z * z + z);
+  }
+
+  ASSERT_TRUE(c_scalar_L > 0 && !(c_scalar_L < 0));
+  ASSERT_TRUE(c_scalar_Lm1 > 0 && !(c_scalar_Lm1 < 0));
+  ASSERT_TRUE(c_scalar_Lm1 < c_scalar_L);
+  ASSERT_FALSE(c_scalar_Lm1 > c_scalar_L);
+  ASSERT_TRUE(c_scalar_P > c_scalar_Pm1);
+  ASSERT_FALSE(c_scalar_P < c_scalar_Pm1);
+
+  // check rolling over L for scalars arithmetics
+  ASSERT_EQ(c_scalar_Lm1 * 2, c_scalar_Lm1 - 1); // (L - 1) * 2 = L + L - 2 = (L - 1) - 1  (mod L)
+  ASSERT_EQ(c_scalar_Lm1 * 100, c_scalar_Lm1 - 99);
+  ASSERT_EQ(c_scalar_Lm1 * c_scalar_Lm1, 1);     // (L - 1) * (L - 1) = L*L - 2L + 1 = 1 (mod L)
+  ASSERT_EQ(c_scalar_Lm1 * (c_scalar_Lm1 - 1) * c_scalar_Lm1, c_scalar_Lm1 - 1);
+  ASSERT_EQ(c_scalar_L   * c_scalar_L, 0);
+
+  ASSERT_EQ(scalar_t(3) / c_scalar_Lm1, scalar_t(3) * c_scalar_Lm1);  // because (L - 1) ^ 2 = 1
+
+  // check is_reduced
+  ASSERT_TRUE(c_scalar_Lm1.is_reduced());
+  ASSERT_FALSE(c_scalar_L.is_reduced());
+  scalar_t p = c_scalar_L;
+  ASSERT_FALSE(p.is_reduced());
+  p = p + 1;
+  ASSERT_TRUE(p.is_reduced());
+  p = 0;
+  p = p + c_scalar_P;
+  ASSERT_TRUE(p.is_reduced());
+  mp::uint256_t mp_p_mod_l = c_scalar_P.as_boost_mp_type<mp::uint256_t>() % c_scalar_L.as_boost_mp_type<mp::uint256_t>();
+  ASSERT_EQ(p, scalar_t(mp_p_mod_l));
+  ASSERT_FALSE(c_scalar_P.is_reduced());
+  ASSERT_FALSE(c_scalar_Pm1.is_reduced());
+  ASSERT_FALSE(c_scalar_256m1.is_reduced());
+
+
+  p.make_random();
+  z.make_random();
+  ASSERT_EQ(scalar_t().assign_muladd(z, z, p), p + z * z);
+  ASSERT_EQ(scalar_t().assign_muladd(z, p, z), z + z * p);
+  ASSERT_EQ(scalar_t().assign_mulsub(z, z, p), p - z * z);
+  ASSERT_EQ(scalar_t().assign_mulsub(z, p, z), z - z * p);
+
+  return true;
+}
+
+TEST(perf, sc_mul)
+{
+  std::vector<scalar_t> scalars(100000);
+  for (auto& s : scalars)
+    s.make_random();
+
+  scalar_t m = 1;
+  
+  TIME_MEASURE_START(t);
+  for (auto& s : scalars)
+    m *= s;
+  TIME_MEASURE_FINISH(t);
+
+  std::cout << m << std::endl;
+
+  LOG_PRINT_L0("sc_mul: " << std::fixed << std::setprecision(3) << t / 1000.0 << " ms");
+
+  return true;
+}
+
+TEST(crypto, hp)
+{
+  bool r = false;
+  scalar_t sk;
+  r = epee::string_tools::parse_tpod_from_hex_string("407b3b73df8f11737494bdde6ca47a42e1b537390aec2fa781a2d170335c440f", sk);
+  ASSERT_TRUE(r);
+  crypto::public_key pk;
+  r = epee::string_tools::parse_tpod_from_hex_string("1b546af91d31fdb1c476fd62fbb65b6fd5ed47804185fc77d48bc4cc00f47ef0", pk);
+  ASSERT_TRUE(r);
+
+  point_t P;
+  ASSERT_TRUE(P.from_public_key(pk));
+  // make sure pk and sk are pair
+  ASSERT_EQ(P, sk * c_point_G);
+
+  // make sure generate_key_image does the same as sk * hash_helper::hp(pk)
+  crypto::key_image ki;
+  crypto::generate_key_image(pk, sk.as_secret_key(), ki);
+  point_t KI;
+  ASSERT_TRUE(KI.from_public_key((crypto::public_key&)ki)); // key image is a point
+
+  ASSERT_EQ(KI, sk * hash_helper_t::hp(P));
+
+  LOG_PRINT_L0(sk.as_secret_key() << " * G = " << P);
+
+  point_t P1 = hash_helper_t::hp(P);
+  LOG_PRINT_L0("Hp(" << P << ") = " << P1);
+  ASSERT_EQ(P1, point_from_str("f9506848342ddb23b014e5975462757f5d296a6acfa0e9837ff940f7655becdb"));
+
+  point_t P100 = P;
+  for (size_t i = 0; i < 100; ++i)
+    P100 = hash_helper_t::hp(P100);
+
+  ASSERT_EQ(P100, point_from_str("925f195fc629fa15f768c775f7eed3a43dcd45c702974d161eb610a9ab9df4f0"));
+
+
+  crypto::hash hash;
+  crypto::cn_fast_hash(sk.data(), sizeof sk, hash);
+
+  LOG_PRINT_L0("cn_fast_hash(" << sk.as_secret_key() << ") = " << hash);
+  ASSERT_EQ(hash, hash_from_str("ee05b0f64eebf20da306eec142da99283154316391caf474be41ff010afb4298"));
+
+  crypto::cn_fast_hash(nullptr, 0, hash);
+  LOG_PRINT_L0("cn_fast_hash('') = " << hash);
+  ASSERT_EQ(hash, hash_from_str("c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470"));
+
+  scalar_t z(hash);
+  point_t zG = z * c_point_G;
+  LOG_PRINT_L0("cn_fast_hash('') * G = " << zG.to_public_key() << " (pub_key)");
+  ASSERT_EQ(zG, point_from_str("7849297236cd7c0d6c69a3c8c179c038d3c1c434735741bb3c8995c3c9d6f2ac"));
+
+  crypto::cn_fast_hash("zano", 4, hash);
+  LOG_PRINT_L0("cn_fast_hash('zano') = " << hash);
+  ASSERT_EQ(hash, hash_from_str("23cea10abfdf3ace0b7132291d51e4eb5a392afb2147e67f907ff4f8f5dd4f9f"));
+
+  z = hash;
+  zG = z * c_point_G;
+  LOG_PRINT_L0("cn_fast_hash('zano') * G = " << zG.to_public_key() << " (pub_key)");
+  ASSERT_EQ(zG, point_from_str("71407d59e9d671fa02f26a6a7f4726c3087d8f1732453396638a1dc2929fb57a"));
+
+  char buf[2000];
+  for (size_t i = 0; i < sizeof buf; i += 4)
+    *(uint32_t*)&buf[i] = *(uint32_t*)"zano";
+  crypto::cn_fast_hash(buf, sizeof buf, (char*)&hash);
+  LOG_PRINT_L0("cn_fast_hash('zano' x 500) = " << hash);
+  ASSERT_EQ(hash, hash_from_str("16d87120c601a6ef3e4ffa5e58176a36b814288199f23ec09ef178c554e8879b"));
+
+  z = hash;
+  zG = z * c_point_G;
+  LOG_PRINT_L0("cn_fast_hash('zano' x 500) * G = " << zG.to_public_key() << " (pub_key)");
+  ASSERT_EQ(zG, point_from_str("dd93067a02fb8661aa64504ac1503402a34426f43650d970c35147cec4b61d55"));
+
+  return true;
+}
+
+TEST(perf, cn_fast_hash)
+{
+  //return true;
+  scalar_t s_rnd = scalar_t::random();
+  const crypto::hash h_initial = *(crypto::hash*)(&s_rnd);
+
+  std::vector<std::vector<uint8_t>> test_data;
+  test_data.push_back(std::vector<uint8_t>(32, 0));
+  test_data.push_back(std::vector<uint8_t>(63, 0));
+  test_data.push_back(std::vector<uint8_t>(127, 0));
+  test_data.push_back(std::vector<uint8_t>(135, 0));
+  test_data.push_back(std::vector<uint8_t>(255, 0));
+  test_data.push_back(std::vector<uint8_t>(271, 0)); // 271 = 136 * 2 - 1
+  test_data.push_back(std::vector<uint8_t>(2030, 0));
+
+  for (size_t j = 0, sz = test_data.size(); j < sz; ++j)
+    crypto::generate_random_bytes(test_data[j].size(), test_data[j].data());
+
+  struct times_t
+  {
+    uint64_t t_old{ 0 }, t_new{ 0 };
+    crypto::hash h_old{};
+    double diff{ 0 };
+  };
+  std::vector<times_t> results(test_data.size());
+
+  size_t n = 50000;
+  double diff_sum = 0;
+
+  for (size_t k = 0; k < 50; ++k)
+  {
+    for (size_t j = 0, sz = test_data.size(); j < sz; ++j)
+    {
+      crypto::hash h = h_initial;
+      TIME_MEASURE_START(t_old);
+      for (size_t i = 0; i < n; ++i)
+      {
+        *(crypto::hash*)(test_data[j].data()) = h;
+        cn_fast_hash_old(test_data[j].data(), test_data[j].size(), (char*)&h);
+      }
+      TIME_MEASURE_FINISH(t_old);
+      results[j].t_old = t_old;
+      results[j].h_old = h;
+    }
+
+    for (size_t j = 0, sz = test_data.size(); j < sz; ++j)
+    {
+      crypto::hash h = h_initial;
+      TIME_MEASURE_START(t_new);
+      for (size_t i = 0; i < n; ++i)
+      {
+        *(crypto::hash*)(test_data[j].data()) = h;
+        cn_fast_hash(test_data[j].data(), test_data[j].size(), (char*)&h);
+      }
+      TIME_MEASURE_FINISH(t_new);
+      results[j].t_new = t_new;
+      ASSERT_EQ(h, results[j].h_old);
+    }
+
+    std::stringstream ss;
+    double diff_round = 0;
+    for (size_t j = 0, sz = test_data.size(); j < sz; ++j)
+    {
+      double diff = ((int64_t)results[j].t_old - (int64_t)results[j].t_new) / (double)n;
+
+      ss << std::fixed << std::setprecision(3) << results[j].t_old / (double)n << "/" <<
+        std::fixed << std::setprecision(3) << results[j].t_new / (double)n << "  ";
+
+      results[j].diff += diff;
+      diff_round += diff;
+    }
+
+    diff_sum += diff_round;
+
+    LOG_PRINT_L0("cn_fast_hash (old/new) [" << std::setw(2) << k << "]: " << ss.str() << " mcs, diff_round = " << std::fixed << std::setprecision(4) << diff_round <<
+     " diff_sum = " << std::fixed << std::setprecision(4) << diff_sum);
+  }
+
+  std::stringstream ss;
+  for (size_t j = 0, sz = results.size(); j < sz; ++j)
+    ss << std::fixed << std::setprecision(4) << results[j].diff << "       ";
+  LOG_PRINT_L0("                             " << ss.str());
+
+  return true;
+}
+
+
+
+TEST(perf, sc_invert)
+{
+  std::vector<scalar_t> scalars(10000);
+  LOG_PRINT_L0("Running " << scalars.size() << " sc_invert tests...");
+
+  for (auto& s : scalars)
+  {
+    s.make_random();
+    scalar_t a, b;
+    sc_invert(&a.m_s[0], &s.m_s[0]);
+    sc_invert2(&b.m_s[0], &s.m_s[0]);
+    ASSERT_EQ(a, b);
+  }
+
+  std::vector<scalar_t> results_0(scalars.size());
+  std::vector<scalar_t> results_1(scalars.size());
+  std::vector<scalar_t> results_2(scalars.size());
+
+  for (size_t j = 0; j < 10; ++j)
+  {
+    LOG_PRINT_L0("Run #" << j);
+
+    // warm-up
+    for (size_t i = 0; i < scalars.size(); ++i)
+      sc_invert(&results_0[i].m_s[0], &scalars[i].m_s[0]);
+
+    TIME_MEASURE_START(t_1);
+    for (size_t i = 0; i < scalars.size(); ++i)
+      sc_invert(&results_1[i].m_s[0], &scalars[i].m_s[0]);
+    TIME_MEASURE_FINISH(t_1);
+
+    TIME_MEASURE_START(t_2);
+    for (size_t i = 0; i < scalars.size(); ++i)
+      sc_invert(&results_2[i].m_s[0], &scalars[i].m_s[0]);
+    TIME_MEASURE_FINISH(t_2);
+
+    LOG_PRINT_L0("sc_invert:  " << std::fixed << std::setprecision(3) << 1.0 * t_1 / scalars.size() << " mcs " << (t_1 < t_2 ? "WIN" : ""));
+    LOG_PRINT_L0("sc_invert2: " << std::fixed << std::setprecision(3) << 1.0 * t_2 / scalars.size() << " mcs " << (t_1 < t_2 ? "" : "    WIN"));
+  }
+
+  return true;
+}
+
+TEST(crypto, scalar_arithmetic_assignment)
+{
+  std::vector<scalar_t> scalars(1000);
+  scalar_t mm = 1, sum = 0;
+  for (auto& s : scalars)
+  {
+    s.make_random();
+    mm /= s;
+    sum += s;
+  }
+  ASSERT_TRUE(!mm.is_zero() && mm != scalar_t(1));
+  ASSERT_TRUE(!sum.is_zero());
+  std::shuffle(scalars.begin(), scalars.end(), crypto::uniform_random_bit_generator());
+  for (auto& s : scalars)
+  {
+    mm *= s;
+    sum -= s;
+  }
+  ASSERT_EQ(mm, 1);
+  ASSERT_EQ(sum, 0);
+
+  return true;
+}
+
+TEST(crypto, point_basics)
+{
+  scalar_t s = 4;
+  point_t E = s * c_point_G;
+  point_t X = 4 * E;
+  point_t K = 193847 * c_point_G;
+  point_t C = E + K;
+
+  ASSERT_EQ(X, 16 * c_point_G);
+  ASSERT_EQ(C - K, E);
+  ASSERT_EQ(C - E, K);
+  ASSERT_EQ(C, (193847 + 4) * c_point_G);
+
+  ASSERT_EQ(c_point_G / 1, 1 * c_point_G);
+  ASSERT_EQ(C / 3, E / 3 + K / 3);
+  //ASSERT_EQ(K, 61 * (K / (61)));
+  //ASSERT_EQ(K, 192847 * (K / scalar_t(192847)));
+  ASSERT_EQ(K, 61 * (283 * (192847 * (K / (192847ull * 283 * 61)))));
+
+  ASSERT_EQ(E, c_point_G + c_point_G + c_point_G + c_point_G);
+  ASSERT_EQ(E - c_point_G, 3 * c_point_G);
+
+  for (size_t i = 0; i < 1000; ++i)
+  {
+    E = hash_helper_t::hp(E);
+    point_t Z = 0 * E;
+    ASSERT_TRUE(Z.is_zero());
+    scalar_t rnd;
+    rnd.make_random();
+    Z = rnd * E;
+    Z = Z - E;
+    Z = Z - (rnd - 1) * E;
+    ASSERT_TRUE(Z.is_zero());
+  }
+
+  return true;
+}
+
+TEST(crypto, neg_identity)
+{
+  point_t z = c_point_0;                  // 0 group element (identity)
+  public_key z_pk = z.to_public_key();    // pub key, corresponding to 0 ge (pub key is not zero bitwise)
+  public_key z_neg_pk = z_pk;
+  ((unsigned char*)&z_neg_pk)[31] = 0x80; // set sign bit manually
+  std::cout << "-Identity = " << z_pk << ENDL;
+  point_t z_neg;
+  ASSERT_FALSE(z_neg.from_public_key(z_neg_pk)); // negative identity should not be loaded
+
+  key_image z_ki;
+  memset(&z_ki, 0, sizeof(z_ki));
+  ((unsigned char*)&z_ki)[00] = 0x01; // y = 1
+
+  ASSERT_TRUE(validate_key_image(z_ki));
+
+  key_image z_neg_ki = z_ki;
+  ((unsigned char*)&z_neg_ki)[31] = 0x80; // set sign bit manually
+
+  ASSERT_FALSE(validate_key_image(z_neg_ki)); // negative identity should not be loaded
+
+
+  // also do zero-byte pub key / key image checks
+
+  public_key zzz_pk;
+  memset(&zzz_pk, 0, sizeof(public_key));
+
+  ASSERT_TRUE(check_key(zzz_pk));
+
+  point_t zzz;
+  ASSERT_TRUE(zzz.from_public_key(zzz_pk));
+  ASSERT_FALSE(zzz.is_in_main_subgroup());
+
+  key_image zzz_ki;
+  memset(&zzz_ki, 0, sizeof(key_image));
+
+  ASSERT_FALSE(validate_key_image(zzz_ki));
+
+  point_t zzz2;
+  ASSERT_TRUE(zzz2.from_key_image(zzz_ki));
+  ASSERT_FALSE(zzz2.is_in_main_subgroup());
+  ASSERT_EQ(zzz, zzz2);
+
+  return true;
+}
+
+TEST(crypto, scalar_reciprocal)
+{
+  int64_t test_nums[] = { 1, 2, 10 };
+
+  for (size_t i = 0; i < sizeof test_nums / sizeof test_nums[0]; ++i)
+  {
+    scalar_t s = test_nums[i];
+    scalar_t z = s - s;
+    ASSERT_TRUE(z.is_zero());
+  }
+
+  scalar_t s = 20;
+  scalar_t d = 5;
+  scalar_t e = s / d;
+  scalar_t m = e * d;
+
+  ASSERT_TRUE(m == s);
+
+  return true;
+}
+
+
+TEST(crypto, scalars)
+{
+  scalar_t s = 20;
+  scalar_t d = 5;
+  scalar_t e = s / d;
+  scalar_t m = e * d;
+
+  ASSERT_TRUE(m == s);
+
+  return true;
+}
+
+TEST(crypto, hex_tools)
+{
+  ASSERT_EQ(parse_tpod_from_hex_string<uint8_t>("00"), 0x00);
+  ASSERT_EQ(parse_tpod_from_hex_string<uint8_t>("01"), 0x01);
+  ASSERT_EQ(parse_tpod_from_hex_string<uint8_t>("f1"), 0xf1);
+  ASSERT_EQ(parse_tpod_from_hex_string<uint8_t>("fe"), 0xfe);
+  ASSERT_EQ(parse_tpod_from_hex_string<uint64_t>("efcdab8967452301"), 0x0123456789abcdef);
+  ASSERT_EQ(parse_tpod_from_hex_string<uint64_t>("0123456789abcdef"), 0xefcdab8967452301);
+  ASSERT_EQ(parse_tpod_from_hex_string<scalar_t>("ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f"), c_scalar_Pm1);
+  ASSERT_EQ(parse_tpod_from_hex_string<scalar_t>("792fdce229e50661d0da1c7db39dd30700000000000000000000000000000006"), c_scalar_1div8);
+
+  return true;
+}
+
+
+TEST(crypto, calc_lsb_32)
+{
+  auto local_calc_lsb = [](uint32_t v) {
+    uint8_t r = 0;
+    while (v != 0 && (v & 1) == 0)
+    {
+      v >>= 1;
+      ++r;
+    }
+    return r;
+  };
+
+  for (uint32_t x = 0; x < UINT32_MAX; ++x)
+  {
+    if (x % 10000000 == 0)
+      std::cout << x << ENDL;
+    ASSERT_EQ((int)local_calc_lsb(x), (int)calc_lsb_32(x));
+  }
+  ASSERT_EQ((int)local_calc_lsb(UINT32_MAX), (int)calc_lsb_32(UINT32_MAX));
+
+  return true;
+}
+
+TEST(crypto, torsion_elements)
+{
+  point_t tor;
+
+  for (size_t i = 0, n = sizeof canonical_torsion_elements / sizeof canonical_torsion_elements[0]; i < n; ++i)
+  {
+    const canonical_torsion_elements_t& el = canonical_torsion_elements[i];
+    ASSERT_TRUE(tor.from_string(el.string));
+    ASSERT_FALSE(tor.is_zero());
+    ASSERT_FALSE(tor.is_in_main_subgroup());
+
+    ASSERT_EQ((fe_isnegative(tor.m_p3.X) != 0), el.sign);
+
+    ASSERT_FALSE(el.incorrect_order_0 * tor == c_point_0);
+    ASSERT_FALSE(el.incorrect_order_1 * tor == c_point_0);
+    ASSERT_TRUE(el.order * tor == c_point_0);
+  }
+
+  // non-canonical elements should not load at all (thanks to the checks in ge_frombytes_vartime)
+  for (size_t i = 0, n = sizeof noncanonical_torsion_elements / sizeof noncanonical_torsion_elements[0]; i < n; ++i)
+  {
+    ASSERT_FALSE(tor.from_string(noncanonical_torsion_elements[i]));
+  }
+
+  return true;
+}
+
+TEST(crypto, point_is_zero)
+{
+  static const fe fancy_p         = { -19, 33554432, -1, 33554432, -1, 33554432, -1, 33554432, -1, 33554432 }; // 2**255 - 19
+  static const fe fancy_p_plus_1  = { -18, 33554432, -1, 33554432, -1, 33554432, -1, 33554432, -1, 33554432 }; // 2**255 - 18
+  static const fe f_one = { 1 };
+
+  ASSERT_TRUE(fe_isnonzero(fancy_p) == 0);
+  ASSERT_TRUE(fe_isnonzero(fancy_p_plus_1) != 0);
+
+  fe f_r, f_x;
+  fe_frombytes(f_x, scalar_t::random().data());
+  fe_mul(f_r, f_x, fancy_p);
+  ASSERT_TRUE(fe_isnonzero(f_r) == 0);
+  
+  fe_sub(f_r, fancy_p_plus_1, f_one);
+  ASSERT_TRUE(fe_isnonzero(f_r) == 0);
+
+  // is_zero
+
+  point_t p;
+  memset(&p.m_p3, 0, sizeof p.m_p3);
+  memcpy(&p.m_p3.X, fancy_p, sizeof p.m_p3.X); // X = 2**255-19
+  memcpy(&p.m_p3.Y, fancy_p_plus_1, sizeof p.m_p3.Y); // Y = 2**255-19+1
+  p.m_p3.Z[0] = 1;
+  // {P, P+1, 1, 0} == {0, 1} (the identity point)
+
+  ASSERT_TRUE(p.is_zero());
+
+
+  memset(&p.m_p3, 0, sizeof p.m_p3);
+  memcpy(&p.m_p3.X, fancy_p, sizeof p.m_p3.X); // X = 2**255-19
+  memcpy(&p.m_p3.Y, fancy_p_plus_1, sizeof p.m_p3.Y); // Y = 2**255-19+1
+  p.m_p3.Z[0] = -1;
+  // {P, P+1, -1, 0} == {0, -1} (not an identity point, torsion element order 2)
+
+  ASSERT_FALSE(p.is_zero());
+
+  memset(&p.m_p3, 0, sizeof p.m_p3);
+  p.m_p3.Y[0] = 2;
+  p.m_p3.Z[0] = 2;
+  // {0, 2, 2, 0} == {0, 1} (the identity point)
+
+  ASSERT_TRUE(p.is_zero());
+
+  // all fe 10 components must be in [-33554432, 33554432]  (curve25519-20060209.pdf page 9)
+  //        2**0      2**26     2**51   2**77    2**102   2**128     2**153    2**179   2**204    2*230 
+  fe a0 = { 7172245,  16777211, 922265, 8160646, 9625798, -12989394, 10843498, 6987154, 15156548, -5214544 };
+  fe a1 = { 7172245, -16777221, 922266, 8160646, 9625798, -12989394, 10843498, 6987154, 15156548, -5214544 };
+  // note, a0 == a1:
+  //  16777211 * 2**26  + 922265 * 2**51 = 2076757281067996545024
+  // -16777221 * 2**26  + 922266 * 2**51 = 2076757281067996545024
+
+  memset(&p.m_p3, 0, sizeof p.m_p3);
+  memcpy(&p.m_p3.Y, &a0, sizeof a0);
+  memcpy(&p.m_p3.Z, &a1, sizeof a1);
+  // {0, x, x, 0} == {0, 1, 1, 0} == {0, 1} (the identity point)
+
+  ASSERT_TRUE(p.is_zero());
+
+  
+  memset(&p.m_p3, 0, sizeof p.m_p3);
+  memcpy(&p.m_p3.Y, f_x, sizeof p.m_p3.Y);
+  memcpy(&p.m_p3.Z, f_x, sizeof p.m_p3.Z);
+  memcpy(&p.m_p3.T, fancy_p, sizeof p.m_p3.T);
+  // {0, x, x, P} == {0, 1} (still the identity point)
+
+  ASSERT_TRUE(p.is_zero());
+
+  //
+  // negative tests
+  //
+
+  memset(&p.m_p3, 0, sizeof p.m_p3);
+  // {0, 0, 0, 0} is not a point at all
+
+  ASSERT_FALSE(p.is_zero());
+
+
+  memset(&p.m_p3, 0, sizeof p.m_p3);
+  memcpy(&p.m_p3.Y, f_x, sizeof p.m_p3.Y);
+  memcpy(&p.m_p3.Z, f_x, sizeof p.m_p3.Z);
+  memcpy(&p.m_p3.T, fancy_p_plus_1, sizeof p.m_p3.T);
+  // {0, x, x, !0} is not a valid point (incorrect non-zero T) 
+
+  ASSERT_FALSE(p.is_zero());
+
+  memcpy(&p.m_p3.T, f_x, sizeof p.m_p3.T);
+  // {0, x, x, x}, while x != 0 is still incorrect point representation
+  ASSERT_FALSE(p.is_zero());
+
+  return true;
+}
+
+// pairs of the same points but with different fe representation (that caused old eq op to fail)
+std::vector<std::pair<point_t, point_t>> twin_point_pairs {
+  {
+    point_t{{-21128868, 3837998, 33062696, -4394645, -14632370, -4032942, -13494326, 9949403, -22877702, 12347080, -23842113, 10741520, -31317130, 13501783, -30346713, 9537971, -4230538, 5133263, 19202715, 304530, 11783766, -14713954, 31928743, -15802260, -23524982, -12132264, -2221079, -13294882, 15351986, -12208940, -25429666, -10630821, 10586935, 3680531, -5196293, 15100068, -4109273, 2588076, -22807834, 9178747}},
+    point_t{{-9713365, -9829929, 12195149, -3403928, -26261133, -16229257, -31293898, -3007350, 14656870, -441189, -21842901, -10684017, -14933612, -15577968, 6355936, -12616303, 17881365, 2613091, -29791631, 8160616, -6564960, 3860717, -32409761, 10253039, -32570848, -3563771, -7755841, 14547843, -12480489, 13372339, 21802122, 15976373, -16158840, -2718080, -16676669, 14276439, -7192951, 11049430, 27384949, 10563297}}
+  },
+  {
+    point_t{{3695219, -9621154, -17709499, 2939106, 3744267, -14575097, -23519506, -10091102, -2604099, 14269408, -3229226, 6334758, -32391005, -2351680, -8798530, -2266840, 32921382, -2519414, -18691041, 3881653, -15053990, 9136740, -3226527, -4942926, 1506694, -9001375, 27935490, -14623776, -3948473, 4210796, 18939736, -15596865, -13293120, 1337568, -18317440, -5143258, 16723454, 14691110, 9769827, -3118966}},
+    point_t{{-11397382, -16642076, -15110371, -3127178, -20841265, -8333469, -8416820, -11641211, -24444275, -1309821, -3258975, -14590075, 2704495, -11408556, -1158440, -13417600, -17702918, 15792391, -17674166, 7544500, -30233403, -6317281, -29573467, 13768629, -1805743, 10305936, -5964981, 2553131, 25279025, 5554228, 24015913, 3005849, 25526408, -4040648, 14468366, 14790756, 25816013, 15853930, 18508209, -16582046}}
+  },
+  {
+    point_t{{3469318, -85183, 29056087, 13528494, -23149977, 16623454, 3373881, 7763807, 24097266, 11526397, 8089099, -2103871, -32120521, 1046529, 28087844, 6858112, -27963932, -3359170, 21430085, -5312246, 21764518, -13443543, -12702889, -12398634, 10157405, 4858225, 26174527, -11743221, -30269431, -10050502, 25862179, 4744514, 32296603, 6270322, -28198957, 1471820, -13801749, -3295909, 17760181, -12065527}},
+    point_t{{-28763218, -1114036, 4671232, -1599732, -14823984, -9622687, 15430161, 12840558, 30741788, -11449341, -28556261, 3623611, 25689145, -14680141, -7832784, 14819387, 2481189, -13167197, -28732414, -14312280, -32965162, -7714625, 33268896, -2408169, -10811971, -4363847, -26138329, 5165910, -18544903, -7502120, 10360740, 6034706, 28458994, -5675091, -28036374, -702149, -8660662, -13290682, 9067253, 4344694}}
+  },
+  {
+    point_t{{-5841866, -15636514, 12367718, 16116867, -26645766, 5140632, 33476033, -3893277, -6807986, -6188111, -18150893, -7313585, -22559821, 14208716, -5344811, -581281, 24672694, -6638035, -10808134, -3046, -7472033, -8901879, 15120908, -7133930, 15015498, 12440181, -27737720, 396004, 3105271, 11399924, 12739797, -10781030, -27655617, 10547004, -1517603, -14788397, -16728565, 5538806, 27633091, 5635300}},
+    point_t{{29738502, -9099722, 18969328, -5041586, -17865763, 3799509, -8535672, 15345696, 760867, -3647512, 21227601, 2877796, 21366975, -5870266, 14750680, 10962526, 10279514, 12394109, -15626344, -10182797, 3199874, -24046, -14148768, -14198371, -29493512, -16221096, -3714752, -8636183, 5751940, -7670476, 1204040, 8561908, -16290929, 13125810, -24274070, -7039328, -21149730, -9157888, -16370207, -4817989}}
+  },
+  {
+    point_t{{5583931, 3584727, 352648, -3282339, -25634902, 4982415, 6570289, -7123343, 28056356, -14753772, 15464638, -10030089, 13934473, 10182538, -32633085, -3344322, 10345546, -6010634, -11737756, 7740657, 12017410, -3538127, -21949796, -16720911, 18521392, -7746707, -25163322, 16438097, -14488853, -11100914, 11664826, -4058927, 13298397, 10849774, 22800849, -8941814, 31033013, 362090, -20721545, 10379502}},
+    point_t{{-15413065, 10389318, 28684750, 9129051, 13176029, -15599624, 16333382, -15196190, 5299760, 5379067, -11298666, -10943555, 24033630, -10331364, -6271762, 15703052, -6168555, -10342077, -17144019, -3303678, 32460403, 15294706, 19144257, 16248865, 22506488, 5505084, -401821, 9347950, -6513204, 7226066, -26715856, 11994906, -13302883, -8556677, 15797496, -3086516, 23027165, 1637560, -29381930, 12262558}}
+  },
+  {
+    point_t{{-26548919, 11392979, 28773327, 197314, 13888676, 5289903, 14156094, -3215467, 12204802, 11098576, -15494111, 10812748, -11869915, -343850, -20456404, -12577384, -4979562, 15251598, -487043, 11571657, -16066121, -2338179, -16228507, 5602197, 25353942, -7225080, 22718433, -11309476, -10403076, 11326705, -296493, -4563931, 10628858, 16672320, 24967340, 210989, -11332864, -13045242, -32517393, 9220843}},
+    point_t{{-8809414, 1276711, 5724117, -10893002, 16836911, -10562554, 7928860, 4905731, -30890761, -16272783, 15099435, 7209265, -17062927, -15647371, -26068760, -10022538, 15199805, 11039218, -17427534, -3334404, 9597778, 5993687, -14091491, -6035380, -18428597, -4056089, -14203111, 349297, 20316350, 1399705, 2972501, -1228750, -23459865, -88574, 9071309, 11300857, 9425425, 596628, 3627198, -1613531}}
+  },
+  {
+    point_t{{-15051466, -12717864, -1094059, 9523511, -9851421, 6693669, -6491711, -14360212, -10025337, 5146942, -15213537, -14748468, -16189919, 6643542, -22303813, -6712277, 12722420, 3747576, -11411745, -5170831, 6906842, -3442874, 13923053, 5056698, 14272344, 2297302, 24147707, 1505741, 23445765, 7170090, -14014582, 6539085, -25379082, 15881906, 9955130, -10830876, -6331971, -9745690, 19301861, -3693027}},
+    point_t{{-23568458, 9628844, -26909663, -2205696, 16765570, 12703337, -19733659, -1311798, 6240000, -3186465, -12848561, -9029739, -21391036, 5644922, 29142361, -8070730, 15491500, 5159583, -15039215, -3782415, 17864864, 13111010, -24101940, 9297110, -23296716, 9763494, -33210081, 12312114, -30144102, 10080914, 31682399, 7452145, 19314287, -7581029, -24620989, -3233342, -25926522, -14260964, 24233736, 13681782}}
+  },
+  {
+    point_t{{19211265, 2757185, 22841428, 4384196, -5344236, -6665958, 13817937, -15401311, 11324591, 13548371, 5920675, -7720845, -26190512, 80906, 11282325, -16150822, 18149158, -15519773, 2721716, -11983296, -14418387, -11153557, 13957160, -3743225, 22506862, -3245854, 4494361, 13510745, -5656988, 5588269, 28354819, -13495704, -13208982, -495328, 17363458, -10857316, -5302126, -7875123, 26008688, -13624830}},
+    point_t{{9615635, 11456756, -23929642, 1059944, 1030437, -11895019, 12717341, 14376320, 18760933, -13214228, 28877065, 8204034, -13488237, -4234088, -16433228, 12293567, 22065763, 1258393, 20249733, -7792923, -28493355, -10099755, 9817133, 10497183, 7163689, 3742107, -24288334, 7485474, 17332829, 1167562, -7414283, -2724061, 32933754, 3732809, 18401256, 10890894, -28075941, -4870953, 21081310, 10942194}}
+  },
+  {
+    point_t{{15697801, -6534008, 10450035, -1554623, -18762845, 11804480, 30164267, 4203906, 28533676, 10647395, 30633476, 9271811, 8721644, -7564181, 5372849, -11987056, 21870223, -770830, -23302500, 5628035, -12397032, 14456892, 14966767, -4384854, 6238573, 5721532, -3482707, 93803, 17582081, -8642913, 10405075, -7178396, -5588624, 15751945, 21474071, 14634321, 2195436, -9319762, -31171521, 3257219}},
+    point_t{{-9159868, 13485045, -1816502, 9498441, 12599869, -9143471, -3235081, -7400456, -11042456, 10726811, 30758369, 2034330, -10446636, -12818157, 15789290, 11476501, 12893075, -11738407, 5385991, -11602328, -12578961, -5727994, -3242915, -14123261, 18142422, 9302871, -27881894, 1412251, 13445358, 3794224, 30076600, 12194158, 27928330, -11549668, -21526967, 908741, 7889436, 11312182, 479283, 3079906}}
+  }
+};
+
+TEST(crypto, point_eq_op)
+{
+  for(auto& pp : twin_point_pairs)
+  {
+    ASSERT_TRUE((pp.first - pp.second).is_zero());
+    ASSERT_TRUE((pp.second - pp.first).is_zero());
+
+    scalar_t r = scalar_t::random();
+    ASSERT_TRUE((r * pp.first - r * pp.second).is_zero());
+    ASSERT_TRUE((r * pp.second - r * pp.first).is_zero());
+
+    ASSERT_TRUE (pp.first == pp.second);
+    ASSERT_FALSE(pp.first != pp.second);
+    ASSERT_TRUE (pp.second == pp.first);
+    ASSERT_FALSE(pp.second != pp.first);
+  }
+
+
+  //// twin points generator
+  //size_t N = 10000000;
+  //size_t hits = 0;
+  //scalar_t r = scalar_t::random();
+  //point_t R = r * c_point_G;
+  //for(size_t i = 0; i < N; ++i)
+  //{
+  //  scalar_t s = scalar_t::random();
+  //  point_t X = (r + s) * c_point_G;
+  //  point_t Y = R + s * c_point_G;
+  //  if (!(X == Y))
+  //  {
+  //    ++hits;
+  //    std::cout << hits << ENDL
+  //      << "  X: " << X << " {" << X.to_comma_separated_int32_str() << "}" << ENDL
+  //      << "  Y: " << Y << " {" << Y.to_comma_separated_int32_str() << "}" << ENDL;
+  //  }
+  //}
+  //std::cout << ENDL << hits << " hits of " << N << ENDL;
+
+  return true;
+}
+
+TEST(crypto, sc_get_bit)
+{
+  static_assert(sizeof(scalar_t) * 8 == 256, "size missmatch");
+
+  scalar_t v = 0; // all bits are 0
+  for (size_t n = 0; n < 256; ++n)
+  {
+    ASSERT_EQ(v.get_bit(static_cast<uint8_t>(n)), false);
+  }
+
+  v = c_scalar_256m1; // all bits are 1
+  for (size_t n = 0; n < 256; ++n)
+  {
+    ASSERT_EQ(v.get_bit(static_cast<uint8_t>(n)), true);
+  }
+
+  // check random value
+  const scalar_t x = scalar_t::random();
+  for (size_t n = 0; n < 64; ++n)
+    ASSERT_EQ(x.get_bit(static_cast<uint8_t>(n)), ((x.m_u64[0] & (1ull << (n - 0))) != 0));
+  for (size_t n = 64; n < 128; ++n)
+    ASSERT_EQ(x.get_bit(static_cast<uint8_t>(n)), ((x.m_u64[1] & (1ull << (n - 64))) != 0));
+  for (size_t n = 128; n < 192; ++n)
+    ASSERT_EQ(x.get_bit(static_cast<uint8_t>(n)), ((x.m_u64[2] & (1ull << (n - 128))) != 0));
+  for (size_t n = 192; n < 256; ++n)
+    ASSERT_EQ(x.get_bit(static_cast<uint8_t>(n)), ((x.m_u64[3] & (1ull << (n - 192))) != 0));
+
+  return true;
+}
+
+
+TEST(crypto, sc_set_bit_clear_bit)
+{
+  static_assert(sizeof(scalar_t) * 8 == 256, "size missmatch");
+
+  // check random value
+  const scalar_t x = scalar_t::random();
+  scalar_t y = scalar_t::random();
+  ASSERT_NEQ(x, y);
+
+  uint8_t i = 0;
+  do
+  {
+    if (x.get_bit(i))
+      y.set_bit(i);
+    else
+      y.clear_bit(i);
+  } while(++i != 0);
+
+  ASSERT_EQ(x, y);
+
+  return true;
+}
+
+
+TEST(crypto, schnorr_sig)
+{
+  public_key invalid_pk = parse_tpod_from_hex_string<public_key>("0000000000000000000000000000000000000000000000000000000000000001");
+  ASSERT_FALSE(check_key(invalid_pk));
+  scalar_t s_rnd = scalar_t::random();
+  hash m = *(crypto::hash*)(&s_rnd);
+  for(size_t i = 0; i < 100; ++i)
+  {
+    generic_schnorr_sig_s ss{};
+    scalar_t a = scalar_t::random();
+    point_t A_pt = a * c_point_G;
+    public_key A = A_pt.to_public_key();
+    // (different behaviour in debug and release) ASSERT_FALSE(generate_schnorr_sig<gt_X>(m, A_pt, a, ss));
+    ASSERT_TRUE(generate_schnorr_sig<gt_G>(m, A_pt, a, ss));
+    ASSERT_FALSE(verify_schnorr_sig<gt_X>(m, A, ss));
+    ASSERT_TRUE(verify_schnorr_sig<gt_G>(m, A, ss));
+
+    A_pt = a * c_point_X;
+    A = A_pt.to_public_key();
+    // (different behaviour in debug and release) ASSERT_FALSE(generate_schnorr_sig<gt_G>(m, A_pt, a, ss));
+    ASSERT_TRUE(generate_schnorr_sig<gt_X>(m, A_pt, a, ss));
+    ASSERT_FALSE(verify_schnorr_sig<gt_G>(m, A, ss));
+    ASSERT_TRUE(verify_schnorr_sig<gt_X>(m, A, ss));
+
+    ASSERT_FALSE(verify_schnorr_sig<gt_X>(currency::null_hash, A, ss));
+    ASSERT_FALSE(verify_schnorr_sig<gt_X>(m, invalid_pk, ss));
+
+    generic_schnorr_sig_s bad_ss = ss;
+    bad_ss.c = c_scalar_Pm1;
+    ASSERT_FALSE(bad_ss.c.is_reduced());
+    ASSERT_FALSE(verify_schnorr_sig<gt_X>(m, A, bad_ss));
+    bad_ss = ss;
+    bad_ss.y = c_scalar_Pm1;
+    ASSERT_FALSE(bad_ss.y.is_reduced());
+    ASSERT_FALSE(verify_schnorr_sig<gt_X>(m, A, bad_ss));
+
+    bad_ss = ss;
+
+    mp::uint256_t c_mp = bad_ss.c.as_boost_mp_type<mp::uint256_t>();
+    c_mp += c_scalar_L.as_boost_mp_type<mp::uint256_t>();
+    memcpy(bad_ss.c.data(), c_mp.backend().limbs(), sizeof(scalar_t));
+    ASSERT_FALSE(bad_ss.c.is_reduced());
+    scalar_t tmp(bad_ss.c);
+    tmp.reduce();
+    ASSERT_EQ(tmp, ss.c);
+    ASSERT_FALSE(verify_schnorr_sig<gt_X>(m, A, bad_ss));
+
+    // binary serialization 
+    std::string blob = t_serializable_object_to_blob(ss);
+    generate_random_bytes(sizeof ss, &ss);
+    ASSERT_TRUE(t_unserializable_object_from_blob(ss, blob));
+    ASSERT_TRUE(verify_schnorr_sig<gt_X>(m, A, ss));
+
+    // boost serialization
+    ASSERT_TRUE(tools::serialize_obj_to_buff(ss, blob));
+    generate_random_bytes(sizeof ss, &ss);
+    ASSERT_TRUE(tools::unserialize_obj_from_buff(ss, blob));
+    ASSERT_TRUE(verify_schnorr_sig<gt_X>(m, A, ss));
+  }
+
+  return true;
+}
+
+
+TEST(crypto, point_negation)
+{
+  ASSERT_EQ(c_point_0, -c_point_0);
+  ASSERT_NEQ(c_point_G, -c_point_G);
+  ASSERT_EQ(c_point_G, -(-c_point_G));
+  ASSERT_EQ(-c_point_G, c_scalar_Lm1 * c_point_G);
+  ASSERT_EQ(-c_point_G, c_point_0 - c_point_G);
+  ASSERT_EQ(0 * (-c_point_G), c_point_0);
+  scalar_t a = scalar_t::random(), b = scalar_t::random();
+  ASSERT_EQ(a * (-c_point_G) + b * c_point_G + a * c_point_H + b * (-c_point_H), (b - a) * c_point_G + (a - b) * c_point_H);
+  ASSERT_EQ(a * (-c_point_G), (a * c_scalar_Lm1) * c_point_G);
+
+  for(size_t i = 0, sz = sizeof(canonical_torsion_elements) / sizeof(canonical_torsion_elements[0]); i < sz; ++i)
+  {
+    point_t el{};
+    ASSERT_TRUE(el.from_string(canonical_torsion_elements[i].string));
+    ASSERT_EQ(el, -(-el));
+    ASSERT_EQ((-scalar_t(1)) * el, (c_scalar_0 - c_scalar_1) * el);
+    ASSERT_NEQ(-el, (-scalar_t(1)) * el);  // because torsion elements have order != L
+    ASSERT_NEQ(-el, c_scalar_Lm1 * el);    // because torsion elements have order != L
+    ASSERT_EQ(-el, (scalar_t(canonical_torsion_elements[i].order) - 1) * el); // they rather have order == canonical_torsion_elements[i].order
+    ASSERT_EQ(-el, c_point_0 - el);
+    ASSERT_EQ((-el) + (el), c_point_0);
+    ASSERT_EQ((-el) - (-el), c_point_0);
+    scalar_t x = scalar_t::random();
+    ASSERT_EQ(x * (-el) + x * el, c_point_0);
+  }
+
+  return true;
+}
+
+
+TEST(crypto, scalar_get_bits)
+{
+  scalar_t x = scalar_t::random();
+  for(size_t i = 0; i < 256; ++i)
+    ASSERT_EQ(x.get_bits(i, 0), 0);
+  for(size_t i = 0; i < 256; ++i)
+    ASSERT_EQ(x.get_bits(i, std::min((size_t)255, i + 65)), 0);
+
+  ASSERT_EQ(x.get_bits(0,   64), x.m_u64[0]);
+  ASSERT_EQ(x.get_bits(64,  64), x.m_u64[1]);
+  ASSERT_EQ(x.get_bits(128, 64), x.m_u64[2]);
+  ASSERT_EQ(x.get_bits(192, 64), x.m_u64[3]);
+
+  uint64_t high_32_bits = x.m_u64[3] >> 32;
+  ASSERT_EQ(x.get_bits(192+32, 32), high_32_bits);
+
+  for(size_t i = 33; i <= 64; ++i)
+    ASSERT_EQ(x.get_bits(192+32, i), high_32_bits);
+
+  for(size_t i = 0; i < 10000; ++i)
+  {
+    scalar_t b = scalar_t::random();
+    scalar_t x = scalar_t::random();
+    size_t bit_index_from = b.m_s[5];
+    size_t bits_count     = b.m_s[6] % 65; // [0; 64] are allowed
+
+    uint64_t extracted_bits = 0;
+    for(size_t j = 0; j < bits_count; ++j)
+    {
+      if (bit_index_from + j <= 255 && x.get_bit(bit_index_from + j))
+        extracted_bits |= 1ull << j;
+    }
+
+    if (extracted_bits != x.get_bits(bit_index_from, bits_count))
+    {
+      std::cout << "i: " << i << ", bit_index_from: " << bit_index_from << ", bits_count: " << bits_count << ENDL
+        << "extracted_bits: " << extracted_bits << ", get_bits(): " << x.get_bits(bit_index_from, bits_count);
+      ASSERT_TRUE(false);
+    }
+  }
+  return true;
+}
+
+
+TEST(crypto, scalarmult_base_vartime)
+{
+  auto check_for_x = [&](const scalar_t& x) -> bool {
+    point_t P, P2;
+    ge_scalarmult_base_vartime(&P.m_p3, x.m_s);
+    ge_scalarmult_base(&P2.m_p3, x.m_s);
+    return (P - P2).is_zero();
+    };
+
+  ASSERT_TRUE(check_for_x(c_scalar_0));
+  ASSERT_TRUE(check_for_x(c_scalar_1));
+  ASSERT_TRUE(check_for_x(c_scalar_1div8));
+  ASSERT_TRUE(check_for_x(c_scalar_Lm1));
+  ASSERT_TRUE(check_for_x(c_scalar_L));
+
+  for(size_t i = 0; i < 1000; ++i)
+  {
+    scalar_t x = scalar_t::random();
+    ASSERT_TRUE(check_for_x(x));
+  }
+
+  return true;
+}
+
+
+template<typename CT>
+bool crypto_msm_runner(size_t N, size_t low_bits_to_clear, size_t high_bits_to_clear)
+{
+  scalar_vec_t g_scalars, h_scalars;
+  g_scalars.resize_and_make_random(N);
+  h_scalars.resize_and_make_random(N);
+  if (N > 4)
+  {
+    g_scalars[0] = c_scalar_Lm1; // always include the max and the min
+    h_scalars[0] = c_scalar_Lm1;
+    g_scalars[1] = 0;
+    h_scalars[1] = 0;
+  }
+
+  point_t sum = c_point_0;
+  for(size_t i = 0; i < N; ++i)
+  {
+    for(size_t bit_index = 0; bit_index < low_bits_to_clear; ++bit_index)
+    {
+      g_scalars[i].clear_bit(bit_index);
+      h_scalars[i].clear_bit(bit_index);
+    }
+    for(size_t bit_index = 256 - high_bits_to_clear; bit_index < 256; ++bit_index)
+    {
+      g_scalars[i].clear_bit(bit_index);
+      h_scalars[i].clear_bit(bit_index);
+    }
+    sum += g_scalars[i] * CT::get_generator(false, i) + h_scalars[i] * CT::get_generator(true, i);
+  }
+
+  //TIME_MEASURE_START(t);
+  bool r = msm_and_check_zero<CT>(g_scalars, h_scalars, -sum);
+  //TIME_MEASURE_FINISH(t);
+  return r;
+}
+
+TEST(crypto, msm)
+{
+  // test the default msm_and_check_zero correctness
+  bool r = false;
+
+  for(size_t N = 1; N <= 128; ++N)
+  {
+    std::cout << "N = " << N << ENDL;
+    r = crypto_msm_runner<bpp_crypto_trait_Zarcanum>(N, 0, 0);
+    ASSERT_TRUE(r);
+    r = crypto_msm_runner<bpp_crypto_trait_ZC_out>(N, 0, 0);
+    ASSERT_TRUE(r);
+  }
+
+  for(size_t i = 0; i <= 128; ++i)
+  {
+    std::cout << "i = " << i << ENDL;
+    r = crypto_msm_runner<bpp_crypto_trait_Zarcanum>(128, i, 0);
+    ASSERT_TRUE(r);
+    r = crypto_msm_runner<bpp_crypto_trait_Zarcanum>(128, 0, i);
+    ASSERT_TRUE(r);
+    r = crypto_msm_runner<bpp_crypto_trait_ZC_out>(256, i, 0);
+    ASSERT_TRUE(r);
+    r = crypto_msm_runner<bpp_crypto_trait_ZC_out>(256, 0, i);
+    ASSERT_TRUE(r);
+  }
+
+  return true;
+}
+
+
+
+inline std::ostream &operator <<(std::ostream &o, const crypto::ge_precomp v)
+{
+  o << "{{";
+
+  for(size_t i = 0; i < 9; ++i)
+    o << v.yplusx[i] << ", ";
+
+  o << v.yplusx[9] << "}, {";
+
+  for(size_t i = 0; i < 9; ++i)
+    o << v.yminusx[i] << ", ";
+
+  o << v.yminusx[9] << "}, {";
+
+  for(size_t i = 0; i < 9; ++i)
+    o << v.xy2d[i] << ", ";
+
+  o << v.xy2d[9] << "}}";
+  return o;
+}
+
+bool calc_and_print_generator_precomp(const point_pc_t& generator, const char* generator_var_name)
+{
+  precomp_data_t precomp_data = {};
+  construct_precomp_data(precomp_data, generator);
+
+  std::cout << "    const precomp_data_t " << generator_var_name << "_precomp_data = {" << ENDL;
+
+  for(size_t i = 0; i < 32; ++i)
+  {
+    std::cout << "      {" << ENDL;
+    for(size_t j = 0; j < 8; ++j)
+      std::cout << "        " << precomp_data[i][j] << (j != 7 ? "," : "" ) << ENDL;
+    std::cout << "      }" << (i != 31 ? "," : "" ) << ENDL;
+  }
+
+  std::cout << "    };" << ENDL;
+
+  return true;
+}
+
+TEST(print, generators_precomp)
+{
+#define CALC_PRECOMP(G) calc_and_print_generator_precomp(G, #G)
+
+  CALC_PRECOMP(c_point_H);
+  CALC_PRECOMP(c_point_H2);
+  CALC_PRECOMP(c_point_U);
+  CALC_PRECOMP(c_point_X);
+  CALC_PRECOMP(c_point_H_plus_G);
+  CALC_PRECOMP(c_point_H_minus_G);
+  return true;
+
+#undef CALC_PRECOMP
+}
+
+bool check_generator_precomp(const point_pc_t& generator, const char* generator_var_name)
+{
+  point_t generator_pt = generator; // to avoid using precomputed data in scalar multiplications
+  point_t random_point = hash_helper_t::hp(scalar_t::random());
+
+  point_t A = generator_pt;
+  for(size_t i = 0; i < 32; ++i)
+  {
+    point_t B = c_point_0;
+    for(size_t j = 0; j < 8; ++j)
+    {
+      B += A;
+
+      // restore ge_p3 from ge_precomp using native NaCl functions... 
+      point_t restored_pt{};
+      ge_p1p1 p1p1{};
+      ge_madd(&p1p1, &random_point.m_p3, &((*generator.m_precomp_data_p)[i][j]));
+      ge_p1p1_to_p3(&restored_pt.m_p3, &p1p1);
+      restored_pt -= random_point;
+
+      // ...and compare it with the calculated one
+      if (B != restored_pt)
+      {
+        std::cout << "ERROR: " << generator_var_name << ", i: " << i << ", j: " << j << ENDL;
+        return false;
+      }
+    }
+    if (i != 31)
+      A.modify_mul_pow_2(8);
+  }
+
+  std::cout << "   " << std::left << std::setw(32) << generator_var_name << "   OK" << ENDL;
+  return true;
+}
+
+TEST(crypto, generators_precomp)
+{
+#define CHECK_PRECOMP(G) ASSERT_TRUE(check_generator_precomp(G, #G))
+
+  CHECK_PRECOMP(c_point_H);
+  CHECK_PRECOMP(c_point_H2);
+  CHECK_PRECOMP(c_point_U);
+  CHECK_PRECOMP(c_point_X);
+  CHECK_PRECOMP(c_point_H_plus_G);
+  CHECK_PRECOMP(c_point_H_minus_G);
+
+  return true;
+
+#undef CHECK_PRECOMP
+}
+#ifndef USE_OPEN_SSL_FOR_ECDSA
+  #include "bitcoin-secp256k1/include/secp256k1.h"
+  TEST(crypto, secp256k1_ecdsa_native)
+{
+  bool r = false;
+
+  secp256k1_context* ctx = secp256k1_context_create(SECP256K1_CONTEXT_NONE);
+  uint8_t randomness[32];
+  crypto::generate_random_bytes(sizeof randomness, randomness);
+  secp256k1_context_randomize(ctx, randomness);
+
+  uint8_t seckey[32] = {};
+  while(true)
+  {
+    crypto::generate_random_bytes(sizeof seckey, seckey);
+    if (secp256k1_ec_seckey_verify(ctx, seckey))
+      break;
+  }
+
+  secp256k1_pubkey pubkey{};
+  ASSERT_TRUE(secp256k1_ec_pubkey_create(ctx, &pubkey, seckey));
+  
+  uint8_t compressed_pubkey[33] = {};
+  size_t output_len = sizeof compressed_pubkey;
+  ASSERT_TRUE(secp256k1_ec_pubkey_serialize(ctx, compressed_pubkey, &output_len, &pubkey, SECP256K1_EC_COMPRESSED));
+  ASSERT_TRUE(output_len == sizeof compressed_pubkey);
+
+
+  secp256k1_ecdsa_signature secp256k1_ecdsa_sig{};
+  hash msg_hash = hash_helper_t::h("message");
+  ASSERT_TRUE(secp256k1_ecdsa_sign(ctx, &secp256k1_ecdsa_sig, (const unsigned char*)&msg_hash, seckey, NULL, NULL));
+
+  // Serialize the signature in a compact form.
+  unsigned char secp256k1_ecdsa_sig_serialized[64] = {};
+  ASSERT_TRUE(secp256k1_ecdsa_signature_serialize_compact(ctx, secp256k1_ecdsa_sig_serialized, &secp256k1_ecdsa_sig));
+
+  //
+  // Verification
+  //
+
+  secp256k1_ecdsa_sig = secp256k1_ecdsa_signature{};
+  pubkey = secp256k1_pubkey{};
+
+  // Deserialize the signature.
+  ASSERT_TRUE(secp256k1_ecdsa_signature_parse_compact(ctx, &secp256k1_ecdsa_sig, secp256k1_ecdsa_sig_serialized));
+
+  // Deserialize the public key. This will return 0 if the public key can't be parsed correctly. */
+  ASSERT_TRUE(secp256k1_ec_pubkey_parse(ctx, &pubkey, compressed_pubkey, sizeof(compressed_pubkey)));
+
+  // verify a signature
+  ASSERT_TRUE(secp256k1_ecdsa_verify(ctx, &secp256k1_ecdsa_sig, (const unsigned char*)&msg_hash, &pubkey));
+
+  // verify using a static context
+  ASSERT_TRUE(secp256k1_ecdsa_verify(secp256k1_context_static, &secp256k1_ecdsa_sig, (const unsigned char*)&msg_hash, &pubkey));
+
+  
+  // Epilogue
+  secp256k1_context_destroy(ctx);
+  return true;
+}
+#endif
+
+TEST(crypto, eth_signature_basics)
+{
+  eth_secret_key sk{};
+  eth_public_key pk{};
+
+  ASSERT_TRUE(generate_eth_key_pair(sk, pk));
+
+  eth_signature sig{};
+  hash m = hash_helper_t::h("How many of you have ever felt personally victimized by elliptic curves?");
+  
+  ASSERT_TRUE(generate_eth_signature(m, sk, sig));
+
+  const eth_signature const_sig = sig;
+  ASSERT_TRUE(verify_eth_signature(m, pk, const_sig));
+
+  for(size_t i = 0; i < sizeof sig; ++i)
+  {
+    eth_signature bad_sig = sig;
+    bad_sig.data[i] ^= 1 + (rand() % 254); // xor with a number fom [1; 255] to make sure this byte will change
+    ASSERT_FALSE(verify_eth_signature(m, pk, bad_sig));
+  }
+
+  return true;
+}
+
+TEST(hash, sha512)
+{
+  hash64 h{};
+
+  // #0
+  // input:  ""
+  // ouptut: cf83e1357eefb8bd f1542850d66d8007 d620e4050b5715dc 83f4a921d36ce9ce 47d0d13c5d85f2b0 ff8318d2877eec2f 63b931bd47417a81 a538327af927da3e
+  ASSERT_TRUE(sha512("", 0, h));
+  hash64 test_result_0 = {{ 0xcf, 0x83, 0xe1, 0x35, 0x7e, 0xef, 0xb8, 0xbd, 0xf1, 0x54, 0x28, 0x50, 0xd6, 0x6d, 0x80, 0x07, 0xd6, 0x20, 0xe4, 0x05, 0x0b, 0x57, 0x15, 0xdc, 0x83, 0xf4, 0xa9, 0x21, 0xd3, 0x6c, 0xe9, 0xce, 0x47, 0xd0, 0xd1, 0x3c, 0x5d, 0x85, 0xf2, 0xb0, 0xff, 0x83, 0x18, 0xd2, 0x87, 0x7e, 0xec, 0x2f, 0x63, 0xb9, 0x31, 0xbd, 0x47, 0x41, 0x7a, 0x81, 0xa5, 0x38, 0x32, 0x7a, 0xf9, 0x27, 0xda, 0x3e }};
+  ASSERT_EQ(h, test_result_0);
+
+  // #1
+  // input:  "abc"
+  // output: ddaf35a193617aba cc417349ae204131 12e6fa4e89a97ea2 0a9eeee64b55d39a 2192992a274fc1a8 36ba3c23a3feebbd 454d4423643ce80e 2a9ac94fa54ca49f
+  ASSERT_TRUE(sha512("abc", 3, h));
+  hash64 test_result_1 = {{ 0xdd, 0xaf, 0x35, 0xa1, 0x93, 0x61, 0x7a, 0xba, 0xcc, 0x41, 0x73, 0x49, 0xae, 0x20, 0x41, 0x31, 0x12, 0xe6, 0xfa, 0x4e, 0x89, 0xa9, 0x7e, 0xa2, 0x0a, 0x9e, 0xee, 0xe6, 0x4b, 0x55, 0xd3, 0x9a, 0x21, 0x92, 0x99, 0x2a, 0x27, 0x4f, 0xc1, 0xa8, 0x36, 0xba, 0x3c, 0x23, 0xa3, 0xfe, 0xeb, 0xbd, 0x45, 0x4d, 0x44, 0x23, 0x64, 0x3c, 0xe8, 0x0e, 0x2a, 0x9a, 0xc9, 0x4f, 0xa5, 0x4c, 0xa4, 0x9f }};
+  ASSERT_EQ(h, test_result_1);
+
+  // #2
+  // input:  "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq" (length 448 bits)
+  // output: 204a8fc6dda82f0a 0ced7beb8e08a416 57c16ef468b228a8 279be331a703c335 96fd15c13b1b07f9 aa1d3bea57789ca0 31ad85c7a71dd703 54ec631238ca3445
+  ASSERT_TRUE(sha512("abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq", 56, h));
+  hash64 test_result_2 = {{ 0x20, 0x4a, 0x8f, 0xc6, 0xdd, 0xa8, 0x2f, 0x0a, 0x0c, 0xed, 0x7b, 0xeb, 0x8e, 0x08, 0xa4, 0x16, 0x57, 0xc1, 0x6e, 0xf4, 0x68, 0xb2, 0x28, 0xa8, 0x27, 0x9b, 0xe3, 0x31, 0xa7, 0x03, 0xc3, 0x35, 0x96, 0xfd, 0x15, 0xc1, 0x3b, 0x1b, 0x07, 0xf9, 0xaa, 0x1d, 0x3b, 0xea, 0x57, 0x78, 0x9c, 0xa0, 0x31, 0xad, 0x85, 0xc7, 0xa7, 0x1d, 0xd7, 0x03, 0x54, 0xec, 0x63, 0x12, 0x38, 0xca, 0x34, 0x45 }};
+  ASSERT_EQ(h, test_result_2);
+
+
+  return true;
+}
+
+std::string reverse_32bytes_hex(const std::string& hex)
+{
+  size_t size = hex.size();
+  CHECK_AND_ASSERT_THROW_MES(size % 2 == 0, "invalid hex");
+  std::string result(size, '0');
+  for(size_t i = 0; i < size; i += 2)
+  {
+    result[i    ] = hex[size - i - 2];
+    result[i + 1] = hex[size - i - 1];
+  }
+  return result;
+}
+
+bool test_eddsa_against_test_vector(const std::string& seed_s, const std::string& pub_key_s, const std::string& hex_encoded_message, const std::string& sig_s)
+{
+  std::string message;
+  CHECK_AND_ASSERT_TRUE(epst::parse_hexstr_to_binbuff(hex_encoded_message, message));
+
+  eddsa_public_key expected_edpk{};
+  CHECK_AND_ASSERT_TRUE(parse_tpod_from_hex_string<eddsa_public_key>(pub_key_s, expected_edpk));
+
+  eddsa_signature expected_signature{};
+  CHECK_AND_ASSERT_TRUE(parse_tpod_from_hex_string<eddsa_signature>(sig_s, expected_signature));
+
+  if (seed_s.empty())
+  {
+    // no secret keys, do verification only
+    CHECK_AND_ASSERT_TRUE(verify_eddsa_signature(message, expected_edpk, expected_signature));
+  }
+  else
+  {
+    // full keys, do all the checks
+    eddsa_seed seed = {};
+    CHECK_AND_ASSERT_TRUE(parse_tpod_from_hex_string(seed_s, seed));
+
+    eddsa_secret_key edsk{};
+    eddsa_public_key edpk{};
+    eddsa_sec_prefix prefix{};
+    CHECK_AND_ASSERT_TRUE(eddsa_seed_to_secret_key_public_key_and_prefix(seed, edsk, edpk, prefix));
+
+    CHECK_AND_ASSERT_EQ(edpk, expected_edpk);
+  
+    eddsa_signature sig{};
+    CHECK_AND_ASSERT_TRUE(generate_eddsa_signature(message, prefix, edsk, edpk, sig));
+
+    CHECK_AND_ASSERT_EQ(sig, expected_signature);
+
+    CHECK_AND_ASSERT_TRUE(verify_eddsa_signature(message, edpk, sig));
+  }
+
+  return true;
+}
+
+TEST(crypto, eddsa)
+{
+  //
+  // 5 test vectors form RFC8032
+  // 
+  // -----TEST 1
+  // SECRET KEY: 9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60
+  // PUBLIC KEY: d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a
+  // MESSAGE (length 0 bytes):
+  // SIGNATURE: e5564300c360ac729086e2cc806e828a84877f1eb8e5d974d873e065224901555fb8821590a33bacc61e39701cf9b46bd25bf5f0595bbe24655141438e7a100b
+
+  CHECK_AND_ASSERT_TRUE(test_eddsa_against_test_vector(
+    "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60",
+    "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
+    "",
+    "e5564300c360ac729086e2cc806e828a84877f1eb8e5d974d873e065224901555fb8821590a33bacc61e39701cf9b46bd25bf5f0595bbe24655141438e7a100b"));
+
+  // -----TEST 2
+  // SECRET KEY: 4ccd089b28ff96da9db6c346ec114e0f5b8a319f35aba624da8cf6ed4fb8a6fb
+  // PUBLIC KEY: 3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c
+  // MESSAGE (length 1 byte): 72
+  // SIGNATURE:  92a009a9f0d4cab8720e820b5f642540a2b27b5416503f8fb3762223ebdb69da085ac1e43e15996e458f3613d0f11d8c387b2eaeb4302aeeb00d291612bb0c00
+
+  CHECK_AND_ASSERT_TRUE(test_eddsa_against_test_vector(
+    "4ccd089b28ff96da9db6c346ec114e0f5b8a319f35aba624da8cf6ed4fb8a6fb",
+    "3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c",
+    "72",
+    "92a009a9f0d4cab8720e820b5f642540a2b27b5416503f8fb3762223ebdb69da085ac1e43e15996e458f3613d0f11d8c387b2eaeb4302aeeb00d291612bb0c00"));
+
+  //  -----TEST 3
+  // SECRET KEY: c5aa8df43f9f837bedb7442f31dcb7b166d38535076f094b85ce3a2e0b4458f7
+  // PUBLIC KEY: fc51cd8e6218a1a38da47ed00230f0580816ed13ba3303ac5deb911548908025
+  // MESSAGE (length 2 bytes): af82
+  // SIGNATURE:  6291d657deec24024827e69c3abe01a30ce548a284743a445e3680d7db5ac3ac18ff9b538d16f290ae67f760984dc6594a7c15e9716ed28dc027beceea1ec40a
+
+  CHECK_AND_ASSERT_TRUE(test_eddsa_against_test_vector(
+    "c5aa8df43f9f837bedb7442f31dcb7b166d38535076f094b85ce3a2e0b4458f7",
+    "fc51cd8e6218a1a38da47ed00230f0580816ed13ba3303ac5deb911548908025",
+    "af82",
+    "6291d657deec24024827e69c3abe01a30ce548a284743a445e3680d7db5ac3ac18ff9b538d16f290ae67f760984dc6594a7c15e9716ed28dc027beceea1ec40a"));
+
+  // -----TEST 1024
+  // SECRET KEY: f5e5767cf153319517630f226876b86c8160cc583bc013744c6bf255f5cc0ee5
+  // PUBLIC KEY: 278117fc144c72340f67d0f2316e8386ceffbf2b2428c9c51fef7c597f1d426e
+  // MESSAGE (length 1023 bytes): 08b8b2b733424243760fe426a4b54908632110a66c2f6591eabd3345e3e4eb98fa6e264bf09efe12ee50f8f54e9f77b1e355f6c50544e23fb1433ddf73be84d879de7c0046dc4996d9e773f4bc9efe5738829adb26c81b37c93a1b270b20329d658675fc6ea534e0810a4432826bf58c941efb65d57a338bbd2e26640f89ffbc1a858efcb8550ee3a5e1998bd177e93a7363c344fe6b199ee5d02e82d522c4feba15452f80288a821a579116ec6dad2b3b310da903401aa62100ab5d1a36553e06203b33890cc9b832f79ef80560ccb9a39ce767967ed628c6ad573cb116dbefefd75499da96bd68a8a97b928a8bbc103b6621fcde2beca1231d206be6cd9ec7aff6f6c94fcd7204ed3455c68c83f4a41da4af2b74ef5c53f1d8ac70bdcb7ed185ce81bd84359d44254d95629e9855a94a7c1958d1f8ada5d0532ed8a5aa3fb2d17ba70eb6248e594e1a2297acbbb39d502f1a8c6eb6f1ce22b3de1a1f40cc24554119a831a9aad6079cad88425de6bde1a9187ebb6092cf67bf2b13fd65f27088d78b7e883c8759d2c4f5c65adb7553878ad575f9fad878e80a0c9ba63bcbcc2732e69485bbc9c90bfbd62481d9089beccf80cfe2df16a2cf65bd92dd597b0707e0917af48bbb75fed413d238f5555a7a569d80c3414a8d0859dc65a46128bab27af87a71314f318c782b23ebfe808b82b0ce26401d2e22f04d83d1255dc51addd3b75a2b1ae0784504df543af8969be3ea7082ff7fc9888c144da2af58429ec96031dbcad3dad9af0dcbaaaf268cb8fcffead94f3c7ca495e056a9b47acdb751fb73e666c6c655ade8297297d07ad1ba5e43f1bca32301651339e22904cc8c42f58c30c04aafdb038dda0847dd988dcda6f3bfd15c4b4c4525004aa06eeff8ca61783aacec57fb3d1f92b0fe2fd1a85f6724517b65e614ad6808d6f6ee34dff7310fdc82aebfd904b01e1dc54b2927094b2db68d6f903b68401adebf5a7e08d78ff4ef5d63653a65040cf9bfd4aca7984a74d37145986780fc0b16ac451649de6188a7dbdf191f64b5fc5e2ab47b57f7f7276cd419c17a3ca8e1b939ae49e488acba6b965610b5480109c8b17b80e1b7b750dfc7598d5d5011fd2dcc5600a32ef5b52a1ecc820e308aa342721aac0943bf6686b64b2579376504ccc493d97e6aed3fb0f9cd71a43dd497f01f17c0e2cb3797aa2a2f256656168e6c496afc5fb93246f6b1116398a346f1a641f3b041e989f7914f90cc2c7fff357876e506b50d334ba77c225bc307ba537152f3f1610e4eafe595f6d9d90d11faa933a15ef1369546868a7f3a45a96768d40fd9d03412c091c6315cf4fde7cb68606937380db2eaaa707b4c4185c32eddcdd306705e4dc1ffc872eeee475a64dfac86aba41c0618983f8741c5ef68d3a101e8a3b8cac60c905c15fc910840b94c00a0b9d0
+  // SIGNATURE:  0aab4c900501b3e24d7cdf4663326a3a87df5e4843b2cbdb67cbf6e460fec350aa5371b1508f9f4528ecea23c436d94b5e8fcd4f681e30a6ac00a9704a188a03
+
+  CHECK_AND_ASSERT_TRUE(test_eddsa_against_test_vector(
+    "f5e5767cf153319517630f226876b86c8160cc583bc013744c6bf255f5cc0ee5",
+    "278117fc144c72340f67d0f2316e8386ceffbf2b2428c9c51fef7c597f1d426e",
+    "08b8b2b733424243760fe426a4b54908632110a66c2f6591eabd3345e3e4eb98fa6e264bf09efe12ee50f8f54e9f77b1e355f6c50544e23fb1433ddf73be84d879de7c0046dc4996d9e773f4bc9efe5738829adb26c81b37c93a1b270b20329d658675fc6ea534e0810a4432826bf58c941efb65d57a338bbd2e26640f89ffbc1a858efcb8550ee3a5e1998bd177e93a7363c344fe6b199ee5d02e82d522c4feba15452f80288a821a579116ec6dad2b3b310da903401aa62100ab5d1a36553e06203b33890cc9b832f79ef80560ccb9a39ce767967ed628c6ad573cb116dbefefd75499da96bd68a8a97b928a8bbc103b6621fcde2beca1231d206be6cd9ec7aff6f6c94fcd7204ed3455c68c83f4a41da4af2b74ef5c53f1d8ac70bdcb7ed185ce81bd84359d44254d95629e9855a94a7c1958d1f8ada5d0532ed8a5aa3fb2d17ba70eb6248e594e1a2297acbbb39d502f1a8c6eb6f1ce22b3de1a1f40cc24554119a831a9aad6079cad88425de6bde1a9187ebb6092cf67bf2b13fd65f27088d78b7e883c8759d2c4f5c65adb7553878ad575f9fad878e80a0c9ba63bcbcc2732e69485bbc9c90bfbd62481d9089beccf80cfe2df16a2cf65bd92dd597b0707e0917af48bbb75fed413d238f5555a7a569d80c3414a8d0859dc65a46128bab27af87a71314f318c782b23ebfe808b82b0ce26401d2e22f04d83d1255dc51addd3b75a2b1ae0784504df543af8969be3ea7082ff7fc9888c144da2af58429ec96031dbcad3dad9af0dcbaaaf268cb8fcffead94f3c7ca495e056a9b47acdb751fb73e666c6c655ade8297297d07ad1ba5e43f1bca32301651339e22904cc8c42f58c30c04aafdb038dda0847dd988dcda6f3bfd15c4b4c4525004aa06eeff8ca61783aacec57fb3d1f92b0fe2fd1a85f6724517b65e614ad6808d6f6ee34dff7310fdc82aebfd904b01e1dc54b2927094b2db68d6f903b68401adebf5a7e08d78ff4ef5d63653a65040cf9bfd4aca7984a74d37145986780fc0b16ac451649de6188a7dbdf191f64b5fc5e2ab47b57f7f7276cd419c17a3ca8e1b939ae49e488acba6b965610b5480109c8b17b80e1b7b750dfc7598d5d5011fd2dcc5600a32ef5b52a1ecc820e308aa342721aac0943bf6686b64b2579376504ccc493d97e6aed3fb0f9cd71a43dd497f01f17c0e2cb3797aa2a2f256656168e6c496afc5fb93246f6b1116398a346f1a641f3b041e989f7914f90cc2c7fff357876e506b50d334ba77c225bc307ba537152f3f1610e4eafe595f6d9d90d11faa933a15ef1369546868a7f3a45a96768d40fd9d03412c091c6315cf4fde7cb68606937380db2eaaa707b4c4185c32eddcdd306705e4dc1ffc872eeee475a64dfac86aba41c0618983f8741c5ef68d3a101e8a3b8cac60c905c15fc910840b94c00a0b9d0",
+    "0aab4c900501b3e24d7cdf4663326a3a87df5e4843b2cbdb67cbf6e460fec350aa5371b1508f9f4528ecea23c436d94b5e8fcd4f681e30a6ac00a9704a188a03"));
+
+  // -----TEST SHA(abc)
+  // SECRET KEY: 833fe62409237b9d62ec77587520911e9a759cec1d19755b7da901b96dca3d42
+  // PUBLIC KEY: ec172b93ad5e563bf4932c70e1245034c35467ef2efd4d64ebf819683467e2bf
+  // MESSAGE (length 64 bytes): ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a2192992a274fc1a836ba3c23a3feebbd454d4423643ce80e2a9ac94fa54ca49f
+  // SIGNATURE:  dc2a4459e7369633a52b1bf277839a00201009a3efbf3ecb69bea2186c26b58909351fc9ac90b3ecfdfbc7c66431e0303dca179c138ac17ad9bef1177331a704
+
+  CHECK_AND_ASSERT_TRUE(test_eddsa_against_test_vector(
+    "833fe62409237b9d62ec77587520911e9a759cec1d19755b7da901b96dca3d42",
+    "ec172b93ad5e563bf4932c70e1245034c35467ef2efd4d64ebf819683467e2bf",
+    "ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a2192992a274fc1a836ba3c23a3feebbd454d4423643ce80e2a9ac94fa54ca49f",
+    "dc2a4459e7369633a52b1bf277839a00201009a3efbf3ecb69bea2186c26b58909351fc9ac90b3ecfdfbc7c66431e0303dca179c138ac17ad9bef1177331a704"));
+
+
+  //
+  // 12 test vectors from "Taming the many EdDSAs" by Chalkias et al https://eprint.iacr.org/2020/1244.pdf
+  // (Our EdDSA implementation is intended to be close to Dalek implementation -- sowle)
+  //
+
+  std::array<bool, 12> iacr1244_test_results;
+
+  // #0, small-order A, small-order R, s = 0
+  // Dalek: accept, Zano: accept
+  iacr1244_test_results[0] = test_eddsa_against_test_vector(
+    "",
+    "c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac03fa",
+    "8c93255d71dcab10e8f379c26200f3c7bd5f09d9bc3068d3ef4edeb4853022b6",
+    "c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac037a0000000000000000000000000000000000000000000000000000000000000000");
+
+  // #1, small-order A
+  // Dalet: accept, Zano: reject
+  iacr1244_test_results[1] = test_eddsa_against_test_vector(
+    "",
+    "c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac03fa",
+    "bd9f44f4dcc75bd531b56b2cd280b0bb38fc1cd6d1230e14861d861de092e79",
+    "f7badec5b8abeaf699583992219b7b223f1df3fbbea919844e3f7c554a43dd43a5bb704786be79fc476f91d3f3f89b03984d8068dcf1bb7dfc6637b45450ac04");
+
+  // #2, small-order R
+  // Dalek: accept, Zano: accept
+  iacr1244_test_results[2] = test_eddsa_against_test_vector(
+    "",
+    "f7badec5b8abeaf699583992219b7b223f1df3fbbea919844e3f7c554a43dd43",
+    "aebf3f2601a0c8c5d39cc7d8911642f740b78168218da8471772b35f9d35b9ab",
+    "c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac03fa8c4bd45aecaca5b24fb97bc10ac27ac8751a7dfe1baff8b953ec9f5833ca260e");
+
+  // #3, normal, succeeds unless full-order is checked
+  // Dalek: accept, Zano: accept
+  iacr1244_test_results[3] = test_eddsa_against_test_vector(
+    "",
+    "cdb267ce40c5cd45306fa5d2f29731459387dbf9eb933b7bd5aed9a765b88d4d",
+    "9bd9f44f4dcc75bd531b56b2cd280b0bb38fc1cd6d1230e14861d861de092e79",
+    "9046a64750444938de19f227bb80485e92b83fdb4b6506c160484c016cc1852f87909e14428a7a1d62e9f22f3d3ad7802db02eb2e688b6c52fcd6648a98bd009");
+
+  // #4
+  // Dalek: reject, Zano: reject
+  iacr1244_test_results[4] = test_eddsa_against_test_vector(
+    "",
+    "cdb267ce40c5cd45306fa5d2f29731459387dbf9eb933b7bd5aed9a765b88d4d",
+    "e47d62c63f830dc7a6851a0b1f33ae4bb2f507fb6cffec4011eaccd55b53f56c",
+    "160a1cb0dc9c0258cd0a7d23e94d8fa878bcb1925f2c64246b2dee1796bed5125ec6bc982a269b723e0668e540911a9a6a58921d6925e434ab10aa7940551a09");
+
+  // #5
+  // Dalek: reject, Zano: reject
+  iacr1244_test_results[5] = test_eddsa_against_test_vector(
+    "",
+    "cdb267ce40c5cd45306fa5d2f29731459387dbf9eb933b7bd5aed9a765b88d4d",
+    "e47d62c63f830dc7a6851a0b1f33ae4bb2f507fb6cffec4011eaccd55b53f56c",
+    "21122a84e0b5fca4052f5b1235c80a537878b38f3142356b2c2384ebad4668b7e40bc836dac0f71076f9abe3a53f9c03c1ceeeddb658d0030494ace586687405");
+
+  // #6, s > L
+  // Dalek: reject, Zano: reject
+  iacr1244_test_results[6] = test_eddsa_against_test_vector(
+    "",
+    "442aad9f089ad9e14647b1ef9099a1ff4798d78589e66f28eca69c11f582a623",
+    "85e241a07d148b41e47d62c63f830dc7a6851a0b1f33ae4bb2f507fb6cffec40",
+    "e96f66be976d82e60150baecff9906684aebb1ef181f67a7189ac78ea23b6c0e547f7690a0e2ddcd04d87dbc3490dc19b3b3052f7ff0538cb68afb369ba3a514");
+
+
+  // #7, s >> L
+  // Dalek: reject, Zano: reject
+  iacr1244_test_results[7] = test_eddsa_against_test_vector(
+    "",
+    "442aad9f089ad9e14647b1ef9099a1ff4798d78589e66f28eca69c11f582a623",
+    "85e241a07d148b41e47d62c63f830dc7a6851a0b1f33ae4bb2f507fb6cffec40",
+    "8ce5b96c8f26d0ab6c47958c9e68b937104cd36e13c33566acd2fe8d38aa19427e71f98a473474f2f13f06f97c20d58cc3f54b8bd0d272f42b695dd7e89a8c22");
+
+
+  // #8, non-canonical R, reduced for hash
+  // Dalek: reject, Zano: reject
+  iacr1244_test_results[8] = test_eddsa_against_test_vector(
+    "",
+    "f7badec5b8abeaf699583992219b7b223f1df3fbbea919844e3f7c554a43dd43",
+    "9bedc267423725d473888631ebf45988bad3db83851ee85c85e241a07d148b41",
+    "ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff03be9678ac102edcd92b0210bb34d7428d12ffc5df5f37e359941266a4e35f0f");
+
+
+  // #9, non-canonical R, not reduced for hash
+  // Dalek: reject, Zano: reject
+  iacr1244_test_results[9] = test_eddsa_against_test_vector(
+    "",
+    "f7badec5b8abeaf699583992219b7b223f1df3fbbea919844e3f7c554a43dd43",
+    "9bedc267423725d473888631ebf45988bad3db83851ee85c85e241a07d148b41",
+    "ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffca8c5b64cd208982aa38d4936621a4775aa233aa0505711d8fdcfdaa943d4908");
+
+
+  // #10, non-canonical A, reduced for hash
+  // Dalek: reject, Zano: reject
+  iacr1244_test_results[10] = test_eddsa_against_test_vector(
+    "",
+    "ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "e96b7021eb39c1a163b6da4e3093dcd3f21387da4cc4572be588fafae23c155b",
+    "a9d55260f765261eb9b84e106f665e00b867287a761990d7135963ee0a7d59dca5bb704786be79fc476f91d3f3f89b03984d8068dcf1bb7dfc6637b45450ac04");
+
+
+  // #11, non-canonical A, not reduced for hash
+  // Dalek: accept, Zano: reject
+  iacr1244_test_results[11] = test_eddsa_against_test_vector(
+    "",
+    "ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "39a591f5321bbe07fd5a23dc2f39d025d74526615746727ceefd6e82ae65c06f",
+    "a9d55260f765261eb9b84e106f665e00b867287a761990d7135963ee0a7d59dca5bb704786be79fc476f91d3f3f89b03984d8068dcf1bb7dfc6637b45450ac04");
+
+  //                                                0     1      2     3     4      5      6      7      8      9      10     11
+  std::array<bool, 12> iacr1244_expected_results = {true, false, true, true, false, false, false, false, false, false, false, false};
+
+  std::stringstream ss;
+  ss << "results against IACR2020/1244 test vectors:" << ENDL;
+  bool success = true;
+  for(size_t i = 0; i < iacr1244_test_results.size(); ++i)
+  {
+    ss << std::setw(2) << i << "  " << (iacr1244_test_results[i] ? "pass" : "fail") << "   expected: " << (iacr1244_expected_results[i] ? "pass" : "fail" ) << ENDL;
+    success = success && (iacr1244_test_results[i] == iacr1244_expected_results[i]);
+  }
+  LOG_PRINT_L0(ss.str());
+
+  return success;
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+// #include "crypto_tests_ml2s.h"
+#include "crypto_tests_range_proofs.h"
+#include "crypto_tests_clsag.h"
+#include "crypto_tests_one_out_of_many_proofs.h"
+#include "crypto_tests_performance.h"
+////////////////////////////////////////////////////////////////////////////////
+
+
+
+//
+// test's runner
+//
+
+bool wildcard_match(const std::string& needle, const std::string& haystack)
+{
+  size_t h = 0;
+  for (size_t n = 0; n < needle.size(); ++n)
+  {
+    switch (needle[n])
+    {
+    case '?':
+      if (h == haystack.size())
+        return false;
+      ++h;
+      break;
+    case '*':
+      if (n + 1 == needle.size())
+        return true;
+      for (size_t i = 0; i + h < haystack.size(); i++)
+        if (wildcard_match(needle.substr(n + 1), haystack.substr(h + i)))
+          return true;
+      return false;
+    default:
+      if (haystack[h] != needle[n])
+        return false;
+      ++h;
+    }
+  }
+  return h == haystack.size();
+}
+
+int crypto_tests(const std::string& cmd_line_param)
+{
+  epee::log_space::get_set_log_detalisation_level(true, LOG_LEVEL_3);
+  epee::log_space::log_singletone::add_logger(LOGGER_CONSOLE, NULL, NULL, LOG_LEVEL_3);
+  epee::log_space::log_singletone::add_logger(LOGGER_FILE,
+    epee::log_space::log_singletone::get_default_log_file().c_str(),
+    epee::log_space::log_singletone::get_default_log_folder().c_str());
+
+
+  size_t filtered_tests_count = 0;
+  std::vector<size_t> failed_tests;
+  for (size_t i = 0; i < g_tests.size(); ++i)
+  {
+    auto& test = g_tests[i];
+
+    if (!wildcard_match(cmd_line_param.c_str(), test.first.c_str()))
+      continue;
+
+    ++filtered_tests_count;
+
+    LOG_PRINT("   " << std::setw(40) << std::left << test.first << " >", LOG_LEVEL_0);
+    TIME_MEASURE_START(runtime);
+    bool r = false;
+    try
+    {
+      r = test.second();
+    }
+    catch (std::exception& e)
+    {
+      LOG_PRINT_RED("EXCEPTION: " << e.what(), LOG_LEVEL_0);
+    }
+    catch (...)
+    {
+      LOG_PRINT_RED("EXCEPTION: unknown", LOG_LEVEL_0);
+    }
+    TIME_MEASURE_FINISH(runtime);
+    uint64_t runtime_ms = runtime / 1000;
+    uint64_t runtime_mcs = runtime % 1000;
+    if (r)
+    {
+      LOG_PRINT_GREEN("   " << std::setw(40) << std::left << test.first << "OK [" << runtime_ms << "." << std::setw(3) << std::setfill('0') << runtime_mcs << " ms]", LOG_LEVEL_0);
+    }
+    else
+    {
+      LOG_PRINT_RED(ENDL << "   " << std::setw(40) << std::left << test.first << "FAILED" << ENDL, LOG_LEVEL_0);
+      failed_tests.push_back(i);
+    }
+  }
+
+  if (filtered_tests_count == 0)
+  {
+    LOG_PRINT_YELLOW(ENDL << ENDL << "No tests were selected, check the filter mask", LOG_LEVEL_0);
+    return 1;
+  }
+
+  if (failed_tests.empty())
+  {
+    LOG_PRINT_GREEN(ENDL, LOG_LEVEL_0);
+    LOG_PRINT_GREEN(filtered_tests_count << " tests passed okay", LOG_LEVEL_0);
+    return 0;
+  }
+
+  LOG_PRINT_RED_L0(ENDL);
+  LOG_PRINT_RED_L0(ENDL << "Failed tests:");
+  for (size_t i : failed_tests)
+  {
+    LOG_PRINT_RED_L0(g_tests[i].first);
+  }
+
+  return 1;
+}

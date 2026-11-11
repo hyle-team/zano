@@ -1,0 +1,25 @@
+{
+  "jsonrpc": "2.0",
+  "id": 0,
+  "method": "marketplace_push_update_offer",
+  "params": {
+    "no": 0,
+    "tx_id": "2987b671cc337203628a3a1bb7ac811e41f110864d6162d3c2276d2c79f694d6",
+    "od": {
+      "ap": "20",
+      "at": "1",
+      "cat": "CLS:MAN:TSH",
+      "cnt": "Skype: some_skype, discord: some_user#01012",
+      "com": "Some nice comments about tshirt",
+      "do": "Additional conditions",
+      "et": 10,
+      "fee": 10000000000,
+      "lci": "",
+      "lco": "World Wide",
+      "ot": 1,
+      "p": "USD",
+      "pt": "Credit cards, BTC, ZANO, ETH",
+      "t": "T-shirt with Zano logo, made by Crypjunkie[updated]"
+    }
+  }
+}

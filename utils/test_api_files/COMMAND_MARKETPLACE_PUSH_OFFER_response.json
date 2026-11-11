@@ -1,0 +1,17 @@
+{
+  "id": 0,
+  "jsonrpc": "2.0",
+  "result": {
+    "tx_blob_size": 549,
+    "tx_hash": "2987b671cc337203628a3a1bb7ac811e41f110864d6162d3c2276d2c79f694d6"
+  }
+}
+-----[2]
+{
+  "id": 0,
+  "jsonrpc": "2.0",
+  "result": {
+    "tx_blob_size": 552,
+    "tx_hash": "1ca72152db6b962e473a0f838c281c902b7e1ed79c0a762bdb197ccf7f4ab2d5"
+  }
+}

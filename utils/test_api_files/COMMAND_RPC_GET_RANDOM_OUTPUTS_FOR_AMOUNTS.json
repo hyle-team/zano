@@ -1,0 +1,1 @@
+{"method": "getrandom_outs","params": {"amounts": [80000000000000000],"outs_count": 11, "use_forced_mix_outs": false }}

@@ -1,0 +1,94 @@
+#!/bin/bash
+
+case $1 in
+   config)
+        cat <<'EOM'
+graph_title performance_transactions
+graph_vlabel mcs
+graph_category transactions
+tx_add_one_tx_time.label tx_add_one_tx_time
+tx_add_one_tx_time.draw LINE
+tx_append_time.label tx_append_time
+tx_append_time.draw LINE
+tx_check_inputs_time.label tx_check_inputs_time
+tx_check_inputs_time.draw AREA
+tx_process_attachment.label tx_process_attachment
+tx_process_attachment.draw STACK
+tx_process_extra.label tx_process_extra
+tx_process_extra.draw STACK
+tx_process_inputs.label tx_process_inputs
+tx_process_inputs.draw STACK
+tx_append_rl_wait.label tx_append_rl_wait
+tx_append_rl_wait.draw STACK
+tx_print_log.label tx_print_log
+tx_print_log.draw STACK
+tx_prapare_append.label tx_prapare_append
+tx_prapare_append.draw STACK
+tx_append_is_expired.label tx_append_is_expired
+tx_append_is_expired.draw STACK
+tx_push_global_index.label tx_push_global_index
+tx_push_global_index.draw STACK
+tx_check_exist.label tx_check_exist
+tx_check_exist.draw STACK
+tx_store_db.label tx_store_db
+tx_store_db.draw STACK
+
+EOM
+        exit 0;;
+esac
+
+CONN_TOOL_OUT="$(connectivity_tool --ip=127.0.0.1 --rpc-port=$ZANO_RPC_PORT --timeout=1000  --getinfo-flags-hex=0x0000000000010000 --rpc-get-daemon-info)"
+# printf "$CONN_TOOL_OUT"
+
+printf "tx_add_one_tx_time.value "
+PARSED_RES="$(printf "$CONN_TOOL_OUT" | grep tx_add_one_tx_time | cut -d ' ' -f2)"
+printf "$PARSED_RES\n"
+
+printf "tx_check_inputs_time.value "
+PARSED_RES="$(printf "$CONN_TOOL_OUT" | grep tx_check_inputs_time | cut -d ' ' -f2)"
+printf "$PARSED_RES\n"
+
+printf "tx_process_attachment.value "
+PARSED_RES="$(printf "$CONN_TOOL_OUT" | grep tx_process_attachment | cut -d ' ' -f2)"
+printf "$PARSED_RES\n"
+
+printf "tx_process_extra.value "
+PARSED_RES="$(printf "$CONN_TOOL_OUT" | grep tx_process_extra | cut -d ' ' -f2)"
+printf "$PARSED_RES\n"
+
+printf "tx_process_inputs.value "
+PARSED_RES="$(printf "$CONN_TOOL_OUT" | grep tx_process_inputs | cut -d ' ' -f2)"
+printf "$PARSED_RES\n"
+
+printf "tx_push_global_index.value "
+PARSED_RES="$(printf "$CONN_TOOL_OUT" | grep tx_push_global_index | cut -d ' ' -f2)"
+printf "$PARSED_RES\n"
+
+printf "tx_store_db.value "
+PARSED_RES="$(printf "$CONN_TOOL_OUT" | grep tx_store_db | cut -d ' ' -f2)"
+printf "$PARSED_RES\n"
+
+printf "tx_check_exist.value "
+PARSED_RES="$(printf "$CONN_TOOL_OUT" | grep tx_check_exist | cut -d ' ' -f2)"
+printf "$PARSED_RES\n"
+
+printf "tx_append_time.value "
+PARSED_RES="$(printf "$CONN_TOOL_OUT" | grep tx_append_time | cut -d ' ' -f2)"
+printf "$PARSED_RES\n"
+
+printf "tx_append_rl_wait.value "
+PARSED_RES="$(printf "$CONN_TOOL_OUT" | grep tx_append_rl_wait | cut -d ' ' -f2)"
+printf "$PARSED_RES\n"
+
+printf "tx_append_is_expired.value "
+PARSED_RES="$(printf "$CONN_TOOL_OUT" | grep tx_append_is_expired | cut -d ' ' -f2)"
+printf "$PARSED_RES\n"
+
+printf "tx_print_log.value "
+PARSED_RES="$(printf "$CONN_TOOL_OUT" | grep tx_print_log | cut -d ' ' -f2)"
+printf "$PARSED_RES\n"
+
+printf "tx_prapare_append.value "
+PARSED_RES="$(printf "$CONN_TOOL_OUT" | grep tx_prapare_append | cut -d ' ' -f2)"
+printf "$PARSED_RES\n"
+

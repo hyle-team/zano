@@ -1,0 +1,18 @@
+#!/bin/bash
+
+case $1 in
+   config)
+        cat <<'EOM'
+graph_title hashrate
+graph_vlabel hashrate
+graph_category daemon
+hashrate_50.label hashrate_50
+hashrate_350.label hashrate_350
+EOM
+        exit 0;;
+esac
+
+printf "hashrate_50.value "
+connectivity_tool --ip=127.0.0.1 --rpc-port=$ZANO_RPC_PORT --timeout=1000 --rpc-get-daemon-info --getinfo-flags-hex="0x0000000000000008" | grep current_network_hashrate_50 | cut -d ' ' -f2
+printf "hashrate_350.value "
+connectivity_tool --ip=127.0.0.1 --rpc-port=$ZANO_RPC_PORT --timeout=1000 --rpc-get-daemon-info --getinfo-flags-hex="0x0000000000000010" | grep current_network_hashrate_350 | cut -d ' ' -f2

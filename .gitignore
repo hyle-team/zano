@@ -1,0 +1,9 @@
+/build*
+/_builds/*
+/tags
+.DS_Store
+._.DS_Store
+Thumbs.db
+._*
+.idea
+.vs/*

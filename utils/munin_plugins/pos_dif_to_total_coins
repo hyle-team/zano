@@ -1,0 +1,15 @@
+#!/bin/bash
+
+case $1 in
+   config)
+        cat <<'EOM'
+graph_title pos_diff_to_total_coins
+graph_vlabel pos_diff_to_total_coins
+graph_category daemon
+pos_diff_to_total_coins.label pos_diff_to_total_coins
+EOM
+        exit 0;;
+esac
+
+printf "pos_diff_to_total_coins.value "
+connectivity_tool --ip=127.0.0.1 --rpc-port=$ZANO_RPC_PORT --timeout=1000 --rpc-get-daemon-info --getinfo-flags-hex="0x0000000000000401" | grep pos_diff_total_coins_rate| cut -d ' ' -f2

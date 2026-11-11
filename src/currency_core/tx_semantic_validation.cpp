@@ -1,0 +1,132 @@
+// Copyright (c) 2018-2025 Zano Project
+// Distributed under the MIT/X11 software license, see the accompanying
+// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+#include "tx_semantic_validation.h"
+#include "currency_format_utils.h"
+#include "currency_format_utils_transactions.h"
+#include "misc_log_ex.h"
+#include "currency_config.h"
+#include "hardfork_specific_terms.h"
+
+namespace currency
+{
+  //-----------------------------------------------------------------------------------------------
+  bool check_tx_extra(const transaction& tx)
+  {
+    tx_extra_info ei = AUTO_VAL_INIT(ei);
+    bool r = parse_and_validate_tx_extra(tx, ei);
+    if (!r)
+      return false;
+    return true;
+  }
+  //-----------------------------------------------------------------------------------------------
+  bool check_tx_inputs_keyimages_diff(const transaction& tx)
+  {
+    std::unordered_set<crypto::key_image> key_images;
+    std::unordered_set<crypto::hash> multisig_out_ids;
+    crypto::key_image ki{};
+    for(const auto& in_v : tx.vin)
+    {
+      if (get_key_image_from_txin_v(in_v, ki))
+      {
+        if (!key_images.insert(ki).second)
+          return false;
+      }
+      else if (in_v.type() == typeid(txin_multisig))
+      {
+        const auto& ms_in = boost::get<txin_multisig>(in_v);
+        if (!multisig_out_ids.insert(ms_in.multisig_out_id).second)
+          return false;
+      }
+    }
+    return true;
+  }
+  //-----------------------------------------------------------------------------------------------
+  bool check_inputs_and_outputs_size(const transaction& tx)
+  {
+    CHECK_AND_ASSERT_MES(tx.vin.size() != 0, false, "transaction has no inputs");
+    CHECK_AND_ASSERT_MES(tx.version < TRANSACTION_VERSION_POST_HF5 || tx.vin.size() <= CURRENCY_TX_MAX_ALLOWED_INPUTS, false, "transaction has too many inputs = " << tx.vin.size());
+    
+    const uint64_t tx_max_allowed_outs = tx.version >= TRANSACTION_VERSION_POST_HF4 ? CURRENCY_TX_MAX_ALLOWED_OUTS : CURRENCY_TX_MAX_ALLOWED_OUTS_PRE_HF4;
+    CHECK_AND_ASSERT_MES(tx.vout.size() <= tx_max_allowed_outs, false, "transaction has too many outputs = " << tx.vout.size());
+    
+    return true;
+  }
+  //-----------------------------------------------------------------------------------------------
+  bool validate_tx_semantic(const transaction& tx, size_t tx_blob_size, const crypto::hash& tx_id)
+  {
+    if (tx_blob_size >= CURRENCY_MAX_TRANSACTION_BLOB_SIZE)
+    {
+      LOG_PRINT_RED_L0("tx blob size is " << tx_blob_size << ", which is greater than or equal to allowed maximum of " << CURRENCY_MAX_TRANSACTION_BLOB_SIZE);
+      return false;
+    }
+
+    if (!check_inputs_and_outputs_size(tx))
+    {
+      LOG_PRINT_RED_L0("tx has invalid inputs/outputs size");
+      return false;
+    }
+
+    if (tx.hardfork_id >= ZANO_HARDFORK_06)
+    {
+      // consider removing the following call, I think it is redundant -- sowle
+      if (!currency::validate_tx_for_hardfork_specific_terms_types_HF6(tx, tx_id, tx.hardfork_id))
+      { 
+        LOG_PRINT_RED_L0("tx failed hardfork specific terms validation");
+        return false;
+      }
+    }
+    else
+    {
+      if (!check_inputs_types_supported(tx))
+      {
+        LOG_PRINT_RED_L0("tx has unsupported input types");
+        return false;
+      }
+    }
+
+    if (!additional_inputs_types_validations(tx))
+    {
+      LOG_PRINT_RED_L0("extra_inputs_types_validations validation failed.");
+      return false;
+    }
+    
+    if (!check_outs_valid(tx))
+    {
+      LOG_PRINT_RED_L0("tx has invalid outputs, rejected");
+      return false;
+    }
+
+    if (!check_bare_money_overflow(tx))
+    {
+      LOG_PRINT_RED_L0("tx has money overflow, rejected");
+      return false;
+    }
+
+    //check if tx use different key images
+    if (!check_tx_inputs_keyimages_diff(tx))
+    {
+      LOG_PRINT_RED_L0("tx inputs have the same key images");
+      return false;
+    }
+
+    if (!check_tx_extra(tx))
+    {
+      LOG_PRINT_RED_L0("tx has wrong extra, rejected");
+      return false;
+    }
+
+    // inexpensive check for pre-HF4 txs
+    // post-HF4 txs balance are being checked in check_tx_balance()
+    if (tx.version <= TRANSACTION_VERSION_PRE_HF4)
+    {
+      if (!check_tx_bare_balance(tx))
+      {
+        LOG_PRINT_RED_L0("tx bare balance check failed");
+        return false;
+      }
+    }
+
+    return true;
+  }
+} // namespace currency

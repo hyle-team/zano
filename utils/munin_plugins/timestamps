@@ -1,0 +1,19 @@
+#!/bin/bash
+
+case $1 in
+   config)
+        cat <<'EOM'
+graph_args --alt-autoscale
+graph_title timestamps
+graph_vlabel timestamp
+graph_category daemon
+last_pos_timestamp.label last_pos_timestamp
+last_pow_timestamp.label last_pow_timestamp
+EOM
+        exit 0;;
+esac
+
+printf "last_pos_timestamp.value "
+connectivity_tool --ip=127.0.0.1 --rpc-port=$ZANO_RPC_PORT --timeout=1000 --rpc-get-daemon-info --getinfo-flags-hex="0x0000000000000100" | grep last_pos_timestamp | cut -d ' ' -f2
+printf "last_pow_timestamp.value "
+connectivity_tool --ip=127.0.0.1 --rpc-port=$ZANO_RPC_PORT --timeout=1000 --rpc-get-daemon-info --getinfo-flags-hex="0x0000000000000200" | grep last_pow_timestamp | cut -d ' ' -f2

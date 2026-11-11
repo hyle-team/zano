@@ -1,0 +1,10 @@
+{
+  "jsonrpc": "2.0",
+  "id": 0,
+  "method": "marketplace_cancel_offer",
+  "params": {
+    "no": 0,
+    "tx_id": "1ca72152db6b962e473a0f838c281c902b7e1ed79c0a762bdb197ccf7f4ab2d5",
+    "fee": 10000000000
+  }
+}

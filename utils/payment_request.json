@@ -1,0 +1,8 @@
+{
+    "version": "1.1",
+    "method": "get_payments",
+    "id": "194521489",
+    "params": {
+        "payment_id": "3d5dc87d13ab981ff0d9433c9c8df4a787a94f54cb853d9729fa0138181928a1"
+    }
+}

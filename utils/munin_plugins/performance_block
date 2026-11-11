@@ -1,0 +1,76 @@
+#!/bin/bash
+
+case $1 in
+   config)
+        cat <<'EOM'
+graph_title performance_block
+graph_vlabel microseconds
+graph_category daemon
+
+
+etc_stuff_6.label etc_stuff_6
+etc_stuff_6.draw AREA
+
+insert_time_4.label insert_time_4
+insert_time_4.draw STACK
+
+longhash_calculating_time_3.label longhash_calculating_time_3
+longhash_calculating_time_3.draw STACK
+
+raise_block_core_event.label raise_block_core_event
+raise_block_core_event.draw STACK
+
+target_calculating_time_2.label target_calculating_time_2
+target_calculating_time_2.draw STACK
+
+all_txs_insert_time_5.label all_txs_insert_time_5
+all_txs_insert_time_5.draw STACK
+
+block_processing_time_1.label block_processing_time_1
+block_processing_time_1.draw LINE2
+
+
+block_processing_time_0.label block_processing_time_0
+block_processing_time_0.draw LINE2
+
+EOM
+        exit 0;;
+esac
+
+CONN_TOOL_OUT="$(connectivity_tool --ip=127.0.0.1 --rpc-port=$ZANO_RPC_PORT --timeout=1000  --getinfo-flags-hex=0x0000000000010000 --rpc-get-daemon-info)"
+# printf "$CONN_TOOL_OUT"
+
+printf "block_processing_time_0.value "
+PARSED_RES="$(printf "$CONN_TOOL_OUT" | grep block_processing_time_0 | cut -d ' ' -f2)"
+printf "$PARSED_RES\n"
+
+printf "block_processing_time_1.value "
+PARSED_RES="$(printf "$CONN_TOOL_OUT" | grep block_processing_time_1 | cut -d ' ' -f2)"
+printf "$PARSED_RES\n"
+
+printf "etc_stuff_6.value "
+PARSED_RES="$(printf "$CONN_TOOL_OUT" | grep etc_stuff_6 | cut -d ' ' -f2)"
+printf "$PARSED_RES\n"
+
+printf "insert_time_4.value "
+PARSED_RES="$(printf "$CONN_TOOL_OUT" | grep insert_time_4 | cut -d ' ' -f2)"
+printf "$PARSED_RES\n"
+
+printf "longhash_calculating_time_3.value "
+PARSED_RES="$(printf "$CONN_TOOL_OUT" | grep longhash_calculating_time_3 | cut -d ' ' -f2)"
+printf "$PARSED_RES\n"
+
+printf "raise_block_core_event.value "
+PARSED_RES="$(printf "$CONN_TOOL_OUT" | grep raise_block_core_event | cut -d ' ' -f2)"
+printf "$PARSED_RES\n"
+
+printf "target_calculating_time_2.value "
+PARSED_RES="$(printf "$CONN_TOOL_OUT" | grep target_calculating_time_2 | cut -d ' ' -f2)"
+printf "$PARSED_RES\n"
+
+printf "all_txs_insert_time_5.value "
+PARSED_RES="$(printf "$CONN_TOOL_OUT" | grep all_txs_insert_time_5 | cut -d ' ' -f2)"
+printf "$PARSED_RES\n"
+
+
+

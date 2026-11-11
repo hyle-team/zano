@@ -1,0 +1,34 @@
+#!/bin/bash
+
+case $1 in
+   config)
+        cat <<'EOM'
+graph_title performance_tranactions_inp.every_inp.every_key
+graph_vlabel mcs
+graph_category transactions.inp
+tx_check_inputs_loop_scan_outputkeys_loop_get_subitem.label get_subitem
+tx_check_inputs_loop_scan_outputkeys_loop_get_subitem.draw AREA
+tx_check_inputs_loop_scan_outputkeys_loop_find_tx.label find_tx
+tx_check_inputs_loop_scan_outputkeys_loop_find_tx.draw STACK
+tx_check_inputs_loop_scan_outputkeys_loop_handle_output.label handle_output
+tx_check_inputs_loop_scan_outputkeys_loop_handle_output.draw STACK
+EOM
+        exit 0;;
+esac
+
+CONN_TOOL_OUT="$(connectivity_tool --ip=127.0.0.1 --rpc-port=$ZANO_RPC_PORT --timeout=1000  --getinfo-flags-hex=0x0000000000010000 --rpc-get-daemon-info)"
+# printf "$CONN_TOOL_OUT"
+
+printf "tx_check_inputs_loop_scan_outputkeys_loop_get_subitem.value "
+PARSED_RES="$(printf "$CONN_TOOL_OUT" | grep tx_check_inputs_loop_scan_outputkeys_loop_get_subitem | cut -d ' ' -f2)"
+printf "$PARSED_RES\n"
+
+printf "tx_check_inputs_loop_scan_outputkeys_loop_find_tx.value "
+PARSED_RES="$(printf "$CONN_TOOL_OUT" | grep tx_check_inputs_loop_scan_outputkeys_loop_find_tx | cut -d ' ' -f2)"
+printf "$PARSED_RES\n"
+
+printf "tx_check_inputs_loop_scan_outputkeys_loop_handle_output.value "
+PARSED_RES="$(printf "$CONN_TOOL_OUT" | grep tx_check_inputs_loop_scan_outputkeys_loop_handle_output | cut -d ' ' -f2)"
+printf "$PARSED_RES\n"
+
+

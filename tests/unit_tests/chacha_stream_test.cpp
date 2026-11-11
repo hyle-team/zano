@@ -1,0 +1,209 @@
+// Copyright (c) 2012-2014 The Boolberry developers
+// Distributed under the MIT/X11 software license, see the accompanying
+// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+
+#include "gtest/gtest.h"
+
+#include <cstdint>
+#include <vector>
+#include <boost/iostreams/stream.hpp>
+#include <boost/iostreams/invert.hpp>
+#include <boost/iostreams/filtering_stream.hpp>
+
+#include "common/encryption_filter.h"
+#include "crypto/crypto.h"
+#include "currency_core/blockchain_storage_basic.h"
+#include "currency_core/blockchain_storage_boost_serialization.h"
+#include "common/boost_serialization_helper.h"
+
+
+#define CRYPTO_HDS_CHACHA_STREAM_TEST               "ZANO_HDS_CHACHA_STREAM_TEST____"
+
+template<typename t_chacha_in, typename t_chacha_out>
+void do_basic_test_with_serialization_on_top()
+{
+  LOG_PRINT_L0("chacha_stream_test");
+  std::list<currency::block_extended_info> test_list;
+  for (size_t i = 0; i != 1000; i++) {
+    test_list.push_back(currency::block_extended_info());
+    test_list.back().height = i;
+    test_list.back().this_block_tx_fee_median = i;
+  }
+
+  std::list<currency::block_extended_info> verification_list;
+  crypto::chacha_iv iv = crypto::rand<crypto::chacha_iv>();
+  boost::filesystem::ofstream store_data_file;
+  store_data_file.open("./test.bin", std::ios_base::binary | std::ios_base::out | std::ios::trunc);
+  t_chacha_out encrypt_filter("pass", iv, CRYPTO_HDS_CHACHA_STREAM_TEST);
+  boost::iostreams::filtering_ostream out;
+  out.push(encrypt_filter);
+  out.push(store_data_file);
+
+
+  //out << buff;
+  tools::portble_serialize_obj_to_stream(test_list, out);
+
+  //out.flush();
+  store_data_file.close();
+
+  boost::filesystem::ifstream data_file;
+  data_file.open("./test.bin", std::ios_base::binary | std::ios_base::in);
+  t_chacha_in decrypt_filter("pass", iv, CRYPTO_HDS_CHACHA_STREAM_TEST);
+
+  boost::iostreams::filtering_istream in;
+  in.push(decrypt_filter);
+  in.push(data_file);
+  try {
+
+    bool res2 = tools::portable_unserialize_obj_from_stream(verification_list, in);
+    ASSERT_TRUE(res2);
+    size_t i = 0;
+    for (auto vle : verification_list) {
+      ASSERT_TRUE(vle.height == i);
+      ASSERT_TRUE(vle.this_block_tx_fee_median == i);
+      i++;
+    }
+    //if(verification_list != test_list) 
+  }
+  catch (std::exception& err)
+  {
+    std::cout << err.what();
+    ASSERT_TRUE(false);
+  }
+}
+template<typename t_chacha_in, typename t_chacha_out>
+void do_diversity_test_on_different_stream_behaviour(bool do_accidental_flushes)
+{
+  LOG_PRINT_L0("chacha_stream_test");
+  //prepare buff
+  const size_t buff_size = 10000;
+  std::string buff(buff_size, ' ');
+  for (size_t i = 0; i != buff_size; i++) {
+    buff[i] = i % 255;
+  }
+
+  crypto::chacha_iv iv = crypto::rand<crypto::chacha_iv>();
+  boost::filesystem::ofstream store_data_file;
+  store_data_file.open("./test.bin", std::ios_base::binary | std::ios_base::out | std::ios::trunc);
+  t_chacha_out encrypt_filter("pass", iv, CRYPTO_HDS_CHACHA_STREAM_TEST);
+  //boost::iostreams::stream<encrypt_chacha_sink> outputStream(sink_encrypt);
+  boost::iostreams::filtering_ostream out;
+  out.push(encrypt_filter);
+  out.push(store_data_file);
+
+  // Sequential writes with random sizes (1-100 bytes) and periodic flush
+  size_t written = 0;
+  size_t write_count = 0;
+  while (written < buff_size)
+  {
+    size_t chunk_size = 1 + (std::rand() % 100);
+    if (written + chunk_size > buff_size)
+    {
+      chunk_size = buff_size - written;
+    }
+    out.write(&buff[written], chunk_size);
+    written += chunk_size;
+    ++write_count;
+
+    // Periodic flush every ~10 writes
+    if (write_count % 10 == 0)
+    {
+      if(do_accidental_flushes)
+        out.flush();
+    }
+  }
+
+  out.flush();
+  store_data_file.close();
+  for (size_t d = 0; d != 1000; d++)
+  {
+    boost::filesystem::ifstream data_file;
+    data_file.open("./test.bin", std::ios_base::binary | std::ios_base::in);
+    std::uintmax_t size = boost::filesystem::file_size("./test.bin");
+    t_chacha_in decrypt_filter("pass", iv, CRYPTO_HDS_CHACHA_STREAM_TEST);
+
+    boost::iostreams::filtering_istream in;
+    in.push(decrypt_filter);
+    in.push(data_file);
+
+    std::string str(buff_size + 100, ' ');
+    try {
+      size_t bytes_read_total = 0;
+      size_t bytes_read_total2 = 0;
+      size_t offset = 0;
+      while (offset < buff_size + 1)
+      {
+        std::streamsize count = std::rand() % 100;
+        //      if (count + offset > buff_size)
+        //      {
+        //        count = buff_size - offset;
+        //      }
+        in.read((char*)&str.data()[offset], count);
+        //self check
+        size_t readed_sz = in.gcount();
+        bytes_read_total += readed_sz;
+        if (!(count + offset > buff_size || readed_sz == count))
+        {
+          ASSERT_TRUE(count + offset > buff_size || readed_sz == count);
+        }
+        offset += readed_sz;
+        if (!in) {
+          break;
+        }
+      }
+      if (in) {
+        ASSERT_TRUE(false);
+      }
+
+      str.resize(bytes_read_total);
+      if (buff != str)
+      {
+        ASSERT_TRUE(false);
+      }
+
+      //std::cout << "OK";
+    }
+    catch (std::exception& err) {
+      std::cout << err.what();
+      ASSERT_TRUE(false);
+    }
+  }
+  //std::cout << "Finished OK!";
+
+}
+
+
+TEST(chacha_stream_test, basic_test_with_serialization_on_top_20)
+{
+  do_basic_test_with_serialization_on_top<tools::encrypt_chacha20_in_filter, tools::encrypt_chacha20_out_filter>();
+}
+
+
+TEST(chacha_stream_test, diversity_test_on_different_stream_behaviour_20)
+{
+  do_diversity_test_on_different_stream_behaviour<tools::encrypt_chacha20_in_filter, tools::encrypt_chacha20_out_filter>(true);
+}
+
+TEST(chacha_stream_test, basic_test_with_serialization_on_top_20_v2)
+{
+  do_basic_test_with_serialization_on_top<tools::encrypt_chacha20_v2_in_filter, tools::encrypt_chacha20_v2_out_filter>();
+}
+
+
+TEST(chacha_stream_test, diversity_test_on_different_stream_behaviour_20_v2)
+{
+  do_diversity_test_on_different_stream_behaviour<tools::encrypt_chacha20_v2_in_filter, tools::encrypt_chacha20_v2_out_filter>(true);
+}
+
+
+
+TEST(chacha_stream_test, basic_test_with_serialization_on_top)
+{
+  do_basic_test_with_serialization_on_top<tools::encrypt_chacha8_in_filter, tools::encrypt_chacha8_out_filter>();
+}
+
+
+TEST(chacha_stream_test, diversity_test_on_different_stream_behaviour)
+{
+  do_diversity_test_on_different_stream_behaviour<tools::encrypt_chacha8_in_filter, tools::encrypt_chacha8_out_filter>(false);
+}

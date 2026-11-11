@@ -1,0 +1,19 @@
+#!/bin/bash
+
+case $1 in
+   config)
+        cat <<'EOM'
+graph_title reward
+graph_vlabel reward
+graph_category daemon
+block_reward.label block_reward
+last_block_reward.label last_block_reward
+
+EOM
+        exit 0;;
+esac
+
+printf "block_reward.value "
+connectivity_tool --ip=127.0.0.1 --rpc-port=$ZANO_RPC_PORT --timeout=1000 --rpc-get-daemon-info --getinfo-flags-hex="0x0000000000000401" | grep block_reward| cut -d ' ' -f2
+printf "last_block_reward.value "
+connectivity_tool --ip=127.0.0.1 --rpc-port=$ZANO_RPC_PORT --timeout=1000 --rpc-get-daemon-info --getinfo-flags-hex="0x0000000000000401" | grep last_block_total_reward| cut -d ' ' -f2

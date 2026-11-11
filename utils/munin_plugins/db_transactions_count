@@ -1,0 +1,18 @@
+#!/bin/bash
+
+case $1 in
+   config)
+        cat <<'EOM'
+graph_title db_tx_count
+graph_vlabel db_tx_count
+graph_category daemon
+db_tx_count.label db_tx_count
+writer_tx_count.label writer_tx_count
+EOM
+        exit 0;;
+esac
+
+printf "db_tx_count.value "
+connectivity_tool --ip=127.0.0.1 --rpc-port=$ZANO_RPC_PORT --timeout=1000 --rpc-get-daemon-info --getinfo-flags-hex="0x0000000000010000" | grep db_tx_count | cut -d ' ' -f2
+printf "writer_tx_count.value "
+connectivity_tool --ip=127.0.0.1 --rpc-port=$ZANO_RPC_PORT --timeout=1000 --rpc-get-daemon-info --getinfo-flags-hex="0x0000000000010000" | grep db_writer_tx_count| cut -d ' ' -f2

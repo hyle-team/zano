@@ -1,0 +1,15 @@
+#!/bin/bash
+
+case $1 in
+   config)
+        cat <<'EOM'
+graph_title tx_daily_count
+graph_vlabel tx_daily_count
+graph_category daemon
+tx_daily_count.label tx_daily_count
+EOM
+        exit 0;;
+esac
+
+printf "tx_daily_count.value "
+connectivity_tool --ip=127.0.0.1 --rpc-port=$ZANO_RPC_PORT --timeout=10000 --rpc-get-daemon-info --getinfo-flags-hex="0x0000000000000080" | grep transactions_cnt_per_day | cut -d ' ' -f2

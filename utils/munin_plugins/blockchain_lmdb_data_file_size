@@ -1,0 +1,15 @@
+#!/bin/bash
+
+case $1 in
+   config)
+        cat <<'EOM'
+graph_title blockchain_lmdb_data_file_size
+graph_vlabel blockchain_lmdb_data_file_size
+graph_category daemon
+blockchain_lmdb_data_file_size.label blockchain_lmdb_data_file_size
+EOM
+        exit 0;;
+esac
+
+printf "blockchain_lmdb_data_file_size.value "
+sudo ls -l /root/.Zano/blockchain_lmdb_v1/data.mdb | cut -d" " -f5

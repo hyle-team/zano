@@ -1,0 +1,17 @@
+#!/bin/bash
+
+case $1 in
+   config)
+        cat <<'EOM'
+graph_title tx_per_block
+graph_vlabel tx_per_block
+graph_category daemon
+tx_per_block.label tx_per_block
+EOM
+        exit 0;;
+esac
+
+printf "tx_per_block.value "
+connectivity_tool --ip=127.0.0.1 --rpc-port=$ZANO_RPC_PORT --timeout=1000 --rpc-get-daemon-info --getinfo-flags-hex="0x0000000000001000" | grep tx_count_in_last_block| cut -d ' ' -f2
+
+

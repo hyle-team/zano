@@ -1,0 +1,46 @@
+#!/bin/bash
+
+case $1 in
+   config)
+        cat <<'EOM'
+graph_title performance_tranactions_inp.every_inp
+graph_vlabel mcs
+graph_category transactions.inp
+tx_check_inputs_loop_kimage_check.label kimage_check
+tx_check_inputs_loop_kimage_check.draw AREA
+tx_check_inputs_loop_ch_in_val_sig.label ch_in_val_sig
+tx_check_inputs_loop_ch_in_val_sig.draw STACK
+tx_check_inputs_loop_scan_outputkeys_get_item_size.label scan_keys_get_item_size
+tx_check_inputs_loop_scan_outputkeys_get_item_size.draw STACK
+tx_check_inputs_loop_scan_outputkeys_relative_to_absolute.label scan_keys_relative_to_absolute
+tx_check_inputs_loop_scan_outputkeys_relative_to_absolute.draw STACK
+tx_check_inputs_loop_scan_outputkeys_loop.label scan_keys_loop
+tx_check_inputs_loop_scan_outputkeys_loop.draw STACK
+EOM
+        exit 0;;
+esac
+
+CONN_TOOL_OUT="$(connectivity_tool --ip=127.0.0.1 --rpc-port=$ZANO_RPC_PORT --timeout=1000  --getinfo-flags-hex=0x0000000000010000 --rpc-get-daemon-info)"
+# printf "$CONN_TOOL_OUT"
+
+printf "tx_check_inputs_loop_kimage_check.value "
+PARSED_RES="$(printf "$CONN_TOOL_OUT" | grep tx_check_inputs_loop_kimage_check | cut -d ' ' -f2)"
+printf "$PARSED_RES\n"
+
+printf "tx_check_inputs_loop_ch_in_val_sig.value "
+PARSED_RES="$(printf "$CONN_TOOL_OUT" | grep tx_check_inputs_loop_ch_in_val_sig | cut -d ' ' -f2)"
+printf "$PARSED_RES\n"
+
+printf "tx_check_inputs_loop_scan_outputkeys_get_item_size.value "
+PARSED_RES="$(printf "$CONN_TOOL_OUT" | grep tx_check_inputs_loop_scan_outputkeys_get_item_size | cut -d ' ' -f2)"
+printf "$PARSED_RES\n"
+
+printf "tx_check_inputs_loop_scan_outputkeys_relative_to_absolute.value "
+PARSED_RES="$(printf "$CONN_TOOL_OUT" | grep tx_check_inputs_loop_scan_outputkeys_relative_to_absolute | cut -d ' ' -f2)"
+printf "$PARSED_RES\n"
+
+printf "tx_check_inputs_loop_scan_outputkeys_loop.value "
+PARSED_RES="$(printf "$CONN_TOOL_OUT" | grep tx_check_inputs_loop_scan_outputkeys_loop | cut -d ' ' -f2)"
+printf "$PARSED_RES\n"
+
+

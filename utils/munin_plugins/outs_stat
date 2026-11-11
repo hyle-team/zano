@@ -1,0 +1,68 @@
+#!/bin/bash
+
+case $1 in
+   config)
+        cat <<'EOM'
+graph_title index_outs_stat
+graph_vlabel amount
+graph_category daemon
+outs_0_001.label outs_0_001
+outs_0_01.label outs_0_01
+outs_0_1.label outs_0_1
+outs_1.label outs_1
+outs_10.label outs_10
+outs_100.label outs_100
+outs_1000.label outs_1000
+outs_10000.label outs_10000
+outs_100000.label outs_100000
+outs_1000000.label outs_1000000
+
+
+EOM
+        exit 0;;
+esac
+
+CONN_TOOL_OUT="$(connectivity_tool --ip=127.0.0.1 --rpc-port=$ZANO_RPC_PORT --timeout=1000  --getinfo-flags-hex=0x0000000000008000 --rpc-get-daemon-info)"
+# printf "$CONN_TOOL_OUT"
+
+printf "outs_0_001.value "
+PARSED_RES="$(printf "$CONN_TOOL_OUT" | grep outs_stat_amount1_0_001 | cut -d ' ' -f2)"
+printf "$PARSED_RES\n"
+
+printf "outs_0_01.value "
+PARSED_RES="$(printf "$CONN_TOOL_OUT" | grep outs_stat_amount2_0_01 | cut -d ' ' -f2)"
+printf "$PARSED_RES\n"
+
+printf "outs_0_1.value "
+PARSED_RES="$(printf "$CONN_TOOL_OUT" | grep outs_stat_amount3_0_1 | cut -d ' ' -f2)"
+printf "$PARSED_RES\n"
+
+printf "outs_1.value "
+PARSED_RES="$(printf "$CONN_TOOL_OUT" | grep outs_stat_amount4_1 | cut -d ' ' -f2)"
+printf "$PARSED_RES\n"
+
+printf "outs_10.value "
+PARSED_RES="$(printf "$CONN_TOOL_OUT" | grep outs_stat_amount5_10 | cut -d ' ' -f2)"
+printf "$PARSED_RES\n"
+
+printf "outs_100.value "
+PARSED_RES="$(printf "$CONN_TOOL_OUT" | grep outs_stat_amount6_100 | cut -d ' ' -f2)"
+printf "$PARSED_RES\n"
+
+printf "outs_1000.value "
+PARSED_RES="$(printf "$CONN_TOOL_OUT" | grep outs_stat_amount7_1000 | cut -d ' ' -f2)"
+printf "$PARSED_RES\n"
+
+printf "outs_10000.value "
+PARSED_RES="$(printf "$CONN_TOOL_OUT" | grep outs_stat_amount8_10000 | cut -d ' ' -f2)"
+printf "$PARSED_RES\n"
+
+printf "outs_100000.value "
+PARSED_RES="$(printf "$CONN_TOOL_OUT" | grep outs_stat_amount9_100000 | cut -d ' ' -f2)"
+printf "$PARSED_RES\n"
+
+printf "outs_1000000.value "
+PARSED_RES="$(printf "$CONN_TOOL_OUT" | grep outs_stat_amount10_1000000 | cut -d ' ' -f2)"
+printf "$PARSED_RES\n"
+
+

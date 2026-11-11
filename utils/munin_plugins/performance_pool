@@ -1,0 +1,83 @@
+#!/bin/bash
+
+case $1 in
+   config)
+        cat <<'EOM'
+graph_title performance_pool
+graph_vlabel ms
+graph_category daemon
+graph_args --upper-limit 170000 --lower-limit 0 -r
+pool_tx_processing_time.label pool_tx_processing_time
+pool_check_inputs_types_supported_time.label pool_check_inputs_types_supported_time
+pool_check_inputs_types_supported_time.draw AREA
+pool_expiration_validate_time.label pool_expiration_validate_time
+pool_expiration_validate_time.draw STACK
+pool_validate_amount_time.label pool_validate_amount_time
+pool_validate_amount_time.draw STACK
+pool_validate_alias_time.label pool_validate_alias_time
+pool_validate_alias_time.draw STACK
+pool_check_keyimages_ws_ms_time.label pool_check_keyimages_ws_ms_time
+pool_check_keyimages_ws_ms_time.draw STACK
+pool_check_inputs_time.label pool_check_inputs_time
+pool_check_inputs_time.draw STACK
+pool_begin_tx_time.label pool_begin_tx_time
+pool_begin_tx_time.draw STACK
+pool_update_db_time.label pool_update_db_time
+pool_update_db_time.draw STACK
+pool_db_commit_time.label pool_db_commit_time
+pool_db_commit_time.draw STACK
+pool_db_wait_lock_time.label pool_db_wait_lock_time
+pool_db_wait_lock_time.draw STACK
+
+
+EOM
+        exit 0;;
+esac
+
+
+CONN_TOOL_OUT="$(connectivity_tool --ip=127.0.0.1 --rpc-port=$ZANO_RPC_PORT --timeout=1000  --getinfo-flags-hex=0x0000000000010000 --rpc-get-daemon-info)"
+# printf "$CONN_TOOL_OUT"
+
+printf "pool_tx_processing_time.value "
+PARSED_RES="$(printf "$CONN_TOOL_OUT" | grep pool_tx_processing_time | cut -d ' ' -f2)"
+printf "$PARSED_RES\n"
+
+printf "pool_check_inputs_types_supported_time.value "
+PARSED_RES="$(printf "$CONN_TOOL_OUT" | grep pool_check_inputs_types_supported_time | cut -d ' ' -f2)"
+printf "$PARSED_RES\n"
+
+printf "pool_expiration_validate_time.value "
+PARSED_RES="$(printf "$CONN_TOOL_OUT" | grep pool_expiration_validate_time | cut -d ' ' -f2)"
+printf "$PARSED_RES\n"
+
+printf "pool_validate_amount_time.value "
+PARSED_RES="$(printf "$CONN_TOOL_OUT" | grep pool_validate_amount_time | cut -d ' ' -f2)"
+printf "$PARSED_RES\n"
+
+printf "pool_validate_alias_time.value "
+PARSED_RES="$(printf "$CONN_TOOL_OUT" | grep pool_validate_alias_time | cut -d ' ' -f2)"
+printf "$PARSED_RES\n"
+
+printf "pool_check_keyimages_ws_ms_time.value "
+PARSED_RES="$(printf "$CONN_TOOL_OUT" | grep pool_check_keyimages_ws_ms_time | cut -d ' ' -f2)"
+printf "$PARSED_RES\n"
+
+printf "pool_check_inputs_time.value "
+PARSED_RES="$(printf "$CONN_TOOL_OUT" | grep pool_check_inputs_time | cut -d ' ' -f2)"
+printf "$PARSED_RES\n"
+
+printf "pool_begin_tx_time.value "
+PARSED_RES="$(printf "$CONN_TOOL_OUT" | grep pool_begin_tx_time | cut -d ' ' -f2)"
+printf "$PARSED_RES\n"
+
+printf "pool_update_db_time.value "
+PARSED_RES="$(printf "$CONN_TOOL_OUT" | grep pool_update_db_time | cut -d ' ' -f2)"
+printf "$PARSED_RES\n"
+
+printf "pool_db_commit_time.value "
+PARSED_RES="$(printf "$CONN_TOOL_OUT" | grep pool_db_commit_time | cut -d ' ' -f2)"
+printf "$PARSED_RES\n"
+
+printf "pool_db_wait_lock_time.value "
+PARSED_RES="$(printf "$CONN_TOOL_OUT" | grep pool_db_wait_lock_time | cut -d ' ' -f2)"
+printf "$PARSED_RES\n"

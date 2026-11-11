@@ -1,0 +1,13 @@
+{
+  "jsonrpc": "2.0",
+  "id": 0,
+  "method": "get_recent_txs_and_info",
+  "params": {
+    "offset": 0,
+    "update_provision_info": true,
+    "exclude_mining_txs": true,
+    "count": 100,
+    "order": "FROM_BEGIN_TO_END",
+    "exclude_unconfirmed": true
+  }
+}

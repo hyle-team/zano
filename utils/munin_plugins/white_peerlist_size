@@ -1,0 +1,15 @@
+#!/bin/bash
+
+case $1 in
+   config)
+        cat <<'EOM'
+graph_title white_peerlist_size
+graph_vlabel white_peerlist_size
+graph_category daemon
+white_peerlist_size.label white_peerlist_size
+EOM
+        exit 0;;
+esac
+
+printf "white_peerlist_size.value "
+connectivity_tool --ip=127.0.0.1 --rpc-port=$ZANO_RPC_PORT --timeout=1000 --rpc-get-daemon-info --getinfo-flags-hex="0x0000000000000000" | grep white_peerlist_size | cut -d ' ' -f2

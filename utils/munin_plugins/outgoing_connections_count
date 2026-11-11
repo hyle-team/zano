@@ -1,0 +1,15 @@
+#!/bin/bash
+
+case $1 in
+   config)
+        cat <<'EOM'
+graph_title outgoing_connections_count
+graph_vlabel outgoing_connections_count
+graph_category daemon
+outgoing_connections_count.label outgoing_connections_count
+EOM
+        exit 0;;
+esac
+
+printf "outgoing_connections_count.value "
+connectivity_tool --ip=127.0.0.1 --rpc-port=$ZANO_RPC_PORT --timeout=1000 --rpc-get-daemon-info --getinfo-flags-hex="0x0000000000000000" | grep outgoing_connections_count | cut -d ' ' -f2

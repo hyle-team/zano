@@ -1,0 +1,18 @@
+#!/bin/bash
+
+case $1 in
+   config)
+        cat <<'EOM'
+graph_title seconds_per_n_blocks
+graph_vlabel seconds_per_n_blocks
+graph_category daemon
+seconds_per_10_blocks.label seconds_per_10_blocks
+seconds_per_30_blocks.label seconds_per_30_blocks
+EOM
+        exit 0;;
+esac
+
+printf "seconds_per_10_blocks.value "
+connectivity_tool --ip=127.0.0.1 --rpc-port=$ZANO_RPC_PORT --timeout=1000 --rpc-get-daemon-info --getinfo-flags-hex="0x0000000000000020" | grep seconds_between_10_blocks | cut -d ' ' -f2
+printf "seconds_per_30_blocks.value "
+connectivity_tool --ip=127.0.0.1 --rpc-port=$ZANO_RPC_PORT --timeout=1000 --rpc-get-daemon-info --getinfo-flags-hex="0x0000000000000040" | grep seconds_between_30_blocks | cut -d ' ' -f2

@@ -1,0 +1,15 @@
+# This patch fixes compilation issue in Boost 1.70-1.71 while it is being compiled by GCC ver >= 8.3
+# -- sowle
+# see also: https://github.com/boostorg/thread/pull/297
+#
+--- boost/thread/pthread/thread_data.hpp.orig   2023-10-10 20:22:30.860192033 +0000
++++ boost/thread/pthread/thread_data.hpp        2023-10-10 18:19:22.460764089 +0000
+@@ -57,7 +57,7 @@
+ #else
+           std::size_t page_size = ::sysconf( _SC_PAGESIZE);
+ #endif
+-#if PTHREAD_STACK_MIN > 0
++#ifdef PTHREAD_STACK_MIN
+           if (size<PTHREAD_STACK_MIN) size=PTHREAD_STACK_MIN;
+ #endif
+           size = ((size+page_size-1)/page_size)*page_size;

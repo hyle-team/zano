@@ -1,0 +1,34 @@
+#!/bin/bash
+
+case $1 in
+   config)
+        cat <<'EOM'
+graph_title performance_tranactions_inp
+graph_vlabel mcs
+graph_category transactions.inp
+tx_check_inputs_prefix_hash.label prefix_hash
+tx_check_inputs_prefix_hash.draw AREA
+tx_check_inputs_attachment_check.label attachment_check
+tx_check_inputs_attachment_check.draw STACK
+tx_check_inputs_loop.label loop
+tx_check_inputs_loop.draw STACK
+EOM
+        exit 0;;
+esac
+
+CONN_TOOL_OUT="$(connectivity_tool --ip=127.0.0.1 --rpc-port=$ZANO_RPC_PORT --timeout=1000  --getinfo-flags-hex=0x0000000000010000 --rpc-get-daemon-info)"
+# printf "$CONN_TOOL_OUT"
+
+printf "tx_check_inputs_prefix_hash.value "
+PARSED_RES="$(printf "$CONN_TOOL_OUT" | grep tx_check_inputs_prefix_hash | cut -d ' ' -f2)"
+printf "$PARSED_RES\n"
+
+printf "tx_check_inputs_attachment_check.value "
+PARSED_RES="$(printf "$CONN_TOOL_OUT" | grep tx_check_inputs_attachment_check | cut -d ' ' -f2)"
+printf "$PARSED_RES\n"
+
+printf "tx_check_inputs_loop.value "
+PARSED_RES="$(printf "$CONN_TOOL_OUT" | grep tx_check_inputs_loop | cut -d ' ' -f2)"
+printf "$PARSED_RES\n"
+
+
