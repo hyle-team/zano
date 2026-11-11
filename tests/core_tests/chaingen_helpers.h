@@ -536,14 +536,14 @@ bool sign_gw_inputs_in_tx(callback_t gw_addr_spend_secrec_key_getter, currency::
   for(size_t i = 0; i < tx.signatures.size(); ++i)
   {
     auto& sig = tx.signatures[i];
-    if (sig.type() != typeid(gateway_sig))
+    if (sig.type() != typeid(currency::gateway_sig))
       continue;
     const auto& in_v = tx.vin[i];
-    CHECKED_GET_SPECIFIC_VARIANT(in_v, const txin_gateway, in_gw, false);
+    CHECKED_GET_SPECIFIC_VARIANT(in_v, const currency::txin_gateway, in_gw, false);
     crypto::hash tx_hash_for_input_sig = currency::prepare_prefix_hash_for_sign(tx, i, tx_id_for_signing);
     CHECK_AND_ASSERT_MES(tx_hash_for_input_sig != currency::null_hash, false, "prepare_prefix_hash_for_sign failed");
     crypto::hash hash_to_sign = crypto::hash_helper_t::h(CRYPTO_HDS_GW_INPUT_SIGNATURE, tx_hash_for_input_sig);
-    gateway_sig& gws = boost::get<gateway_sig>(sig);
+    currency::gateway_sig& gws = boost::get<currency::gateway_sig>(sig);
     CHECKED_GET_SPECIFIC_VARIANT(gws.s, crypto::generic_schnorr_sig_s, gsss, false);
     crypto::generic_schnorr_sig& gss = static_cast<crypto::generic_schnorr_sig&>(gsss);
     crypto::secret_key sk{};
