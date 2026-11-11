@@ -1337,26 +1337,10 @@ bool hard_fork_6_full_gw_tx_test::generate(std::vector<test_event_entry>& events
   r = construct_tx(alice_acc.get_keys(), sources, destinations, std::vector<extra_v>({ ado }), empty_attachment, tx_7, tx_version, tx_hardfork_id, tx_key, 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_to_key failed");
 
-  // sign gw inputs
-  crypto::hash tx_id_for_signing = get_transaction_hash(tx_7);
-  for(size_t i = 0; i < tx_7.signatures.size(); ++i)
-  {
-    auto& sig = tx_7.signatures[i];
-    if (sig.type() != typeid(gateway_sig))
-      continue;
-    const auto& in_v = tx_7.vin[i];
-    CHECKED_GET_SPECIFIC_VARIANT(in_v, const txin_gateway, in_gw, false);
-    crypto::hash tx_hash_for_input_sig = currency::prepare_prefix_hash_for_sign(tx_7, i, tx_id_for_signing);
-    CHECK_AND_ASSERT_MES(tx_hash_for_input_sig != currency::null_hash, false, "prepare_prefix_hash_for_sign failed");
-    crypto::hash hash_to_sign = crypto::hash_helper_t::h(CRYPTO_HDS_GW_INPUT_SIGNATURE, tx_hash_for_input_sig);
-    gateway_sig& gws = boost::get<gateway_sig>(sig);
-    CHECKED_GET_SPECIFIC_VARIANT(gws.s, crypto::generic_schnorr_sig_s, gsss, false);
-    crypto::generic_schnorr_sig& gss = static_cast<crypto::generic_schnorr_sig&>(gsss);
-    if (in_gw.gateway_addr == m_gw_addr1_view.pub)
-      CHECK_AND_ASSERT_TRUE(crypto::generate_schnorr_sig<crypto::gt_G>(hash_to_sign, crypto::point_t(m_gw_addr1_spend.pub), crypto::scalar_t(m_gw_addr1_spend.sec), gss));
-    else
-      CHECK_AND_ASSERT_TRUE(crypto::generate_schnorr_sig<crypto::gt_G>(hash_to_sign, crypto::point_t(m_gw_addr2_spend.pub), crypto::scalar_t(m_gw_addr2_spend.sec), gss));
-  }
+  r = sign_gw_inputs_in_tx([&](const crypto::public_key& gw_addr, crypto::secret_key& gw_spend_secret) -> bool {
+    gw_spend_secret = (gw_addr == m_gw_addr1_view.pub) ? m_gw_addr1_spend.sec : m_gw_addr2_spend.sec;
+    return true;
+  }, tx_7);
 
   ADD_CUSTOM_EVENT(events, tx_7);
   MAKE_NEXT_BLOCK_TX1(events, blk_7, blk_6, miner_acc, tx_7);
@@ -1435,26 +1419,10 @@ bool hard_fork_6_full_gw_tx_test::generate(std::vector<test_event_entry>& events
   r = construct_tx(carol_acc.get_keys(), sources, destinations, empty_extra, empty_attachment, tx_8, tx_version, tx_hardfork_id, tx_key, 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_to_key failed");
 
-  // sign gw inputs
-  tx_id_for_signing = get_transaction_hash(tx_8);
-  for(size_t i = 0; i < tx_8.signatures.size(); ++i)
-  {
-    auto& sig = tx_8.signatures[i];
-    if (sig.type() != typeid(gateway_sig))
-      continue;
-    const auto& in_v = tx_8.vin[i];
-    CHECKED_GET_SPECIFIC_VARIANT(in_v, const txin_gateway, in_gw, false);
-    crypto::hash tx_hash_for_input_sig = currency::prepare_prefix_hash_for_sign(tx_8, i, tx_id_for_signing);
-    CHECK_AND_ASSERT_MES(tx_hash_for_input_sig != currency::null_hash, false, "prepare_prefix_hash_for_sign failed");
-    crypto::hash hash_to_sign = crypto::hash_helper_t::h(CRYPTO_HDS_GW_INPUT_SIGNATURE, tx_hash_for_input_sig);
-    gateway_sig& gws = boost::get<gateway_sig>(sig);
-    CHECKED_GET_SPECIFIC_VARIANT(gws.s, crypto::generic_schnorr_sig_s, gsss, false);
-    crypto::generic_schnorr_sig& gss = static_cast<crypto::generic_schnorr_sig&>(gsss);
-    if (in_gw.gateway_addr == m_gw_addr1_view.pub)
-      CHECK_AND_ASSERT_TRUE(crypto::generate_schnorr_sig<crypto::gt_G>(hash_to_sign, crypto::point_t(m_gw_addr1_spend.pub), crypto::scalar_t(m_gw_addr1_spend.sec), gss));
-    else
-      CHECK_AND_ASSERT_TRUE(crypto::generate_schnorr_sig<crypto::gt_G>(hash_to_sign, crypto::point_t(m_gw_addr2_spend.pub), crypto::scalar_t(m_gw_addr2_spend.sec), gss));
-  }
+  r = sign_gw_inputs_in_tx([&](const crypto::public_key& gw_addr, crypto::secret_key& gw_spend_secret) -> bool {
+    gw_spend_secret = (gw_addr == m_gw_addr1_view.pub) ? m_gw_addr1_spend.sec : m_gw_addr2_spend.sec;
+    return true;
+  }, tx_8);
 
   ADD_CUSTOM_EVENT(events, tx_8);
   MAKE_NEXT_BLOCK_TX1(events, blk_8, blk_7r, miner_acc, tx_8);
@@ -1504,27 +1472,10 @@ bool hard_fork_6_full_gw_tx_test::generate(std::vector<test_event_entry>& events
   r = construct_tx(account_keys{}, sources, destinations, empty_extra, empty_attachment, tx_9, tx_version, tx_hardfork_id, tx_key, 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_to_key failed");
 
-  // sign gw inputs
-  tx_id_for_signing = get_transaction_hash(tx_9);
-  for(size_t i = 0; i < tx_9.signatures.size(); ++i)
-  {
-    auto& sig = tx_9.signatures[i];
-    if (sig.type() != typeid(gateway_sig))
-      continue;
-    const auto& in_v = tx_9.vin[i];
-    CHECKED_GET_SPECIFIC_VARIANT(in_v, const txin_gateway, in_gw, false);
-    crypto::hash tx_hash_for_input_sig = currency::prepare_prefix_hash_for_sign(tx_9, i, tx_id_for_signing);
-    CHECK_AND_ASSERT_MES(tx_hash_for_input_sig != currency::null_hash, false, "prepare_prefix_hash_for_sign failed");
-    crypto::hash hash_to_sign = crypto::hash_helper_t::h(CRYPTO_HDS_GW_INPUT_SIGNATURE, tx_hash_for_input_sig);
-    gateway_sig& gws = boost::get<gateway_sig>(sig);
-    CHECKED_GET_SPECIFIC_VARIANT(gws.s, crypto::generic_schnorr_sig_s, gsss, false);
-    crypto::generic_schnorr_sig& gss = static_cast<crypto::generic_schnorr_sig&>(gsss);
-    if (in_gw.gateway_addr == m_gw_addr1_view.pub)
-      CHECK_AND_ASSERT_TRUE(crypto::generate_schnorr_sig<crypto::gt_G>(hash_to_sign, crypto::point_t(m_gw_addr1_spend.pub), crypto::scalar_t(m_gw_addr1_spend.sec), gss));
-    else
-      CHECK_AND_ASSERT_TRUE(crypto::generate_schnorr_sig<crypto::gt_G>(hash_to_sign, crypto::point_t(m_gw_addr2_spend.pub), crypto::scalar_t(m_gw_addr2_spend.sec), gss));
-
-  }
+  r = sign_gw_inputs_in_tx([&](const crypto::public_key& gw_addr, crypto::secret_key& gw_spend_secret) -> bool {
+    gw_spend_secret = (gw_addr == m_gw_addr1_view.pub) ? m_gw_addr1_spend.sec : m_gw_addr2_spend.sec;
+    return true;
+  }, tx_9);
 
   ADD_CUSTOM_EVENT(events, tx_9);
   MAKE_NEXT_BLOCK_TX1(events, blk_9, blk_8r, miner_acc, tx_9);
