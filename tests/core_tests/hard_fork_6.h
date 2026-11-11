@@ -100,3 +100,8 @@ struct hard_fork_6_gw_bad_ins_outs : public wallet_test
   mutable currency::keypair m_gw_addr_view{};
   mutable currency::keypair m_gw_addr_spend{};
 };
+
+struct hard_fork_6_gw_reorg_refund_overflow : public wallet_test
+{
+  bool generate(std::vector<test_event_entry>& events) const;
+};
