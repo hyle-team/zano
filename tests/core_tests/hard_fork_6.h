@@ -90,9 +90,9 @@ struct hard_fork_6_asset_descriptor_limits : public wallet_test
   bool generate(std::vector<test_event_entry>& events) const;
 };
 
-struct hard_fork_6_gw_out_with_bad_asset_id : public wallet_test
+struct hard_fork_6_gw_bad_ins_outs : public wallet_test
 {
-  hard_fork_6_gw_out_with_bad_asset_id();
+  hard_fork_6_gw_bad_ins_outs();
   bool generate(std::vector<test_event_entry>& events) const;
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 
