@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2025 Zano Project
+// Copyright (c) 2014-2026 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
@@ -15,6 +15,7 @@
 #include "rpc/core_rpc_server.h"
 #include "currency_core/bc_offers_service.h"
 #include "p2p/net_node.h"
+#include "currency_core/crypto_config.h"
 
 // chaingen-independent helpers that may be used outside of core_tests (for ex. in functional_tests)
 
@@ -523,6 +524,36 @@ bool invoke_text_json_for_core(currency::core& c, const std::string& method_name
   core_rpc_wrapper.set_enabled_admin_api(true);
   
   return invoke_text_json_for_rpc(core_rpc_wrapper, method_name, req, resp);
+}
+
+//---------------------------------------------------------------
+
+// callback: bool cb(const crypto::public_key& gw_addr, crypto::secret_key& gw_spend_secret) -- should populate gw_spend_secret; returns true to actually sign with generic_schnorr_sig, false to skip
+template<typename callback_t>
+bool sign_gw_inputs_in_tx(callback_t gw_addr_spend_secrec_key_getter, currency::transaction& tx)
+{
+  crypto::hash tx_id_for_signing = get_transaction_hash(tx);
+  for(size_t i = 0; i < tx.signatures.size(); ++i)
+  {
+    auto& sig = tx.signatures[i];
+    if (sig.type() != typeid(currency::gateway_sig))
+      continue;
+    const auto& in_v = tx.vin[i];
+    CHECKED_GET_SPECIFIC_VARIANT(in_v, const currency::txin_gateway, in_gw, false);
+    crypto::hash tx_hash_for_input_sig = currency::prepare_prefix_hash_for_sign(tx, i, tx_id_for_signing);
+    CHECK_AND_ASSERT_MES(tx_hash_for_input_sig != currency::null_hash, false, "prepare_prefix_hash_for_sign failed");
+    crypto::hash hash_to_sign = crypto::hash_helper_t::h(CRYPTO_HDS_GW_INPUT_SIGNATURE, tx_hash_for_input_sig);
+    currency::gateway_sig& gws = boost::get<currency::gateway_sig>(sig);
+    CHECKED_GET_SPECIFIC_VARIANT(gws.s, crypto::generic_schnorr_sig_s, gsss, false);
+    crypto::generic_schnorr_sig& gss = static_cast<crypto::generic_schnorr_sig&>(gsss);
+    crypto::secret_key sk{};
+    if (gw_addr_spend_secrec_key_getter(in_gw.gateway_addr, sk))
+    {
+      crypto::scalar_t ss = sk;
+      CHECK_AND_ASSERT_TRUE(crypto::generate_schnorr_sig<crypto::gt_G>(hash_to_sign, ss * crypto::c_point_G, ss, gss));
+    }
+  }
+  return true;
 }
 
 //---------------------------------------------------------------

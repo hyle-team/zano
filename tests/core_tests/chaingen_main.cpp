@@ -1413,7 +1413,8 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY(hard_fork_6_coinbase_size_rules);
     GENERATE_AND_PLAY_HF(hard_fork_6_gw_incompatible_with_mode_separate, "6,8-*");
     GENERATE_AND_PLAY(hard_fork_6_asset_descriptor_limits);
-    GENERATE_AND_PLAY_HF(hard_fork_6_gw_out_with_bad_asset_id, "6,8-*");
+    GENERATE_AND_PLAY_HF(hard_fork_6_gw_bad_ins_outs, "6,8-*");
+    GENERATE_AND_PLAY_HF(hard_fork_6_gw_reorg_refund_overflow, "6,8-*");
 
     GENERATE_AND_PLAY(hf_booster_hf8_activation_basic);
     GENERATE_AND_PLAY(hf_booster_gentime_basic);
