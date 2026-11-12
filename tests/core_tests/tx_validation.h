@@ -10,7 +10,9 @@
 
 struct gen_tx_big_version : public test_chain_unit_enchanced
 {
+  gen_tx_big_version();
   bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };
 
 struct gen_tx_unlock_time : public test_chain_unit_enchanced

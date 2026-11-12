@@ -56,11 +56,40 @@ bool gen_block_big_major_version::generate(std::vector<test_event_entry>& events
 {
   BLOCK_VALIDATION_INIT_GENERATE();
 
+  // A block with major_version > CURRENT_BLOCK_MAJOR_VERSION can be neither serialized nor parsed,
+  // so it cannot be a currency::block event. Build a current-version block, then raise the version
+  // in its wire blob and feed the raw blob to the core (event #2, the invalid block index).
   block blk_1;
-  generator.construct_block_manually(blk_1, blk_0, miner_account, test_generator::bf_major_ver, CURRENT_BLOCK_MAJOR_VERSION + 1);
-  events.push_back(blk_1);
+  generator.construct_block_manually(blk_1, blk_0, miner_account, test_generator::bf_major_ver, CURRENT_BLOCK_MAJOR_VERSION);
+
+  blobdata blk_blob = t_serializable_object_to_blob(blk_1);
+  CHECK_AND_ASSERT_MES(!blk_blob.empty() && static_cast<uint8_t>(blk_blob[0]) == CURRENT_BLOCK_MAJOR_VERSION, false, "unexpected block blob layout");
+  blk_blob[0] = static_cast<char>(CURRENT_BLOCK_MAJOR_VERSION + 1);
+
+  DO_CALLBACK_PARAMS_STR(events, "c1", blk_blob);
 
   DO_CALLBACK(events, "check_block_purged");
+
+  return true;
+}
+
+gen_block_big_major_version::gen_block_big_major_version()
+{
+  REGISTER_CALLBACK_METHOD(gen_block_big_major_version, c1);
+}
+
+bool gen_block_big_major_version::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  const blobdata& blk_blob = boost::get<callback_entry>(events[ev_index]).callback_params;
+
+  block b = AUTO_VAL_INIT(b);
+  CHECK_AND_ASSERT_MES(!parse_and_validate_block_from_blob(blk_blob, b), false, "block with a too big major version was parsed");
+
+  uint64_t height = c.get_current_blockchain_size();
+  block_verification_context bvc = AUTO_VAL_INIT(bvc);
+  c.handle_incoming_block(blk_blob, bvc);
+  CHECK_AND_ASSERT_MES(bvc.m_verification_failed, false, "block with a too big major version was not rejected");
+  CHECK_AND_ASSERT_MES(c.get_current_blockchain_size() == height, false, "block with a too big major version was added");
 
   return true;
 }

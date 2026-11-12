@@ -348,7 +348,6 @@ namespace currency
       FIELD(gateway_addr)
       FIELD(asset_id)
       VARINT_FIELD(amount)
-      VARINT_FIELD(version) // do we really need it? -- sowle
     END_SERIALIZE()
 
   };
