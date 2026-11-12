@@ -4434,7 +4434,19 @@ namespace currency
   //---------------------------------------------------------------
   bool parse_and_validate_block_from_blob(const blobdata& b_blob, block& b)
   {
-    return parse_and_validate_object_from_blob(b_blob, b);
+    if(!parse_and_validate_object_from_blob(b_blob, b))
+      return false;
+
+    try
+    {
+      get_block_hash(b);  // header and miner tx must serialize back, otherwise the block has no id
+    }
+    catch(const std::exception& e)
+    {
+      LOG_ERROR("Failed to calculate block id, parsed block does not serialize back: " << e.what());
+      return false;
+    }
+    return true;
   }
 
   //---------------------------------------------------------------
