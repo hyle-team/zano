@@ -1232,7 +1232,12 @@ std::string wallets_manager::open_wallet(const std::wstring& path, const std::st
 
 bool wallets_manager::get_opened_wallets(std::list<view::open_wallet_response>& result)
 {
-  SHARED_CRITICAL_REGION_LOCAL(m_wallets_lock); 
+  SHARED_CRITICAL_REGION_LOCAL(m_wallets_lock);
+  return get_opened_wallets_unlocked(result);
+}
+
+bool wallets_manager::get_opened_wallets_unlocked(std::list<view::open_wallet_response>& result)
+{
   for (auto& w : m_wallets)
   {
     result.push_back(view::open_wallet_response());
@@ -2217,7 +2222,7 @@ void wallets_manager::on_tor_status_change(size_t wallet_id, const std::string& 
 void wallets_manager::on_mw_get_wallets(std::vector<tools::wallet_public::wallet_entry_info>& wallets)
 {
   std::list<view::open_wallet_response> opened_wallets;
-  this->get_opened_wallets(opened_wallets);
+  this->get_opened_wallets_unlocked(opened_wallets);
   wallets.resize(opened_wallets.size());
   size_t i = 0;
   for (const auto& item : opened_wallets)
@@ -2229,7 +2234,6 @@ void wallets_manager::on_mw_get_wallets(std::vector<tools::wallet_public::wallet
 }
 bool wallets_manager::on_mw_select_wallet(uint64_t wallet_id)
 {
-  SHARED_CRITICAL_REGION_LOCAL(m_wallets_lock);    
   auto it = m_wallets.find(wallet_id);      
   if (it == m_wallets.end())                
     return false; 
@@ -2243,11 +2247,13 @@ bool wallets_manager::on_mw_select_wallet(uint64_t wallet_id)
 
 bool wallets_manager::on_mw_get_wallets(const tools::wallet_public::COMMAND_MW_GET_WALLETS::request& req, tools::wallet_public::COMMAND_MW_GET_WALLETS::response& res, epee::json_rpc::error& er, epee::net_utils::connection_context_base& cntx)
 {
+  SHARED_CRITICAL_REGION_LOCAL(m_wallets_lock);
   this->on_mw_get_wallets(res.wallets);
   return true;
 }
 bool wallets_manager::on_mw_select_wallet(const tools::wallet_public::COMMAND_MW_SELECT_WALLET::request& req, tools::wallet_public::COMMAND_MW_SELECT_WALLET::response& res, epee::json_rpc::error& er, epee::net_utils::connection_context_base& cntx)
 {
+  SHARED_CRITICAL_REGION_LOCAL(m_wallets_lock);
   this->on_mw_select_wallet(req.wallet_id);
   res.status = API_RETURN_CODE_OK;
   return true;

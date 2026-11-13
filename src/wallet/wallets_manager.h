@@ -183,6 +183,8 @@ public:
   bool is_remote_node_mode() const { return m_remote_node_mode; }
 
 private:
+  // caller must hold m_wallets_lock
+  bool get_opened_wallets_unlocked(std::list<view::open_wallet_response>& result);
   std::string restore_wallet(const std::wstring& path, const std::string& password, const std::function<bool(tools::wallet2&)>& cb, view::open_wallet_response& owr);
   void main_worker(const po::variables_map& vm);
   bool init_local_daemon();
