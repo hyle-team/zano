@@ -7,6 +7,7 @@
 #include "offers_tests_common.h"
 #include "pos_basic_tests.h"
 #include "pos_block_builder.h"
+#include "wallet/core_fast_rpc_proxy.h"
 
 using namespace epee;
 using namespace currency;
@@ -189,8 +190,31 @@ bool pos_mining_with_decoys::generate(std::vector<test_event_entry>& events) con
 
 bool pos_mining_with_decoys::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
+  struct decoy_rpc_proxy : tools::core_fast_rpc_proxy
+  {
+    explicit decoy_rpc_proxy(const tools::core_fast_rpc_proxy& proxy)
+      : tools::core_fast_rpc_proxy(proxy)
+    {}
+
+    bool call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request& req,
+      COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::response& rsp) override
+    {
+      ++rpc4_calls;
+      last_request = req;
+      return tools::core_fast_rpc_proxy::call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4(req, rsp);
+    }
+
+    size_t rpc4_calls = 0;
+    COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request last_request{};
+  };
+
   bool r = false;
   CHECK_AND_ASSERT_MES(!c.get_blockchain_storage().get_core_runtime_config().is_hardfork_active_for_height(4, c.get_top_block_height()), false, "HF4 should not be active");
+  auto& bcs = c.get_blockchain_storage();
+  const uint64_t last_pow_height = bcs.get_last_x_block_height(false);
+  auto fast_proxy = std::dynamic_pointer_cast<tools::core_fast_rpc_proxy>(m_core_proxy);
+  CHECK_AND_ASSERT_MES(fast_proxy, false, "expected the genuine in-process RPC proxy");
+  auto rpc_proxy = std::make_shared<decoy_rpc_proxy>(*fast_proxy);
 
   std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, m_accounts[MINER_ACC_IDX]);
   miner_wlt->refresh();
@@ -211,12 +235,32 @@ bool pos_mining_with_decoys::c1(currency::core& c, size_t ev_index, const std::v
   dan_wlt->refresh();
   CHECK_AND_ASSERT_MES(check_balance_via_wallet(*dan_wlt, "Dan", 47 * TESTS_DEFAULT_FEE, INVALID_BALANCE_VAL, 47 * TESTS_DEFAULT_FEE), false, "");
 
+  for (const auto& wallet : {miner_wlt, alice_wlt, bob_wlt, carol_wlt, dan_wlt})
+    wallet->set_core_proxy(rpc_proxy);
+
+  auto check_staking_request = [&](size_t expected_calls, uint64_t amount) -> bool
+  {
+    CHECK_AND_ASSERT_EQ(rpc_proxy->rpc4_calls, expected_calls);
+    const auto& req = rpc_proxy->last_request;
+    CHECK_AND_ASSERT_EQ(req.look_up_strategy, std::string(LOOK_UP_STRATEGY_POS_COINBASE));
+    CHECK_AND_ASSERT_EQ(req.batches.size(), 1);
+    const auto& batch = req.batches.front();
+    CHECK_AND_ASSERT_EQ(batch.input_amount, amount);
+    CHECK_AND_ASSERT_MES(batch.heights.empty(), false, "pre-ZC staking requested height-based decoys");
+    CHECK_AND_ASSERT_EQ(batch.ring_size, CURRENCY_DEFAULT_DECOY_SET_SIZE + 1);
+    CHECK_AND_ASSERT_EQ(batch.global_offsets.size(), batch.ring_size);
+    return true;
+  };
+
 
   // 1. Alice should be able to mine a PoS block with 1 decoys (ring size == 2)
   size_t top_block_height = c.get_top_block_height();
+  const uint64_t alice_pos_height = top_block_height + 1;
 
-  r = alice_wlt->try_mint_pos(m_accounts[ALICE_ACC_IDX].get_public_address());
+  // Keep only the returned stake in Alice's wallet for the last-PoW checks below.
+  r = alice_wlt->try_mint_pos(m_accounts[MINER_ACC_IDX].get_public_address());
   CHECK_AND_ASSERT_MES(r, false, "try_mint_pos failed");
+  CHECK_AND_ASSERT_MES(check_staking_request(1, 47 * TESTS_DEFAULT_FEE), false, "incorrect partial-ring staking request");
   
   {
     block b{};
@@ -235,6 +279,7 @@ bool pos_mining_with_decoys::c1(currency::core& c, size_t ev_index, const std::v
   bob_wlt->refresh();
   r = bob_wlt->try_mint_pos(m_accounts[BOB_ACC_IDX].get_public_address());
   CHECK_AND_ASSERT_MES(r, false, "try_mint_pos failed");
+  CHECK_AND_ASSERT_MES(check_staking_request(2, 5 * TESTS_DEFAULT_FEE), false, "incorrect real-only staking request");
 
   {
     block b{};
@@ -253,6 +298,7 @@ bool pos_mining_with_decoys::c1(currency::core& c, size_t ev_index, const std::v
   carol_wlt->refresh();
   r = carol_wlt->try_mint_pos(m_accounts[CAROL_ACC_IDX].get_public_address());
   CHECK_AND_ASSERT_MES(r, false, "try_mint_pos failed");
+  CHECK_AND_ASSERT_MES(check_staking_request(3, COIN), false, "incorrect full-ring staking request");
 
   {
     block b{};
@@ -273,6 +319,7 @@ bool pos_mining_with_decoys::c1(currency::core& c, size_t ev_index, const std::v
   dan_wlt->refresh();
   r = dan_wlt->try_mint_pos(m_accounts[DAN_ACC_IDX].get_public_address());
   CHECK_AND_ASSERT_MES(r, false, "try_mint_pos failed");
+  CHECK_AND_ASSERT_EQ(rpc_proxy->rpc4_calls, 3); // auditable staking must not request decoys
 
   {
     block b{};
@@ -283,6 +330,77 @@ bool pos_mining_with_decoys::c1(currency::core& c, size_t ev_index, const std::v
     CHECK_AND_ASSERT_MES(intk.amount == 47 * TESTS_DEFAULT_FEE, false, "incorrect amount: " << intk.amount);
     CHECK_AND_ASSERT_MES(intk.key_offsets.size() == 1, false, "unexpected ring size: " << intk.key_offsets.size());
   }
+
+  // 5. Mature outputs created after the last PoW are not eligible for staking.
+  const uint64_t maturity = std::max<uint64_t>(CURRENCY_MINED_MONEY_UNLOCK_WINDOW, bcs.get_core_runtime_config().min_coinstake_age);
+  while (c.get_top_block_height() < alice_pos_height + maturity)
+  {
+    miner_wlt->refresh();
+    const uint64_t height_before = c.get_top_block_height();
+    size_t checked_entries = 0;
+    CHECK_AND_ASSERT_MES(mine_next_pos_block_in_playtime_with_wallet(*miner_wlt,
+      m_accounts[MINER_ACC_IDX].get_public_address(), checked_entries), false, "cannot extend the PoS-only sequence");
+    CHECK_AND_ASSERT_EQ(c.get_top_block_height(), height_before + 1);
+  }
+  CHECK_AND_ASSERT_EQ(bcs.get_last_x_block_height(false), last_pow_height);
+  CHECK_AND_ASSERT_MES(c.get_top_block_height() - bcs.get_core_runtime_config().min_coinstake_age > last_pow_height,
+    false, "the last PoW must be the limiting height, not the stake age");
+
+  alice_wlt->refresh();
+  std::vector<tools::transfer_details> alice_outputs;
+  alice_wlt->enumerate_transfers([&](uint64_t, const tools::transfer_details& td) -> bool
+  {
+    if (!td.is_spent() && td.amount() == 47 * TESTS_DEFAULT_FEE)
+      alice_outputs.push_back(td);
+    return true;
+  });
+  CHECK_AND_ASSERT_EQ(alice_outputs.size(), 1);
+  const auto& alice_stake = alice_outputs.front();
+  CHECK_AND_ASSERT_EQ(alice_stake.m_ptx_wallet_info->m_block_height, alice_pos_height);
+  CHECK_AND_ASSERT_MES(alice_pos_height > last_pow_height, false, "stake must have been created after the last PoW");
+  CHECK_AND_ASSERT_MES(alice_wlt->is_transfer_unlocked(alice_stake), false, "stake must already be unlocked");
+  CHECK_AND_ASSERT_EQ(alice_wlt->get_pos_entries_count(), 0);
+
+  COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request pos_req{};
+  pos_req.look_up_strategy = LOOK_UP_STRATEGY_POS_COINBASE;
+  auto& batch = pos_req.batches.emplace_back();
+  batch.input_amount = alice_stake.amount();
+  batch.ring_size = 2;
+  batch.global_offsets.assign(2, alice_stake.m_global_output_index);
+  auto check_stake_candidate = [&](const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request& req, bool expected) -> bool
+  {
+    COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::response rsp{};
+    CHECK_AND_ASSERT_MES(m_core_proxy->call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4(req, rsp), false, "candidate RPC failed");
+    CHECK_AND_ASSERT_EQ(rsp.status, std::string(API_RETURN_CODE_OK));
+    CHECK_AND_ASSERT_EQ(rsp.blocks_batches.size(), 1);
+    bool found = false;
+    for (const auto& block : rsp.blocks_batches.front().blocks)
+    {
+      if (req.look_up_strategy == LOOK_UP_STRATEGY_POS_COINBASE)
+        CHECK_AND_ASSERT_MES(block.block_height <= bcs.get_last_x_block_height(false), false, "PoS candidate is newer than the last PoW");
+      for (const auto& out : block.outs)
+        found |= out.global_amount_index == alice_stake.m_global_output_index;
+    }
+    CHECK_AND_ASSERT_EQ(found, expected);
+    return true;
+  };
+  CHECK_AND_ASSERT_MES(check_stake_candidate(pos_req, false), false, "PoS lookup accepted an output newer than the last PoW");
+  auto regular_req = pos_req;
+  regular_req.look_up_strategy = LOOK_UP_STRATEGY_REGULAR_TX;
+  CHECK_AND_ASSERT_MES(check_stake_candidate(regular_req, true), false, "otherwise eligible output was not available to a regular bare request");
+
+  // 6. One new PoW makes the same output eligible for both lookup and actual staking.
+  CHECK_AND_ASSERT_MES(mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c), false, "cannot mine the next PoW block");
+  alice_wlt->refresh();
+  CHECK_AND_ASSERT_EQ(alice_wlt->get_pos_entries_count(), 1);
+  CHECK_AND_ASSERT_MES(check_stake_candidate(pos_req, true), false, "PoS lookup did not include the output after a new PoW");
+  top_block_height = c.get_top_block_height();
+  const size_t calls_before = rpc_proxy->rpc4_calls;
+  size_t checked_entries = 0;
+  CHECK_AND_ASSERT_MES(mine_next_pos_block_in_playtime_with_wallet(*alice_wlt,
+    m_accounts[MINER_ACC_IDX].get_public_address(), checked_entries), false, "cannot stake the output after a new PoW");
+  CHECK_AND_ASSERT_EQ(c.get_top_block_height(), top_block_height + 1);
+  CHECK_AND_ASSERT_MES(check_staking_request(calls_before + 1, 47 * TESTS_DEFAULT_FEE), false, "incorrect staking request after a new PoW");
 
   return true;
 }

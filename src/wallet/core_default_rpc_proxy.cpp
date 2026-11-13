@@ -101,11 +101,6 @@ namespace tools
     return invoke_http_json_rpc_update_is_disconnect("get_alias_by_address", req, res);
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  bool default_http_core_proxy::call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3(const currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::request& req, currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::response& res)
-  {
-    return invoke_http_bin_remote_command2_update_is_disconnect("/getrandom_outs3.bin", req, res);
-  }
-  //------------------------------------------------------------------------------------------------------------------------------
   bool default_http_core_proxy::call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4(const currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request& req, currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::response& res)
   {
     return invoke_http_bin_remote_command2_update_is_disconnect("/getrandom_outs4.bin", req, res);

@@ -3152,7 +3152,7 @@ bool blockchain_storage::build_random_out_entry_from_tx_entry(const transaction_
   return true;
 }
 //------------------------------------------------------------------
-size_t blockchain_storage::find_end_of_allowed_index(uint64_t amount) const
+size_t blockchain_storage::find_end_of_allowed_index(uint64_t amount, std::optional<uint64_t> height_upper_limit) const
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
   uint64_t sz = m_db_outputs.get_item_size(amount);
@@ -3166,8 +3166,10 @@ size_t blockchain_storage::find_end_of_allowed_index(uint64_t amount) const
     auto out_ptr = m_db_outputs.get_subitem(amount, i);
     auto tx_ptr = m_db_transactions.find(out_ptr->tx_id);
     CHECK_AND_ASSERT_MES(tx_ptr, 0, "internal error: failed to find transaction from outputs index with tx_id=" << out_ptr->tx_id << ", amount: " << print_money_brief(amount));
-    if (tx_ptr->m_keeper_block_height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW <= get_current_blockchain_size())
-      return i+1;
+    // searche for outs that are old enough and fall within the specified limit
+    if ((!height_upper_limit || tx_ptr->m_keeper_block_height <= *height_upper_limit) && 
+      tx_ptr->m_keeper_block_height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW <= get_current_blockchain_size())
+        return i+1;
   } while (i != 0);
   return 0;
 }
@@ -3234,129 +3236,16 @@ bool blockchain_storage::get_random_outs_for_amounts(const COMMAND_RPC_GET_RANDO
   return true;
 }
 //------------------------------------------------------------------
-bool blockchain_storage::get_target_outs_for_amount_prezarcanum(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::request& req, const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::offsets_distribution& details,  COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount& result_outs, std::map<uint64_t, uint64_t>& amounts_to_up_index_limit_cache) const
-{  
-  size_t decoys_count = details.global_offsets.size();
-  uint64_t amount = details.amount;
-
-  uint64_t outs_container_size = m_db_outputs.get_item_size(details.amount);
-  if (!outs_container_size)
-  {
-    LOG_ERROR("COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS: not outs for amount " << amount << ", wallet should use some real outs when it lookup for some mix, so, at least one out for this amount should exist");
-    return false;//actually this is strange situation, wallet should use some real outs when it lookup for some mix, so, at least one out for this amount should exist
-  }
-  //it is not good idea to use top fresh outs, because it increases possibility of transaction canceling on split
-  //lets find upper bound of not fresh outs
-  size_t up_index_limit = 0;
-  auto it_limit = amounts_to_up_index_limit_cache.find(amount);
-  if (it_limit == amounts_to_up_index_limit_cache.end())
-  {
-    up_index_limit = find_end_of_allowed_index(amount);
-    amounts_to_up_index_limit_cache[up_index_limit];
-  }
-  else
-  {
-    up_index_limit = it_limit->second;
-  }
-
-  CHECK_AND_ASSERT_MES(up_index_limit <= outs_container_size, false, "internal error: find_end_of_allowed_index returned wrong index=" << up_index_limit << ", with amount_outs.size = " << outs_container_size);
-  if (up_index_limit >= decoys_count)
-  {
-    std::set<size_t> used;
-    //used.insert(details.own_global_index);
-    for (uint64_t j = 0; j != decoys_count || used.size() >= up_index_limit;)
-    {
-      size_t g_index_initial = crypto::rand<size_t>() % up_index_limit;
-      size_t g_index = g_index_initial;
-      //enumerate via whole loop from g_index to up_index_limit and then from 0 to g_index
-      while (true)
-      {
-        if (!used.count(g_index))
-          break;
-        g_index++;
-        
-        if (g_index >= up_index_limit)
-          g_index = 0;
-        if (g_index == g_index_initial)
-        {
-          // we enumerated full circle and couldn't find needed amount of outs
-          LOG_PRINT_YELLOW("Not enough inputs for amount " << print_money_brief(amount) << ", needed " << decoys_count << ", added " << result_outs.outs.size() << " good outs from " << up_index_limit << " unlocked of " << outs_container_size << " total", LOG_LEVEL_0);
-          return true;
-        }
-      }
-
-      bool added = add_out_to_get_random_outs(result_outs, amount, g_index, decoys_count, req.use_forced_mix_outs, req.height_upper_limit);
-      used.insert(g_index);
-      if (added)
-        ++j;      
-    }
-    if (result_outs.outs.size() < decoys_count)
-    {
-      LOG_PRINT_YELLOW("Not enough inputs for amount " << print_money_brief(amount) << ", needed " << decoys_count << ", added " << result_outs.outs.size() << " good outs from " << up_index_limit << " unlocked of " << outs_container_size << " total", LOG_LEVEL_0);
-    }
-    return true;
-  }
-  else
-  {
-    size_t added = 0;
-    for (size_t i = 0; i != up_index_limit; i++)
-      added += add_out_to_get_random_outs(result_outs, amount, i, decoys_count, req.use_forced_mix_outs, req.height_upper_limit) ? 1 : 0;
-    LOG_PRINT_YELLOW("Not enough inputs for amount " << print_money_brief(amount) << ", needed " << decoys_count << ", added " << added << " good outs from " << up_index_limit << " unlocked of " << outs_container_size << " total - respond with all good outs", LOG_LEVEL_0);
-    return true;
-  }
-}
-//------------------------------------------------------------------
-bool blockchain_storage::get_target_outs_for_postzarcanum(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::request& req, const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::offsets_distribution& details, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount& result_outs, std::map<uint64_t, uint64_t>& amounts_to_up_index_limit_cache) const 
-{
-  for (auto global_index : details.global_offsets)
-  {
-    //pick up a random output from selected_global_indes
-    bool res = add_out_to_get_random_outs(result_outs, details.amount, global_index, this->get_core_runtime_config().hf4_minimum_mixins, false);
-    if (!res)
-    {
-      COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry& oen = *result_outs.outs.insert(result_outs.outs.end(), COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry{});
-      oen.flags = RANDOM_OUTPUTS_FOR_AMOUNTS_FLAGS_NOT_ALLOWED;
-    }
-  }
-  CHECK_AND_ASSERT_THROW_MES(details.global_offsets.size() == result_outs.outs.size(), "details.global_offsets.size() == result_outs.outs.size() check failed");  
-  return true;
-}
-//------------------------------------------------------------------
-bool blockchain_storage::get_random_outs_for_amounts3(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::request& req, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::response& res)const
-{
-  CRITICAL_REGION_LOCAL(m_read_lock);
-  LOG_PRINT_L3("[get_random_outs_for_amounts] amounts: " << req.amounts.size());
-  std::map<uint64_t, uint64_t> amounts_to_up_index_limit_cache;  
-
-
-  for (size_t i = 0; i != req.amounts.size(); i++)
-  {
-    uint64_t amount = req.amounts[i].amount;
-    //const std::vector<uint64_t>& offsets = req.amounts[i].offsets;
-    COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount& result_outs = *res.outs.insert(res.outs.end(), COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount());
-    result_outs.amount = amount;
-
-    bool r = false;
-    if (amount == 0)
-    {
-      //zarcanum era inputs
-      r = get_target_outs_for_postzarcanum(req, req.amounts[i], result_outs, amounts_to_up_index_limit_cache);
-    }
-    else
-    {
-      //zarcanum era inputs
-      r = get_target_outs_for_amount_prezarcanum(req, req.amounts[i], result_outs, amounts_to_up_index_limit_cache);
-    }
-    if (!r)
-      return false;
-  }
-  return true;
-}
-//------------------------------------------------------------------
-bool blockchain_storage::get_bare_outs_by_indices(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request_batch& batch, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::blocks_batch& response_batch, uint64_t chain_size) const
+bool blockchain_storage::get_bare_outs_by_indices(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request_batch& batch, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::blocks_batch& response_batch, uint64_t chain_size, std::optional<uint64_t> pos_height_limit) const
 {
   CHECK_AND_ASSERT_MES(batch.input_amount != 0 && batch.heights.empty() && batch.ring_size >= 2 && batch.global_offsets.size() >= batch.ring_size, false, "invalid bare output candidate request");
-  const uint64_t outputs_count = m_db_outputs.get_item_size(batch.input_amount);
+  
+  // for pre-zc staking - limit by range to the selected indices
+  // for regular bare - txs keep original full range(unlock and other checks later)
+  const uint64_t outputs_count = pos_height_limit
+    ? find_end_of_allowed_index(batch.input_amount, pos_height_limit)
+    : m_db_outputs.get_item_size(batch.input_amount);
+
   auto& out_blocks = response_batch.blocks;
   const size_t pool_target = batch.global_offsets.size();
   std::unordered_set<uint64_t> checked_indices;
@@ -3379,7 +3268,10 @@ bool blockchain_storage::get_bare_outs_by_indices(const COMMAND_RPC_GET_RANDOM_O
     CHECK_AND_ASSERT_MES(output.type() == typeid(tx_out_bare), false, "bare output has an unexpected type");
     const auto& bare_output = boost::get<tx_out_bare>(output);
     CHECK_AND_ASSERT_MES(bare_output.amount == batch.input_amount && bare_output.target.type() == typeid(txout_to_key), false, "inconsistent bare output amount or target");
-    eligible = chain_size - block_height >= CURRENCY_MINED_MONEY_UNLOCK_WINDOW && build_random_out_entry_from_tx_entry(*tx_ptr, output_index, batch.input_amount, global_index, ring_size, false, /*height_upper_limit=*/0, entry);
+    eligible = 
+      (!pos_height_limit || block_height <= *pos_height_limit) && // apply height limit
+      chain_size - block_height >= CURRENCY_MINED_MONEY_UNLOCK_WINDOW && // skip too recent outs
+      build_random_out_entry_from_tx_entry(*tx_ptr, output_index, batch.input_amount, global_index, ring_size, false, /*height_upper_limit=*/0, entry);
     return true;
   };
 
@@ -3457,6 +3349,7 @@ bool blockchain_storage::get_random_outs_for_amounts4(const COMMAND_RPC_GET_RAND
 
   uint64_t total_heights_requested = 0, total_blocks_found = 0, total_blocks_loaded = 0, total_collects = 0, total_seeds_skipped_pre_hf4 = 0, total_passes = 0;
 
+  std::optional<uint64_t> pos_height_limit;
   for(size_t i = 0; i < req.batches.size(); ++i)
   {
     const bool zc_outs_only = (req.batches[i].input_amount == 0);
@@ -3474,7 +3367,14 @@ bool blockchain_storage::get_random_outs_for_amounts4(const COMMAND_RPC_GET_RAND
     const auto& batch = req.batches[i];
     if (!batch.global_offsets.empty() || batch.ring_size != 0)
     {
-      if (!get_bare_outs_by_indices(batch, res.blocks_batches.back(), chain_size))
+      if (req.look_up_strategy == LOOK_UP_STRATEGY_POS_COINBASE && !pos_height_limit)
+      {
+        const uint64_t min_age = m_core_runtime_config.min_coinstake_age;
+        CHECK_AND_ASSERT_MES(chain_size > min_age, false, "no valid stake height for indexed PoS lookup");
+        pos_height_limit = std::min(get_last_x_block_height(false), chain_size - 1 - min_age);
+      }
+
+      if (!get_bare_outs_by_indices(batch, res.blocks_batches.back(), chain_size, pos_height_limit))
         return false;
 
       total_blocks_found += out_blocks.size();

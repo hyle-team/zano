@@ -5390,65 +5390,74 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, uint64_t ful
     stake_input.amount = pe.amount;
 
     // get decoys outputs and construct miner tx
-    COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::response decoys_resp = AUTO_VAL_INIT(decoys_resp);
+    std::list<out_entry> ring_candidates;
     std::vector<const crypto::public_key*> ring;
     uint64_t secret_index = 0; // index of the real stake output
     if (m_required_decoys_count > 0 && !is_auditable())
     {
-      COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::request decoys_req = AUTO_VAL_INIT(decoys_req);
-      decoys_req.height_upper_limit = std::min(m_last_pow_block_h, m_last_known_daemon_height > m_core_runtime_config.min_coinstake_age ? m_last_known_daemon_height - m_core_runtime_config.min_coinstake_age : m_last_pow_block_h);
-      decoys_req.use_forced_mix_outs = false;
-      decoys_req.coinbase_percents = 0;
-      decoys_req.amounts.resize(1); // request one batch of decoys
-      decoys_req.amounts[0].amount = pe.amount;
-      decoys_req.amounts[0].global_offsets.resize(m_required_decoys_count + 1); // one more to be able to skip a decoy in case it hits the real output
+      const uint64_t block_height = get_block_height(b);
+      const uint64_t min_age = m_core_runtime_config.min_coinstake_age;
+      WLT_CHECK_AND_ASSERT_MES(block_height > min_age, false, "no valid stake height for indexed PoS lookup");
+      
+      const uint64_t height_limit = std::min(m_last_pow_block_h, block_height - 1 - min_age);
+      WLT_CHECK_AND_ASSERT_MES(td.m_ptx_wallet_info->m_block_height <= height_limit, false, "stake output is too recent for this PoS block");
+      
+      COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request decoys_req4 = AUTO_VAL_INIT(decoys_req4);
+      decoys_req4.look_up_strategy = LOOK_UP_STRATEGY_POS_COINBASE;
+      auto& batch = decoys_req4.batches.emplace_back();
+      batch.input_amount = pe.amount;
+      batch.ring_size = m_required_decoys_count + 1;
+      batch.global_offsets.resize(batch.ring_size);
+      std::generate(
+        batch.global_offsets.begin(),
+        batch.global_offsets.end(),
+        [] { return crypto::rand<uint64_t>(); });
 
-      r = m_core_proxy->call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3(decoys_req, decoys_resp);
-      // TODO @#@# do we need these exceptions?
-      THROW_IF_FALSE_WALLET_EX(r, error::no_connection_to_daemon, "getrandom_outs3.bin");
-      THROW_IF_FALSE_WALLET_EX(decoys_resp.status != API_RETURN_CODE_BUSY, error::daemon_busy, "getrandom_outs3.bin");
-      THROW_IF_FALSE_WALLET_EX(decoys_resp.status == API_RETURN_CODE_OK, error::get_random_outs_error, decoys_resp.status);
-      WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(decoys_resp.outs.size() == 1, "got wrong number of decoys batches: " << decoys_resp.outs.size());
+      COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::response decoys_resp4 = AUTO_VAL_INIT(decoys_resp4);
+      r = m_core_proxy->call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4(decoys_req4, decoys_resp4);
+      THROW_IF_FALSE_WALLET_EX(r, error::no_connection_to_daemon, "getrandom_outs4.bin");
+      THROW_IF_FALSE_WALLET_EX(decoys_resp4.status != API_RETURN_CODE_BUSY, error::daemon_busy, "getrandom_outs4.bin");
+      THROW_IF_FALSE_WALLET_EX(decoys_resp4.status == API_RETURN_CODE_OK, error::get_random_outs_error, decoys_resp4.status);
+      WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(decoys_resp4.blocks_batches.size() == 1, "got wrong number of decoys batches: " << decoys_resp4.blocks_batches.size());
 
-      // we expect that less decoys can be returned than requested, we will use them all anyway
-      WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(decoys_resp.outs[0].outs.size() <= m_required_decoys_count + 1, "for PoS stake tx got greater decoys to mix than requested: " << decoys_resp.outs[0].outs.size() << " < " << m_required_decoys_count + 1);
+      ring_candidates.clear();
+      ring_candidates.emplace_back(td.m_global_output_index, stake_out_target.key);
+      std::unordered_set<uint64_t> used_gindices {td.m_global_output_index};
+      size_t returned_candidates = 0;
 
-      auto& ring_candidates = decoys_resp.outs[0].outs;
-      ring_candidates.emplace_front(td.m_global_output_index, stake_out_target.key);
-
-      std::unordered_set<uint64_t> used_gindices;
-      size_t good_outs_count = 0;
-      for (auto it = ring_candidates.begin(); it != ring_candidates.end(); )
+      //parse batches/blocks/outs from response
+      for(const auto& block : decoys_resp4.blocks_batches.front().blocks)
       {
-        if (used_gindices.count(it->global_amount_index) != 0)
+        WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(block.block_height <= height_limit, "daemon returned a candidate above the PoS template height limit");
+        
+        returned_candidates += block.outs.size();
+        WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(returned_candidates <= batch.global_offsets.size(), "daemon returned more PoS candidates than requested");
+
+        for(const auto& out : block.outs)
         {
-          it = ring_candidates.erase(it);
-          continue;
+          if (ring_candidates.size() == batch.ring_size)
+            break;
+          if (used_gindices.insert(out.global_amount_index).second)
+            ring_candidates.push_back(out);
         }
-        used_gindices.insert(it->global_amount_index);
-        if (++good_outs_count == m_required_decoys_count + 1)
-        {
-          ring_candidates.erase(++it, ring_candidates.end());
-          break;
-        }
-        ++it;
       }
 
-      // won't assert that ring_candidates.size() == m_required_decoys_count + 1 here as we will use all the decoys anyway
       if (ring_candidates.size() < m_required_decoys_count + 1)
-        LOG_PRINT_YELLOW("PoS: using " << ring_candidates.size() - 1 << " decoys for mining tx, while " << m_required_decoys_count << " are required", LOG_LEVEL_1);
+        LOG_PRINT_YELLOW("PoS using " << ring_candidates.size() - 1 << " decoys for mining tx, while " << m_required_decoys_count << " are required", LOG_LEVEL_1);
 
-      ring_candidates.sort([](auto& l, auto& r) { return l.global_amount_index < r.global_amount_index; }); // sort them now (note absolute_sorted_output_offsets_to_relative_in_place() below)
+      WLT_CHECK_AND_ASSERT_MES(is_mixattr_applicable_for_fake_outs_counter(source_tx.version, stake_out_target.mix_attr, ring_candidates.size() - 1, m_core_runtime_config),
+        false, "stake out does not allow the selected PoS ring size");
+      
+      ring_candidates.sort([](const auto& a, const auto& b) { return a.global_amount_index < b.global_amount_index; });
 
       uint64_t i = 0;
-      for (auto& el : ring_candidates)
+      for( auto& candidate : ring_candidates)
       {
-        uint64_t gindex = el.global_amount_index;
-        if (gindex == td.m_global_output_index)
+        if (candidate.global_amount_index == td.m_global_output_index)
           secret_index = i;
         ++i;
-        ring.emplace_back(&el.stealth_address);
-        stake_input.key_offsets.push_back(el.global_amount_index);
+        ring.emplace_back(&candidate.stealth_address);
+        stake_input.key_offsets.push_back(candidate.global_amount_index);
       }
       r = absolute_sorted_output_offsets_to_relative_in_place(stake_input.key_offsets);
       WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(r, "absolute_sorted_output_offsets_to_relative_in_place failed");
