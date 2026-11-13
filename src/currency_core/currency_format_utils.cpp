@@ -1328,7 +1328,16 @@ namespace currency
     crypto::public_key tx_onetime_key = currency::get_tx_pub_key_from_extra(tx);
     CHECK_AND_ASSERT_MES(tx_onetime_key != null_pkey, false, "Failed to get tx pub key from extra on submit_hf_booster");
     CHECK_AND_ASSERT_MES(hfu.tx_onetime_pub_key == tx_onetime_key, false, "Tx onetime pub key mismatch on submit_hf_booster");
-    crypto::hash h = bc_services::get_hf_booster_update_hash(hfu);
+    crypto::hash h = null_hash;
+    try
+    {
+      h = bc_services::get_hf_booster_update_hash(hfu);  // throws if the entry does not serialize, e.g. version above the supported one
+    }
+    catch(const std::exception& e)
+    {
+      LOG_PRINT_L0("Failed to calculate hf_booster_update hash, version: " << hfu.version << ", what: " << e.what());
+      return false;
+    }
     // validate against the maintainer pub key
     bool r = crypto::verify_schnorr_sig(h, core_runtime_config.hf_maintainers_public_key, hfu.maintainer_signature);
     CHECK_AND_ASSERT_MES(r, false, "Failed to verify schnorr signature on submit_hf_booster");
