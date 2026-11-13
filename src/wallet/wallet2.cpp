@@ -693,6 +693,23 @@ void wallet2::process_new_transaction(const currency::transaction& tx_from_block
   {
     //good news - got money! take care about it
 
+    // A tx that pays this wallet under the key of an ionic swap it took part in, but is not that swap. The counterparty knows
+    // the tx secret key and can copy the outputs this wallet expects from the swap. Crediting the copies would make the wallet
+    // drop the real swap outputs as duplicates, and spending a copy would make the real output unspendable for good.
+    // The swap itself spends this wallet's inputs (initiator) or has the recorded id (finalizer).
+    auto swap_it = std::find_if(m_ionic_swaps_watchlist.begin(), m_ionic_swaps_watchlist.end(),
+      [&](const std::pair<crypto::key_derivation, crypto::hash>& e) { return e.first == derivation; });
+    if (swap_it != m_ionic_swaps_watchlist.end() && !ptc.spent_own_outs_in_inputs && swap_it->second != ptc.tx_hash())
+    {
+      std::stringstream ss;
+      ss << "WARNING: tx " << ptc.tx_hash() << " @ block " << height << " repeats the transaction key of an ionic swap of this wallet and is not that swap, its "
+        << outs.size() << " output(s) to this wallet are skipped.";
+      WLT_LOG_RED(ss.str(), LOG_LEVEL_0);
+      if (auto wcb = m_wcallback.lock())
+        wcb->on_message(i_wallet2_callback::ms_red, ss.str());
+      return;
+    }
+
     bool has_tx_wide_payment_id = currency::has_tx_wide_payment_id(tx);
     bool has_intrinsic_payment_id = std::any_of(outs.begin(), outs.end(), [&]( const wallet_out_info& o ) { return o.payment_id != 0; });
     bool is_self_directed_tx = (outs.size() == tx.vout.size());
@@ -781,6 +798,31 @@ void wallet2::process_new_transaction(const currency::transaction& tx_from_block
 
           if (ki != currency::null_ki)
           {
+            // Backstop for a wallet without the watchlist (restored from seed, resynced): this tx spends this wallet's own inputs,
+            // so its owner took part in it, and an earlier output with the same key image is still unspent. Only one output of the
+            // pair can ever be spent. Keep this one and forget the earlier one, otherwise the wallet loses what it gets in a tx it
+            // has just paid for. Chain order is fixed, so every rescan makes the same choice.
+            if (ptc.spent_own_outs_in_inputs)
+            {
+              auto dup_it = m_key_images.find(ki);
+              auto earlier_td_it = dup_it != m_key_images.end() ? m_transfers.find(dup_it->second) : m_transfers.end();
+              if (earlier_td_it != m_transfers.end() && !earlier_td_it->second.is_spent())
+              {
+                std::stringstream ss;
+                ss << "WARNING: output #" << o << " of tx " << ptc.tx_hash() << " @ block " << height << " has key image " << ki << " already seen in unspent output #"
+                  << earlier_td_it->second.m_internal_output_index << " of tx " << get_transaction_hash(earlier_td_it->second.m_ptx_wallet_info->m_tx) << " (tid=" << dup_it->second
+                  << "). This tx spends own inputs, so its output is kept and the earlier one is dropped.";
+                WLT_LOG_RED(ss.str(), LOG_LEVEL_0);
+                if (auto wcb = m_wcallback.lock())
+                  wcb->on_message(i_wallet2_callback::ms_red, ss.str());
+
+                remove_transfer_from_transfers_cache(earlier_td_it->second.m_amount, dup_it->second, earlier_td_it->second.get_asset_id());
+                remove_transfer_from_amount_gindex_map(dup_it->second);
+                m_transfers.erase(earlier_td_it);
+                m_key_images.erase(dup_it); // the lookup below finds nothing and the output is added as a new transfer
+              }
+            }
+
             // make sure calculated key image for this own output has not been seen before
             auto it = m_key_images.find(ki);
             if (it != m_key_images.end())
@@ -6998,6 +7040,13 @@ bool wallet2::build_ionic_swap_template(const wallet_public::ionic_swap_proposal
   for (uint64_t i : selected_transfers)
     m_transfers.at(i).m_flags &= ~WALLET_TRANSFER_DETAIL_FLAG_BLOCKED;
 
+  // The finalizer gets the tx secret key of this template and can copy the outputs this wallet expects from the swap into
+  // a tx of its own. Remember the template: such a tx is recognized in process_new_transaction.
+  crypto::key_derivation own_derivation = AUTO_VAL_INIT(own_derivation);
+  bool r = crypto::generate_key_derivation(get_tx_pub_key_from_extra(finalize_result.tx), m_account.get_keys().view_secret_key, own_derivation);
+  WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(r, "failed to generate key derivation for the ionic swap template");
+  m_ionic_swaps_watchlist.emplace_back(own_derivation, currency::null_hash);
+
   //add_transfers_to_expiration_list(selected_transfers, for_expiration_list, this->get_core_runtime_config().get_core_time() + proposal_detais.expiration_time, currency::null_hash);
 
   //wrap it all 
@@ -7169,6 +7218,32 @@ bool wallet2::get_ionic_swap_proposal_info(const wallet_public::ionic_swap_propo
 }
 
 //----------------------------------------------------------------------------------------------------
+bool wallet2::is_ionic_swap_tx_key_fresh(const crypto::public_key& tx_pub_key, const crypto::key_derivation& derivation) const
+{
+  // the same key was already used in a swap this wallet created or accepted
+  for (const auto& e : m_ionic_swaps_watchlist)
+  {
+    if (e.first == derivation)
+      return false;
+  }
+
+  if (m_watch_only)
+    return true; // no spend secret key, key images can't be calculated
+
+  // Would any output of a tx with this key repeat a key image this wallet has already seen (spent ones included)?
+  // Key images are compared, not the bytes of the tx pub key: a key shifted by a small-order point gives the same derivation.
+  for (size_t i = 0; i != CURRENCY_TX_MAX_ALLOWED_OUTS; ++i)
+  {
+    currency::keypair in_ephemeral = AUTO_VAL_INIT(in_ephemeral);
+    crypto::key_image ki = currency::null_ki;
+    bool r = currency::generate_key_image_helper(m_account.get_keys(), tx_pub_key, i, in_ephemeral, ki);
+    THROW_IF_FALSE_WALLET_INT_ERR_EX(r, "generate_key_image_helper failed for output #" << i);
+    if (m_key_images.count(ki) != 0)
+      return false;
+  }
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
 bool wallet2::accept_ionic_swap_proposal(const std::string& raw_proposal, currency::transaction& result_tx)
 {
   wallet_public::ionic_swap_proposal proposal = AUTO_VAL_INIT(proposal);
@@ -7187,6 +7262,15 @@ bool wallet2::accept_ionic_swap_proposal(const wallet_public::ionic_swap_proposa
   wallet_public::ionic_swap_proposal_context ionic_context = AUTO_VAL_INIT(ionic_context);
   bool r = get_ionic_swap_proposal_info(proposal, msc.proposal_info, ionic_context);
   THROW_IF_TRUE_WALLET_EX(!r, error::wallet_internal_error, "Failed to get info from proposal");
+
+  // The initiator knows the tx secret key of the template. If that key has already paid this wallet, the outputs this wallet
+  // gets from the swap (receipt and change) would repeat key images it already has, and only one output of such a pair
+  // can ever be spent. Refuse such a proposal.
+  crypto::public_key swap_tx_pub_key = get_tx_pub_key_from_extra(proposal.tx_template);
+  crypto::key_derivation swap_derivation = AUTO_VAL_INIT(swap_derivation);
+  r = crypto::generate_key_derivation(swap_tx_pub_key, m_account.get_keys().view_secret_key, swap_derivation);
+  THROW_IF_TRUE_WALLET_EX(!r, error::wallet_internal_error, "Failed to generate key derivation for proposal");
+  THROW_IF_TRUE_WALLET_EX(!is_ionic_swap_tx_key_fresh(swap_tx_pub_key, swap_derivation), error::wallet_internal_error, "Proposal refused: its transaction key has already been used to pay this wallet");
 
   std::unordered_map<crypto::public_key, wallet_public::asset_balance_entry_base> balances;
   uint64_t mined = 0;
@@ -7244,6 +7328,8 @@ bool wallet2::accept_ionic_swap_proposal(const wallet_public::ionic_swap_proposa
     clear_transfers_from_flag(ftp.selected_transfers, WALLET_TRANSFER_DETAIL_FLAG_SPENT, std::string("exception in finalize_transaction, tx: ") + epee::string_tools::pod_to_hex(get_transaction_hash(result_tx)));
     throw;
   }
+  // from now on any other tx that pays this wallet under the same key is a twin of this swap (see process_new_transaction)
+  m_ionic_swaps_watchlist.emplace_back(swap_derivation, get_transaction_hash(result_tx));
   mark_transfers_as_spent(ftp.selected_transfers, std::string("Proposal has been accepted with tx <" + epee::string_tools::pod_to_hex(get_transaction_hash(result_tx))) + ">");
   return true;
 }
@@ -8184,6 +8270,19 @@ void wallet2::add_transfers_to_transfers_cache(const std::vector<uint64_t>& inde
 void wallet2::add_transfer_to_transfers_cache(uint64_t amount, uint64_t index, const crypto::public_key& asset_id /* = currency::native_coin_asset_id */)
 {
   m_found_free_amounts[asset_id][amount].insert(index);
+}
+//----------------------------------------------------------------------------------------------------
+void wallet2::remove_transfer_from_transfers_cache(uint64_t amount, uint64_t index, const crypto::public_key& asset_id /* = currency::native_coin_asset_id */)
+{
+  auto asset_it = m_found_free_amounts.find(asset_id);
+  if (asset_it == m_found_free_amounts.end())
+    return;
+  auto amount_it = asset_it->second.find(amount);
+  if (amount_it == asset_it->second.end())
+    return;
+  amount_it->second.erase(index);
+  if (amount_it->second.empty())
+    asset_it->second.erase(amount_it);
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::select_transfers(assets_selection_context& needed_money_map, size_t fake_outputs_count, uint64_t /*dust_threshold*/, std::vector<uint64_t>& selected_indicies)

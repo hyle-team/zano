@@ -154,6 +154,9 @@ namespace tools
     uint64_t m_last_pow_block_h = 0;
     std::list<std::pair<uint64_t, wallet_event_t>> m_rollback_events;
     std::list<std::pair<uint64_t, uint64_t> > m_last_zc_global_indexs; // <height, last_zc_global_indexs>, biggest height comes in front
+    // ionic swaps this wallet created or accepted: (key derivation of the swap tx for this wallet,
+    // id of the completed tx; null_hash on the initiator's side, which doesn't know that id)
+    std::vector<std::pair<crypto::key_derivation, crypto::hash>> m_ionic_swaps_watchlist;
 
     //variables that not being serialized
     std::atomic<uint64_t> m_last_bc_timestamp = 0;
@@ -235,6 +238,11 @@ namespace tools
       // and we remove legacy height-0 entries when loading an older wallet
       if (t_archive::is_loading::value && ver < 171)
         migrate_unconfirmed_payments_171();
+
+      // v173 adds the ionic swaps watchlist
+      if (ver < 173)
+        return;
+      a & m_ionic_swaps_watchlist;
     }
   };
   
@@ -801,6 +809,7 @@ namespace tools
     bool get_ionic_swap_proposal_info(const wallet_public::ionic_swap_proposal& proposal, wallet_public::ionic_swap_proposal_info& proposal_info, wallet_public::ionic_swap_proposal_context& ionic_context) const;
     bool accept_ionic_swap_proposal(const std::string& raw_proposal, currency::transaction& result_tx);
     bool accept_ionic_swap_proposal(const wallet_public::ionic_swap_proposal& proposal, currency::transaction& result_tx);
+    bool is_ionic_swap_tx_key_fresh(const crypto::public_key& tx_pub_key, const crypto::key_derivation& derivation) const;
 
     void fill_ado_version_based_onhardfork(currency::asset_descriptor_operation& asset_reg_info);
     void fill_adb_version_based_onhardfork(currency::asset_descriptor_base& asset_base);
@@ -862,6 +871,7 @@ private:
     bool select_transfers(assets_selection_context& needed_money_map, size_t fake_outputs_count, uint64_t dust, std::vector<uint64_t>& selected_indicies);
     void add_transfers_to_transfers_cache(const std::vector<uint64_t>& indexs);
     void add_transfer_to_transfers_cache(uint64_t amount, uint64_t index, const crypto::public_key& asset_id = currency::native_coin_asset_id);
+    void remove_transfer_from_transfers_cache(uint64_t amount, uint64_t index, const crypto::public_key& asset_id = currency::native_coin_asset_id);
     bool prepare_file_names(const std::wstring& file_path);
     void process_unconfirmed(const currency::transaction& tx, std::vector<std::string>& recipients, std::vector<std::string>& recipients_aliases);
     void add_sent_unconfirmed_tx(const currency::transaction& tx,
