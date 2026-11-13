@@ -41,6 +41,8 @@ DISABLE_VS_WARNINGS(4244 4345 4503) //'boost::foreach_detail_::or_' : decorated 
 #define LOG_DEFAULT_CHANNEL "tx_pool"
 ENABLE_CHANNEL_BY_DEFAULT("tx_pool");
 
+const command_line::arg_descriptor<bool>  arg_use_partial_tx_proof_validation ( "use-partial-tx-proof-validation", "Partially validate tx proofs on pool admission (only balance, not ASP & RP)");
+
 using namespace epee;
 
 namespace currency
@@ -259,12 +261,23 @@ namespace currency
           asset_op_verification_context avc = { tx, id, ado, next_block_height };
           return m_blockchain.validate_asset_operation(avc, m_blockchain.get_current_blockchain_size());
           }, true);
-        CHECK_AND_ASSERT_MES_CUSTOM(r, false, { tvc.m_verification_failed = true; }, "post-HF4 tx " << id << ": asset operation is invalid");
+        CHECK_AND_ASSERT_MES_CUSTOM(r, false, { tvc.m_verification_failed = true; }, "tx " << id << ": asset operation is invalid");
 
         if (!kept_by_block)
         {
           r = m_blockchain.validate_tx_gw_asset_ids(tx, next_block_height);
-          CHECK_AND_ASSERT_MES_CUSTOM(r, false, { tvc.m_verification_failed = true; }, "post-HF6 tx " << id << ": gw asset id validation failed");
+          CHECK_AND_ASSERT_MES_CUSTOM(r, false, { tvc.m_verification_failed = true; }, "tx " << id << ": gw asset id validation failed");
+
+          if (!m_use_partial_tx_proof_validation)
+          {
+            TIME_MEASURE_START_PD(check_post_hf4_asprp);
+            r = verify_asset_surjection_proof(tx, id);
+            CHECK_AND_ASSERT_MES_CUSTOM(r, false, { tvc.m_verification_failed = true; }, "tx " << id << ": ASP is invalid");
+
+            r = check_single_tx_range_proofs(tx, id);
+            CHECK_AND_ASSERT_MES_CUSTOM(r, false, { tvc.m_verification_failed = true; }, "tx " << id << ": range proof is invalid");
+            TIME_MEASURE_FINISH_PD(check_post_hf4_asprp);
+          }
         }
       }
     }
@@ -286,6 +299,7 @@ namespace currency
       << "/" << m_performance_data.check_keyimages_ws_ms_time.get_last_val()
       << "/" << m_performance_data.check_inputs_time.get_last_val()
       << "/b"<< m_performance_data.check_post_hf4_balance.get_last_val()
+      << "/a"<< m_performance_data.check_post_hf4_asprp.get_last_val()
       << "/" << m_performance_data.begin_tx_time.get_last_val()
       << "/" << m_performance_data.update_db_time.get_last_val()
       << "/" << m_performance_data.db_commit_time.get_last_val()
@@ -1284,6 +1298,11 @@ namespace currency
     db_tx_ptr->commit_transaction();
   }
   //---------------------------------------------------------------------------------
+  void tx_memory_pool::init_options(boost::program_options::options_description& desc)
+  {
+    command_line::add_arg(desc, arg_use_partial_tx_proof_validation);
+  }
+  //---------------------------------------------------------------------------------
   bool tx_memory_pool::init(const std::string& config_folder, const boost::program_options::variables_map& vm)
   {
     tools::db::db_backend_selector dbbs;
@@ -1388,6 +1407,8 @@ namespace currency
     }
 
     load_keyimages_cache();
+
+    m_use_partial_tx_proof_validation = (command_line::has_arg(vm, arg_use_partial_tx_proof_validation) && command_line::get_arg(vm, arg_use_partial_tx_proof_validation));
 
     return true;
   }

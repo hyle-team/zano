@@ -27,6 +27,8 @@
 #include "common/boost_serialization_helper.h"
 #include "currency_protocol/currency_protocol_handler_common.h"
 
+extern const command_line::arg_descriptor<bool> arg_use_partial_tx_proof_validation;
+
 namespace currency
 {
   class blockchain_storage;
@@ -79,6 +81,7 @@ namespace currency
       epee::math_helper::average<uint64_t, 5> update_db_time;
       epee::math_helper::average<uint64_t, 5> db_commit_time;
       epee::math_helper::average<uint64_t, 1> check_post_hf4_balance;
+      epee::math_helper::average<uint64_t, 1> check_post_hf4_asprp;
     };
 
     typedef std::unordered_map<crypto::key_image, std::set<crypto::hash>> key_image_cache;
@@ -115,6 +118,8 @@ namespace currency
     void purge_transactions();
     void clear();
 
+    static void init_options(boost::program_options::options_description& desc);
+    
     // load/store operations
     bool init(const std::string& config_folder, const boost::program_options::variables_map& vm);
     bool deinit();
@@ -147,6 +152,8 @@ namespace currency
 #ifdef TX_POOL_USE_UNSECURE_TEST_FUNCTIONS
     void unsecure_disable_tx_validation_on_addition(bool validation_disabled) { m_unsecure_disable_tx_validation_on_addition = validation_disabled; }
 #endif
+
+    void set_cli_flag_use_partial_tx_proof_validation(bool value) { m_use_partial_tx_proof_validation = value; } // made for tests, reflect CLI option
 
   private:
     bool on_tx_add(crypto::hash tx_id, const transaction& tx, bool kept_by_block);
@@ -204,6 +211,7 @@ namespace currency
     mutable epee::critical_section m_remove_stuck_txs_lock;
 
     bool m_unsecure_disable_tx_validation_on_addition = false;
+    bool m_use_partial_tx_proof_validation = false;
   };
 }
 
