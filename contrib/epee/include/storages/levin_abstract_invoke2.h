@@ -209,10 +209,14 @@ namespace epee
       //get portable storage limits
       const epee::serialization::portable_storage_limits& limits =
         []() -> const epee::serialization::portable_storage_limits& {
-        if constexpr (has_static_portable_storage_limits<t_owner>::value)
+
+        if constexpr(has_static_portable_storage_limits<t_in_type>::value)
+          return t_in_type::local_portable_storage_limits;
+        else if constexpr (has_static_portable_storage_limits<t_owner>::value)
           return t_owner::local_portable_storage_limits;
         else
           return epee::serialization::gdefault_portable_storage_limits;
+
         }();
 
 

@@ -274,6 +274,8 @@ namespace nodetool
     {
       /*actually we don't need to send any real data*/
 
+      inline static constexpr epee::serialization::portable_storage_limits local_portable_storage_limits { 2, 2, 2 };
+
       BEGIN_KV_SERIALIZE_MAP()
       END_KV_SERIALIZE_MAP()
     };
