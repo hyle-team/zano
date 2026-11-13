@@ -3152,7 +3152,7 @@ bool blockchain_storage::build_random_out_entry_from_tx_entry(const transaction_
   return true;
 }
 //------------------------------------------------------------------
-size_t blockchain_storage::find_end_of_allowed_index(uint64_t amount) const
+size_t blockchain_storage::find_end_of_allowed_index(uint64_t amount, std::optional<uint64_t> height_upper_limit) const
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
   uint64_t sz = m_db_outputs.get_item_size(amount);
@@ -3166,8 +3166,10 @@ size_t blockchain_storage::find_end_of_allowed_index(uint64_t amount) const
     auto out_ptr = m_db_outputs.get_subitem(amount, i);
     auto tx_ptr = m_db_transactions.find(out_ptr->tx_id);
     CHECK_AND_ASSERT_MES(tx_ptr, 0, "internal error: failed to find transaction from outputs index with tx_id=" << out_ptr->tx_id << ", amount: " << print_money_brief(amount));
-    if (tx_ptr->m_keeper_block_height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW <= get_current_blockchain_size())
-      return i+1;
+    // searche for outs that are old enough and fall within the specified limit
+    if ((!height_upper_limit || tx_ptr->m_keeper_block_height <= *height_upper_limit) && 
+      tx_ptr->m_keeper_block_height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW <= get_current_blockchain_size())
+        return i+1;
   } while (i != 0);
   return 0;
 }
@@ -3353,10 +3355,16 @@ bool blockchain_storage::get_random_outs_for_amounts3(const COMMAND_RPC_GET_RAND
   return true;
 }
 //------------------------------------------------------------------
-bool blockchain_storage::get_bare_outs_by_indices(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request_batch& batch, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::blocks_batch& response_batch, uint64_t chain_size) const
+bool blockchain_storage::get_bare_outs_by_indices(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request_batch& batch, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::blocks_batch& response_batch, uint64_t chain_size, std::optional<uint64_t> pos_height_limit) const
 {
   CHECK_AND_ASSERT_MES(batch.input_amount != 0 && batch.heights.empty() && batch.ring_size >= 2 && batch.global_offsets.size() >= batch.ring_size, false, "invalid bare output candidate request");
-  const uint64_t outputs_count = m_db_outputs.get_item_size(batch.input_amount);
+  
+  // for pre-zc staking - limit by range to the selected indices
+  // for regular bare - txs keep original full range(unlock and other checks later)
+  const uint64_t outputs_count = pos_height_limit
+    ? find_end_of_allowed_index(batch.input_amount, pos_height_limit)
+    : m_db_outputs.get_item_size(batch.input_amount);
+
   auto& out_blocks = response_batch.blocks;
   const size_t pool_target = batch.global_offsets.size();
   std::unordered_set<uint64_t> checked_indices;
@@ -3379,7 +3387,10 @@ bool blockchain_storage::get_bare_outs_by_indices(const COMMAND_RPC_GET_RANDOM_O
     CHECK_AND_ASSERT_MES(output.type() == typeid(tx_out_bare), false, "bare output has an unexpected type");
     const auto& bare_output = boost::get<tx_out_bare>(output);
     CHECK_AND_ASSERT_MES(bare_output.amount == batch.input_amount && bare_output.target.type() == typeid(txout_to_key), false, "inconsistent bare output amount or target");
-    eligible = chain_size - block_height >= CURRENCY_MINED_MONEY_UNLOCK_WINDOW && build_random_out_entry_from_tx_entry(*tx_ptr, output_index, batch.input_amount, global_index, ring_size, false, /*height_upper_limit=*/0, entry);
+    eligible = 
+      (!pos_height_limit || block_height <= *pos_height_limit) && // apply height limit
+      chain_size - block_height >= CURRENCY_MINED_MONEY_UNLOCK_WINDOW && // skip too recent outs
+      build_random_out_entry_from_tx_entry(*tx_ptr, output_index, batch.input_amount, global_index, ring_size, false, /*height_upper_limit=*/0, entry);
     return true;
   };
 
@@ -3457,6 +3468,7 @@ bool blockchain_storage::get_random_outs_for_amounts4(const COMMAND_RPC_GET_RAND
 
   uint64_t total_heights_requested = 0, total_blocks_found = 0, total_blocks_loaded = 0, total_collects = 0, total_seeds_skipped_pre_hf4 = 0, total_passes = 0;
 
+  std::optional<uint64_t> pos_height_limit;
   for(size_t i = 0; i < req.batches.size(); ++i)
   {
     const bool zc_outs_only = (req.batches[i].input_amount == 0);
@@ -3474,7 +3486,14 @@ bool blockchain_storage::get_random_outs_for_amounts4(const COMMAND_RPC_GET_RAND
     const auto& batch = req.batches[i];
     if (!batch.global_offsets.empty() || batch.ring_size != 0)
     {
-      if (!get_bare_outs_by_indices(batch, res.blocks_batches.back(), chain_size))
+      if (req.look_up_strategy == LOOK_UP_STRATEGY_POS_COINBASE && !pos_height_limit)
+      {
+        const uint64_t min_age = m_core_runtime_config.min_coinstake_age;
+        CHECK_AND_ASSERT_MES(chain_size > min_age, false, "no valid stake height for indexed PoS lookup");
+        pos_height_limit = std::min(get_last_x_block_height(false), chain_size - 1 - min_age);
+      }
+
+      if (!get_bare_outs_by_indices(batch, res.blocks_batches.back(), chain_size, pos_height_limit))
         return false;
 
       total_blocks_found += out_blocks.size();
