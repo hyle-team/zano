@@ -86,7 +86,6 @@ namespace nodetool
     //at this moment we have hardcoded config
     m_config.m_net_config.handshake_interval = P2P_DEFAULT_HANDSHAKE_INTERVAL;
     m_config.m_net_config.connections_count = P2P_DEFAULT_CONNECTIONS_COUNT;
-    m_config.m_net_config.packet_max_size = P2P_DEFAULT_PACKET_MAX_SIZE; //20 MB limit
     m_config.m_net_config.config_id = 0; // initial config
     m_config.m_net_config.connection_timeout = P2P_DEFAULT_CONNECTION_TIMEOUT;
     m_config.m_net_config.ping_connection_timeout = P2P_DEFAULT_PING_CONNECTION_TIMEOUT;
