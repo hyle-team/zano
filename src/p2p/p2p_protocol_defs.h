@@ -79,7 +79,6 @@ namespace nodetool
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(connections_count)
       KV_SERIALIZE(handshake_interval)
-      KV_SERIALIZE(packet_max_size)
       KV_SERIALIZE(config_id)
     END_KV_SERIALIZE_MAP()
 
@@ -87,7 +86,6 @@ namespace nodetool
     uint32_t connection_timeout = 0;
     uint32_t ping_connection_timeout = 0;
     uint32_t handshake_interval = 0;
-    uint32_t packet_max_size = 0;
     uint32_t config_id = 0;
     uint32_t send_peerlist_sz = 0;
     uint32_t default_max_inc_count = 0;
