@@ -640,6 +640,7 @@ namespace currency
     std::atomic<bool> m_is_blockchain_storing;
     std::atomic<bool> m_is_irreverseble_prunning_on;
     bool m_non_pruning_mode_enabled;
+    uint64_t m_ignored_hardfork_id = 0;   // --danger-ignore-hardfork-and-diverge: HF boosters for this hardfork are neither recorded nor applied; 0: none
 
     std::string m_config_folder;
     //events

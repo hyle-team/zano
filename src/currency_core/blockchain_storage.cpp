@@ -85,6 +85,9 @@ DISABLE_VS_WARNINGS(4267)
 
 const command_line::arg_descriptor<uint64_t>  arg_db_cache_l1       ( "db-cache-l1", "Specify size of memory mapped db cache file");
 const command_line::arg_descriptor<uint64_t>  arg_db_cache_l2       ( "db-cache-l2", "Specify cached elements in db helpers");
+const command_line::arg_descriptor<uint64_t>  arg_danger_ignore_hardfork_and_diverge ( "danger-ignore-hardfork-and-diverge", "DANGER ZONE: ignore the HF booster that activates the hardfork with the given id and keep running without activating it. "
+                                                                                       "Once that hardfork activates on the network, this node DIVERGES from it: it rejects the network's new blocks and transactions, "
+                                                                                       "and everything it mines, stakes or sends is valid only on its own diverged chain");
 
 //------------------------------------------------------------------
 blockchain_storage::blockchain_storage(tx_memory_pool& tx_pool) :m_db(nullptr, m_rw_lock),
@@ -170,6 +173,7 @@ void blockchain_storage::init_options(boost::program_options::options_descriptio
   command_line::add_arg(desc, arg_db_cache_l1);
   command_line::add_arg(desc, arg_db_cache_l2);
   command_line::add_arg(desc, command_line::arg_non_pruning_mode);
+  command_line::add_arg(desc, arg_danger_ignore_hardfork_and_diverge);
 }
 //------------------------------------------------------------------
 uint64_t blockchain_storage::get_block_h_older_then(uint64_t timestamp) const 
@@ -312,6 +316,15 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
     cache_size_l1 = command_line::get_arg(vm, arg_db_cache_l1);
   }
   LOG_PRINT_GREEN("Using db file cache size(L1): " << cache_size_l1, LOG_LEVEL_0);
+
+  if (command_line::has_arg(vm, arg_danger_ignore_hardfork_and_diverge))
+  {
+    m_ignored_hardfork_id = command_line::get_arg(vm, arg_danger_ignore_hardfork_and_diverge);
+    CHECK_AND_ASSERT_MES(m_ignored_hardfork_id >= ZANO_HARDFORK_08, false, "--" << arg_danger_ignore_hardfork_and_diverge.name << "=" << m_ignored_hardfork_id
+      << " is invalid: HF boosters exist only for hardfork " << ZANO_HARDFORK_08 << " and later");
+    LOG_PRINT_RED_L0("[DANGER] --" << arg_danger_ignore_hardfork_and_diverge.name << "=" << m_ignored_hardfork_id << " is set: HF boosters for hardfork "
+      << m_ignored_hardfork_id << " are ignored, and this node will DIVERGE from the network when that hardfork activates");
+  }
 
   m_config_folder = config_folder;
 
@@ -5820,6 +5833,16 @@ bool blockchain_storage::put_hf_booster_update(const transaction& tx, const cryp
     CHECK_AND_ASSERT_THROW_MES(!m_core_runtime_config.is_hardfork_active_for_height(update.hf_id, get_current_blockchain_size()), "hf_booster_update: hf_id is already active");
   }
 
+  // --danger-ignore-hardfork-and-diverge: the booster passed the same checks as on every other node (so this node accepts the
+  // same blocks), but it is neither recorded in the DB nor applied. Nothing that reads the DB later
+  // (hf_booster_load_hardforks_from_db, check_hf_compliance_on_current_height) sees it, and pop_hf_booster_update skips it
+  if (m_ignored_hardfork_id != 0 && update.hf_id == m_ignored_hardfork_id)
+  {
+    LOG_PRINT_RED_L0("[DANGER] Ignoring hf_booster_update for hardfork " << update.hf_id << " (activation after height " << update.hf_new_activation_height
+      << ") in tx " << tx_id << " because of --" << arg_danger_ignore_hardfork_and_diverge.name << ": this node will DIVERGE from the network when that hardfork activates");
+    return true;
+  }
+
   
   //if this build not aware of this hf, then prev value in db would be not then one as with known
 
@@ -5863,6 +5886,12 @@ bool blockchain_storage::pop_hf_booster_update(const transaction& tx, const cryp
   if(!r && tx.hardfork_id < ZANO_HARDFORK_08)
   {
     // this was pre-HF8 tx with broken proof, so it was ignored and never used to actual put_hf_booster_update, so we don't need to pop anything
+    return true;
+  }
+
+  if (m_ignored_hardfork_id != 0 && update.hf_id == m_ignored_hardfork_id)
+  {
+    // --danger-ignore-hardfork-and-diverge: put_hf_booster_update did not record it, so there is nothing to pop
     return true;
   }
 
