@@ -7,6 +7,7 @@
 #pragma once
 
 #include <boost/uuid/uuid.hpp>
+#include "net/levin_base.h"
 #include "serialization/keyvalue_serialization.h"
 #include "misc_language.h"
 #include "currency_core/currency_config.h"
@@ -192,6 +193,9 @@ namespace nodetool
 
     struct request
     {
+      // 10pb + 91nd + 304pd + 188me = 593 * 3 = 1779 bytes
+      inline static constexpr epee::serialization::portable_storage_limits local_portable_storage_limits{32,8,8, 1779};
+
       basic_node_data node_data;
       t_playload_type payload_data;
       maintainers_entry maintrs_entry;
@@ -205,6 +209,9 @@ namespace nodetool
 
     struct response
     {
+      // 593 same +  16lp + 2pl + (252peers * 24bytes) = 6659 * 3 = 19977 bytes
+      inline static constexpr epee::serialization::portable_storage_limits local_portable_storage_limits{32,8,8, 19977};
+
       basic_node_data node_data;
       t_playload_type payload_data;
       std::vector<peerlist_entry> local_peerlist;
@@ -230,6 +237,9 @@ namespace nodetool
 
     struct request
     {
+      // 10h + 304pd + 188me = 502 * 3 = 1506 bytes
+      inline static constexpr epee::serialization::portable_storage_limits local_portable_storage_limits{32,8,8, 1506};
+
       t_playload_type payload_data;
       maintainers_entry maintrs_entry;
 
@@ -241,6 +251,9 @@ namespace nodetool
 
     struct response
     {
+      // 502 same + 20lt + (252*24) = 6588 * 3 = 19764 bytes
+      inline static constexpr epee::serialization::portable_storage_limits local_portable_storage_limits{32,8,8, 19764};
+
       int64_t local_time;
       t_playload_type payload_data;
       std::vector<peerlist_entry> local_peerlist; 
@@ -272,6 +285,9 @@ namespace nodetool
 
     struct request
     {
+      // 10bytes request + 118 extra bytes
+      inline static constexpr epee::serialization::portable_storage_limits local_portable_storage_limits{6,4,4,128};
+
       /*actually we don't need to send any real data*/
 
       BEGIN_KV_SERIALIZE_MAP()
@@ -280,6 +296,9 @@ namespace nodetool
 
     struct response
     {
+      //38bytes + 90 extra bytes
+      inline static constexpr epee::serialization::portable_storage_limits local_portable_storage_limits{6,4,4,128};
+
       std::string status;
       peerid_type peer_id;
 
@@ -339,6 +358,9 @@ namespace nodetool
 
     struct request
     {
+      // 10ps_h + 50pr + 108tr = 168 * 3 = 504 bytes
+      inline static constexpr epee::serialization::portable_storage_limits local_portable_storage_limits{32,4,8, 504};
+
       typename payload_stat_info::params pr;
       proof_of_trust tr;
       BEGIN_KV_SERIALIZE_MAP()
@@ -349,6 +371,9 @@ namespace nodetool
     
     struct response
     {
+      // depending on the payload_stat_info size, so set the default
+      inline static constexpr epee::serialization::portable_storage_limits local_portable_storage_limits{10000,10000,10000, LEVIN_DEFAULT_MAX_PACKET_SIZE};
+  
       std::string version;
       uint64_t connections_count;
       uint64_t incoming_connections_count;
@@ -375,6 +400,8 @@ namespace nodetool
 
     struct request
     {
+      // 10pb_h + 108tr = 118 * 3 = 354 bytes
+      inline static constexpr epee::serialization::portable_storage_limits local_portable_storage_limits{8,4,4, 354};
       proof_of_trust tr;
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(tr)
@@ -383,6 +410,8 @@ namespace nodetool
 
     struct response
     {
+      // depending on the number of peers and connections, set a reasonable default
+      inline static constexpr epee::serialization::portable_storage_limits local_portable_storage_limits{10000,10000,10000, LEVIN_DEFAULT_MAX_PACKET_SIZE};
       std::vector<peerlist_entry> local_peerlist_white; 
       std::vector<peerlist_entry> local_peerlist_gray; 
       std::list<connection_entry> connections_list; 
@@ -409,12 +438,17 @@ namespace nodetool
 
     struct request
     {
+      // just 10pb_h + 22 extra bytes
+      inline static constexpr epee::serialization::portable_storage_limits local_portable_storage_limits{4,2,2, 32};
+
       BEGIN_KV_SERIALIZE_MAP()
       END_KV_SERIALIZE_MAP()    
     };
 
     struct response
     {
+      // 10pb_h + 15id = 25bytes + 103 extra
+      inline static constexpr epee::serialization::portable_storage_limits local_portable_storage_limits{4,2,2, 128};
       peerid_type my_id;
 
       BEGIN_KV_SERIALIZE_MAP()
@@ -432,6 +466,9 @@ namespace nodetool
 
     struct request
     {
+      // 10pb_h + 22 extra bytes
+      inline static constexpr epee::serialization::portable_storage_limits local_portable_storage_limits{4,2,2, 32};
+
       BEGIN_KV_SERIALIZE_MAP()
       END_KV_SERIALIZE_MAP()
     };
@@ -449,6 +486,14 @@ namespace nodetool
     
     struct response
     {
+
+      // imagine what we have 1024 limit for in+out connections
+      // 10pb_h + 7 peers field nametype + 2array elem count(1024) + (1024*33bytes peer info) = 33811 * 2 = 67622 bytes
+      // entries = 1+2*1024 = 2050
+      // sections = 1 + 1024 = 1025
+      // array elems = 1024
+      inline static constexpr epee::serialization::portable_storage_limits local_portable_storage_limits{2050,1025,1026, 67622};
+
       std::vector<anonymized_peer_info> peers;
 
       BEGIN_KV_SERIALIZE_MAP()

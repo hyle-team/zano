@@ -36,6 +36,23 @@ namespace epee
 {
   namespace net_utils
   {
+    template<typename, typename = void>
+    struct has_static_portable_storage_limits : std::false_type {};
+
+    template<typename T>
+    struct has_static_portable_storage_limits<T, std::void_t<decltype(T::local_portable_storage_limits)>> : std::true_type {};
+    
+    template<class t_type, class t_owner = void>
+    constexpr const serialization::portable_storage_limits& get_portable_storage_limits()
+    {
+      if constexpr (has_static_portable_storage_limits<t_type>::value)
+        return t_type::local_portable_storage_limits;
+      else if constexpr (has_static_portable_storage_limits<t_owner>::value)
+        return t_owner::local_portable_storage_limits;
+      else
+       return serialization::gdefault_portable_storage_limits;
+    }
+
     template<class t_arg, class t_result, class t_transport>
     bool invoke_remote_command2(int command, const t_arg& out_struct, t_result& result_struct, t_transport& transport)
     {
@@ -56,7 +73,7 @@ namespace epee
         return false;
       }
       serialization::portable_storage stg_ret;
-      if(!stg_ret.load_from_binary(buff_to_recv))
+      if(!stg_ret.load_from_binary(buff_to_recv, get_portable_storage_limits<t_result>()))
       {
         LOG_ERROR("Failed to load_from_binary on command " << command);
         return false;
@@ -109,7 +126,7 @@ namespace epee
         return false;
       }
       typename serialization::portable_storage stg_ret;
-      if(!stg_ret.load_from_binary(buff_to_recv))
+      if(!stg_ret.load_from_binary(buff_to_recv, get_portable_storage_limits<t_result>()))
       {
         LOG_ERROR("Failed to load_from_binary on command " << command);
         return false;
@@ -143,7 +160,7 @@ namespace epee
           return false;
         }
         serialization::portable_storage stg_ret;
-        if(!stg_ret.load_from_binary(buff))
+        if(!stg_ret.load_from_binary(buff, get_portable_storage_limits<t_result>()))
         {
           LOG_ERROR("Failed to load_from_binary on command " << command);
           TRY_ENTRY();
@@ -189,16 +206,6 @@ namespace epee
       }
       return true;
     }
-    //----------------------------------------------------------------------------------------------------
-    //----------------------------------------------------------------------------------------------------
-
-
-      template<typename, typename = void>
-      struct has_static_portable_storage_limits : std::false_type {};
-
-      template<typename T>
-      struct has_static_portable_storage_limits<T, std::void_t<decltype(T::local_portable_storage_limits)>> : std::true_type {};
-
 
     //----------------------------------------------------------------------------------------------------
     //----------------------------------------------------------------------------------------------------
@@ -207,14 +214,7 @@ namespace epee
     {
 
       //get portable storage limits
-      const epee::serialization::portable_storage_limits& limits =
-        []() -> const epee::serialization::portable_storage_limits& {
-        if constexpr (has_static_portable_storage_limits<t_owner>::value)
-          return t_owner::local_portable_storage_limits;
-        else
-          return epee::serialization::gdefault_portable_storage_limits;
-        }();
-
+      const auto& limits = get_portable_storage_limits<t_in_type, t_owner>();
 
       serialization::portable_storage strg;
       if(!strg.load_from_binary(in_buff, limits))
@@ -243,6 +243,13 @@ namespace epee
         return LEVIN_ERROR_INTERNAL;
       }
 
+      const auto& out_limits = get_portable_storage_limits<t_out_type, t_owner>();
+      if (buff_out.size() > out_limits.max_serialized_size)
+      {
+        LOG_ERROR("Serialized response sizse " << buff_out.size() << " exceeds limit " << out_limits.max_serialized_size << " on command " << command);
+        buff_out.clear();
+        return LEVIN_ERROR_INTERNAL;
+      }
       return res;
     };
 
@@ -251,13 +258,7 @@ namespace epee
     {
 
       //get portable storage limits
-      const epee::serialization::portable_storage_limits& limits =
-        []() -> const epee::serialization::portable_storage_limits& {
-        if constexpr (has_static_portable_storage_limits<t_owner>::value)
-          return t_owner::local_portable_storage_limits;
-        else
-          return epee::serialization::gdefault_portable_storage_limits;
-        }();
+      const auto& limits = get_portable_storage_limits<t_in_type, t_owner>();
 
       serialization::portable_storage strg;
       if(!strg.load_from_binary(in_buff, limits))

@@ -8,6 +8,7 @@
 
 #include <list>
 #include <memory>
+#include "net/levin_base.h"
 #include "serialization/keyvalue_serialization.h"
 #include "currency_core/currency_basic.h"
 #include "currency_core/connection_context.h"
@@ -60,6 +61,9 @@ namespace currency
 
     struct request
     {
+      //keep existing p2p limits, 10k entries,array and sections
+      inline static constexpr epee::serialization::portable_storage_limits local_portable_storage_limits{10000,10000,10000, LEVIN_DEFAULT_MAX_PACKET_SIZE};
+
       block_complete_entry b;
       uint64_t current_blockchain_height;
 
@@ -79,6 +83,11 @@ namespace currency
 
     struct request
     {
+      // tx count: CURRENCY_RELAY_TXS_MAX_COUNT = 5
+      // tx size: CURRENCY_MAX_TRANSACTION_BLOB_SIZE = 122800 bytes
+      // 10pb_h + 5*(4len + 122800) = 614036 * 2 = 1228072bytes
+      inline static constexpr epee::serialization::portable_storage_limits local_portable_storage_limits{16,8,8, 1228072};
+
       std::list<blobdata>   txs;
 
       BEGIN_KV_SERIALIZE_MAP()
@@ -88,6 +97,9 @@ namespace currency
 
     struct response
     {
+      // 10pb_h + 6field + 1str len + 13 ACCESS_DENIED = 30 * 10 = 300 bytes
+      inline static constexpr epee::serialization::portable_storage_limits local_portable_storage_limits{4,2,2, 300};
+  
       std::string code;
 
       BEGIN_KV_SERIALIZE_MAP()
@@ -105,6 +117,9 @@ namespace currency
 
     struct request
     {
+      //10pb_h + 5tx_field + 2blob_sz + (500tx_hashes*32bytes) + 8blocks + 2blob_sz + (500blk_hashes * 32) = 32027 * 3 = 96081 bytes
+      inline static constexpr epee::serialization::portable_storage_limits local_portable_storage_limits{8,4,4, 96081};
+
       std::list<crypto::hash>    txs;
       std::list<crypto::hash>    blocks;
 
@@ -121,6 +136,9 @@ namespace currency
 
     struct request
     {
+
+      //default limits, we cant calculate the exact size of entries, sections and arrays
+      inline static constexpr epee::serialization::portable_storage_limits local_portable_storage_limits{10000, 10000, 10000, LEVIN_DEFAULT_MAX_PACKET_SIZE};
       std::list<blobdata>              txs;
       std::list<block_complete_entry>  blocks;
       std::list<crypto::hash>          missed_ids;
@@ -160,6 +178,10 @@ namespace currency
 
     struct request
     {
+      // CURRENCY_NOTIFY_REQUEST_CHAIN_MAX_BLOCKS_COUNT = 100 hashes 32 bytes each
+      // 10pb_h + 11bi + 2blob_len + 100*32 = 3223 * 3 = 9669 bytes
+      inline static constexpr epee::serialization::portable_storage_limits local_portable_storage_limits{ 8, 4, 4, 9669 };
+
       std::list<crypto::hash> block_ids; /*IDs of the first 10 blocks are sequential, next goes with pow(2,n) offset, like 2, 4, 8, 16, 32, 64 and so on, and the last one is always genesis block */
 
       BEGIN_KV_SERIALIZE_MAP()
@@ -176,6 +198,10 @@ namespace currency
 
     struct request
     {
+      // BLOCKS_IDS_SYNCHRONIZING_DEFAULT_COUNT = 2000
+      // 10pb_h + 22sh + 22th + 13bi + 2000*57 = 114403 * 2 = 228806 bytes
+      // entries 3+2 * 2000 = 4003, 2000arr elems, 2001sections - i add over by my imho
+       inline static constexpr epee::serialization::portable_storage_limits local_portable_storage_limits{5000, 4000, 4000, 228806};
       uint64_t start_height;
       uint64_t total_height;
       std::list<block_context_info> m_block_ids;
