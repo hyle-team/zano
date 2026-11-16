@@ -8885,6 +8885,21 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
   TIME_MEASURE_FINISH_PD(block_processing_time_1);
   TIME_MEASURE_FINISH_PD_MS(block_processing_time_0_ms);
 
+  // Hardfork activation is detected here, for every block connected to the main chain: a block added one by one,
+  // each block connected by switch_to_alternative_blockchain() (the delivered block may be above the activation height),
+  // and a block produced by this node (core::handle_block_found() does not go through core::add_new_block()).
+  // The write is a nested DB transaction, so it is committed or aborted together with the block.
+  if (bei.height > 0 && !bvc.do_just_simulation)
+  {
+    size_t hardfork_id_for_this_block = m_core_runtime_config.hard_forks.get_the_most_recent_hardfork_id_for_height(bei.height);
+    size_t hardfork_id_for_next_block = m_core_runtime_config.hard_forks.get_the_most_recent_hardfork_id_for_height(bei.height + 1);
+    if (hardfork_id_for_this_block != hardfork_id_for_next_block)
+    {
+      LOG_PRINT_GREEN("Hardfork " << hardfork_id_for_next_block << " has been activated after the block at height " << bei.height, LOG_LEVEL_0);
+      on_hardfork_activated(hardfork_id_for_next_block);
+    }
+  }
+
   //print result
   stringstream powpos_str_entry, timestamp_str_entry, pos_validation_str_entry, block_reward_entry;
   if (is_pos_bl)
