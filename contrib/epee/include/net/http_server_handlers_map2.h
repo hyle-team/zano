@@ -483,6 +483,7 @@ namespace epee {
     else if(auto_doc<command_type, true>(current_zone_json_uri, method_name, true, docs) && callback_name == method_name) \
 { \
   size_t flags_ = 0; \
+  LOG_PRINT_L4("[JSON_REQUEST_BODY]: [" << method_name << "]" << ENDL << query_info.m_body);                        \
   call_found = true; \
   PREPARE_OBJECTS_FROM_JSON(command_type) \
   epee::json_rpc::error_response fail_resp = AUTO_VAL_INIT(fail_resp); \
@@ -528,6 +529,7 @@ namespace epee {
 { \
   call_found = true; \
   size_t flags_ = 0; \
+  LOG_PRINT_L4("[JSON_REQUEST_BODY]: [" << method_name << "]" << ENDL << query_info.m_body);                        \
   PREPARE_OBJECTS_FROM_JSON(command_type) \
   epee::json_rpc::error_response fail_resp = AUTO_VAL_INIT(fail_resp); \
   fail_resp.jsonrpc = "2.0"; \
@@ -547,6 +549,7 @@ namespace epee {
 { \
   call_found = true; \
   size_t flags_ = 0; \
+  LOG_PRINT_L4("[JSON_REQUEST_BODY]: [" << method_name << "]" << ENDL << query_info.m_body);                        \
   PREPARE_OBJECTS_FROM_JSON(command_type) \
   if(!callback_f(req.params, resp.result, m_conn_context)) \
   { \
@@ -567,6 +570,7 @@ namespace epee {
     else if(auto_doc<command_type, true>(current_zone_json_uri, method_name, true, docs) && callback_name == method_name && predicate) \
 { \
   size_t flags_ = 0; \
+  LOG_PRINT_L4("[JSON_REQUEST_BODY]: [" << method_name << "]" << ENDL << query_info.m_body);                        \
   call_found = true; \
   PREPARE_OBJECTS_FROM_JSON(command_type) \
   if(!callback_f(req.params, resp.result, m_conn_context)) \
