@@ -12,6 +12,7 @@
 #include "misc_language.h"
 #include "currency_core/currency_config.h"
 #include "crypto/crypto.h"
+#include "storages/portable_storage_from_bin.h"
 
 namespace nodetool
 {
