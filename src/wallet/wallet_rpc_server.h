@@ -32,13 +32,19 @@ namespace tools
   {
     wallet_rpc_locker(i_wallet_provider* wallet_provider) :m_pwallet_provider(wallet_provider)
     {
-      m_pwallet_provider->lock();
-//#ifndef MOBILE_WALLET_BUILD
-      m_wallet_ptr = m_pwallet_provider->get_wallet();
-//#endif   
-      if (!m_wallet_ptr.get())
+      m_pwallet_provider->lock();  // contract: if lock() throws, it holds nothing (see wallets_manager::lock fix, report 199)
+      try
       {
-        throw std::runtime_error("Wallet object closed");
+        m_wallet_ptr = m_pwallet_provider->get_wallet();
+        if(!m_wallet_ptr.get())
+        {
+          throw std::runtime_error("Wallet object closed");
+        }
+      }
+      catch(...)
+      {
+        m_pwallet_provider->unlock();
+        throw;
       }
     }
 
