@@ -3183,7 +3183,7 @@ namespace
     crypto::derive_key_romix_keccak(CRYPTO_HDS_WALLET_KDF_ROMIX, password.data(), password.size(),
       kf_data.kdf_salt.data(), kf_data.kdf_salt.size(), kf_data.kdf_N_log2, kf_data.kdf_phase2_log2_reduction, stretched);
     std::string result(reinterpret_cast<const char*>(stretched), sizeof(stretched));
-    memset(stretched, 0, sizeof(stretched));
+    crypto::wipe(stretched);
     return result;
   }
 }
