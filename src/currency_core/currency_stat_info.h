@@ -38,10 +38,8 @@ namespace currency
     struct params
     {
       uint64_t chain_len;
-      uint64_t logs_journal_len;
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(chain_len)
-        KV_SERIALIZE(logs_journal_len)
       END_KV_SERIALIZE_MAP()
     };
 
@@ -54,7 +52,6 @@ namespace currency
     std::list<chain_entry> main_chain_blocks;
     std::list<chain_entry> alt_chain_blocks;
     std::list<error_stat_entry> errors_stat;
-    std::list<std::string> errors_journal;
     
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(tx_pool_size)
@@ -66,7 +63,6 @@ namespace currency
       //KV_SERIALIZE(alt_chain_blocks)
       KV_SERIALIZE(errors_stat)
       KV_SERIALIZE(epic_failure_happend)
-      KV_SERIALIZE(errors_journal)
     END_KV_SERIALIZE_MAP()
   };
 }

@@ -5,6 +5,7 @@
 #include <memory>
 #include <thread>
 #include <atomic>
+#include <future>
 #include <boost/format.hpp>
 #include <bitset>
 
@@ -1426,6 +1427,81 @@ namespace db_test
   TEST(mdbx, key_value_prefix_enum_multithread_test)
   {
     key_value_prefix_enum_multithread_test<db::mdbx_db_backend>();
+  }
+#endif
+
+  //////////////////////////////////////////////////////////////////////////////
+  // write_tx_lock_order_test
+  // basic_db_accessor refuses to start the first write transaction of a thread that holds the read lock:
+  // the thread would wait for the DB write lock while holding the read lock, and a writer that holds
+  // the DB write lock waits at its commit for all readers to leave
+  //////////////////////////////////////////////////////////////////////////////
+  template<typename db_backend_t>
+  void write_tx_lock_order_test()
+  {
+    std::shared_ptr<db_backend_t> backend_ptr = std::make_shared<db_backend_t>();
+    epee::shared_recursive_mutex db_lock;
+    db::basic_db_accessor dbb(backend_ptr, db_lock);
+    ASSERT_TRUE(dbb.open(get_db_decorated_name<db_backend_t>() + "_lock_order"));
+
+    // no read lock
+    ASSERT_TRUE(dbb.begin_transaction());
+    dbb.commit_transaction();
+
+    // read lock: read-only transactions are fine, the first write transaction is refused
+    db_lock.lock_shared();
+    ASSERT_TRUE(dbb.begin_transaction(true));
+    dbb.commit_transaction();
+    ASSERT_THROW(dbb.begin_transaction(), std::runtime_error);
+    db_lock.unlock_shared();
+
+    // the refused transaction left nothing behind
+    ASSERT_TRUE(dbb.begin_transaction());
+    dbb.commit_transaction();
+
+    // read lock taken inside a write transaction: nested write transactions and commits under it are fine
+    ASSERT_TRUE(dbb.begin_transaction());
+    db_lock.lock_shared();
+    ASSERT_TRUE(dbb.begin_transaction());
+    dbb.commit_transaction();
+    dbb.commit_transaction();
+    db_lock.unlock_shared();
+
+    // the read lock of another thread doesn't matter here, only the commit waits for it
+    std::promise<void> locked, release;
+    std::thread reader([&]()
+    {
+      db_lock.lock_shared();
+      locked.set_value();
+      release.get_future().wait();
+      db_lock.unlock_shared();
+    });
+    locked.get_future().wait();
+    bool begun = false;
+    try
+    {
+      begun = dbb.begin_transaction();
+    }
+    catch (...)
+    {
+    }
+    release.set_value();
+    reader.join();
+    ASSERT_TRUE(begun);
+    dbb.commit_transaction();
+
+    ASSERT_TRUE(dbb.close());
+  }
+
+  TEST(lmdb, write_tx_lock_order_test)
+  {
+    write_tx_lock_order_test<db::lmdb_db_backend>();
+  }
+
+#ifdef ENABLED_ENGINE_MDBX
+  TEST(mdbx, write_tx_lock_order_test)
+  {
+    write_tx_lock_order_test<db::mdbx_db_backend>();
   }
 #endif
 } // namespace lmdb_test

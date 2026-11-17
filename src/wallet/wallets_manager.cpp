@@ -2262,7 +2262,7 @@ bool wallets_manager::on_mw_select_wallet(const tools::wallet_public::COMMAND_MW
 void wallets_manager::lock() 
 {
 #ifndef MOBILE_WALLET_BUILD
-  m_select_wallet_rpc_lock.lock();
+  std::unique_lock<std::recursive_mutex> guard(m_select_wallet_rpc_lock);
   {
     SHARED_CRITICAL_REGION_LOCAL(m_wallets_lock);
     auto it = m_wallets.find(m_rpc_selected_wallet_id);
@@ -2272,6 +2272,7 @@ void wallets_manager::lock()
     }
     m_current_wallet_locked_object = it->second.w.lock();
   }
+  guard.release();
 #endif
 }
 
