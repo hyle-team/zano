@@ -7894,7 +7894,30 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
   }
 
 
+  bool var_is_hardfork_8_zone = m_core_runtime_config.is_hardfork_active_for_height(8, block_height);
+  if(var_is_hardfork_8_zone)
+  {
+    // forbid combining GW addresses with any other type of input, and forbid having inputs from different GW addresses in the same tx
+    // (even though the current codebase supports all sorts of address combinations)
 
+    std::set<gateway_address_id_type> found_gw_address_ids;
+    bool found_non_gw_inputs = false;
+    for(auto& inv : tx.vin)
+    {
+      if(inv.type() == typeid(txin_gateway))
+      {
+        const txin_gateway& gw_in = boost::get<txin_gateway>(inv);
+        found_gw_address_ids.insert(gw_in.gateway_addr);
+      }
+      else
+      {
+        found_non_gw_inputs = true;
+      }
+    }
+
+    CHECK_AND_ASSERT_MES(found_gw_address_ids.size() <= 1, false, "transaction has inputs from different GW addresses");
+    CHECK_AND_ASSERT_MES(!found_non_gw_inputs || found_gw_address_ids.empty(), false, "transaction has GW inputs combined with non-GW inputs");
+  }
 
   return true;
 }

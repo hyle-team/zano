@@ -2195,29 +2195,33 @@ bool hard_fork_6_asset_descriptor_limits::generate(std::vector<test_event_entry>
 
 //------------------------------------------------------------------------------
 
-hard_fork_6_gw_bad_ins_outs::hard_fork_6_gw_bad_ins_outs()
+hard_fork_6_gw_bad_ins_outs_base::hard_fork_6_gw_bad_ins_outs_base(bool play_bad_ins)
+  : m_play_bad_ins(play_bad_ins)
 {
-  REGISTER_CALLBACK_METHOD(hard_fork_6_gw_bad_ins_outs, c1);
+  REGISTER_CALLBACK_METHOD(hard_fork_6_gw_bad_ins_outs_base, c1);
 }
 
-bool hard_fork_6_gw_bad_ins_outs::generate(std::vector<test_event_entry>& events) const
+bool hard_fork_6_gw_bad_ins_outs_base::generate(std::vector<test_event_entry>& events) const
 {
   // Test idea: gw inputs and outputs must name a registered asset, a non-zero amount, a known gw address and (inputs) a sufficient balance
   // case | gw in / out                      | pool   | main block | alt block
   // -----+----------------------------------+--------+------------+---------------------------
+  // hard_fork_6_gw_bad_outs (ZC inputs only):
   // O1   | out: -A (mints A)                | reject | reject     | reject
   // O2   | out: -H (mints native coins)     | reject | reject     | reject
   // O3   | out: A, zero amount              | reject | reject     | reject
   // O4   | out: small-order point asset id  | reject | reject     | reject
   // O5   | out: unknown gw address          | accept | reject     | accept, chain switch fails
+  // then a valid gw withdrawal and a same-tx registration in an alt block that becomes main
+  // c1: registration moved away and back by chain switches, emission in a fresh alt block
+  // hard_fork_6_gw_bad_ins (gw inputs only, all from one gw address, as HF8 requires; the fee is paid by a native gw input):
   // I1   | in:  A, zero amount              | reject | reject     | reject
   // I2   | in:  -A                          | reject | reject     | reject
   // I3   | in:  A over the balance          | accept | reject     | accept, chain switch fails
   // I4   | in:  A, bad signature            | reject | reject     | accept, chain switch fails
   // I5   | in:  unknown gw address          | reject | reject     | accept, chain switch fails
   // I6   | in:  A twice, over the balance   | accept | reject     | accept, chain switch fails
-  // then a valid gw withdrawal and a same-tx registration in an alt block that becomes main
-  // c1: registration moved away and back by chain switches, emission in a fresh alt block
+  // then a valid gw withdrawal built the same way (control)
 
   bool r = false;
   uint64_t ts = test_core_time::get_time();
@@ -2417,6 +2421,79 @@ bool hard_fork_6_gw_bad_ins_outs::generate(std::vector<test_event_entry>& events
   std::vector<tx_source_entry> sources;
   transaction tx{};
 
+  if (m_play_bad_ins)
+  {
+    // every tx below has gw inputs only, all from one gw address:
+    // a native input that covers the fee and two outputs to Alice, followed by the inputs under test
+    const uint64_t gw_native_in = TESTS_DEFAULT_FEE + MK_TEST_COINS(2);
+    auto reset_sources_and_destinations = [&](const crypto::public_key& gw_addr) {
+      sources.clear();
+      sources.push_back(gw_source(gw_addr, native_coin_asset_id, gw_native_in));
+      destinations.clear();
+      destinations.emplace_back(MK_TEST_COINS(1),               alice_addr);
+      destinations.emplace_back(MK_TEST_COINS(1),               alice_addr);
+    };
+
+    // I1: gw in of A with zero amount
+    reset_sources_and_destinations(m_gw_addr_view.pub);
+    sources.push_back(gw_source(m_gw_addr_view.pub, m_asset_id, 0));
+    CHECK_AND_ASSERT_TRUE(construct_gw_tx(sources, destinations, gw_sec, tx));
+    play_bad_gw_tx(tx, false, false);
+
+    // I2: gw in of -A (cancels one of the two units of A taken by another gw input)
+    reset_sources_and_destinations(m_gw_addr_view.pub);
+    sources.push_back(gw_source(m_gw_addr_view.pub, m_asset_id, 2));
+    sources.push_back(gw_source(m_gw_addr_view.pub, anti_asset_id, 1));
+    destinations.emplace_back(1,                                alice_addr,           m_asset_id);
+    CHECK_AND_ASSERT_TRUE(construct_gw_tx(sources, destinations, gw_sec, tx));
+    play_bad_gw_tx(tx, false, false);
+
+    // I3: gw in of A over the gw balance
+    reset_sources_and_destinations(m_gw_addr_view.pub);
+    sources.push_back(gw_source(m_gw_addr_view.pub, m_asset_id, gw_asset_balance + 1));
+    destinations.emplace_back(gw_asset_balance + 1,             bob_addr,             m_asset_id);
+    CHECK_AND_ASSERT_TRUE(construct_gw_tx(sources, destinations, gw_sec, tx));
+    play_bad_gw_tx(tx, true, true);
+
+    // I4: gw ins signed with a wrong key
+    reset_sources_and_destinations(m_gw_addr_view.pub);
+    sources.push_back(gw_source(m_gw_addr_view.pub, m_asset_id, 1));
+    destinations.emplace_back(1,                                alice_addr,           m_asset_id);
+    CHECK_AND_ASSERT_TRUE(construct_gw_tx(sources, destinations, keypair::generate().sec, tx));
+    play_bad_gw_tx(tx, false, true);
+
+    // I5: gw ins from an unregistered gw address
+    reset_sources_and_destinations(pk_unknown_gw_addr);
+    sources.push_back(gw_source(pk_unknown_gw_addr, m_asset_id, 1));
+    destinations.emplace_back(1,                                alice_addr,           m_asset_id);
+    CHECK_AND_ASSERT_TRUE(construct_gw_tx(sources, destinations, gw_sec, tx));
+    play_bad_gw_tx(tx, false, true);
+
+    // I6: two gw ins of A, each within the gw balance, over it together
+    reset_sources_and_destinations(m_gw_addr_view.pub);
+    sources.push_back(gw_source(m_gw_addr_view.pub, m_asset_id, 60));
+    sources.push_back(gw_source(m_gw_addr_view.pub, m_asset_id, 50));
+    destinations.emplace_back(110,                              bob_addr,             m_asset_id);
+    CHECK_AND_ASSERT_TRUE(construct_gw_tx(sources, destinations, gw_sec, tx));
+    play_bad_gw_tx(tx, true, true);
+
+    // control: a valid gw withdrawal built the same way is accepted
+    reset_sources_and_destinations(m_gw_addr_view.pub);
+    sources.push_back(gw_source(m_gw_addr_view.pub, m_asset_id, 7));
+    destinations.emplace_back(7,                                bob_addr,             m_asset_id);
+    transaction tx_good{};
+    CHECK_AND_ASSERT_TRUE(construct_gw_tx(sources, destinations, gw_sec, tx_good));
+    ADD_CUSTOM_EVENT(events, tx_good);
+    DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(1));
+    MAKE_NEXT_BLOCK_TX_LIST(events, blk_7, blk_6, miner_acc, std::list<transaction>({ tx_good }));
+    DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(0));
+    DO_CALLBACK_PARAMS_STR(events, "check_gw_balance", t_serializable_object_to_blob(gw_address_balance_check_param{ m_gw_addr_view.pub, gw_native_balance - gw_native_in }));
+    DO_CALLBACK_PARAMS_STR(events, "check_gw_balance", t_serializable_object_to_blob(gw_address_balance_check_param{ m_gw_addr_view.pub, gw_asset_balance - 7,  m_asset_id }));
+    DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(BOB_ACC_IDX, 7, m_asset_id, 0));
+
+    return true;
+  }
+
   // O1: gw out of -A, balanced by A minted to Bob
   destinations.clear();
   destinations.emplace_back(change_native,                    alice_addr);
@@ -2459,63 +2536,6 @@ bool hard_fork_6_gw_bad_ins_outs::generate(std::vector<test_event_entry>& events
   CHECK_AND_ASSERT_TRUE(construct_gw_tx(sources_zc, destinations, gw_sec, tx));
   play_bad_gw_tx(tx, true, true);
 
-  // I1: gw in of A with zero amount
-  sources = sources_zc;
-  sources.push_back(gw_source(m_gw_addr_view.pub, m_asset_id, 0));
-  destinations.clear();
-  destinations.emplace_back(change_native,                    alice_addr);
-  destinations.emplace_back(20,                               alice_addr,           m_asset_id);
-  CHECK_AND_ASSERT_TRUE(construct_gw_tx(sources, destinations, gw_sec, tx));
-  play_bad_gw_tx(tx, false, false);
-
-  // I2: gw in of -A
-  sources = sources_zc;
-  sources.push_back(gw_source(m_gw_addr_view.pub, anti_asset_id, 1));
-  destinations.clear();
-  destinations.emplace_back(change_native,                    alice_addr);
-  destinations.emplace_back(19,                               alice_addr,           m_asset_id);
-  CHECK_AND_ASSERT_TRUE(construct_gw_tx(sources, destinations, gw_sec, tx));
-  play_bad_gw_tx(tx, false, false);
-
-  // I3: gw in of A over the gw balance
-  sources = sources_zc;
-  sources.push_back(gw_source(m_gw_addr_view.pub, m_asset_id, gw_asset_balance + 1));
-  destinations.clear();
-  destinations.emplace_back(change_native,                    alice_addr);
-  destinations.emplace_back(20,                               alice_addr,           m_asset_id);
-  destinations.emplace_back(gw_asset_balance + 1,             bob_addr,             m_asset_id);
-  CHECK_AND_ASSERT_TRUE(construct_gw_tx(sources, destinations, gw_sec, tx));
-  play_bad_gw_tx(tx, true, true);
-
-  // I4: gw in of A signed with a wrong key
-  sources = sources_zc;
-  sources.push_back(gw_source(m_gw_addr_view.pub, m_asset_id, 1));
-  destinations.clear();
-  destinations.emplace_back(change_native,                    alice_addr);
-  destinations.emplace_back(21,                               alice_addr,           m_asset_id);
-  CHECK_AND_ASSERT_TRUE(construct_gw_tx(sources, destinations, keypair::generate().sec, tx));
-  play_bad_gw_tx(tx, false, true);
-
-  // I5: gw in from an unregistered gw address
-  sources = sources_zc;
-  sources.push_back(gw_source(pk_unknown_gw_addr, m_asset_id, 1));
-  destinations.clear();
-  destinations.emplace_back(change_native,                    alice_addr);
-  destinations.emplace_back(21,                               alice_addr,           m_asset_id);
-  CHECK_AND_ASSERT_TRUE(construct_gw_tx(sources, destinations, gw_sec, tx));
-  play_bad_gw_tx(tx, false, true);
-
-  // I6: two gw ins of A, each within the gw balance, over it together
-  sources = sources_zc;
-  sources.push_back(gw_source(m_gw_addr_view.pub, m_asset_id, 60));
-  sources.push_back(gw_source(m_gw_addr_view.pub, m_asset_id, 50));
-  destinations.clear();
-  destinations.emplace_back(change_native,                    alice_addr);
-  destinations.emplace_back(20,                               alice_addr,           m_asset_id);
-  destinations.emplace_back(110,                              bob_addr,             m_asset_id);
-  CHECK_AND_ASSERT_TRUE(construct_gw_tx(sources, destinations, gw_sec, tx));
-  play_bad_gw_tx(tx, true, true);
-
   //
   // tx_6_good: the same ZC sources, legit destinations
   //
@@ -2556,20 +2576,16 @@ bool hard_fork_6_gw_bad_ins_outs::generate(std::vector<test_event_entry>& events
     CHECK_AND_ASSERT_TRUE(get_type_in_variant_container(tx_7.extra, ado));
     CHECK_AND_ASSERT_TRUE(get_or_calculate_asset_id(ado, nullptr, &asset_3_id));
   }
-  ADD_CUSTOM_EVENT(events, tx_7); // before tx_8's sources are picked, so they don't overlap
+  ADD_CUSTOM_EVENT(events, tx_7);
   transaction tx_8{};
   {
-    amounts.clear();
-    amounts[native_coin_asset_id] = TESTS_DEFAULT_FEE;
+    // gw inputs only, all from one gw address (as HF8 requires): the fee is paid by a native gw input
     sources.clear();
-    r = fill_tx_sources(sources, events, blk_6, alice_acc.get_keys(), amounts, 0, std::vector<tx_source_entry>(), fts_default);
-    CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources failed");
-    found_amounts.clear();
-    get_sources_total_amount(sources, found_amounts);
+    sources.push_back(gw_source(m_gw_addr_view.pub, native_coin_asset_id, TESTS_DEFAULT_FEE));
     sources.push_back(gw_source(m_gw_addr_view.pub, m_asset_id, 7));
     destinations.clear();
-    destinations.emplace_back(found_amounts[native_coin_asset_id] - TESTS_DEFAULT_FEE, alice_addr);
-    destinations.emplace_back(7, bob_addr, m_asset_id);
+    destinations.emplace_back(3, bob_addr, m_asset_id);
+    destinations.emplace_back(4, bob_addr, m_asset_id);
     CHECK_AND_ASSERT_TRUE(construct_gw_tx(sources, destinations, gw_sec, tx_8));
   }
   ADD_CUSTOM_EVENT(events, tx_8);
@@ -2591,14 +2607,14 @@ bool hard_fork_6_gw_bad_ins_outs::generate(std::vector<test_event_entry>& events
   DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(BOB_ACC_IDX, MK_TEST_COINS(0)));
 
   DO_CALLBACK_PARAMS_STR(events, "check_gw_balance", t_serializable_object_to_blob(gw_address_balance_check_param{ m_gw_addr_view.pub, gw_asset_balance - 7,  m_asset_id }));
-  DO_CALLBACK_PARAMS_STR(events, "check_gw_balance", t_serializable_object_to_blob(gw_address_balance_check_param{ m_gw_addr_view.pub, gw_native_balance }));
+  DO_CALLBACK_PARAMS_STR(events, "check_gw_balance", t_serializable_object_to_blob(gw_address_balance_check_param{ m_gw_addr_view.pub, gw_native_balance - TESTS_DEFAULT_FEE })); // tx_8's fee
 
   DO_CALLBACK(events, "c1");
 
   return true;
 }
 
-bool hard_fork_6_gw_bad_ins_outs::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+bool hard_fork_6_gw_bad_ins_outs_base::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
   // split -- A (asset 2 reg) -- A+1 (asset 2 emitted to gw) -- A+2 (2nd emission, fresh alt block)  --  4 blocks
   //      \-- 4 blocks        -- reg (emissions aren't ready yet)  -- both emissions
@@ -2892,6 +2908,236 @@ bool hard_fork_6_gw_reorg_refund_overflow::generate(std::vector<test_event_entry
   DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_13b));
   DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(0));
   check_gw_native_balances(gw_native_balance_b, deposit_amount - TESTS_DEFAULT_FEE);
+
+  return true;
+}
+
+//------------------------------------------------------------------------------
+
+bool hard_fork_8_gw_input_composition::generate(std::vector<test_event_entry>& events) const
+{
+  // Test idea: starting from HF8 a tx that has a gw input must have gw inputs only, and all of them must name the same gw address.
+  // case | inputs                                   | before HF8 | HF8+ (pool, main block, alt block)
+  // -----+------------------------------------------+------------+-----------------------------------
+  // M1   | ZC + gw address 1                        | accept     | reject
+  // M2   | gw address 1 + gw address 2              | accept     | reject
+  // M3   | gw address 1: native coins and asset A   | accept     | accept
+
+  bool r = false;
+  uint64_t ts = test_core_time::get_time();
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
+  account_base& bob_acc   = m_accounts[BOB_ACC_IDX];   bob_acc.generate();   bob_acc.set_createtime(ts);
+  const account_public_address& alice_addr = alice_acc.get_public_address();
+  const account_public_address& bob_addr   = bob_acc.get_public_address();
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
+  DO_CALLBACK(events, "configure_core"); // default configure_core callback will initialize core runtime config with m_hardforks
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+  MAKE_NEXT_BLOCK(events, blk_1, blk_0r, miner_acc);
+
+  // tx_0: small ZC outputs to Alice
+  transaction tx_0{};
+  CHECK_AND_ASSERT_SUCCESS(construct_tx_with_many_outputs(m_hardforks, events, blk_1, miner_acc.get_keys(), alice_addr, MK_TEST_COINS(301), 10, TESTS_DEFAULT_FEE, tx_0));
+  ADD_CUSTOM_EVENT(events, tx_0);
+  MAKE_NEXT_BLOCK_TX1(events, blk_2, blk_1, miner_acc, tx_0);
+  REWIND_BLOCKS_N(events, blk_2r, blk_2, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  // register two gw addresses
+  const keypair gw_1_view  = keypair::generate();
+  const keypair gw_1_spend = keypair::generate();
+  const keypair gw_2_view  = keypair::generate();
+  const keypair gw_2_spend = keypair::generate();
+  gateway_address_descriptor_operation gwdo{};
+  gateway_address_descriptor_operation_register gwdo_reg{};
+  gwdo_reg.view_pub_key = gw_1_view.pub;
+  gwdo_reg.descriptor.owner_key = gw_1_spend.pub;
+  gwdo.operation = gwdo_reg;
+  MAKE_TX_EXTRA_ATTACH_FEE(events, tx_1, miner_acc, miner_acc, 0, CURRENCY_GATEWAY_ADDRESS_REGISTRATION_FEE, blk_2r, std::vector<extra_v>({ gwdo }), empty_attachment);
+  MAKE_NEXT_BLOCK_TX1(events, blk_3, blk_2r, miner_acc, tx_1);
+  gwdo_reg.view_pub_key = gw_2_view.pub;
+  gwdo_reg.descriptor.owner_key = gw_2_spend.pub;
+  gwdo.operation = gwdo_reg;
+  MAKE_TX_EXTRA_ATTACH_FEE(events, tx_2, miner_acc, miner_acc, 0, CURRENCY_GATEWAY_ADDRESS_REGISTRATION_FEE, blk_3, std::vector<extra_v>({ gwdo }), empty_attachment);
+  MAKE_NEXT_BLOCK_TX1(events, blk_4, blk_3, miner_acc, tx_2);
+
+  // register asset A (tx_3: Alice to herself)
+  size_t current_hardfork_id = m_hardforks.get_the_most_recent_hardfork_id_for_height(get_block_height(blk_4));
+  crypto::public_key asset_id{};
+  std::vector<tx_destination_entry> destinations;
+  transaction tx_3{};
+  {
+    asset_descriptor_base adb{};
+    adb.total_max_supply = 420;
+    adb.ticker = "GWIC";
+    adb.full_name = "Gateway input composition";
+    asset_descriptor_operation ado{};
+    fill_ado_version_based_onhardfork(ado, current_hardfork_id);
+    ado.opt_descriptor = adb;
+    fill_adb_version_based_onhardfork(*ado.opt_descriptor, current_hardfork_id);
+    ado.operation_type = ASSET_DESCRIPTOR_OPERATION_REGISTER;
+    for(size_t i = 0; i < 12; ++i)
+      destinations.emplace_back(10, alice_addr, null_pkey);
+    destinations.emplace_back(MK_TEST_COINS(100), alice_addr);
+    r = construct_tx_to_key(m_hardforks, events, tx_3, blk_4, alice_acc, destinations, TESTS_DEFAULT_FEE, 0, 0, std::vector<attachment_v>({ ado }));
+    CHECK_AND_ASSERT_MES(r, false, "construct_tx_to_key failed");
+    CHECK_AND_ASSERT_TRUE(get_type_in_variant_container(tx_3.extra, ado));
+    CHECK_AND_ASSERT_TRUE(get_or_calculate_asset_id(ado, nullptr, &asset_id));
+    ADD_CUSTOM_EVENT(events, tx_3);
+  }
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_5, blk_4, miner_acc, std::list<transaction>({ tx_3 }));
+  REWIND_BLOCKS_N(events, blk_5r, blk_5, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  // Alice funds both gw addresses
+  const uint64_t gw_1_native_balance = MK_TEST_COINS(13);
+  const uint64_t gw_1_asset_balance  = 100;
+  const uint64_t gw_2_native_balance = MK_TEST_COINS(13);
+  destinations.clear();
+  destinations.emplace_back(gw_1_native_balance, gw_1_view.pub);
+  destinations.emplace_back(gw_1_asset_balance,  gw_1_view.pub, asset_id);
+  destinations.emplace_back(gw_2_native_balance, gw_2_view.pub);
+  transaction tx_4{};
+  r = construct_tx_to_key(m_hardforks, events, tx_4, blk_5r, alice_acc, destinations);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx_to_key failed");
+  ADD_CUSTOM_EVENT(events, tx_4);
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_6, blk_5r, miner_acc, std::list<transaction>({ tx_4 }));
+
+  auto check_gw_balances = [&](uint64_t native_balance_1, uint64_t asset_balance_1, uint64_t native_balance_2) {
+    DO_CALLBACK_PARAMS_STR(events, "check_gw_balance", t_serializable_object_to_blob(gw_address_balance_check_param{ gw_1_view.pub, native_balance_1 }));
+    DO_CALLBACK_PARAMS_STR(events, "check_gw_balance", t_serializable_object_to_blob(gw_address_balance_check_param{ gw_1_view.pub, asset_balance_1, asset_id }));
+    DO_CALLBACK_PARAMS_STR(events, "check_gw_balance", t_serializable_object_to_blob(gw_address_balance_check_param{ gw_2_view.pub, native_balance_2 }));
+  };
+  check_gw_balances(gw_1_native_balance, gw_1_asset_balance, gw_2_native_balance);
+
+  // ZC sources for M1: Alice's native coins for the fee
+  std::unordered_map<crypto::public_key, uint64_t> amounts;
+  amounts[native_coin_asset_id] = TESTS_DEFAULT_FEE;
+  std::vector<tx_source_entry> sources_zc;
+  r = fill_tx_sources(sources_zc, events, blk_6, alice_acc.get_keys(), amounts, 0, std::vector<tx_source_entry>(), fts_default);
+  CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources failed");
+  std::unordered_map<crypto::public_key, uint64_t> found_amounts;
+  get_sources_total_amount(sources_zc, found_amounts);
+  const uint64_t change_native = found_amounts[native_coin_asset_id] - TESTS_DEFAULT_FEE;
+  CHECK_AND_ASSERT_MES(change_native > 0, false, "no change for M1");
+
+  REWIND_BLOCKS_N(events, blk_7, blk_6, miner_acc, 2); // rejected txs are tried in a block on top of it (main) and on top of blk_6 (alt, one block shorter than main)
+
+  size_t tx_hardfork_id{};
+  uint64_t tx_version = get_tx_version_and_hardfork_id(get_block_height(blk_7) + 1, m_hardforks, tx_hardfork_id);
+  const bool hf8_rule_active = m_hardforks.is_hardfork_active_for_height(ZANO_HARDFORK_08, get_block_height(blk_7) + 1);
+
+  epee::misc_utils::events_dispatcher ed_replace_fee_by_standard;
+  ed_replace_fee_by_standard.SUBSCIRBE_EVENT<wde_construct_tx_before_prefix_hash_sealing>([&](const wde_construct_tx_before_prefix_hash_sealing& w){
+    // replace autocalculated fee
+    auto it = std::remove_if(w.tx->extra.begin(), w.tx->extra.end(), [](const payload_items_v& pi) { return pi.type() == typeid(zarcanum_tx_data_v1); });
+    w.tx->extra.erase(it, w.tx->extra.end());
+    w.tx->extra.push_back(zarcanum_tx_data_v1{ TESTS_DEFAULT_FEE });
+  });
+
+  auto gw_source = [](const crypto::public_key& gw_addr, const crypto::public_key& asset_id, uint64_t amount) -> tx_source_entry {
+    tx_source_entry tse{};
+    tse.gateway_origin = gw_addr;
+    tse.asset_id = asset_id;
+    tse.amount = amount;
+    return tse;
+  };
+
+  auto construct_gw_tx = [&](const std::vector<tx_source_entry>& sources, const std::vector<tx_destination_entry>& destinations, transaction& tx) -> bool {
+    finalize_tx_param ftp{};
+    ftp.tx_version = tx_version;
+    ftp.tx_hardfork_id = tx_hardfork_id;
+    ftp.sources = sources;
+    ftp.prepared_destinations = destinations;
+    ftp.shuffle = true;
+    ftp.pevents_dispatcher = &ed_replace_fee_by_standard;
+    finalized_tx ft{};
+    CHECK_AND_ASSERT_MES(construct_tx(alice_acc.get_keys(), ftp, ft), false, "construct_tx failed");
+    CHECK_AND_ASSERT_TRUE(sign_gw_inputs_in_tx([&](const crypto::public_key& gw_addr, crypto::secret_key& sec) -> bool {
+      sec = gw_addr == gw_2_view.pub ? gw_2_spend.sec : gw_1_spend.sec;
+      return true;
+    }, ft.tx));
+    tx = ft.tx;
+    return true;
+  };
+
+  // the tx is tried in the pool, in a main chain block on top of blk_7 and in an alt block on top of blk_6: all three must refuse it
+  auto play_rejected_tx = [&](const transaction& tx) {
+    DO_CALLBACK(events, "mark_invalid_tx");
+    ADD_CUSTOM_EVENT(events, tx);
+    events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, true));
+    ADD_CUSTOM_EVENT(events, tx);
+    DO_CALLBACK(events, "mark_invalid_block");
+    MAKE_NEXT_BLOCK_TX_LIST(events, blk_bad_main, blk_7, miner_acc, std::list<transaction>({ tx }));
+    ADD_CUSTOM_EVENT(events, tx);
+    DO_CALLBACK(events, "mark_invalid_block");
+    MAKE_NEXT_BLOCK_TX_LIST(events, blk_bad_alt, blk_6, miner_acc, std::list<transaction>({ tx }));
+    events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, false));
+    DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(0));
+    DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_7));
+    check_gw_balances(gw_1_native_balance, gw_1_asset_balance, gw_2_native_balance);
+  };
+
+  // M1: Alice's ZC input pays the fee, a gw input of address 1 gives 7 units of A to Bob
+  std::vector<tx_source_entry> sources = sources_zc;
+  sources.push_back(gw_source(gw_1_view.pub, asset_id, 7));
+  destinations.clear();
+  destinations.emplace_back(change_native,                    alice_addr);
+  destinations.emplace_back(7,                                bob_addr,             asset_id);
+  transaction tx_m1{};
+  CHECK_AND_ASSERT_TRUE(construct_gw_tx(sources, destinations, tx_m1));
+
+  // M2: native gw inputs of address 1 (covers the fee) and of address 2
+  sources.clear();
+  sources.push_back(gw_source(gw_1_view.pub, native_coin_asset_id, TESTS_DEFAULT_FEE + MK_TEST_COINS(1)));
+  sources.push_back(gw_source(gw_2_view.pub, native_coin_asset_id, MK_TEST_COINS(1)));
+  destinations.clear();
+  destinations.emplace_back(MK_TEST_COINS(1),                 alice_addr);
+  destinations.emplace_back(MK_TEST_COINS(1),                 alice_addr);
+  transaction tx_m2{};
+  CHECK_AND_ASSERT_TRUE(construct_gw_tx(sources, destinations, tx_m2));
+
+  // M3: two gw inputs of address 1: native coins (covers the fee) and 5 units of A to Bob
+  sources.clear();
+  sources.push_back(gw_source(gw_1_view.pub, native_coin_asset_id, TESTS_DEFAULT_FEE + MK_TEST_COINS(1)));
+  sources.push_back(gw_source(gw_1_view.pub, asset_id, 5));
+  destinations.clear();
+  destinations.emplace_back(MK_TEST_COINS(1),                 alice_addr);
+  destinations.emplace_back(5,                                bob_addr,             asset_id);
+  transaction tx_m3{};
+  CHECK_AND_ASSERT_TRUE(construct_gw_tx(sources, destinations, tx_m3));
+
+  std::list<transaction> accepted_txs;
+  if (hf8_rule_active)
+  {
+    play_rejected_tx(tx_m1);
+    play_rejected_tx(tx_m2);
+  }
+  else
+  {
+    ADD_CUSTOM_EVENT(events, tx_m1);
+    ADD_CUSTOM_EVENT(events, tx_m2);
+    accepted_txs.push_back(tx_m1);
+    accepted_txs.push_back(tx_m2);
+  }
+  ADD_CUSTOM_EVENT(events, tx_m3);
+  accepted_txs.push_back(tx_m3);
+
+  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", accepted_txs.size());
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_8, blk_7, miner_acc, accepted_txs);
+  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(0));
+
+  const uint64_t gw_native_spend = TESTS_DEFAULT_FEE + MK_TEST_COINS(1); // native coins taken from gw address 1 by M2 and by M3
+  if (hf8_rule_active)
+  {
+    check_gw_balances(gw_1_native_balance - gw_native_spend, gw_1_asset_balance - 5, gw_2_native_balance);
+    DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(BOB_ACC_IDX, 5, asset_id, 0));
+  }
+  else
+  {
+    check_gw_balances(gw_1_native_balance - 2 * gw_native_spend, gw_1_asset_balance - 7 - 5, gw_2_native_balance - MK_TEST_COINS(1));
+    DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(BOB_ACC_IDX, 7 + 5, asset_id, 0));
+  }
 
   return true;
 }
