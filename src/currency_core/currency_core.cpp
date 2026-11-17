@@ -68,6 +68,7 @@ namespace currency
   void core::init_options(boost::program_options::options_description& desc)
   {
     blockchain_storage::init_options(desc);
+    tx_memory_pool::init_options(desc);
   }
   //-----------------------------------------------------------------------------------------------
   std::string core::get_config_folder()
