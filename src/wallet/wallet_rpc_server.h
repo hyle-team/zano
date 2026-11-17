@@ -294,6 +294,7 @@ namespace tools
     bool m_allow_legacy_decrypt;
     uint64_t m_last_wallet_store_height;
     std::string m_jwt_secret;
+    epee::critical_section m_jwt_lock;
     epee::misc_utils::expirating_set<std::string, uint64_t> m_jwt_used_salts;
     tools::extension_http_origin_verifier m_origin_verifier;
   };

@@ -269,6 +269,7 @@ namespace tools
     
     try
     {
+      CRITICAL_REGION_LOCAL(m_jwt_lock);
       if(m_jwt_used_salts.get_set().size() > JWT_TOKEN_OVERWHELM_LIMIT)
       {
         throw std::runtime_error("Salt is overwhelmed");
