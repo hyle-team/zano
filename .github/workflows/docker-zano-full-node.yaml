@@ -1,6 +1,8 @@
 name: Build & push zano-full-node docker image
 
 on:
+  release:
+    types: [published]
   workflow_dispatch:
     inputs:
       branch:
@@ -16,9 +18,16 @@ on:
         type: boolean
         default: true
 
+permissions:
+  contents: read
+
 jobs:
   build-push:
     runs-on: ubuntu-latest
+    env:
+      SRC_REF: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.branch }}
+      IMAGE_TAG: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.image_tag }}
+      PUSH_LATEST: ${{ (github.event_name == 'release' && !github.event.release.prerelease) || (github.event_name == 'workflow_dispatch' && inputs.update_latest) }}
     steps:
       - uses: actions/checkout@v4
         #with:
@@ -37,11 +46,11 @@ jobs:
           file: utils/docker/zano-full-node/Dockerfile
           push: true
           build-args: |
-            BRANCH=${{ github.event.inputs.branch }}
+            BRANCH=${{ env.SRC_REF }}
             CACHEBUST=${{ github.run_id }}
           tags: |
-            zanoproject/zano-full-node:${{ github.event.inputs.image_tag }}
-            zanoproject/zano-full-node:${{ github.event.inputs.branch }}
-            ${{ (inputs.update_latest == true || inputs.update_latest == 'true') && 'zanoproject/zano-full-node:latest' || '' }}
+            zanoproject/zano-full-node:${{ env.IMAGE_TAG }}
+            ${{ env.SRC_REF != env.IMAGE_TAG && format('zanoproject/zano-full-node:{0}', env.SRC_REF) || '' }}
+            ${{ env.PUSH_LATEST == 'true' && 'zanoproject/zano-full-node:latest' || '' }}
           cache-from: type=registry,ref=zanoproject/zano-full-node:buildcache
           cache-to:   type=registry,ref=zanoproject/zano-full-node:buildcache,mode=max
