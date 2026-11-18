@@ -7,7 +7,6 @@
 #include "chaingen.h"
 #include "alias_tests.h"
 #include "tx_builder.h"
-#include "random_helper.h"
 
 using namespace epee;
 using namespace currency;
@@ -365,7 +364,7 @@ bool gen_alias_tests::check_too_many_aliases_registration(currency::core& c, siz
       LOG_PRINT_YELLOW("Generating alias #" << i << " of " << total_alias_to_gen << "...", LOG_LEVEL_0);
       someone.generate();
       ai.m_address = someone.get_public_address();
-      ai.m_alias = gen_random_alias(random_in_range(ALIAS_MINIMUM_PUBLIC_SHORT_NAME_ALLOWED, ALIAS_MINIMUM_PUBLIC_SHORT_NAME_ALLOWED + 20));
+      ai.m_alias = "test-limit-" + std::to_string(i);
       transaction alias_reg_tx = AUTO_VAL_INIT(alias_reg_tx);
       miner_wlt->request_alias_registration(ai, alias_reg_tx, TESTS_DEFAULT_FEE, estimated_alias_cost);
       
@@ -1420,7 +1419,7 @@ bool gen_alias_too_many_regs_in_block_template::add_block_from_template(currency
       LOG_PRINT_YELLOW("Generating alias #" << i << " of " << m_total_alias_to_gen << "...", LOG_LEVEL_0);
       someone.generate();
       ai.m_address = someone.get_public_address();
-      ai.m_alias = gen_random_alias(random_in_range(ALIAS_MINIMUM_PUBLIC_SHORT_NAME_ALLOWED, ALIAS_MINIMUM_PUBLIC_SHORT_NAME_ALLOWED + 20));
+      ai.m_alias = "test-limit-" + std::to_string(i);
       transaction alias_reg_tx = AUTO_VAL_INIT(alias_reg_tx);
       alice_wlt->request_alias_registration(ai, alias_reg_tx, TESTS_DEFAULT_FEE, m_estimated_alias_cost);
     }

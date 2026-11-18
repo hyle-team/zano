@@ -148,7 +148,7 @@ public:
     int exit_code = 0;
   };
 
-  int run_parent_if_needed(int argc, char* argv[], const std::vector<test_job>& g_test_jobs) const;
+  int run_parent_if_needed(int argc, char* argv[], const std::vector<test_job>& g_test_jobs);
   bool write_worker_report(const worker_report& rep) const;
   void log_test_taken_by_this_process(const std::string& test_name) const;
 
@@ -179,19 +179,18 @@ private:
   };
 
   const boost::program_options::variables_map& m_vm;
+  std::filesystem::path m_run_root;
   mutable std::mutex cerr_mx;
 
-  std::filesystem::path get_run_root_path() const;
   std::filesystem::path get_worker_report_path(uint32_t worker_id) const;
   std::filesystem::path get_worker_log_path(uint32_t worker_id) const;
-  std::string make_worker_data_dir(const std::filesystem::path& run_root_abs, int worker_id) const;
   std::filesystem::path get_worker_dir_path(uint32_t worker_id) const;
   std::filesystem::path get_taken_tests_log_path_for_this_process() const;
   std::filesystem::path get_workers_report_path() const;
 
   std::vector<std::string> build_base_args_without_worker_specific(int argc, char* argv[]) const;
 
-  int run_workers_and_wait(int argc, char* argv[], const std::vector<test_job>& g_test_jobs) const;
+  int run_workers_and_wait(int argc, char* argv[], const std::vector<test_job>& g_test_jobs);
   int print_aggregated_report_and_return_rc(uint32_t processes, uint64_t wall_time_ms, const coretests_shm::shared_state* shm_state, const std::vector<test_job>& jobs) const;
   void print_worker_failure_reasons(uint32_t processes, const std::vector<int>& worker_exit_codes) const;
 

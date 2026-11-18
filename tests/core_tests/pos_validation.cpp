@@ -1024,9 +1024,9 @@ bool pos_altblocks_validation::generate(std::vector<test_event_entry>& events) c
   r = generate_pos_block_with_given_coinstake(generator, events, miner_acc, blk_2a, blk_0r.miner_tx, 0, blk_3aa);
   CHECK_AND_ASSERT_MES(r, false, "generate_pos_block_with_given_coinstake failed");
   if (HF4_active)
-    boost::get<zarcanum_sig>(blk_3aa.miner_tx.signatures[0]).y0.m_u64[1] = 5; // invalidate signature
+    boost::get<zarcanum_sig>(blk_3aa.miner_tx.signatures[0]).y0.m_u64[1] ^= 0x02; // invalidate signature
   else
-    boost::get<NLSAG_sig>(blk_3aa.miner_tx.signatures[0]).s[0].c.data[5] = 7; // invalidate signature
+    boost::get<NLSAG_sig>(blk_3aa.miner_tx.signatures[0]).s[0].c.data[5] ^= 0x01; // invalidate signature
   DO_CALLBACK(events, "mark_invalid_block");
   ADD_CUSTOM_EVENT(events, blk_3aa);
 
