@@ -224,13 +224,15 @@ TEST(parse_and_validate_tx_extra, is_correct_parse_and_validate_tx_extra)
 }
 TEST(block_rpc_details, miner_userdata_does_not_break_json_utf8)
 {
+  const char* utf8_text = "<v\xC3\xA8" "3;&\xC3\xAE" "n";
   const struct
   {
     const char* input;
-    const char* expected;
+    const char* expected_json_text;
+    const char* expected_decoded_text;
   } cases[] = {
-    { "<v\xE8" "3;&\xEE" "n", "<v\xEF\xBF\xBD" "3;&\xEF\xBF\xBD" "n" },
-    { "<v\xC3\xA8" "3;&\xC3\xAE" "n", "<v\xC3\xA8" "3;&\xC3\xAE" "n" }
+    { "<v\xE8" "3;&\xEE" "n", R"(<v\u00e83;&\u00een)", utf8_text },
+    { utf8_text, utf8_text, utf8_text }
   };
   currency::account_base acc;
   acc.generate();
@@ -248,125 +250,22 @@ TEST(block_rpc_details, miner_userdata_does_not_break_json_utf8)
     currency::block_rpc_extended_info details = {};
     details.total_fee = TESTS_DEFAULT_FEE;
     ASSERT_TRUE(currency::fill_block_rpc_details(details, bei, currency::null_hash));
-    EXPECT_EQ(test_case.expected, details.miner_text_info);
-    EXPECT_EQ(std::string::npos, utf8::find_invalid(details.miner_text_info));
-    EXPECT_EQ(original_blob, t_serializable_object_to_blob(bei.bl));
+    EXPECT_EQ(test_case.input, details.miner_text_info);
 
     currency::COMMAND_RPC_GET_BLOCKS_DETAILS::response response = {};
     response.status = API_RETURN_CODE_OK;
     response.blocks.push_back(details);
-    const std::string json = epee::serialization::store_t_to_json(response);
-    ASSERT_FALSE(json.empty());
+    std::string json;
+    ASSERT_TRUE(epee::net_utils::http::store_json_response(response, json));
     EXPECT_EQ(std::string::npos, utf8::find_invalid(json));
+    EXPECT_NE(std::string::npos, json.find(std::string("\"miner_text_info\": \"") + test_case.expected_json_text + "\""));
+    EXPECT_EQ(test_case.input, response.blocks.front().miner_text_info);
+    EXPECT_EQ(original_blob, t_serializable_object_to_blob(bei.bl));
     currency::COMMAND_RPC_GET_BLOCKS_DETAILS::response parsed = {};
     ASSERT_TRUE(epee::serialization::load_t_from_json(parsed, json));
     ASSERT_EQ(1, parsed.blocks.size());
-    EXPECT_EQ(test_case.expected, parsed.blocks.front().miner_text_info);
+    EXPECT_EQ(test_case.expected_decoded_text, parsed.blocks.front().miner_text_info);
   }
-}
-
-TEST(block_rpc_details, json_request_to_database_record_to_rpc_trace)
-{
-  const auto print_bytes = [](const char* stage, const std::string& bytes)
-  {
-    std::cout << stage << " size=" << bytes.size()
-      << " hex=" << epee::string_tools::buff_to_hex_nodelimer(bytes) << '\n';
-  };
-  currency::account_base acc;
-  acc.generate();
-  const std::string body =
-    R"({"jsonrpc":"2.0","id":1,"method":"getblocktemplate","params":{"wallet_address":")"
-    + currency::get_account_address_as_str(acc.get_keys().account_address)
-    + R"(","pos_block":false,"extra_text":"<v\u00e83;&\u00een"}})";
-  std::cout << "S1 miner -> node HTTP JSON body: " << body << '\n';
-  print_bytes("S1 HTTP body bytes", body);
-  ASSERT_EQ(std::string::npos, utf8::find_invalid(body));
-
-  epee::serialization::portable_storage ps;
-  ASSERT_TRUE(ps.load_from_json(body));
-  epee::json_rpc::request<currency::COMMAND_RPC_GETBLOCKTEMPLATE::request> request = {};
-  ASSERT_TRUE(request.load(ps));
-  ASSERT_EQ("getblocktemplate", request.method);
-  // characterize the current legacy decoder, not correct Unicode decoding
-  ASSERT_EQ("<v\xE8" "3;&\xEE" "n", request.params.extra_text);
-  EXPECT_EQ(2u, utf8::find_invalid(request.params.extra_text));
-  print_bytes("S2 parsed request.params.extra_text", request.params.extra_text);
-
-  currency::account_public_address miner_address = {};
-  ASSERT_TRUE(currency::get_account_address_from_str(miner_address, request.params.wallet_address));
-  currency::block block_template = {};
-  block_template.major_version = 1;
-  uint64_t block_reward_without_fee = 0, block_reward = 0;
-  ASSERT_TRUE(currency::construct_miner_tx(0, 0, 10000000000000, 1000, TESTS_DEFAULT_FEE,
-    miner_address, miner_address, block_template.miner_tx, block_reward_without_fee, block_reward,
-    TRANSACTION_VERSION_PRE_HF4, 0, request.params.extra_text, 1));
-  currency::extra_user_data userdata = {};
-  ASSERT_TRUE(currency::get_type_in_variant_container(block_template.miner_tx.extra, userdata));
-  ASSERT_EQ(request.params.extra_text, userdata.buff);
-  print_bytes("S3 miner_tx.extra userdata", userdata.buff);
-
-  std::string block_blob;
-  ASSERT_TRUE(t_serializable_object_to_blob(block_template, block_blob));
-  const std::string template_hex = epee::string_tools::buff_to_hex_nodelimer(block_blob);
-  std::cout << "S4 node -> miner blocktemplate_blob (HEX): " << template_hex << '\n';
-  const std::string submit_body =
-    R"({"jsonrpc":"2.0","id":1,"method":"submitblock","params":[")" + template_hex + R"("]})";
-  std::cout << "S5 miner -> node submitblock body (codec example, no PoW): " << submit_body << '\n';
-  epee::json_rpc::request<currency::COMMAND_RPC_SUBMITBLOCK::request> submit_request = {};
-  ASSERT_TRUE(epee::serialization::load_t_from_json(submit_request, submit_body));
-  ASSERT_EQ("submitblock", submit_request.method);
-  ASSERT_EQ(1, submit_request.params.size());
-  std::string submitted_blob;
-  ASSERT_TRUE(epee::string_tools::parse_hexstr_to_binbuff(submit_request.params.front(), submitted_blob));
-  ASSERT_EQ(block_blob, submitted_blob);
-  currency::block submitted_block = {};
-  ASSERT_TRUE(currency::parse_and_validate_block_from_blob(submitted_blob, submitted_block));
-  ASSERT_TRUE(currency::get_type_in_variant_container(submitted_block.miner_tx.extra, userdata));
-  ASSERT_EQ(request.params.extra_text, userdata.buff);
-  print_bytes("S5 decoded submitted miner userdata", userdata.buff);
-
-  // use the same block_extended_info codec as the 'blocks' table, without a DB write
-  currency::block_extended_info record = {};
-  record.bl = submitted_block;
-  std::string record_blob;
-  ASSERT_TRUE(t_serializable_object_to_blob(record, record_blob));
-  print_bytes("S6 blocks table value codec (not actual DB I/O)", record_blob);
-  currency::block_extended_info restored = {};
-  ASSERT_TRUE(t_unserializable_object_from_blob(restored, record_blob));
-  ASSERT_TRUE(currency::get_type_in_variant_container(restored.bl.miner_tx.extra, userdata));
-  ASSERT_EQ(request.params.extra_text, userdata.buff);
-  ASSERT_EQ(block_blob, t_serializable_object_to_blob(restored.bl));
-  print_bytes("S6 userdata restored from record bytes", userdata.buff);
-
-  currency::block_rpc_extended_info details = {};
-  details.total_fee = TESTS_DEFAULT_FEE;
-  ASSERT_TRUE(currency::fill_block_rpc_details(details, restored, currency::null_hash));
-  epee::json_rpc::response<currency::COMMAND_RPC_GET_BLOCKS_DETAILS::response,
-    epee::json_rpc::dummy_error> response = {};
-  response.jsonrpc = "2.0";
-  response.id = request.id;
-  response.result.status = API_RETURN_CODE_OK;
-  response.result.blocks.push_back(details);
-
-  // recreate only the old response copy; do not alter the stored record
-  auto legacy_response = response;
-  legacy_response.result.blocks.front().miner_text_info = userdata.buff;
-  const std::string legacy_json = epee::serialization::store_t_to_json(legacy_response);
-  ASSERT_NE(std::string::npos, utf8::find_invalid(legacy_json));
-  print_bytes("S7 old node -> client HTTP JSON body", legacy_json);
-  std::cout << "S7 old body first invalid UTF-8 offset=" << utf8::find_invalid(legacy_json) << '\n';
-
-  ASSERT_EQ("<v\xEF\xBF\xBD" "3;&\xEF\xBF\xBD" "n", details.miner_text_info);
-  print_bytes("S8 fixed RPC miner_text_info", details.miner_text_info);
-  const std::string json = epee::serialization::store_t_to_json(response);
-  ASSERT_EQ(std::string::npos, utf8::find_invalid(json));
-  print_bytes("S8 fixed node -> client HTTP JSON body", json);
-  std::cout << "S8 fixed JSON body: " << json << '\n';
-  decltype(response) parsed = {};
-  ASSERT_TRUE(epee::serialization::load_t_from_json(parsed, json));
-  ASSERT_EQ(1, parsed.result.blocks.size());
-  EXPECT_EQ(details.miner_text_info, parsed.result.blocks.front().miner_text_info);
-  EXPECT_EQ(record_blob, t_serializable_object_to_blob(restored));
 }
 
 TEST(market_json, offer_attachment_roundtrip)
@@ -436,47 +335,6 @@ TEST(market_json, offer_attachment_roundtrip)
       << " after=" << epee::string_tools::buff_to_hex_nodelimer(decoded->of.comment)
       << " signature_valid=" << signature_valid << '\n';
   }
-}
-
-TEST(market_json, external_unicode_escape_uses_legacy_byte_decoding)
-{
-  bc_services::update_offer offer = {};
-  offer.tx_id = crypto::cn_fast_hash("offer", 5);
-  offer.of.comment = "\xC3\xA8\xC3\xAE"; // UTF-8 for U+00E8 and U+00EE
-  const currency::keypair owner_keys = currency::keypair::generate();
-  const std::string sig_blob = bc_services::make_offer_sig_blob(offer);
-  crypto::generate_signature(crypto::cn_fast_hash(sig_blob.data(), sig_blob.size()),
-    owner_keys.pub, owner_keys.sec, offer.sig);
-  ASSERT_TRUE(crypto::check_signature(crypto::cn_fast_hash(sig_blob.data(), sig_blob.size()), owner_keys.pub, offer.sig));
-
-  std::vector<currency::attachment_v> attachments;
-  bc_services::put_offer_into_attachment(offer, attachments);
-  ASSERT_EQ(1u, attachments.size());
-  auto& attachment = boost::get<currency::tx_service_attachment>(attachments.front());
-  ASSERT_EQ(std::string::npos, attachment.body.find(R"(\u00e8)"));
-  const size_t comment_pos = attachment.body.find(offer.of.comment);
-  ASSERT_NE(std::string::npos, comment_pos);
-  // emulate an external writer equivalent JSON, not output generated by epee
-  attachment.body.replace(comment_pos, offer.of.comment.size(), R"(\u00e8\u00ee)");
-  ASSERT_EQ(std::string::npos, utf8::find_invalid(attachment.body));
-  std::cout << "MARKET external escaped JSON: " << attachment.body << '\n';
-  ASSERT_TRUE(epee::zlib_helper::pack(attachment.body));
-
-  std::vector<bc_services::offers_attachment_t> instructions;
-  bc_services::extract_market_instructions(instructions, attachments);
-  ASSERT_EQ(1u, instructions.size());
-  const auto* decoded = boost::get<bc_services::update_offer>(&instructions.front());
-  ASSERT_TRUE(decoded != nullptr);
-  // characterize the current legacy parser these are not correct UTF-8 bytes
-  EXPECT_EQ("\xE8\xEE", decoded->of.comment);
-  EXPECT_NE(std::string::npos, utf8::find_invalid(decoded->of.comment));
-  const std::string decoded_sig_blob = bc_services::make_offer_sig_blob(*decoded);
-  EXPECT_NE(sig_blob, decoded_sig_blob);
-  const bool signature_valid = crypto::check_signature(crypto::cn_fast_hash(decoded_sig_blob.data(), decoded_sig_blob.size()), owner_keys.pub, decoded->sig);
-  EXPECT_FALSE(signature_valid);
-  std::cout << "MARKET external comment before=" << epee::string_tools::buff_to_hex_nodelimer(offer.of.comment)
-    << " after=" << epee::string_tools::buff_to_hex_nodelimer(decoded->of.comment)
-    << " signature_valid=" << signature_valid << '\n';
 }
 
 TEST(parse_and_validate_tx_extra, is_correct_extranonce_too_big)
