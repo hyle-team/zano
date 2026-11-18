@@ -26,6 +26,8 @@
 #pragma once 
 #include <algorithm>
 #include <ios>
+#include <iterator>
+#include <boost/locale/utf.hpp>
 
 namespace epee 
 {
@@ -167,26 +169,42 @@ namespace misc_utils
               val.push_back('/');break;
             case 'u':  // \uDDDD sequence
               {
-                bool ok = false;
-                size_t chars_left = buf_end - it - 1;
-                size_t chars_to_get = std::min(static_cast<size_t>(4), chars_left); // in [0, 4]
-                char tmp[10] = {0};
-                memcpy(tmp, &(*(it+1)), chars_to_get);
-                it = it + chars_to_get; // move forward to skip 0..4 digits
-                if (chars_to_get == 4)
+                const auto read_code_unit = [&it, buf_end]()
                 {
-                  char *p_last_decoded_char = nullptr;
-                  unsigned long value = strtoul(tmp, &p_last_decoded_char, 16); // expected value is from 0x0000 (\u0000) to 0x00ff (\u00ff)
-                  if (value <= 0xff && p_last_decoded_char - tmp == 4)
+                  size_t chars_left = buf_end - it - 1;
+                  if (chars_left < 4)
+                    ASSERT_MES_AND_THROW("JSON incomplete \\u escape sequence");
+                  unsigned long value = 0;
+                  for (size_t i = 0; i < 4; ++i)
                   {
-                    val.push_back(static_cast<char>(value));
-                    ok = true;
+                    const char c = *++it;
+                    value <<= 4;
+                    if (c >= '0' && c <= '9')
+                      value += c - '0';
+                    else if (c >= 'a' && c <= 'f')
+                      value += c - 'a' + 10;
+                    else if (c >= 'A' && c <= 'F')
+                      value += c - 'A' + 10;
+                    else
+                      ASSERT_MES_AND_THROW("JSON invalid hex digit in \\u escape sequence");
                   }
-                }
-                if (!ok)
+                  return value;
+                };
+                unsigned long value = read_code_unit();
+                if (value >= 0xd800 && value <= 0xdbff)
                 {
-                  LOG_PRINT_L0("JSON invalid escape sequence: \\u" << tmp);
+                  size_t chars_left = buf_end - it - 1;
+                  if (chars_left < 6 || *(it + 1) != '\\' || *(it + 2) != 'u')
+                    ASSERT_MES_AND_THROW("JSON missing low surrogate in \\u escape sequence");
+                  it += 2;
+                  unsigned long low = read_code_unit();
+                  if (low < 0xdc00 || low > 0xdfff)
+                    ASSERT_MES_AND_THROW("JSON invalid low surrogate in \\u escape sequence");
+                  value = 0x10000 + ((value - 0xd800) << 10) + (low - 0xdc00);
                 }
+                else if (value >= 0xdc00 && value <= 0xdfff)
+                  ASSERT_MES_AND_THROW("JSON unexpected low surrogate in \\u escape sequence");
+                boost::locale::utf::utf_traits<char>::encode(static_cast<boost::locale::utf::code_point>(value), std::back_inserter(val));
               }
               break;
             default:
