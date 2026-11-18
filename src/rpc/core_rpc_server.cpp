@@ -38,6 +38,7 @@ using namespace epee;
 #define RPC_LIMIT_COMMAND_RPC_GET_ALT_BLOCKS_DETAILS_COUNT                                      100
 #define RPC_LIMIT_COMMAND_RPC_FORCE_RELAY_RAW_TXS                                               100
 #define RPC_LIMIT_COMMAND_RPC_GET_ALIASES_COUNT                                                 200
+#define RPC_LIMIT_COMMAND_RPC_GATEWAY_GET_ADDRESSES                                             100
 #define RPC_LIMIT_COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY                                       200
 
 
@@ -738,6 +739,26 @@ namespace currency
       VARIANT_CASE_OTHER();
         return false;
     VARIANT_SWITCH_END();
+    return true;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool core_rpc_server::on_gateway_get_addresses(const COMMAND_RPC_GATEWAY_GET_ADDRESSES::request& req, COMMAND_RPC_GATEWAY_GET_ADDRESSES::response& res, connection_context& cntx)
+  {
+    CHECK_CORE_READY();
+    CHECK_RPC_LIMITS(req.count, RPC_LIMIT_COMMAND_RPC_GATEWAY_GET_ADDRESSES);
+
+    std::vector<gateway_address_id_type> address_ids;
+    if(!m_core.get_blockchain_storage().get_gateway_addresses(req.offset, req.count, address_ids, res.top_block_height))
+    {
+      res.status = API_RETURN_CODE_INTERNAL_ERROR;
+      return true;
+    }
+    for(const auto& address_id : address_ids)
+    {
+      res.addresses.push_back(get_account_address_as_str(address_id));
+    }
+    
+    res.status = API_RETURN_CODE_OK;
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
