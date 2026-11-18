@@ -5226,9 +5226,6 @@ bool wallet_rpc_sweep_below::c1(currency::core& c, size_t ev_index, const std::v
     CHECK_AND_ASSERT_MES(r, false, "case auditable prep: mine failed");
     auditable_wlt->refresh();
     CHECK_AND_ASSERT_EQ(auditable_wlt->balance(currency::native_coin_asset_id), auditable_sweep_amount);
-    tools::transfer_container auditable_transfers;
-    auditable_wlt->get_transfers(auditable_transfers);
-    const uint64_t auditable_outs_count = auditable_transfers.size(); // the funding transfer may be split into several outputs
 
     // Usually the funding tx pays one output here plus change to the miner. When the miner happens to
     // spend a UTXO of exactly auditable_sweep_amount + fee there is no change, and wallet2 splits the
