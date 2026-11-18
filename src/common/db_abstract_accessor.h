@@ -132,6 +132,18 @@ namespace tools
       }
       bool begin_transaction(bool readonly = false)
       {
+        if(!readonly)
+        {
+          bool has_write_tx = false;
+          {
+            CRITICAL_REGION_LOCAL(m_transactions_stack_lock);
+            has_write_tx = has_writer_tx_in_stack(m_transactions_stack[std::this_thread::get_id()]);
+          }
+          CHECK_AND_ASSERT_THROW_MES(has_write_tx || !m_rwlock.is_locked_shared_by_this_thread(),
+                                     "write transaction is started while the read lock is held, it may deadlock with another writer");
+        }
+
+
         bool r = m_backend->begin_transaction(readonly);
         CRITICAL_REGION_LOCAL(m_transactions_stack_lock);
         std::vector<bool>& this_thread_tx_stack = m_transactions_stack[std::this_thread::get_id()];

@@ -154,6 +154,9 @@ namespace epee
         if(!result_struct.load(stg_ret))
         {
           LOG_ERROR("Failed to result_struct.load(stg_ret) on command " << command);
+          TRY_ENTRY();
+          cb(LEVIN_ERROR_FORMAT, result_struct, context);
+          CATCH_ENTRY2(true);
           return false;
         }
         TRY_ENTRY()

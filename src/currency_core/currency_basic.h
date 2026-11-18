@@ -348,7 +348,9 @@ namespace currency
       FIELD(gateway_addr)
       FIELD(asset_id)
       VARINT_FIELD(amount)
-      VARINT_FIELD(version) // do we really need it? -- sowle
+#if defined(TESTNET) && defined(CURRENCY_FORMATION_VERSION) && (CURRENCY_FORMATION_VERSION == 103)
+      VARINT_FIELD(version)  // remove this when testnet restarted with new formation version
+#endif
     END_SERIALIZE()
 
   };

@@ -250,7 +250,8 @@ template<class t_object>
 std::string t_serializable_object_to_blob(const t_object& to)
 {
   std::string b;
-  t_serializable_object_to_blob(to, b);
+  bool r = t_serializable_object_to_blob(to, b);
+  CHECK_AND_ASSERT_THROW_MES(r, "Failed to serialize object to blob");
   return b;
 }
 

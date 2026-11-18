@@ -32,13 +32,19 @@ namespace tools
   {
     wallet_rpc_locker(i_wallet_provider* wallet_provider) :m_pwallet_provider(wallet_provider)
     {
-      m_pwallet_provider->lock();
-//#ifndef MOBILE_WALLET_BUILD
-      m_wallet_ptr = m_pwallet_provider->get_wallet();
-//#endif   
-      if (!m_wallet_ptr.get())
+      m_pwallet_provider->lock();  // contract: if lock() throws, it holds nothing (see wallets_manager::lock fix, report 199)
+      try
       {
-        throw std::runtime_error("Wallet object closed");
+        m_wallet_ptr = m_pwallet_provider->get_wallet();
+        if(!m_wallet_ptr.get())
+        {
+          throw std::runtime_error("Wallet object closed");
+        }
+      }
+      catch(...)
+      {
+        m_pwallet_provider->unlock();
+        throw;
       }
     }
 
@@ -137,8 +143,8 @@ namespace tools
         MAP_JON_RPC_WE("submit_transfer",           on_submit_transfer,           wallet_public::COMMAND_SUBMIT_TRANSFER)
         MAP_JON_RPC_WE("search_for_transactions",   on_search_for_transactions,   wallet_public::COMMAND_RPC_SEARCH_FOR_TRANSACTIONS_LEGACY)
         MAP_JON_RPC_WE("search_for_transactions2",  on_search_for_transactions2,  wallet_public::COMMAND_RPC_SEARCH_FOR_TRANSACTIONS)
-        MAP_JON_RPC_WE("get_restore_info",          on_getwallet_restore_info,    wallet_public::COMMAND_RPC_GET_WALLET_RESTORE_INFO)
-        MAP_JON_RPC_WE("get_seed_phrase_info",      on_get_seed_phrase_info,      wallet_public::COMMAND_RPC_GET_SEED_PHRASE_INFO)
+        MAP_JON_RPC_WE_FLAGS("get_restore_info",    on_getwallet_restore_info,    wallet_public::COMMAND_RPC_GET_WALLET_RESTORE_INFO, UMF_NEVER_LOG)
+        MAP_JON_RPC_WE_FLAGS("get_seed_phrase_info",on_get_seed_phrase_info,      wallet_public::COMMAND_RPC_GET_SEED_PHRASE_INFO, UMF_NEVER_LOG)
         MAP_JON_RPC_WE("get_mining_history",        on_get_mining_history,        wallet_public::COMMAND_RPC_GET_MINING_HISTORY)
         MAP_JON_RPC_WE("register_alias",            on_register_alias,            wallet_public::COMMAND_RPC_REGISTER_ALIAS)
         MAP_JON_RPC_WE("update_alias",              on_update_alias,              wallet_public::COMMAND_RPC_UPDATE_ALIAS)
@@ -288,6 +294,7 @@ namespace tools
     bool m_allow_legacy_decrypt;
     uint64_t m_last_wallet_store_height;
     std::string m_jwt_secret;
+    epee::critical_section m_jwt_lock;
     epee::misc_utils::expirating_set<std::string, uint64_t> m_jwt_used_salts;
     tools::extension_http_origin_verifier m_origin_verifier;
   };

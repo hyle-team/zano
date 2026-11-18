@@ -660,7 +660,8 @@ namespace currency
   {
     std::ostringstream s;
     binary_archive<true> a(s);
-    ::serialization::serialize(a, const_cast<transaction_prefix&>(tx));
+    bool r = ::serialization::serialize(a, const_cast<transaction_prefix&>(tx));
+    CHECK_AND_ASSERT_THROW_MES(r, "Failed to serialize transaction prefix");
     std::string data = s.str();
     crypto::cn_fast_hash(data.data(), data.size(), h);
   }
@@ -691,8 +692,15 @@ namespace currency
     CHECK_AND_ASSERT_MES(r, false, "Failed to parse transaction from blob");
     //TODO: validate tx
 
-    //crypto::cn_fast_hash(tx_blob.data(), tx_blob.size(), tx_hash);
-    get_transaction_prefix_hash(tx, tx_hash);
+    try
+    {
+      get_transaction_prefix_hash(tx, tx_hash);
+    }
+    catch(const std::exception& e)
+    {
+      LOG_ERROR("Failed to calculate transaction id, parsed transaction does not serialize back: " << e.what());
+      return false;
+    }
     return true;
   }
   //---------------------------------------------------------------

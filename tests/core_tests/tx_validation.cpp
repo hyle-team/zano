@@ -30,15 +30,44 @@ bool gen_tx_big_version::generate(std::vector<test_event_entry>& events) const
   std::vector<tx_destination_entry> destinations;
   fill_tx_sources_and_destinations(events, blk_0r, miner_account, miner_account, MK_TEST_COINS(1), TESTS_DEFAULT_FEE, 0, sources, destinations);
 
+  // A transaction with version > CURRENT_TRANSACTION_VERSION can be neither serialized nor parsed,
+  // so it cannot be a currency::transaction event. Build and sign a current-version tx, then raise
+  // the version in its wire blob and feed the raw blob to the core.
   tx_builder builder;
-  builder.step1_init(CURRENT_TRANSACTION_VERSION + 1, 0);
+  builder.step1_init(CURRENT_TRANSACTION_VERSION, 0);
   builder.step2_fill_inputs(miner_account.get_keys(), sources);
   builder.step3_fill_outputs(destinations);
   builder.step4_calc_hash();
   builder.step5_sign(sources);
 
-  DO_CALLBACK(events, "mark_invalid_tx");
-  events.push_back(builder.m_tx);
+  blobdata tx_blob = t_serializable_object_to_blob(builder.m_tx);
+  static_assert(CURRENT_TRANSACTION_VERSION + 1 < 0x80, "version must stay a one-byte varint");
+  CHECK_AND_ASSERT_MES(!tx_blob.empty() && static_cast<uint8_t>(tx_blob[0]) == CURRENT_TRANSACTION_VERSION, false, "unexpected tx blob layout");
+  tx_blob[0] = static_cast<char>(CURRENT_TRANSACTION_VERSION + 1);
+
+  DO_CALLBACK_PARAMS_STR(events, "c1", tx_blob);
+
+  return true;
+}
+
+gen_tx_big_version::gen_tx_big_version()
+{
+  REGISTER_CALLBACK_METHOD(gen_tx_big_version, c1);
+}
+
+bool gen_tx_big_version::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  const blobdata& tx_blob = boost::get<callback_entry>(events[ev_index]).callback_params;
+
+  transaction tx = AUTO_VAL_INIT(tx);
+  crypto::hash tx_hash = null_hash;
+  CHECK_AND_ASSERT_MES(!parse_and_validate_tx_from_blob(tx_blob, tx, tx_hash), false, "tx with a too big version was parsed");
+
+  size_t pool_size = c.get_pool_transactions_count();
+  tx_verification_context tvc = AUTO_VAL_INIT(tvc);
+  c.handle_incoming_tx(tx_blob, tvc, false);
+  CHECK_AND_ASSERT_MES(tvc.m_verification_failed, false, "tx with a too big version was not rejected");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == pool_size, false, "tx with a too big version was added to the pool");
 
   return true;
 }

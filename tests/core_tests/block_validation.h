@@ -55,7 +55,9 @@ struct gen_block_accepted_base : public test_chain_unit_enchanced
 
 struct gen_block_big_major_version : public gen_block_verification_base<2>
 {
+  gen_block_big_major_version();
   bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };
 
 struct gen_block_big_minor_version : public gen_block_accepted_base<2 /* <- expected blockchain height */>

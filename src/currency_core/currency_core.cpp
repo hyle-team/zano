@@ -68,6 +68,7 @@ namespace currency
   void core::init_options(boost::program_options::options_description& desc)
   {
     blockchain_storage::init_options(desc);
+    tx_memory_pool::init_options(desc);
   }
   //-----------------------------------------------------------------------------------------------
   std::string core::get_config_folder()
@@ -320,21 +321,15 @@ namespace currency
       st_inf.errors_stat.back().err_count = entry.second;
     }
     st_inf.epic_failure_happend = m_blockchain_storage.get_performnce_data().epic_failure_happend;
-    epee::log_space::log_singletone::get_journal_items(st_inf.errors_journal, pr.logs_journal_len);
     //check deadlocks
     auto dl_list = epee::deadlock_guard_singleton::get_deadlock_journal();
     if (dl_list.size())
     {
       st_inf.epic_failure_happend = true;
-      st_inf.errors_journal.insert(st_inf.errors_journal.end(), dl_list.begin(), dl_list.end());
     }
 
     return true;
   }
-
-
-
-
   //-----------------------------------------------------------------------------------------------
   bool core::add_new_tx(const transaction& tx, tx_verification_context& tvc, bool kept_by_block)
   {
@@ -448,7 +443,8 @@ namespace currency
       });
 
       TIME_MEASURE_START_MS(time_add_new_block_ms);
-      m_blockchain_storage.add_new_block(b, *p_verification_result);
+      //m_blockchain_storage.add_new_block(b, *p_verification_result);
+      add_new_block(b, *p_verification_result);
       TIME_MEASURE_FINISH_MS(time_add_new_block_ms);
 
 
@@ -563,26 +559,26 @@ namespace currency
       bool r = m_blockchain_storage.add_new_block(b, bvc);
       if (r && bvc.m_added_to_main_chain)
       {
-        uint64_t h = get_block_height(b);
-        if (h > 0)
+        uint64_t h_resulting =  m_blockchain_storage.get_top_block_height();
+        if(h > 0 && h_resulting > 0)
         {
           auto& crc = m_blockchain_storage.get_core_runtime_config();
-          size_t hardfork_id_for_prev_block = crc.hard_forks.get_the_most_recent_hardfork_id_for_height(h);
-          size_t hardfork_id_for_curr_block = crc.hard_forks.get_the_most_recent_hardfork_id_for_height(h + 1);
-          if (hardfork_id_for_prev_block != hardfork_id_for_curr_block)
+          size_t hardfork_id_for_prev_block = crc.hard_forks.get_the_most_recent_hardfork_id_for_height(h + 1);
+          size_t hardfork_id_for_curr_block = crc.hard_forks.get_the_most_recent_hardfork_id_for_height(h_resulting + 1);
+          if(hardfork_id_for_curr_block > hardfork_id_for_prev_block)
           {
-            LOG_PRINT_GREEN("Hardfork " << hardfork_id_for_curr_block << " has been activated after the block at height " << h, LOG_LEVEL_0);
-            m_blockchain_storage.on_hardfork_activated(hardfork_id_for_curr_block);
+            // the most recent hardfork id in the DB is updated by blockchain_storage::handle_block_to_main_chain()
             m_pprotocol->on_hardfork_activated(hardfork_id_for_curr_block);
           }
-        }
 
-        if (h == m_stop_after_height)
-        {
-          LOG_PRINT_YELLOW("Reached block " << h << ", the daemon will now stop as requested", LOG_LEVEL_0);
-          if (m_critical_error_handler)
-            return m_critical_error_handler->on_immediate_stop_requested();
-          return false;
+
+          if(m_stop_after_height !=0 && h_resulting >= m_stop_after_height)
+          {
+            LOG_PRINT_YELLOW("Reached block " << h_resulting << ", the daemon will now stop as requested", LOG_LEVEL_0);
+            if(m_critical_error_handler)
+              return m_critical_error_handler->on_immediate_stop_requested();
+            return false;
+          }
         }
       }
       return r;

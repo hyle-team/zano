@@ -90,13 +90,35 @@ struct hard_fork_6_asset_descriptor_limits : public wallet_test
   bool generate(std::vector<test_event_entry>& events) const;
 };
 
-struct hard_fork_6_gw_out_with_bad_asset_id : public wallet_test
+// common chain setup and helpers for hard_fork_6_gw_bad_outs and hard_fork_6_gw_bad_ins, not registered on its own
+struct hard_fork_6_gw_bad_ins_outs_base : public wallet_test
 {
-  hard_fork_6_gw_out_with_bad_asset_id();
+  explicit hard_fork_6_gw_bad_ins_outs_base(bool play_bad_ins);
   bool generate(std::vector<test_event_entry>& events) const;
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 
+  const bool m_play_bad_ins; // true: bad gw inputs (I1-I6), false: bad gw outputs (O1-O5) and registrations in alt blocks
   mutable crypto::public_key m_asset_id{};
   mutable currency::keypair m_gw_addr_view{};
   mutable currency::keypair m_gw_addr_spend{};
+};
+
+struct hard_fork_6_gw_bad_outs : public hard_fork_6_gw_bad_ins_outs_base
+{
+  hard_fork_6_gw_bad_outs() : hard_fork_6_gw_bad_ins_outs_base(false) {}
+};
+
+struct hard_fork_6_gw_bad_ins : public hard_fork_6_gw_bad_ins_outs_base
+{
+  hard_fork_6_gw_bad_ins() : hard_fork_6_gw_bad_ins_outs_base(true) {}
+};
+
+struct hard_fork_6_gw_reorg_refund_overflow : public wallet_test
+{
+  bool generate(std::vector<test_event_entry>& events) const;
+};
+
+struct hard_fork_8_gw_input_composition : public wallet_test
+{
+  bool generate(std::vector<test_event_entry>& events) const;
 };

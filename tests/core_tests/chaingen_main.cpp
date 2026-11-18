@@ -227,6 +227,8 @@ bool generate_and_play(const char* const genclass_name, size_t hardfork_id = SIZ
     }
     g.get_hardforks().clear();
     g.get_hardforks().set_hardfork_height(hardfork_id, 1 /* <- height_the_hardfork_is_active_after */);
+    if(g.get_hardforks().last_supported_hardfork_id < hardfork_id)
+      g.get_hardforks().last_supported_hardfork_id = hardfork_id;
   }
   hfd_local = g.get_hardforks(); // save a copy for the safety checking at the end
 
@@ -597,7 +599,17 @@ public:
     }
     else
     {
-      m_c.handle_incoming_tx(tx_blob, tvc, m_txs_kept_by_block);
+      try
+      {
+        m_c.handle_incoming_tx(tx_blob, tvc, m_txs_kept_by_block);
+      }
+      catch (const std::exception& e)
+      {
+        // the core rejects some txs by throwing (e.g. an unverifiable service entry in extra); for the replay that is a plain rejection
+        LOG_PRINT_YELLOW("handle_incoming_tx threw for event #" << m_ev_index << ": " << e.what(), LOG_LEVEL_0);
+        tvc = AUTO_VAL_INIT(tvc);
+        tvc.m_verification_failed = true;
+      }
       bool tx_added = pool_size + 1 == m_c.get_pool_transactions_count();
       bool r = check_tx_verification_context(tvc, tx_added, m_ev_index, tx, m_validator);
       LOCAL_ASSERT(r);
@@ -1180,7 +1192,7 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY(wallet_rpc_transfer);
     GENERATE_AND_PLAY(wallet_rpc_alias_tests);
     GENERATE_AND_PLAY_HF(wallet_rpc_exchange_suite, "3-*");
-    GENERATE_AND_PLAY_HF(wallet_true_rpc_pos_mining, "4-*");
+    //GENERATE_AND_PLAY_HF(wallet_true_rpc_pos_mining, "4-*"); //test were created when faced problem with --rpc-ignore-offline, now probably not needed as it duplicating existing code
     GENERATE_AND_PLAY_HF(wallet_rpc_cold_signing, "3,5-*");
     // GENERATE_AND_PLAY_HF(wallet_rpc_multiple_receivers, "5-*"); work in progress -- sowle
     GENERATE_AND_PLAY_HF(wallet_chain_switch_with_spending_the_same_ki, "3");
@@ -1401,7 +1413,20 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY(hard_fork_6_coinbase_size_rules);
     GENERATE_AND_PLAY_HF(hard_fork_6_gw_incompatible_with_mode_separate, "6,8-*");
     GENERATE_AND_PLAY(hard_fork_6_asset_descriptor_limits);
-    GENERATE_AND_PLAY_HF(hard_fork_6_gw_out_with_bad_asset_id, "6,8-*");
+    GENERATE_AND_PLAY_HF(hard_fork_6_gw_bad_outs, "6,8-*");
+    GENERATE_AND_PLAY_HF(hard_fork_6_gw_bad_ins, "6,8-*");
+    GENERATE_AND_PLAY_HF(hard_fork_6_gw_reorg_refund_overflow, "6,8-*");
+    GENERATE_AND_PLAY_HF(hard_fork_8_gw_input_composition, "6,8-*");
+
+    GENERATE_AND_PLAY(hf_booster_hf8_activation_basic);
+    GENERATE_AND_PLAY(hf_booster_gentime_basic);
+    GENERATE_AND_PLAY(hf_booster_reorg_before_activation);
+    GENERATE_AND_PLAY(hf_booster_reorg_after_activation);
+    GENERATE_AND_PLAY(hf_booster_rollback_on_invalid_block);
+    GENERATE_AND_PLAY(hf_booster_invalid_boosters_rejected);
+    GENERATE_AND_PLAY(hf_booster_unsupported_hf_halts);
+    GENERATE_AND_PLAY(hf_booster_unknown_hf_halts);
+    GENERATE_AND_PLAY_INTERMITTED_BY_BLOCKCHAIN_SAVELOAD(hf_booster_unknown_hf_halts);
 
     // GW address alt-chain tests
     GENERATE_AND_PLAY(gw_addr_altchain_spend_in_both_chains);
@@ -1535,6 +1560,7 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_options, arg_worker_id);
   command_line::add_arg(desc_options, arg_run_root);
   command_line::add_arg(desc_options, arg_shm_name);
+  command_line::add_arg(desc_options, arg_beep);
 
   currency::core::init_options(desc_options);
   tools::db::db_backend_selector::init_options(desc_options);
@@ -1794,7 +1820,10 @@ int main(int argc, char* argv[])
     return 2;
   }*/
 #ifdef _WIN32
-  ::Beep(1050, 1000);
+  if(command_line::has_arg(g_vm, arg_beep))
+  {
+    ::Beep(1050, 1000);
+  }
 #endif
 
   return serious_failures_count == 0 ? 0 : 1;

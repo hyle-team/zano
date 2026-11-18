@@ -290,12 +290,14 @@ namespace currency
       uint64_t    current_height;
       uint64_t    current_hardfork;
       std::string status;
+      std::vector<uint64_t> rti_hardforks;  // core_runtime_config::hardforks_t, for wallet hf sync against hf_booster
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(blocks)                     DOC_DSCR("Bunch of blocks") DOC_EXMP_AUTO(1) DOC_END
         KV_SERIALIZE(start_height)               DOC_DSCR("Starting height of the resulting bunch of blocks.") DOC_EXMP(2000000) DOC_END
         KV_SERIALIZE(current_height)             DOC_DSCR("Current height of the blockchain.") DOC_EXMP(2555000) DOC_END
         KV_SERIALIZE(current_hardfork)           DOC_DSCR("Current hardfork, used for wallet <-> version verification") DOC_EXMP(4) DOC_END
+        KV_SERIALIZE(rti_hardforks)              DOC_DSCR("Hardforks for wallet hf sync against hf_booster") DOC_EXMP_AUTO(1) DOC_END
         KV_SERIALIZE(status)                     DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
       END_KV_SERIALIZE_MAP()
     };
@@ -2207,6 +2209,35 @@ namespace currency
     END_KV_SERIALIZE_MAP()
 
     bool from_gateway_address_descriptor_base(const gateway_address_descriptor_base& gadb);
+  };
+
+  struct COMMAND_RPC_GATEWAY_GET_ADDRESSES
+  {
+    DOC_COMMAND("Retrieves a page of gateway addresses registered in the current main chain.");
+
+    struct request
+    {
+      uint64_t offset = 0;
+      uint64_t count = 100;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(offset) DOC_DSCR("Number of addresses to skip in database key order.") DOC_EXMP(0) DOC_END
+        KV_SERIALIZE(count)  DOC_DSCR("Maximum number of addresses to return. Defaults to 100.") DOC_EXMP(100) DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      std::string status;
+      uint64_t top_block_height = 0;
+      std::list<std::string> addresses;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(status)           DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
+        KV_SERIALIZE(top_block_height) DOC_DSCR("Height of the top block for the returned registry state, equal to the blockchain size minus one.") DOC_EXMP(1000) DOC_END
+        KV_SERIALIZE(addresses)        DOC_DSCR("Canonical gateway addresses without payment IDs. Omitted when the page is empty.") DOC_EXMP_AGGR("gwZ5sqZkre33rxhoo9ht5xcmzy5khvr2hFSfvk7TeXeMXxby7acC3fs1D") DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
   };
 
   struct COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO

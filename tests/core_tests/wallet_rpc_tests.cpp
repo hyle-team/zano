@@ -1944,9 +1944,9 @@ bool wallet_rpc_hardfork_verification::generate(std::vector<test_event_entry>& e
 
 bool wallet_rpc_hardfork_verification::c1(currency::core& c, size_t, const std::vector<test_event_entry>& events)
 {
-  // The test idea: verify that wallet and core hardfork versions must match, 
-  // if wallet is on a different hardfork than the daemon, refresh should fail. 
-  // when both sides switch to the same hardfork again, refresh must succeed.
+  // The test idea: the wallet takes the daemon's hardfork schedule whatever its own one is, so a schedule
+  // difference is not an incompatibility any more. The only incompatibility is a daemon on a hardfork above
+  // the wallet's last_supported_hardfork_id: then refresh must fail and the wallet must keep its own schedule.
 
   std::shared_ptr<debug_wallet2> miner_wlt = init_playtime_test_wallet_t<debug_wallet2>(events, c, MINER_ACC_IDX);
 
@@ -1957,15 +1957,16 @@ bool wallet_rpc_hardfork_verification::c1(currency::core& c, size_t, const std::
   bool hf_mismatch_err = false;
 
   miner_wlt->get_debug_events_dispatcher()
-    .SUBSCIRBE_DEBUG_EVENT<wde_error_type>([&](const wde_error_type& e)
+    .SUBSCIRBE_EVENT<wde_error_type>([&](const wde_error_type& e)
     {
       if (e == wde_pulling_hardforks_missmatch)
         hf_mismatch_err = true;
     });
 
   miner_wlt->refresh(blocks_added, received_money, stop);
+  CHECK_AND_ASSERT_MES(!hf_mismatch_err, false, "initial refresh must succeed");
 
-  // 1) wallet->HF6, core->HF5 => error
+  // 1) wallet has its own schedule (HF6 at height 1), core is on HF5 => refresh succeeds, wallet takes the core's schedule
   {
     auto cfg = c.get_blockchain_storage().get_core_runtime_config();
     cfg.hard_forks.set_hardfork_height(6, 1);
@@ -1977,12 +1978,13 @@ bool wallet_rpc_hardfork_verification::c1(currency::core& c, size_t, const std::
 
     miner_wlt->refresh(blocks_added, received_money, stop);
 
-    CHECK_AND_ASSERT_MES(hf_mismatch_err, false, "wallet->hf6 vs core->hf5 must fail");
+    CHECK_AND_ASSERT_MES(!hf_mismatch_err, false, "wallet->hf6 vs core->hf5: refresh must succeed");
+    CHECK_AND_ASSERT_MES(miner_wlt->get_core_runtime_config().hard_forks == c.get_blockchain_storage().get_core_runtime_config().hard_forks, false,
+      "wallet->hf6 vs core->hf5: wallet must take the core's schedule");
   }
 
-  // wallet->HF5 and core->HF6 -> error
+  // 2) core moves to HF6, wallet still has the HF5 schedule => refresh succeeds, wallet follows the core to HF6
   {
-    miner_wlt->set_core_runtime_config(c.get_blockchain_storage().get_core_runtime_config());
     auto cfg = c.get_blockchain_storage().get_core_runtime_config();
     cfg.hard_forks.set_hardfork_height(6, 1);
     c.get_blockchain_storage().set_core_runtime_config(cfg);
@@ -1993,15 +1995,17 @@ bool wallet_rpc_hardfork_verification::c1(currency::core& c, size_t, const std::
 
     miner_wlt->refresh(blocks_added, received_money, stop);
 
-    CHECK_AND_ASSERT_MES(hf_mismatch_err, false, "wallet->hf5 vs core->hf6 must fail");
+    CHECK_AND_ASSERT_MES(!hf_mismatch_err, false, "wallet->hf5 vs core->hf6: refresh must succeed");
+    CHECK_AND_ASSERT_MES(miner_wlt->get_core_runtime_config().hard_forks.get_height_the_hardfork_active_after(6) == 1, false,
+      "wallet->hf5 vs core->hf6: wallet must take the core's HF6 height");
   }
 
-  // both HF6 -> success
+  // 3) core is on HF6, wallet supports only up to HF5 => refresh fails, wallet keeps its own schedule
   {
     auto cfg = c.get_blockchain_storage().get_core_runtime_config();
-    cfg.hard_forks.set_hardfork_height(6, 1);
+    cfg.hard_forks.set_hardfork_height(6, CURRENCY_MAX_BLOCK_NUMBER);
+    cfg.hard_forks.last_supported_hardfork_id = 5;
     miner_wlt->set_core_runtime_config(cfg);
-    c.get_blockchain_storage().set_core_runtime_config(cfg);
 
     hf_mismatch_err = false;
     blocks_added = 0;
@@ -2009,7 +2013,26 @@ bool wallet_rpc_hardfork_verification::c1(currency::core& c, size_t, const std::
 
     miner_wlt->refresh(blocks_added, received_money, stop);
 
-    CHECK_AND_ASSERT_MES(!hf_mismatch_err, false, "refresh must succeed when both on the same HF");
+    CHECK_AND_ASSERT_MES(hf_mismatch_err, false, "core->hf6 vs wallet supporting up to hf5 must fail");
+    CHECK_AND_ASSERT_MES(miner_wlt->get_core_runtime_config().hard_forks.get_height_the_hardfork_active_after(6) == CURRENCY_MAX_BLOCK_NUMBER, false,
+      "wallet must not take the schedule of a daemon it refuses");
+  }
+
+  // 4) the same wallet now supports up to HF6 (the boundary) => refresh succeeds, wallet takes the core's schedule
+  {
+    auto cfg = miner_wlt->get_core_runtime_config();
+    cfg.hard_forks.last_supported_hardfork_id = 6;
+    miner_wlt->set_core_runtime_config(cfg);
+
+    hf_mismatch_err = false;
+    blocks_added = 0;
+    received_money = false;
+
+    miner_wlt->refresh(blocks_added, received_money, stop);
+
+    CHECK_AND_ASSERT_MES(!hf_mismatch_err, false, "core->hf6 vs wallet supporting up to hf6: refresh must succeed");
+    CHECK_AND_ASSERT_MES(miner_wlt->get_core_runtime_config().hard_forks == c.get_blockchain_storage().get_core_runtime_config().hard_forks, false,
+      "core->hf6 vs wallet supporting up to hf6: wallet must take the core's schedule");
   }
 
   miner_wlt->callback(std::make_shared<tools::i_wallet2_callback>());
@@ -2151,6 +2174,37 @@ bool wallet_rpc_gateway_address::c1(currency::core& c, size_t ev_index, const st
 
   r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, 3);
   CHECK_AND_ASSERT_TRUE(r);
+
+  currency::COMMAND_RPC_GATEWAY_GET_ADDRESSES::request gw_get_addresses_req = {};
+  currency::COMMAND_RPC_GATEWAY_GET_ADDRESSES::response gw_get_addresses_resp = {};
+  gw_get_addresses_req.count = 100;
+
+#ifndef TESTNET
+  core_rpc_wrapper.set_ignore_connectivity_status(false);
+  r = invoke_text_json_for_rpc(core_rpc_wrapper, "gateway_get_addresses", gw_get_addresses_req, gw_get_addresses_resp);
+  core_rpc_wrapper.set_ignore_connectivity_status(true);
+  CHECK_AND_ASSERT_TRUE(r);
+  CHECK_AND_ASSERT_EQ(gw_get_addresses_resp.status, API_RETURN_CODE_BUSY);
+  gw_get_addresses_resp = {};
+#endif
+
+  r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_get_addresses", gw_get_addresses_req, gw_get_addresses_resp);
+  CHECK_AND_ASSERT_TRUE(r);
+  CHECK_AND_ASSERT_EQ(gw_get_addresses_resp.addresses.size(), 1);
+  CHECK_AND_ASSERT_EQ(gw_get_addresses_resp.addresses.front(), gw_reg_resp.address);
+  CHECK_AND_ASSERT_EQ(gw_get_addresses_resp.top_block_height, c.get_top_block_height());
+
+  gw_get_addresses_req.offset = 1;
+  gw_get_addresses_resp = {};
+  r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_get_addresses", gw_get_addresses_req, gw_get_addresses_resp);
+  CHECK_AND_ASSERT_TRUE(r);
+  CHECK_AND_ASSERT_TRUE(gw_get_addresses_resp.addresses.empty());
+
+  ++gw_get_addresses_req.count;
+  gw_get_addresses_resp = {};
+  r = invoke_text_json_for_rpc(core_rpc_wrapper, "gateway_get_addresses", gw_get_addresses_req, gw_get_addresses_resp);
+  CHECK_AND_ASSERT_TRUE(r);
+  CHECK_AND_ASSERT_EQ(gw_get_addresses_resp.status, API_RETURN_CODE_ARG_OUT_OF_LIMITS);
 
   // request gw address info for that freshly genereated gw address and validate the response
   currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO::request gw_get_info_req = {};
@@ -5204,6 +5258,15 @@ bool wallet_rpc_sweep_below::c1(currency::core& c, size_t ev_index, const std::v
     auditable_wlt->refresh();
     CHECK_AND_ASSERT_EQ(auditable_wlt->balance(currency::native_coin_asset_id), auditable_sweep_amount);
 
+    // Usually the funding tx pays one output here plus change to the miner. When the miner happens to
+    // spend a UTXO of exactly auditable_sweep_amount + fee there is no change, and wallet2 splits the
+    // destination in two to reach CURRENCY_TX_MIN_ALLOWED_OUTS. Count what the wallet really received.
+    tools::transfer_container auditable_transfers;
+    auditable_wlt->get_transfers(auditable_transfers);
+    const uint64_t auditable_outs_count = auditable_transfers.size();
+    CHECK_AND_ASSERT_MES(auditable_outs_count == 1 || auditable_outs_count == CURRENCY_TX_MIN_ALLOWED_OUTS, false,
+      "case auditable prep: unexpected number of received outputs: " << auditable_outs_count);
+
     tools::wallet_rpc_server auditable_rpc(auditable_wlt);
     tools::wallet_public::COMMAND_SWEEP_BELOW::request req{};
     req.mixin = 1;
@@ -5214,8 +5277,8 @@ bool wallet_rpc_sweep_below::c1(currency::core& c, size_t ev_index, const std::v
     const int code = call_sweep_below(auditable_rpc, req, res);
 
     CHECK_AND_ASSERT_EQ(code, 0);
-    CHECK_AND_ASSERT_EQ(res.outs_total, 1);
-    CHECK_AND_ASSERT_EQ(res.outs_swept, 1);
+    CHECK_AND_ASSERT_EQ(res.outs_total, auditable_outs_count);
+    CHECK_AND_ASSERT_EQ(res.outs_swept, auditable_outs_count);
     CHECK_AND_ASSERT_EQ(res.amount_total, auditable_sweep_amount);
     CHECK_AND_ASSERT_EQ(res.amount_swept, auditable_sweep_amount);
     CHECK_AND_ASSERT_EQ(res.asset_id, currency::native_coin_asset_id);
@@ -5223,9 +5286,11 @@ bool wallet_rpc_sweep_below::c1(currency::core& c, size_t ev_index, const std::v
     std::list<transaction> pool_txs;
     r = c.get_pool_transactions(pool_txs);
     CHECK_AND_ASSERT_MES(r && pool_txs.size() == 1, false, "case auditable: get_pool_transactions failed");
-    CHECK_AND_ASSERT_EQ(pool_txs.front().vin.size(), 1);
-    CHECK_AND_ASSERT_MES(pool_txs.front().vin.front().type() == typeid(txin_zc_input), false,
-      "case auditable: sweep_below produced a non-ZC input");
+    CHECK_AND_ASSERT_EQ(pool_txs.front().vin.size(), auditable_outs_count);
+    for (const auto& input : pool_txs.front().vin)
+    {
+      CHECK_AND_ASSERT_MES(input.type() == typeid(txin_zc_input), false, "case auditable: sweep_below produced a non-ZC input");
+    }
     CHECK_AND_ASSERT_MES(check_mixin_value_for_each_input(0, get_transaction_hash(pool_txs.front()), c), false,
       "case auditable: expected zero mixins");
 
