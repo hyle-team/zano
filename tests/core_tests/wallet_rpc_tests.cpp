@@ -5230,6 +5230,15 @@ bool wallet_rpc_sweep_below::c1(currency::core& c, size_t ev_index, const std::v
     auditable_wlt->get_transfers(auditable_transfers);
     const uint64_t auditable_outs_count = auditable_transfers.size(); // the funding transfer may be split into several outputs
 
+    // Usually the funding tx pays one output here plus change to the miner. When the miner happens to
+    // spend a UTXO of exactly auditable_sweep_amount + fee there is no change, and wallet2 splits the
+    // destination in two to reach CURRENCY_TX_MIN_ALLOWED_OUTS. Count what the wallet really received.
+    tools::transfer_container auditable_transfers;
+    auditable_wlt->get_transfers(auditable_transfers);
+    const uint64_t auditable_outs_count = auditable_transfers.size();
+    CHECK_AND_ASSERT_MES(auditable_outs_count == 1 || auditable_outs_count == CURRENCY_TX_MIN_ALLOWED_OUTS, false,
+      "case auditable prep: unexpected number of received outputs: " << auditable_outs_count);
+
     tools::wallet_rpc_server auditable_rpc(auditable_wlt);
     tools::wallet_public::COMMAND_SWEEP_BELOW::request req{};
     req.mixin = 1;
@@ -5251,7 +5260,9 @@ bool wallet_rpc_sweep_below::c1(currency::core& c, size_t ev_index, const std::v
     CHECK_AND_ASSERT_MES(r && pool_txs.size() == 1, false, "case auditable: get_pool_transactions failed");
     CHECK_AND_ASSERT_EQ(pool_txs.front().vin.size(), auditable_outs_count);
     for (const auto& input : pool_txs.front().vin)
+    {
       CHECK_AND_ASSERT_MES(input.type() == typeid(txin_zc_input), false, "case auditable: sweep_below produced a non-ZC input");
+    }
     CHECK_AND_ASSERT_MES(check_mixin_value_for_each_input(0, get_transaction_hash(pool_txs.front()), c), false,
       "case auditable: expected zero mixins");
 

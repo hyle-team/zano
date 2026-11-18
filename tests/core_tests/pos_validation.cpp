@@ -942,7 +942,20 @@ bool pos_altblocks_validation::generate(std::vector<test_event_entry>& events) c
   //    stake_tx_out_id = i;
   //}
 
+  // tx_0 spends exactly one output (alice_money) and so has no change. With the default digit split its
+  // only destination becomes a single output whenever alice_money - 17 * fee has one nonzero digit
+  // (alice_money is a random 3-digit chunk of the coinbase), and since HF4 such a tx is rejected
+  // (CURRENCY_TX_MIN_ALLOWED_OUTS). The random split always gives at least two outputs.
+  const test_gentime_settings tgs_saved = test_generator::get_test_gentime_settings();
+  if (HF4_active)
+  {
+    test_gentime_settings tgs = tgs_saved;
+    tgs.split_strategy = tests_random_split_strategy;
+    test_generator::set_test_gentime_settings(tgs);
+  }
   MAKE_TX_FEE(events, tx_0, alice_acc, alice_acc, alice_money - TESTS_DEFAULT_FEE * 17, TESTS_DEFAULT_FEE * 17, blk_2);
+  test_generator::set_test_gentime_settings(tgs_saved);
+  CHECK_AND_ASSERT_MES(tx_0.vout.size() >= (HF4_active ? CURRENCY_TX_MIN_ALLOWED_OUTS : 1), false, "tx_0 has too few outputs: " << tx_0.vout.size());
   // tx_0 transfers all Alice's money, so it effectevily spends all outputs in stake_ts, make sure it does
   //CHECK_AND_ASSERT_MES(tx_0.vin.size() == stake_tx.vout.size(), false, "probably, tx_0 doesn't spend all Alice's money as expected, tx_0.vin.size()=" << tx_0.vin.size() << ", stake_tx.vout.size()=" << stake_tx.vout.size());
 
