@@ -382,7 +382,8 @@ namespace currency
       res.blocks.back().txs_ptr = std::move(b.second);
       res.blocks.back().coinbase_ptr = b.third;
     }
-
+    auto& core_hfs = m_core.get_blockchain_storage().get_core_runtime_config().hard_forks.m_height_the_hardfork_n_active_after;
+    res.rti_hardforks.assign(core_hfs.begin(), core_hfs.end());
     res.status = API_RETURN_CODE_OK;
     return true;
   }
@@ -466,6 +467,8 @@ namespace currency
       }
     }
 
+    auto& core_hfs = m_core.get_blockchain_storage().get_core_runtime_config().hard_forks.m_height_the_hardfork_n_active_after;
+    res.rti_hardforks.assign(core_hfs.begin(), core_hfs.end());
 
     LOG_PRINT_L2("[on_get_blocks]: Finished");
     res.status = API_RETURN_CODE_OK;

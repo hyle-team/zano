@@ -21,4 +21,5 @@ namespace chaingen_args
   extern command_line::arg_descriptor<int32_t>     arg_worker_id;
   extern command_line::arg_descriptor<std::string> arg_run_root;
   extern command_line::arg_descriptor<std::string> arg_shm_name;
-}
+  extern command_line::arg_descriptor<bool>        arg_beep;
+ }

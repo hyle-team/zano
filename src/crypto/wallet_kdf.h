@@ -9,6 +9,7 @@
 #include <memory.h>
 #include <string>
 #include <vector>
+#include "crypto.h"
 
 namespace crypto
 {
@@ -56,7 +57,9 @@ namespace crypto
         seed.append(reinterpret_cast<const char*>(password_data), password_data_size);
       keccak(reinterpret_cast<const uint8_t*>(seed.data()), (int)seed.size(), V.data(), 32);
       if (!seed.empty())
-        memset(const_cast<char*>(seed.data()), 0, seed.size());
+      {
+        wipe(const_cast<char*>(seed.data()), seed.size());
+      }
     }
 
     uint8_t block_in[40]; // 32 (prev block) + 8 (i_le64) = 40
@@ -95,8 +98,9 @@ namespace crypto
     memcpy(out_stretched, X, 32);
 
     // wipe buffs
-    memset(V.data(), 0, V.size());
-    memset(X, 0, sizeof(X));
-    memset(mix, 0, sizeof(mix));
+    wipe(V.data(), V.size());
+    wipe(X);
+    wipe(mix);
+    wipe(block_in);
   }
 }

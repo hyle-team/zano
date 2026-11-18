@@ -67,6 +67,7 @@ using namespace currency;
 #define BLOCKCHAIN_STORAGE_CONTAINER_ASSETS                  "assets"
 #define BLOCKCHAIN_STORAGE_CONTAINER_GATEWAY_ADDRESSES       "gateway_addresses"
 #define BLOCKCHAIN_STORAGE_CONTAINER_GATEWAY_TRANSACTIONS    "gateway_transactions"
+#define BLOCKCHAIN_STORAGE_CONTAINER_HF_UPDATES              "hardfork_updates"
 
 #define BLOCKCHAIN_STORAGE_OPTIONS_ID_CURRENT_BLOCK_CUMUL_SZ_LIMIT          0
 #define BLOCKCHAIN_STORAGE_OPTIONS_ID_CURRENT_PRUNED_RS_HEIGHT              1
@@ -84,6 +85,9 @@ DISABLE_VS_WARNINGS(4267)
 
 const command_line::arg_descriptor<uint64_t>  arg_db_cache_l1       ( "db-cache-l1", "Specify size of memory mapped db cache file");
 const command_line::arg_descriptor<uint64_t>  arg_db_cache_l2       ( "db-cache-l2", "Specify cached elements in db helpers");
+const command_line::arg_descriptor<uint64_t>  arg_danger_ignore_hardfork_and_diverge ( "danger-ignore-hardfork-and-diverge", "DANGER ZONE: ignore the HF booster that activates the hardfork with the given id and keep running without activating it. "
+                                                                                       "Once that hardfork activates on the network, this node DIVERGES from it: it rejects the network's new blocks and transactions, "
+                                                                                       "and everything it mines, stakes or sends is valid only on its own diverged chain");
 
 //------------------------------------------------------------------
 blockchain_storage::blockchain_storage(tx_memory_pool& tx_pool) :m_db(nullptr, m_rw_lock),
@@ -100,6 +104,7 @@ blockchain_storage::blockchain_storage(tx_memory_pool& tx_pool) :m_db(nullptr, m
                                                                  m_db_addr_to_default_alias(m_db),
                                                                  m_db_gateway_addresses(m_db),
                                                                  m_db_gateway_transactions(m_db), 
+                                                                 m_db_hardfork_updates(m_db),
                                                                  m_read_lock(m_rw_lock),
                                                                  m_db_current_block_cumul_sz_limit(BLOCKCHAIN_STORAGE_OPTIONS_ID_CURRENT_BLOCK_CUMUL_SZ_LIMIT, m_db_solo_options),
                                                                  m_db_current_pruned_rs_height(BLOCKCHAIN_STORAGE_OPTIONS_ID_CURRENT_PRUNED_RS_HEIGHT, m_db_solo_options),
@@ -168,6 +173,7 @@ void blockchain_storage::init_options(boost::program_options::options_descriptio
   command_line::add_arg(desc, arg_db_cache_l1);
   command_line::add_arg(desc, arg_db_cache_l2);
   command_line::add_arg(desc, command_line::arg_non_pruning_mode);
+  command_line::add_arg(desc, arg_danger_ignore_hardfork_and_diverge);
 }
 //------------------------------------------------------------------
 uint64_t blockchain_storage::get_block_h_older_then(uint64_t timestamp) const 
@@ -311,6 +317,15 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
   }
   LOG_PRINT_GREEN("Using db file cache size(L1): " << cache_size_l1, LOG_LEVEL_0);
 
+  if (command_line::has_arg(vm, arg_danger_ignore_hardfork_and_diverge))
+  {
+    m_ignored_hardfork_id = command_line::get_arg(vm, arg_danger_ignore_hardfork_and_diverge);
+    CHECK_AND_ASSERT_MES(m_ignored_hardfork_id >= ZANO_HARDFORK_08, false, "--" << arg_danger_ignore_hardfork_and_diverge.name << "=" << m_ignored_hardfork_id
+      << " is invalid: HF boosters exist only for hardfork " << ZANO_HARDFORK_08 << " and later");
+    LOG_PRINT_RED_L0("[DANGER] --" << arg_danger_ignore_hardfork_and_diverge.name << "=" << m_ignored_hardfork_id << " is set: HF boosters for hardfork "
+      << m_ignored_hardfork_id << " are ignored, and this node will DIVERGE from the network when that hardfork activates");
+  }
+
   m_config_folder = config_folder;
 
   // remove old incompatible DB
@@ -363,9 +378,11 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
     res = m_db_gateway_transactions.init(BLOCKCHAIN_STORAGE_CONTAINER_GATEWAY_TRANSACTIONS);
     CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
     res = m_db_addr_to_default_alias.init(BLOCKCHAIN_STORAGE_CONTAINER_ADDR_TO_DEFAULT_ALIAS);
+    CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");    
+    res = m_db_hardfork_updates.init(BLOCKCHAIN_STORAGE_CONTAINER_HF_UPDATES);
     CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
-    
-    
+
+
 
     if (command_line::has_arg(vm, arg_db_cache_l2))
     {
@@ -543,7 +560,14 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
         }
         LOG_PRINT_MAGENTA("migration of m_db_per_block_gindex_incs completed successfully", LOG_LEVEL_0);
       }
+
+      if (!need_reinit && !init_booster_hf())
+      {
+        LOG_PRINT_RED_L0("Failed to init booster hardfork");
+        return false;
+      }
 #ifndef TESTNET
+
       // MAINNET ONLY
       if (m_db_most_recent_hardfork_id == 0)
       {
@@ -618,6 +642,7 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
       m_db_per_block_gindex_incs.deinit();
       m_db_gateway_addresses.deinit();
       m_db_gateway_transactions.deinit();
+      m_db_hardfork_updates.deinit();
       m_db.close();
       size_t files_removed = boost::filesystem::remove_all(epee::string_encoding::utf8_to_wstring(db_folder_path));
       LOG_PRINT_L1(files_removed << " files at " << db_folder_path << " removed");
@@ -641,6 +666,12 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
     add_new_block(bl, bvc);
     CHECK_AND_ASSERT_MES(!bvc.m_verification_failed, false, "Failed to add genesis block to blockchain");
     LOG_PRINT_MAGENTA("Storage initialized with genesis", LOG_LEVEL_0);
+    
+    if(!init_booster_hf())  // a fresh DB is booster-aware from the start
+    {
+      LOG_PRINT_RED_L0("Failed to init booster hardfork");
+      return false;
+    }
   } 
 
   // check last hardfork activation compliance (in case of emergency hardfork)
@@ -837,6 +868,32 @@ bool blockchain_storage::pop_block_from_blockchain(transactions_map& onboard_tra
   return true;
 }
 //------------------------------------------------------------------
+bool blockchain_storage::init_booster_hf()
+{
+  if(!m_db_hardfork_updates.size())
+  {
+    auto db_tx_ptr = m_db.begin_transaction_obj();
+    if (m_db_blocks.size() > ZANO_HARDFORK_BOOSTER_UNAWARE_MAX_HEIGHT)
+    {
+      LOG_PRINT_L0("Booster-caused truncation to " << ZANO_HARDFORK_BOOSTER_UNAWARE_MAX_HEIGHT << "...");
+      
+      truncate_blockchain(ZANO_HARDFORK_BOOSTER_UNAWARE_MAX_HEIGHT + 1);      
+      LOG_PRINT_L0("Booster-caused truncation done.");
+    }
+    hf_booster_store_hardforks_to_db();
+    db_tx_ptr->commit_transaction();
+  }
+  else
+  {
+    hf_booster_load_hardforks_from_db();
+  }
+
+  if(!check_hf_compliance_on_current_height())
+    return false;
+
+  return true;
+}
+//------------------------------------------------------------------
 bool blockchain_storage::set_checkpoints(checkpoints&& chk_pts) 
 {
   m_checkpoints = chk_pts;
@@ -947,6 +1004,7 @@ bool blockchain_storage::clear()
     m_pow_targetdata_cache.clear();
     m_db_gateway_addresses.clear();
     m_db_gateway_transactions.clear();
+    m_db_hardfork_updates.clear();
     db_tx_ptr->commit_transaction();
   }
   
@@ -2079,6 +2137,7 @@ void blockchain_storage::reset_db_cache() const
   m_db_assets.clear_cache();
   m_db_gateway_addresses.clear_cache();
   m_db_gateway_transactions.clear_cache();
+  m_db_hardfork_updates.clear_cache();
   m_db_addr_to_alias.clear_cache();
   m_db_addr_to_default_alias.clear_cache();
 }
@@ -3980,6 +4039,7 @@ void blockchain_storage::print_db_cache_perfeormance_data() const
     DB_CONTAINER_PERF_DATA_ENTRY(m_db_assets) << ENDL
     DB_CONTAINER_PERF_DATA_ENTRY(m_db_gateway_addresses) << ENDL
     DB_CONTAINER_PERF_DATA_ENTRY(m_db_gateway_transactions) << ENDL
+    DB_CONTAINER_PERF_DATA_ENTRY(m_db_hardfork_updates) << ENDL
     DB_CONTAINER_PERF_DATA_ENTRY(m_db_addr_to_alias) << ENDL
     DB_CONTAINER_PERF_DATA_ENTRY(m_db_addr_to_default_alias) << ENDL
     //DB_CONTAINER_PERF_DATA_ENTRY(m_db_per_block_gindex_incs) << ENDL
@@ -4644,6 +4704,12 @@ bool blockchain_storage::unprocess_blockchain_tx_extra(const transaction& tx, co
     CHECK_AND_ASSERT_MES(ei.m_opt_gateway_address_operation.has_value(), false, "m_opt_gateway_address_operation has no value");
     r = pop_gw_address_operation(ei.m_opt_gateway_address_operation.value(), height, tx_id);
     CHECK_AND_ASSERT_MES(r, false, "pop_gw_address_operation failed, op: " << ei.m_opt_gateway_address_operation.value().operation.type().name());
+  }
+  if(ei.m_opt_hf_booster_update)
+  {
+    CHECK_AND_ASSERT_MES(ei.m_opt_hf_booster_update.has_value(), false, "m_opt_hf_booster_update has no value");
+    r = pop_hf_booster_update(tx, tx_id, ei.m_opt_hf_booster_update.value(), height);
+    CHECK_AND_ASSERT_MES(r, false, "pop_hf_booster_update failed, tx_id" << tx_id << ", update: " << epee::serialization::store_t_to_json(*ei.m_opt_hf_booster_update));
   }
 
   return true;
@@ -5604,6 +5670,12 @@ bool blockchain_storage::process_blockchain_tx_extra(const transaction& tx, cons
     CHECK_AND_ASSERT_MES(r, false, "put_gw_address_operation failed, op: " << ei.m_opt_gateway_address_operation.value().operation.type().name());
   } 
 
+  if(ei.m_opt_hf_booster_update)
+  {
+    CHECK_AND_ASSERT_MES(ei.m_opt_hf_booster_update.has_value(), false, "m_opt_hf_booster_update has no value");
+    r = put_hf_booster_update(tx, tx_id, ei.m_opt_hf_booster_update.value(), height);
+    CHECK_AND_ASSERT_THROW_MES(r, "put_hf_booster_update failed, tx_id" << tx_id << ", update: " << epee::serialization::store_t_to_json(*ei.m_opt_hf_booster_update));
+  }
   return true;
 }
 //------------------------------------------------------------------
@@ -5714,6 +5786,137 @@ bool blockchain_storage::pop_gw_address_operation(const gateway_address_descript
     m_db_gateway_addresses.set(address_id, local_gad);
   else
     m_db_gateway_addresses.erase(address_id);
+
+  return true;
+}
+//------------------------------------------------------------------
+bool blockchain_storage::hf_booster_store_hardforks_to_db()
+{
+  for(uint64_t hf_id = 0; hf_id < m_core_runtime_config.hard_forks.m_total_count; hf_id++)
+  {
+    m_db_hardfork_updates.set(hf_id, std::list<uint64_t>(1, m_core_runtime_config.hard_forks.get_height_the_hardfork_active_after(hf_id)));
+  }
+  return true;
+}
+//------------------------------------------------------------------
+bool blockchain_storage::hf_booster_load_hardforks_from_db()
+{
+  for(uint64_t hf_id = 0; hf_id < m_core_runtime_config.hard_forks.m_total_count; hf_id++)
+  {
+    auto hf_ptr = m_db_hardfork_updates.find(hf_id);
+    if(hf_ptr && hf_ptr->size())
+    {
+      m_core_runtime_config.hard_forks.set_hardfork_height(hf_id, hf_ptr->back()); 
+    }
+  }
+  return true;
+}
+//------------------------------------------------------------------
+bool blockchain_storage::put_hf_booster_update(const transaction& tx, const crypto::hash& tx_id, const bc_services::hf_booster_update& update, const uint64_t height)
+{
+  bool r = verify_hf_booster_signature(update, tx, m_core_runtime_config);
+  //if we are in pre-HF8 zone, then we ignore this tx without breaking the chain, to avoid network split.
+  if(!r && tx.hardfork_id < ZANO_HARDFORK_08)
+  {
+    LOG_PRINT_RED_L0("Ignoring hf_booster_update tx " << tx_id << " with hf_id: " << update.hf_id << ", as we are in pre-HF8 zone, to avoid network split");
+    return true;
+  }
+
+  CHECK_AND_ASSERT_THROW_MES(r, "Failed to verify hf_booster_update signature for hf_id: " << update.hf_id << ", tx_id: " << tx_id);
+
+  // check against minimal distance allowed betwen hf height and current height and other conditions
+  CHECK_AND_ASSERT_THROW_MES(update.hf_new_activation_height > get_current_blockchain_size(), "hf_booster_update: update.hf_new_activation_height > get_current_blockchain_size() failed");
+  CHECK_AND_ASSERT_THROW_MES(update.hf_new_activation_height - get_current_blockchain_size() > m_core_runtime_config.minimal_distance_between_boost_and_hf, "hf_booster_update: minimal_distance_between_boost_and_hf condition is not fit");
+  if (update.hf_id < m_core_runtime_config.hard_forks.m_total_count)
+  {
+    // if we aware of the hardfork, then we check that it is not yet active, otherwise we just put it to DB
+    CHECK_AND_ASSERT_THROW_MES(!m_core_runtime_config.is_hardfork_active_for_height(update.hf_id, get_current_blockchain_size()), "hf_booster_update: hf_id is already active");
+  }
+
+  // --danger-ignore-hardfork-and-diverge: the booster passed the same checks as on every other node (so this node accepts the
+  // same blocks), but it is neither recorded in the DB nor applied. Nothing that reads the DB later
+  // (hf_booster_load_hardforks_from_db, check_hf_compliance_on_current_height) sees it, and pop_hf_booster_update skips it
+  if (m_ignored_hardfork_id != 0 && update.hf_id == m_ignored_hardfork_id)
+  {
+    LOG_PRINT_RED_L0("[DANGER] Ignoring hf_booster_update for hardfork " << update.hf_id << " (activation after height " << update.hf_new_activation_height
+      << ") in tx " << tx_id << " because of --" << arg_danger_ignore_hardfork_and_diverge.name << ": this node will DIVERGE from the network when that hardfork activates");
+    return true;
+  }
+
+  
+  //if this build not aware of this hf, then prev value in db would be not then one as with known
+
+  //signature verified, now need to push this info into db, against 
+  std::list<uint64_t> hf_heights;
+  auto current_ptr = m_db_hardfork_updates.get(update.hf_id);
+  if(current_ptr)
+  {
+    hf_heights = *current_ptr;
+  }
+  // if there as no prev record, then we'll put original default activation height into the list, so we can rollback to it if needed
+  if (!hf_heights.size())
+  {
+    if (update.hf_id < m_core_runtime_config.hard_forks.m_total_count)
+    {
+      hf_heights.push_back(m_core_runtime_config.hard_forks.get_height_the_hardfork_active_after(update.hf_id));
+    }
+    else
+    {
+      LOG_PRINT_RED_L0("Warning: hf_booster_update: hf_id " << update.hf_id << " is not known to this build, so we can't get default activation height for it, will put as default uint64_t max, and we'll still store the new activation height into db");
+      hf_heights.push_back(std::numeric_limits<uint64_t>::max());
+    }
+    
+  }
+  hf_heights.push_back(update.hf_new_activation_height);
+  m_db_hardfork_updates.set(update.hf_id, hf_heights);
+  // update structure in memory
+  m_core_runtime_config.hard_forks.set_hardfork_height_if_exist(update.hf_id, update.hf_new_activation_height);
+  return true;
+}
+//------------------------------------------------------------------
+bool blockchain_storage::pop_hf_booster_update(const transaction& tx, const crypto::hash& tx_id, const bc_services::hf_booster_update& update, const uint64_t height)
+{
+  if (!m_db_hardfork_updates.size())
+  {
+    return true;  // this is likely truncating rised by init_booster_hardforks, so we don't need to pop anything as prev build was hf_booster - not aware
+  }
+  //make sure it was valid update
+  bool r = verify_hf_booster_signature(update, tx, m_core_runtime_config);
+  // if we are in pre-HF8 zone, then we ignore this tx without breaking the chain, to avoid network split.
+  if(!r && tx.hardfork_id < ZANO_HARDFORK_08)
+  {
+    // this was pre-HF8 tx with broken proof, so it was ignored and never used to actual put_hf_booster_update, so we don't need to pop anything
+    return true;
+  }
+
+  if (m_ignored_hardfork_id != 0 && update.hf_id == m_ignored_hardfork_id)
+  {
+    // --danger-ignore-hardfork-and-diverge: put_hf_booster_update did not record it, so there is nothing to pop
+    return true;
+  }
+
+
+  std::list<uint64_t> hf_heights;
+  auto current_ptr = m_db_hardfork_updates.get(update.hf_id);
+  CHECK_AND_ASSERT_MES(current_ptr, false, "pop_hf_booster_update: no hf_heights found for hf_id " << update.hf_id);
+  hf_heights = *current_ptr;
+  CHECK_AND_ASSERT_MES(hf_heights.size(), false, "pop_hf_booster_update: no hf_heights found for hf_id " << update.hf_id);
+  CHECK_AND_ASSERT_MES(hf_heights.back() == update.hf_new_activation_height, false, "pop_hf_booster_update: last hf_height mismatch for hf_id " << update.hf_id << ", expected: " << update.hf_new_activation_height << ", actual: " << hf_heights.back());
+  hf_heights.pop_back();
+  if(hf_heights.size())
+  {    
+    m_db_hardfork_updates.set(update.hf_id, hf_heights);
+  }
+  else
+  {
+    //this should never happen, as every new hf_booster comes with 2 pushes - default (max uint64_t) + the one that arrived 
+    LOG_ERROR("[Internal error]: Pop hb_booster with no items to pop");
+    return false;
+  }
+
+  if(update.hf_id < m_core_runtime_config.hard_forks.m_total_count)
+    m_core_runtime_config.hard_forks.set_hardfork_height(update.hf_id, hf_heights.back());
+
 
   return true;
 }
@@ -7691,7 +7894,30 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
   }
 
 
+  bool var_is_hardfork_8_zone = m_core_runtime_config.is_hardfork_active_for_height(8, block_height);
+  if(var_is_hardfork_8_zone)
+  {
+    // forbid combining GW addresses with any other type of input, and forbid having inputs from different GW addresses in the same tx
+    // (even though the current codebase supports all sorts of address combinations)
 
+    std::set<gateway_address_id_type> found_gw_address_ids;
+    bool found_non_gw_inputs = false;
+    for(auto& inv : tx.vin)
+    {
+      if(inv.type() == typeid(txin_gateway))
+      {
+        const txin_gateway& gw_in = boost::get<txin_gateway>(inv);
+        found_gw_address_ids.insert(gw_in.gateway_addr);
+      }
+      else
+      {
+        found_non_gw_inputs = true;
+      }
+    }
+
+    CHECK_AND_ASSERT_MES(found_gw_address_ids.size() <= 1, false, "transaction has inputs from different GW addresses");
+    CHECK_AND_ASSERT_MES(!found_non_gw_inputs || found_gw_address_ids.empty(), false, "transaction has GW inputs combined with non-GW inputs");
+  }
 
   return true;
 }
@@ -8148,11 +8374,58 @@ bool get_tx_from_cache(const crypto::hash& tx_id, transactions_map& tx_cache, tr
   return true;
 }
 //------------------------------------------------------------------
+bool blockchain_storage::check_hf_compliance_on_current_height()
+{
+  const uint64_t max_hf_count = 10000;
+
+
+  uint64_t h = this->get_current_blockchain_size();
+  if(h == 0)
+    return true;
+
+  std::vector<uint64_t> hf_heights_from_db;
+  for (uint64_t i = 0; i != max_hf_count; i++)
+  {
+    auto ptr_list = m_db_hardfork_updates.get(i);
+    if(!ptr_list)
+      break;
+    hf_heights_from_db.push_back(ptr_list->back());
+  }
+
+  auto get_the_most_recent_hardfork_id_for_height = [&](uint64_t h) -> uint64_t
+  {
+    if(!hf_heights_from_db.size())
+      return 0;
+    for(size_t hid = hf_heights_from_db.size() - 1; hid != 0; --hid)  // 0 is not including
+    {
+      if(h > hf_heights_from_db[hid])
+        return hid;
+    }
+    return 0;
+  };
+
+  size_t hardfork_id_for_next_block = get_the_most_recent_hardfork_id_for_height(h);
+
+  if(hardfork_id_for_next_block > m_core_runtime_config.hard_forks.last_supported_hardfork_id)
+  {
+    LOG_ERROR("[IMPORTANT] Hardfork " << hardfork_id_for_next_block << " is not supported by this version of the software, but it's been activateded by hf booster. Please upgrade to a newer version or contact the team if you sure that you are on the latest version.");
+    this->m_performance_data.epic_failure_happend = true;
+    m_performance_data.unsupported_hardfork_id    = hardfork_id_for_next_block;
+    return false;
+  }
+  return true;
+}
+//------------------------------------------------------------------
 bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypto::hash& id, block_verification_context& bvc)
 {
   TIME_MEASURE_START_PD_MS(block_processing_time_0_ms);
   CRITICAL_REGION_LOCAL(m_read_lock);
   TIME_MEASURE_START_PD(block_processing_time_1);
+
+  if (!check_hf_compliance_on_current_height())
+  {
+    return false;
+  }
 
   uint64_t height = get_current_blockchain_size(); // height <-> block height correspondence is validated in prevalidate_miner_transaction()
 
@@ -8635,6 +8908,21 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
   TIME_MEASURE_FINISH_PD(block_processing_time_1);
   TIME_MEASURE_FINISH_PD_MS(block_processing_time_0_ms);
 
+  // Hardfork activation is detected here, for every block connected to the main chain: a block added one by one,
+  // each block connected by switch_to_alternative_blockchain() (the delivered block may be above the activation height),
+  // and a block produced by this node (core::handle_block_found() does not go through core::add_new_block()).
+  // The write is a nested DB transaction, so it is committed or aborted together with the block.
+  if (bei.height > 0 && !bvc.do_just_simulation)
+  {
+    size_t hardfork_id_for_this_block = m_core_runtime_config.hard_forks.get_the_most_recent_hardfork_id_for_height(bei.height);
+    size_t hardfork_id_for_next_block = m_core_runtime_config.hard_forks.get_the_most_recent_hardfork_id_for_height(bei.height + 1);
+    if (hardfork_id_for_this_block != hardfork_id_for_next_block)
+    {
+      LOG_PRINT_GREEN("Hardfork " << hardfork_id_for_next_block << " has been activated after the block at height " << bei.height, LOG_LEVEL_0);
+      on_hardfork_activated(hardfork_id_for_next_block);
+    }
+  }
+
   //print result
   stringstream powpos_str_entry, timestamp_str_entry, pos_validation_str_entry, block_reward_entry;
   if (is_pos_bl)
@@ -8783,6 +9071,7 @@ void blockchain_storage::on_abort_transaction()
 {
   if (m_event_handler) m_event_handler->on_clear_events();
   CHECK_AND_ASSERT_MES_NO_RET(validate_blockchain_prev_links(), "EPIC FAIL! 4");
+  hf_booster_load_hardforks_from_db();
   m_timestamps_median_cache.clear();
 }
 //------------------------------------------------------------------
@@ -8914,6 +9203,7 @@ bool blockchain_storage::add_new_block(const block& bl, block_verification_conte
         db_tx_ptr->abort_transaction();
         CHECK_AND_ASSERT_MES(validate_blockchain_prev_links(), false, "EPIC FAIL! 2.2");
         m_tx_pool.on_finalize_db_transaction();
+        on_abort_transaction();
         return r;
       }
       db_tx_ptr->commit_transaction();
@@ -9124,10 +9414,13 @@ bool blockchain_storage::build_kernel(const crypto::key_image& ki,
   return true;
 }
 //------------------------------------------------------------------
-void blockchain_storage::set_core_runtime_config(const core_runtime_config& pc) const
+void blockchain_storage::set_core_runtime_config(const core_runtime_config& pc)
 {
   m_core_runtime_config = pc;
   m_services_mgr.set_core_runtime_config(pc);
+  auto db_tx_ptr = m_db.begin_transaction_obj();
+  hf_booster_store_hardforks_to_db();
+  db_tx_ptr->commit_transaction();
 }
 //------------------------------------------------------------------
 const core_runtime_config& blockchain_storage::get_core_runtime_config() const

@@ -1227,7 +1227,9 @@ bool multisig_and_unlock_time::generate(std::vector<test_event_entry>& events) c
 
   destinations.assign({ tx_destination_entry(amount - TESTS_DEFAULT_FEE, alice_acc.get_public_address()) });
 
-  ADJUST_TEST_CORE_TIME(unlock_time - CURRENCY_LOCKED_TX_ALLOWED_DELTA_SECONDS - 1);
+  // test core time is time(NULL) + shift, so it keeps ticking with the wall clock during replay;
+  // keep a margin of several seconds, otherwise crossing a second boundary unlocks the output too early
+  ADJUST_TEST_CORE_TIME(unlock_time - CURRENCY_LOCKED_TX_ALLOWED_DELTA_SECONDS - 10);
 
   // tx_2 should be created ok, but rejected by the core, as one of input refers to a locked tx
   // Note: tx_2 has unlock_time_2 specified
@@ -1249,7 +1251,8 @@ bool multisig_and_unlock_time::generate(std::vector<test_event_entry>& events) c
   MAKE_NEXT_BLOCK_TX1(events, blk_2, blk_1, miner_acc, tx_2);
 
   // Next, check tx_2 unlock time by spending all coins
-  ADJUST_TEST_CORE_TIME(unlock_time_2 - CURRENCY_LOCKED_TX_ALLOWED_DELTA_SECONDS - 1);
+  // same wall-clock margin as above
+  ADJUST_TEST_CORE_TIME(unlock_time_2 - CURRENCY_LOCKED_TX_ALLOWED_DELTA_SECONDS - 10);
 
   DO_CALLBACK(events, "mark_invalid_tx");
   // instead of MAKE_TX use manual construction to set check_for_unlocktime = false, old: MAKE_TX(events, tx_3, alice_acc, bob_acc, amount - TESTS_DEFAULT_FEE * 2, blk_2);
