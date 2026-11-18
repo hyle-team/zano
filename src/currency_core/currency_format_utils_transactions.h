@@ -60,6 +60,7 @@ namespace currency
     crypto::public_key asset_id = currency::native_coin_asset_id; //asset id (not blinded, not premultiplied by 1/8) TODO @#@# consider changing to crypto::point_t
     
     currency::gateway_address_id_type gateway_origin = {}; // for gateway transfers, the source gateway address id
+    uint64_t nonce                                   = 0;  // for gateway transfers, the source gateway address nonce
 
 
     bool is_multisig() const    { return ms_sigs_count > 0; }

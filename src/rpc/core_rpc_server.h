@@ -216,6 +216,7 @@ namespace currency
     void set_session_blob(const std::string& session_id, const currency::block& blob);
     bool get_session_blob(const std::string& session_id, currency::block& blob);
     void do_explicit_block_simulations();
+    uint64_t get_next_nonce_for_tx(const currency::gateway_address_id_type& origin_addr, uint64_t nonce);
     
     core& m_core;
     nodetool::node_server<currency::t_currency_protocol_handler<currency::core> >& m_p2p;

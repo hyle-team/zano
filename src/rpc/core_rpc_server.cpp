@@ -796,6 +796,20 @@ namespace currency
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
+  uint64_t core_rpc_server::get_next_nonce_for_tx(const currency::gateway_address_id_type& origin_addr, uint64_t nonce)
+  {
+    if(!nonce)
+    {
+      // let's figure out next available nonce
+      nonce = m_core.get_tx_pool().get_next_available_nonce_for_gw(origin_addr);
+      if(!nonce)
+      {
+        nonce = m_core.get_blockchain_storage().get_gw_next_nonce(origin_addr);
+      }
+    }
+    return nonce;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_gateway_create_transfer(const COMMAND_RPC_GATEWAY_CREATE_TRANSFER::request& req, COMMAND_RPC_GATEWAY_CREATE_TRANSFER::response& res, connection_context& cntx)
   {
     CHECK_CORE_READY();
@@ -876,6 +890,7 @@ namespace currency
       return true;
     }
 
+    uint64_t nonce_local = get_next_nonce_for_tx(req.origin_gateway_id, req.nonce);
 
     for (const auto& [asset_id, amount] : total_coins_needed)
     {
@@ -883,6 +898,7 @@ namespace currency
       source.asset_id = asset_id;
       source.amount = amount;
       source.gateway_origin = req.origin_gateway_id;
+      source.nonce = nonce_local;
       ftp.sources.push_back(source);
     }
 
@@ -1215,6 +1231,7 @@ namespace currency
     source.asset_id = currency::native_coin_asset_id;
     source.amount = fee;
     source.gateway_origin = req.address_id;
+    source.nonce = get_next_nonce_for_tx(req.address_id, req.nonce);
     ftp.sources.push_back(source);
 
     ftp.crypt_address.view_public_key = req.address_id;

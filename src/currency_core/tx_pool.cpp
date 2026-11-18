@@ -146,8 +146,8 @@ namespace currency
       return false;
     }
 
-
-    r = m_blockchain.validate_tx_for_hardfork_specific_terms(tx, id);
+    blockchain_storage::transaction_verification_context btvc = { };
+    r = m_blockchain.validate_tx_for_hardfork_specific_terms(tx, id, btvc);
     CHECK_AND_ASSERT_MES(r, false, "Transaction " << id <<" doesn't fit current hardfork");
 
     TIME_MEASURE_START_PD(tx_processing_time);
@@ -1445,7 +1445,8 @@ namespace currency
 
     m_db_transactions.enumerate_items([&](uint64_t i, const crypto::hash& h, const tx_details &tx_entry)
     {
-      if (!m_blockchain.validate_tx_for_hardfork_specific_terms(tx_entry.tx, h))
+      blockchain_storage::transaction_verification_context btvc = { };
+      if (!m_blockchain.validate_tx_for_hardfork_specific_terms(tx_entry.tx, h, btvc))
         invalid_tx_ids.push_back(h);
       return true;
     });
@@ -1463,6 +1464,12 @@ namespace currency
   bool tx_memory_pool::is_tx_blacklisted(const crypto::hash& id) const
   {
     return m_db_black_tx_list.get(id) != nullptr;
+  }
+  //---------------------------------------------------------------------------------
+  uint64_t tx_memory_pool::get_next_available_nonce_for_gw(const currency::gateway_address_id_type& addr) const
+  {
+    //TODO;
+    return 0;
   }
   //---------------------------------------------------------------------------------
   bool tx_memory_pool::load_keyimages_cache()

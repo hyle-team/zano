@@ -3051,6 +3051,7 @@ namespace currency
         input_gateway.amount = src_entr.amount;
         input_gateway.asset_id = (crypto::c_scalar_1div8 * crypto::point_t(src_entr.asset_id)).to_public_key();
         input_gateway.gateway_addr = src_entr.gateway_origin;
+        input_gateway.nonce = src_entr.nonce;
         tx.vin.push_back(input_gateway);
         has_non_zc_inputs = true;
       }
@@ -5418,7 +5419,8 @@ namespace currency
     return
       a.amount == b.amount &&
       a.asset_id == b.asset_id &&
-      a.gateway_addr == b.gateway_addr;
+      a.gateway_addr == b.gateway_addr &&
+      a.nonce == b.nonce;
   }
   //--------------------------------------------------------------------------------
   boost::multiprecision::uint1024_t get_a_to_b_relative_cumulative_difficulty(const wide_difficulty_type& difficulty_pos_at_split_point,

@@ -67,6 +67,7 @@ using namespace currency;
 #define BLOCKCHAIN_STORAGE_CONTAINER_ASSETS                  "assets"
 #define BLOCKCHAIN_STORAGE_CONTAINER_GATEWAY_ADDRESSES       "gateway_addresses"
 #define BLOCKCHAIN_STORAGE_CONTAINER_GATEWAY_TRANSACTIONS    "gateway_transactions"
+#define BLOCKCHAIN_STORAGE_CONTAINER_GATEWAY_NONCES          "gateway_nonces"
 #define BLOCKCHAIN_STORAGE_CONTAINER_HF_UPDATES              "hardfork_updates"
 
 #define BLOCKCHAIN_STORAGE_OPTIONS_ID_CURRENT_BLOCK_CUMUL_SZ_LIMIT          0
@@ -103,7 +104,8 @@ blockchain_storage::blockchain_storage(tx_memory_pool& tx_pool) :m_db(nullptr, m
                                                                  m_db_addr_to_alias(m_db),
                                                                  m_db_addr_to_default_alias(m_db),
                                                                  m_db_gateway_addresses(m_db),
-                                                                 m_db_gateway_transactions(m_db), 
+                                                                 m_db_gateway_transactions(m_db),
+                                                                 m_db_gateway_nonces(m_db),
                                                                  m_db_hardfork_updates(m_db),
                                                                  m_read_lock(m_rw_lock),
                                                                  m_db_current_block_cumul_sz_limit(BLOCKCHAIN_STORAGE_OPTIONS_ID_CURRENT_BLOCK_CUMUL_SZ_LIMIT, m_db_solo_options),
@@ -238,6 +240,7 @@ void blockchain_storage::set_db_l2_cache_size(uint64_t ceched_elements) const
   m_db_assets.set_cache_size(ceched_elements);
   m_db_gateway_addresses.set_cache_size(ceched_elements);
   m_db_gateway_transactions.set_cache_size(ceched_elements);
+  m_db_gateway_nonces.set_cache_size(ceched_elements);
   m_db_addr_to_alias.set_cache_size(ceched_elements);
   m_db_addr_to_default_alias.set_cache_size(ceched_elements);
 }
@@ -257,6 +260,7 @@ std::string blockchain_storage::get_db_l2_cache_state_str() const
   PRINT_CACHE_STATE(m_db_assets);
   PRINT_CACHE_STATE(m_db_gateway_addresses);
   PRINT_CACHE_STATE(m_db_gateway_transactions);
+  PRINT_CACHE_STATE(m_db_gateway_nonces);
   PRINT_CACHE_STATE(m_db_addr_to_alias);
   PRINT_CACHE_STATE(m_db_addr_to_default_alias);
   return ss.str();
@@ -376,6 +380,8 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
     res = m_db_gateway_addresses.init(BLOCKCHAIN_STORAGE_CONTAINER_GATEWAY_ADDRESSES);
     CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
     res = m_db_gateway_transactions.init(BLOCKCHAIN_STORAGE_CONTAINER_GATEWAY_TRANSACTIONS);
+    CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
+    res = m_db_gateway_nonces.init(BLOCKCHAIN_STORAGE_CONTAINER_GATEWAY_NONCES);
     CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
     res = m_db_addr_to_default_alias.init(BLOCKCHAIN_STORAGE_CONTAINER_ADDR_TO_DEFAULT_ALIAS);
     CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");    
@@ -642,6 +648,7 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
       m_db_per_block_gindex_incs.deinit();
       m_db_gateway_addresses.deinit();
       m_db_gateway_transactions.deinit();
+      m_db_gateway_nonces.deinit();
       m_db_hardfork_updates.deinit();
       m_db.close();
       size_t files_removed = boost::filesystem::remove_all(epee::string_encoding::utf8_to_wstring(db_folder_path));
@@ -1004,6 +1011,7 @@ bool blockchain_storage::clear()
     m_pow_targetdata_cache.clear();
     m_db_gateway_addresses.clear();
     m_db_gateway_transactions.clear();
+    m_db_gateway_nonces.clear();
     m_db_hardfork_updates.clear();
     db_tx_ptr->commit_transaction();
   }
@@ -1123,20 +1131,77 @@ void get_gateway_addresses_involved_in_tx(std::set<currency::gateway_address_id_
   }
 }
 //------------------------------------------------------------------
-bool blockchain_storage::process_tx_gateway_history(const crypto::hash& tx_id, const transaction& tx_)
+bool blockchain_storage::set_gw_prev_nonce(const currency::gateway_address_id_type& addr, uint64_t nonce)
 {
+  //this called only on rollback
+  auto nonce_ptr = m_db_gateway_nonces.get(addr);
+  CHECK_AND_ASSERT_MES(nonce_ptr, false, "Internal error: unexpected missig nonce for addr" << get_account_address_as_str(addr));
+
+  CHECK_AND_ASSERT_MES(0 != nonce, false, "Internal error: unexpected prev nonce stored val: " << *nonce_ptr << ", Address: " << currency::get_account_address_as_str(addr));
+
+  CHECK_AND_ASSERT_MES( (*nonce_ptr) - 1 == nonce, false, "Internal error: unexpected prev nonce stored val: " << *nonce_ptr << ", assigning: " << nonce<< ", Address: " << currency::get_account_address_as_str(addr));
+
+  m_db_gateway_nonces.set(addr, nonce);
+  return true;
+}
+//------------------------------------------------------------------
+bool blockchain_storage::set_gw_next_nonce(const currency::gateway_address_id_type& addr, uint64_t nonce)
+{
+  auto nonce_ptr = m_db_gateway_nonces.get(addr);
+  if (!nonce_ptr)
+  {
+    CHECK_AND_ASSERT_THROW_MES(nonce == CURRENCY_GATEWAY_ADDRESS_NONCE_STARTER + 1, "Internal error: unexpected initial nonce(" << nonce << ")");
+  }
+  else
+  {
+    CHECK_AND_ASSERT_THROW_MES(nonce == *nonce_ptr + 1, "Internal error: unexpected next nonce: " << nonce << ", stored val: " << *nonce_ptr);
+  }
+  
+  m_db_gateway_nonces.set(addr, nonce);
+  return true;
+}
+//------------------------------------------------------------------
+uint64_t blockchain_storage::get_gw_next_nonce(const currency::gateway_address_id_type& addr) const
+{
+  CRITICAL_REGION_LOCAL(m_read_lock);
+  auto nonce_ptr = m_db_gateway_nonces.get(addr);
+  if(!nonce_ptr)
+    return CURRENCY_GATEWAY_ADDRESS_NONCE_STARTER;
+
+  return *nonce_ptr;
+}
+//------------------------------------------------------------------
+bool blockchain_storage::validate_tx_gateway_nonce(const transaction& tx_)
+{
+  if(m_tvc.has_gw_ins)
+  {
+    CHECK_AND_ASSERT_MES(get_gw_next_nonce(m_tvc.gw_input_addr) == m_tvc.nonce, false, "Wrong nonce, tx input nonce: " 
+      << m_tvc.nonce << ", db nonce for address(" << currency::get_account_address_as_str(m_tvc.gw_input_addr) << "): " << get_gw_next_nonce(m_tvc.gw_input_addr));
+  }
+  return true;
+}
+//------------------------------------------------------------------
+bool blockchain_storage::process_tx_gateway_history(const crypto::hash& tx_id, const transaction& tx_)
+{  
+  if(m_tvc.has_gw_ins)
+  {
+    set_gw_next_nonce(m_tvc.gw_input_addr, m_tvc.nonce + 1);
+  }
   //associate transaction id with every gateway address mentioned in this tx to maintain the history of transactions related to gateway addresses
   std::set<currency::gateway_address_id_type> gw;
   get_gateway_addresses_involved_in_tx(gw, tx_);
+
   for(const auto& gw_addr : gw)
   {
     m_db_gateway_transactions.push_back_item(gw_addr, tx_id);
   }
+
   return true;
 }
 //------------------------------------------------------------------
 bool blockchain_storage::unprocess_tx_gateway_history(const crypto::hash& tx_id, const transaction& tx_)
 {
+  bool r = true;
   //remove association of transaction id with every gateway address mentioned in this tx
   std::set<currency::gateway_address_id_type> gw;
   get_gateway_addresses_involved_in_tx(gw, tx_);
@@ -1148,7 +1213,22 @@ bool blockchain_storage::unprocess_tx_gateway_history(const crypto::hash& tx_id,
       m_db_gateway_transactions.pop_back_item(gw_addr);
     }
   }
-  return true;
+  
+  //for each gw address in inputs
+  for(auto it = tx_.vin.crbegin(); it != tx_.vin.crend(); ++it)
+  {
+    const auto& in = *it;
+    if (in.type() == typeid(txin_gateway))
+    {
+      //check that nonce is right 
+      const txin_gateway& gw_in = boost::get<txin_gateway>(in);
+      r = set_gw_prev_nonce(gw_in.gateway_addr, gw_in.nonce);
+      CHECK_AND_ASSERT_MES(r, false, "Failed to set_gw_prev_nonce");
+      break;
+    }
+  }
+
+  return r;
 }
 //------------------------------------------------------------------
 bool blockchain_storage::purge_transaction_from_blockchain(const crypto::hash& tx_id, uint64_t& fee, transaction& tx_)
@@ -1172,7 +1252,8 @@ bool blockchain_storage::purge_transaction_from_blockchain(const crypto::hash& t
 
   bool r = unprocess_blockchain_tx_attachments(tx, get_current_blockchain_size(), 0/*TODO: add valid timestamp here in future if need*/);
 
-  unprocess_tx_gateway_history(tx_id, tx_);
+  r = unprocess_tx_gateway_history(tx_id, tx_);
+  CHECK_AND_ASSERT_MES(r, false, "failed to unprocess_tx_gateway_history for tx " << tx_id);
   
   r = unprocess_blockchain_tx_extra(tx, tx_res_ptr->m_keeper_block_height, tx_id);
   CHECK_AND_ASSERT_MES(r, false, "failed to unprocess_blockchain_tx_extra for tx " << tx_id);
@@ -2137,6 +2218,7 @@ void blockchain_storage::reset_db_cache() const
   m_db_assets.clear_cache();
   m_db_gateway_addresses.clear_cache();
   m_db_gateway_transactions.clear_cache();
+  m_db_gateway_nonces.clear_cache();
   m_db_hardfork_updates.clear_cache();
   m_db_addr_to_alias.clear_cache();
   m_db_addr_to_default_alias.clear_cache();
@@ -6236,6 +6318,9 @@ bool blockchain_storage::gateway_get_address_history(const currency::gateway_add
 
 bool blockchain_storage::add_transaction_from_block(const transaction& tx, const crypto::hash& tx_id, const crypto::hash& bl_id, uint64_t bl_height, uint64_t timestamp, bool taken_from_pool)
 {
+  //always reset m_tvc before we go through tx verification
+  m_tvc = transaction_verification_context { };
+
   bool tx_validated = false;
   bool is_coinbase_ = is_coinbase(tx);
   bool need_to_profile = !is_coinbase_;
@@ -6256,8 +6341,10 @@ bool blockchain_storage::add_transaction_from_block(const transaction& tx, const
   CHECK_AND_ASSERT_THROW_MES(!is_tx_expired(tx), "Transaction can't be added to the blockchain since it's already expired. tx expiration time: " << get_tx_expiration_time(tx) << ", blockchain median time: " << get_tx_expiration_median());
   TIME_MEASURE_FINISH_PD_COND(need_to_profile, tx_append_is_expired);
 
-  CHECK_AND_ASSERT_THROW_MES(validate_tx_for_hardfork_specific_terms(tx, tx_id, bl_height), "tx " << tx_id << ": hardfork-specific validation failed");
+  CHECK_AND_ASSERT_THROW_MES(validate_tx_for_hardfork_specific_terms(tx, tx_id, bl_height, m_tvc), "tx " << tx_id << ": hardfork-specific validation failed");
   CHECK_AND_ASSERT_THROW_MES(validate_tx_gw_asset_ids(tx, bl_height), "tx " << tx_id << ": gateway asset id validation failed");
+  CHECK_AND_ASSERT_THROW_MES(validate_tx_gateway_nonce(tx), "Transaction can't be added to the blockchain due to gw nonce doesn't fit");
+
 
   TIME_MEASURE_START_PD(tx_process_extra);
   bool r = process_blockchain_tx_extra(tx, tx_id, bl_height);
@@ -7620,7 +7707,7 @@ void blockchain_storage::get_pos_mining_estimate(uint64_t amount_coins,
   estimate_result = current_amount;
 }
 //------------------------------------------------------------------
-bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transaction& tx, const crypto::hash& tx_id) const
+bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transaction& tx, const crypto::hash& tx_id, transaction_verification_context& tvc) const
 {
   if (m_db_major_failure)
   {
@@ -7629,7 +7716,7 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
   }
 
   uint64_t block_height = m_db_blocks.size();
-  return validate_tx_for_hardfork_specific_terms(tx, tx_id, block_height);
+  return validate_tx_for_hardfork_specific_terms(tx, tx_id, block_height, tvc);
 }
 //------------------------------------------------------------------
 size_t blockchain_storage::get_current_hardfork_id() const
@@ -7766,7 +7853,7 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms_types_HF4(const
 }
 
 
-bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transaction& tx, const crypto::hash& tx_id, uint64_t block_height) const
+bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transaction& tx, const crypto::hash& tx_id, uint64_t block_height, transaction_verification_context& tvc) const
 {
   bool r = false;
   if (m_core_runtime_config.is_hardfork_active_for_height(6, block_height))
@@ -7857,67 +7944,67 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
     // enforce explicitly existing soft limits (s.a. tx_memory_pool::add_tx) and implicit hard limits (verify_BGE_proof etc.)
     CHECK_AND_ASSERT_MES(tx.vin.size() <= CURRENCY_TX_MAX_ALLOWED_INPUTS, false, "transaction has too many inputs = " << tx.vin.size());
     CHECK_AND_ASSERT_MES(tx.vout.size() <= CURRENCY_TX_MAX_ALLOWED_OUTS,  false, "transaction has too many outputs = " << tx.vout.size());
-
-    bool has_gw_ins = false;
+    std::set<uint64_t> gw_nonces;
+    std::set<gateway_address_id_type> found_gw_address_ids;
+    tvc.has_gw_ins = false;
     for(auto& inv : tx.vin)
     {
       if (inv.type() == typeid(txin_gateway))
       {
-        has_gw_ins = true;
+        tvc.has_gw_ins = true;
         CHECK_AND_ASSERT_MES(boost::get<txin_gateway>(inv).amount != 0, false, "zero amount gw inputs are not allowed");
+        gw_nonces.insert(boost::get<txin_gateway>(inv).nonce);
+        found_gw_address_ids.insert(boost::get<txin_gateway>(inv).gateway_addr);
+        tvc.gw_input_addr = boost::get<txin_gateway>(inv).gateway_addr; // if we ever allow multiple GW inluts from different addresses this need to be changed
+      }
+      else
+      {
+        tvc.has_non_gw_ins = true;
       }
     }
-    bool has_gw_outs = false;
+    tvc.has_gw_outs = false;
     for(auto& outv : tx.vout)
     {
       if (outv.type() == typeid(tx_out_gateway))
       {
-        has_gw_outs = true;
+        tvc.has_gw_outs = true;
         CHECK_AND_ASSERT_MES(boost::get<tx_out_gateway>(outv).amount != 0, false, "zero amount gw outputs are not allowed");
       }
     }
 
     if (mode_separate)
     {
-      CHECK_AND_ASSERT_MES(!has_gw_ins && !has_gw_outs, false, "TX_FLAG_SIGNATURE_MODE_SEPARATE is incompatible with gw ins/outs");
+      CHECK_AND_ASSERT_MES(!tvc.has_gw_ins && !tvc.has_gw_outs, false, "TX_FLAG_SIGNATURE_MODE_SEPARATE is incompatible with gw ins/outs");
     }
 
-    if (has_gw_outs)
+    if(tvc.has_gw_outs)
     {
       bool has_legacy_pid = has_tx_wide_payment_id(tx);
       CHECK_AND_ASSERT_MES(!has_legacy_pid, false, "legacy tx-wide payment ID is incompatible with gateway outputs");
+    }
+    if(tvc.has_gw_ins)
+    {
+      CHECK_AND_ASSERT_MES(gw_nonces.size() == 1, false, "transaction has multiple gw nonces");
+      tvc.nonce = *gw_nonces.begin();
     }
 
     gateway_address_descriptor_operation gado{};
     if (get_type_in_variant_container<gateway_address_descriptor_operation>(tx.extra, gado))
       CHECK_AND_ASSERT_MES(validate_gateway_descriptor_operation_limits(gado), false, "transaction has invalid gateway descriptor");
-  }
 
-
-  bool var_is_hardfork_8_zone = m_core_runtime_config.is_hardfork_active_for_height(8, block_height);
-  if(var_is_hardfork_8_zone)
-  {
-    // forbid combining GW addresses with any other type of input, and forbid having inputs from different GW addresses in the same tx
-    // (even though the current codebase supports all sorts of address combinations)
-
-    std::set<gateway_address_id_type> found_gw_address_ids;
-    bool found_non_gw_inputs = false;
-    for(auto& inv : tx.vin)
+    bool var_is_hardfork_8_zone = m_core_runtime_config.is_hardfork_active_for_height(8, block_height);
+    if(var_is_hardfork_8_zone)
     {
-      if(inv.type() == typeid(txin_gateway))
+      // forbid combining GW addresses with any other type of input, and forbid having inputs from different GW addresses in the same tx
+      // (even though the current codebase supports all sorts of address combinations)
+      if (tvc.has_gw_ins)
       {
-        const txin_gateway& gw_in = boost::get<txin_gateway>(inv);
-        found_gw_address_ids.insert(gw_in.gateway_addr);
-      }
-      else
-      {
-        found_non_gw_inputs = true;
+        CHECK_AND_ASSERT_MES(found_gw_address_ids.size() == 1, false, "transaction has inputs from different GW addresses");
+        CHECK_AND_ASSERT_MES(!tvc.has_non_gw_ins, false, "transaction has GW inputs combined with non-GW inputs");
       }
     }
-
-    CHECK_AND_ASSERT_MES(found_gw_address_ids.size() <= 1, false, "transaction has inputs from different GW addresses");
-    CHECK_AND_ASSERT_MES(!found_non_gw_inputs || found_gw_address_ids.empty(), false, "transaction has GW inputs combined with non-GW inputs");
   }
+
 
   return true;
 }
@@ -10125,6 +10212,7 @@ void blockchain_storage::update_asset_id_registration_for_tx_in_block(const tran
 //------------------------------------------------------------------
 bool blockchain_storage::validate_alt_block_txs(const block& b, const crypto::hash& id, std::unordered_set<crypto::key_image>& collected_keyimages, alt_block_extended_info& abei, const alt_chain_type& alt_chain, uint64_t split_height, uint64_t& ki_lookup_time_total) const
 {
+  m_tvc = transaction_verification_context();
   uint64_t height = abei.height;
   bool r = false;
   std::unordered_set<crypto::hash> alt_chain_block_ids;
@@ -10194,11 +10282,12 @@ bool blockchain_storage::validate_alt_block_txs(const block& b, const crypto::ha
   update_alt_out_indexes_for_tx_in_block(b.miner_tx, abei);
   update_asset_id_registration_for_tx_in_block(b.miner_tx, abei);
 
-  CHECK_AND_ASSERT_MES(validate_tx_for_hardfork_specific_terms(b.miner_tx, null_hash, height), false, "miner tx hardfork-specific validation failed");
+  CHECK_AND_ASSERT_MES(validate_tx_for_hardfork_specific_terms(b.miner_tx, null_hash, height, m_tvc), false, "miner tx hardfork-specific validation failed");
 
   std::vector<uint64_t> fees;
   for (auto tx_id : b.tx_hashes)
   {
+    m_tvc = transaction_verification_context();
     std::shared_ptr<transaction> tx_ptr;
     auto it = abei.onboard_transactions.find(tx_id);
     if (it == abei.onboard_transactions.end())
@@ -10241,7 +10330,7 @@ bool blockchain_storage::validate_alt_block_txs(const block& b, const crypto::ha
       }
     }
 
-    CHECK_AND_ASSERT_MES(validate_tx_for_hardfork_specific_terms(tx, tx_id, height), false, "tx " << tx_id << ": hardfork-specific validation failed");
+    CHECK_AND_ASSERT_MES(validate_tx_for_hardfork_specific_terms(tx, tx_id, height, m_tvc), false, "tx " << tx_id << ": hardfork-specific validation failed");
     
     // Updating out indices in abei (and not updating alt_chain) during this cycle is safe because txs in the same block can't reference one another,
     // so only valid references are either to previous alt blocks (accessed via alt_chain) or to main chain blocks.

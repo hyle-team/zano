@@ -148,6 +148,7 @@ namespace currency
     void remove_incompatible_txs(); // made public to be called after the BCS is loaded and hardfork info is ready
 
     bool is_tx_blacklisted(const crypto::hash& id) const;
+    uint64_t get_next_available_nonce_for_gw(const currency::gateway_address_id_type& addr) const;
 
 #ifdef TX_POOL_USE_UNSECURE_TEST_FUNCTIONS
     void unsecure_disable_tx_validation_on_addition(bool validation_disabled) { m_unsecure_disable_tx_validation_on_addition = validation_disabled; }

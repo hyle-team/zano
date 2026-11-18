@@ -189,7 +189,8 @@ namespace currency
 
     bool prevalidate_transaction(const transaction& tx, const blobdata& tx_blob, const crypto::hash& tx_id, const blockchain_storage& blockchain, std::string& error)
     {
-      if (!blockchain.validate_tx_for_hardfork_specific_terms(tx, tx_id))
+      blockchain_storage::transaction_verification_context tvc = { };
+      if(!blockchain.validate_tx_for_hardfork_specific_terms(tx, tx_id, tvc))
       {
         error = "Transaction does not satisfy current hardfork rules";
         return false;

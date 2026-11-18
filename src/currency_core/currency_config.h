@@ -228,9 +228,8 @@ static_assert(CURRENCY_FORMATION_VERSION == 103);
 #define GUI_DISPATCH_QUE_MAXSIZE                        100
 
 #define CURRENCY_GATEWAY_ADDRESS_REGISTRATION_FEE       ((uint64_t)100000000000000) // 100 Zano
-
+#define CURRENCY_GATEWAY_ADDRESS_NONCE_STARTER          1
 #define ALLOW_DEBUG_COMMANDS
-
 
 
 #define CURRENCY_NAME_ABR                               "ZANO"

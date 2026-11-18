@@ -343,14 +343,13 @@ namespace currency
     gateway_address_id_type gateway_addr = null_pkey;
     crypto::public_key asset_id = null_pkey;                     // premultiplied by 1/8
     uint64_t amount = 0;
+    uint64_t nonce = 0;
 
     BEGIN_VERSIONED_SERIALIZE(0, version)
       FIELD(gateway_addr)
       FIELD(asset_id)
       VARINT_FIELD(amount)
-#if defined(TESTNET) && defined(CURRENCY_FORMATION_VERSION) && (CURRENCY_FORMATION_VERSION == 103)
-      VARINT_FIELD(version)  // remove this when testnet restarted with new formation version
-#endif
+      VARINT_FIELD(nonce)
     END_SERIALIZE()
 
   };

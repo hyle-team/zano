@@ -196,6 +196,21 @@ namespace currency
       // asset IDs from all register operations
       std::vector<crypto::public_key> registered_asset_ids;
     };
+
+
+    // this structure should be used to store all information associated with currently validating transaction in 
+    // blockchain storage, rather than dragging all countless paramaters through the all functions 
+    struct transaction_verification_context
+    {
+      bool has_gw_ins = false;
+      bool has_gw_outs = false;
+      bool has_non_gw_ins = false;
+      uint64_t nonce        = 0;
+      gateway_address_id_type gw_input_addr = { };
+    };
+
+
+
     typedef std::unordered_map<crypto::hash, alt_block_extended_info> alt_chain_container;
     typedef std::vector<alt_chain_container::iterator> alt_chain_type; // alternative subchain, front -> mainchain(split point), back -> alternative head
 
@@ -346,8 +361,8 @@ namespace currency
     bool check_ms_input(const transaction& tx, size_t in_index, const txin_multisig& txin, const crypto::hash& tx_prefix_hash, const transaction& source_tx, size_t out_n) const;
     bool validate_tx_for_hardfork_specific_terms_types_HF6(const transaction& tx, const crypto::hash& tx_id, uint64_t block_height) const;
     bool validate_tx_for_hardfork_specific_terms_types_HF4(const transaction& tx, const crypto::hash& tx_id, uint64_t block_height) const;
-    bool validate_tx_for_hardfork_specific_terms(const transaction& tx, const crypto::hash& tx_id, uint64_t block_height) const;
-    bool validate_tx_for_hardfork_specific_terms(const transaction& tx, const crypto::hash& tx_id) const;
+    bool validate_tx_for_hardfork_specific_terms(const transaction& tx, const crypto::hash& tx_id, uint64_t block_height, transaction_verification_context& tvc) const;
+    bool validate_tx_for_hardfork_specific_terms(const transaction& tx, const crypto::hash& tx_id, transaction_verification_context& tvc) const;
     bool validate_tx_gw_asset_ids(const transaction& tx, uint64_t block_height, const alt_chain_type& alt_chain = alt_chain_type{}, const alt_block_extended_info* p_current_alt_block = nullptr) const;
     bool get_output_keys_for_input_with_checks(const transaction& tx, const txin_v& verified_input, std::vector<crypto::public_key>& output_keys, uint64_t& max_related_block_height, uint64_t& source_max_unlock_time_for_pos_coinbase, scan_for_keys_context& scan_context) const;
     bool get_output_keys_for_input_with_checks(const transaction& tx, const txin_v& verified_input, std::vector<crypto::public_key>& output_keys, uint64_t& max_related_block_height, uint64_t& source_max_unlock_time_for_pos_coinbase) const;
@@ -551,6 +566,7 @@ namespace currency
     void on_hardfork_activated(size_t hardfork_id);
     void print_db_l2_cache_state() const;
     std::string get_db_l2_cache_state_str() const;
+    uint64_t get_gw_next_nonce(const currency::gateway_address_id_type& addr) const;
 
   private:
 
@@ -573,6 +589,7 @@ namespace currency
     // Gateway addresses
     typedef tools::db::cached_key_value_accessor<gateway_address_id_type, gateway_address_data, true, false> gateway_addresses_container;
     typedef tools::db::chunked_key_to_array_accessor<gateway_address_id_type, crypto::hash, false, 100> gateway_address_transactions_container;
+    typedef tools::db::cached_key_value_accessor<gateway_address_id_type, uint64_t, false, false> gateway_nonce_container;
 
     //hf booster
     typedef tools::db::cached_key_value_accessor<uint64_t, std::list<uint64_t>, true, true> hardforks_updates_container;
@@ -625,6 +642,9 @@ namespace currency
     assets_container m_db_assets;
     gateway_addresses_container m_db_gateway_addresses;
     gateway_address_transactions_container m_db_gateway_transactions;
+    gateway_nonce_container m_db_gateway_nonces;  // better to store nonce in separate container rather than in m_db_gateway_addresses, to not overcomplicated push/pop logic
+
+
     hardforks_updates_container m_db_hardfork_updates;
 
 
@@ -667,6 +687,8 @@ namespace currency
     bool m_is_reorganize_in_process;    
     mutable std::atomic<bool> m_deinit_is_done;
     mutable uint64_t m_blockchain_launch_timestamp;
+
+    mutable transaction_verification_context m_tvc = { };
 
     //bool init_tx_fee_median();
     //bool update_tx_fee_median();
@@ -803,7 +825,9 @@ namespace currency
     void remove_old_dbs();
     bool process_tx_gateway_history(const crypto::hash& tx_id, const transaction& tx_);
     bool unprocess_tx_gateway_history(const crypto::hash& tx_id, const transaction& tx_);
-
+    bool set_gw_next_nonce(const currency::gateway_address_id_type& addr, uint64_t nonce);
+    bool set_gw_prev_nonce(const currency::gateway_address_id_type& addr, uint64_t nonce);
+    bool validate_tx_gateway_nonce(const transaction& tx_);
 
     //POS
     wide_difficulty_type get_adjusted_cumulative_difficulty_for_next_pos(wide_difficulty_type next_diff)const;
