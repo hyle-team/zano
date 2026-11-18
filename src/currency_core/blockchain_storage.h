@@ -121,6 +121,7 @@ namespace currency
       
       //TODO: move this to suitable place or remove it all
       std::atomic<bool> epic_failure_happend;
+      std::atomic<uint64_t> unsupported_hardfork_id = 0;  // 0: none
       tools::db::stat_info si;
     };
 
@@ -420,8 +421,9 @@ namespace currency
     bool validate_asset_operation_hf4(asset_op_verification_context& avc) const;
     bool validate_asset_operation_hf5(asset_op_verification_context& avc) const;
     bool validate_asset_operation(asset_op_verification_context& avc, uint64_t height) const;
+    bool check_hf_compliance_on_current_height();
 
-    void set_core_runtime_config(const core_runtime_config& pc) const;
+    void set_core_runtime_config(const core_runtime_config& pc);
     const core_runtime_config& get_core_runtime_config()const;
     size_t get_current_sequence_factor(bool pos)const;
     bool get_last_n_blocks_sizes(std::vector<size_t>& sz, size_t count)const;
@@ -572,6 +574,9 @@ namespace currency
     typedef tools::db::cached_key_value_accessor<gateway_address_id_type, gateway_address_data, true, false> gateway_addresses_container;
     typedef tools::db::chunked_key_to_array_accessor<gateway_address_id_type, crypto::hash, false, 100> gateway_address_transactions_container;
 
+    //hf booster
+    typedef tools::db::cached_key_value_accessor<uint64_t, std::list<uint64_t>, true, true> hardforks_updates_container;
+
 
     //-----------------------------------------
 
@@ -620,6 +625,7 @@ namespace currency
     assets_container m_db_assets;
     gateway_addresses_container m_db_gateway_addresses;
     gateway_address_transactions_container m_db_gateway_transactions;
+    hardforks_updates_container m_db_hardfork_updates;
 
 
 
@@ -634,6 +640,7 @@ namespace currency
     std::atomic<bool> m_is_blockchain_storing;
     std::atomic<bool> m_is_irreverseble_prunning_on;
     bool m_non_pruning_mode_enabled;
+    uint64_t m_ignored_hardfork_id = 0;   // --danger-ignore-hardfork-and-diverge: HF boosters for this hardfork are neither recorded nor applied; 0: none
 
     std::string m_config_folder;
     //events
@@ -756,10 +763,16 @@ namespace currency
     bool put_gw_address_operation(const transaction& tx, const crypto::hash& tx_id, const gateway_address_descriptor_operation& ado, const uint64_t height);
     bool pop_gw_address_operation(const gateway_address_descriptor_operation& ado, const uint64_t height, const crypto::hash& tx_id);
 
+    bool put_hf_booster_update(const transaction& tx, const crypto::hash& tx_id, const bc_services::hf_booster_update& update, const uint64_t height);
+    bool pop_hf_booster_update(const transaction& tx, const crypto::hash& tx_id, const bc_services::hf_booster_update& update, const uint64_t height);
+
     bool put_gw_address_operation_register(const transaction& tx, const crypto::hash& tx_id, const gateway_address_descriptor_operation_register& gao, const uint64_t height);
     bool put_gw_address_operation_update(const transaction& tx, const crypto::hash& tx_id, const gateway_address_descriptor_operation_update& gao, const uint64_t height);
     bool validate_gw_address_ownership(const transaction& tx, const crypto::hash& tx_id, const gateway_address_descriptor_operation_update& gao, const gateway_address_data& gad, const uint64_t height);
 
+    bool hf_booster_load_hardforks_from_db();
+    bool hf_booster_store_hardforks_to_db();
+    bool init_booster_hf();
     void fill_addr_to_alias_dict();
     //bool resync_spent_tx_flags();
     bool prune_ring_signatures_and_attachments_if_need();

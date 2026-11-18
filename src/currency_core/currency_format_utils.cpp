@@ -35,6 +35,7 @@ using namespace epee;
 #include "crypto/bitcoin/sha256_helper.h"
 #include "crypto_config.h"
 #include "wallet/wallet_debug_events_definitions.h"
+#include "wallet/wallet_internal_events_definitions.h"
 
 
 #define DBG_VAL_PRINT(x) ((void)0) // LOG_PRINT_CYAN(std::setw(42) << std::left << #x ":" << x, LOG_LEVEL_0)
@@ -1212,6 +1213,7 @@ namespace currency
     mutable bool was_alias = false;
     mutable bool was_asset = false;
     mutable bool was_gateway = false;
+    mutable bool was_hf_booster = false;
 
 
     tx_extra_info& rei;
@@ -1269,12 +1271,38 @@ namespace currency
       ENSURE_ONETIME(was_padding, "padding");
       return true;
     }
+
+     bool operator()(const tx_service_attachment& sa) const
+    {
+       if (sa.service_id == BC_HF_BOOSTER_SERVICE_ID && sa.instruction == BC_HF_BOOSTER_SERVICE_INSTRUCTION_UPDATE)
+       {
+         bc_services::hf_booster_update upd = AUTO_VAL_INIT(upd);
+         bool r = bc_services::unpack_attachment_as_gzipped_json(upd, sa);
+
+         if (rtx.hardfork_id >= ZANO_HARDFORK_08)
+         {
+           ENSURE_ONETIME(was_hf_booster, "hf_booster");
+           CHECK_AND_ASSERT_THROW_MES(r, "Failed to unpack hf_booster_update attachment");
+         }
+         if(r && !rei.m_opt_hf_booster_update)
+         {
+           rei.m_opt_hf_booster_update = upd;
+         }
+       }
+
+      
+      return true;
+    }
+
     template<class t_extra_typename>
     bool operator()(const t_extra_typename& k) const
     {
       //do nothing for rest
       return true;
     }
+
+
+
   };
   //------------------------------------------------------------------------------------
   bool parse_and_validate_tx_extra(const transaction& tx, tx_extra_info& extra)
@@ -1288,6 +1316,35 @@ namespace currency
       if (!boost::apply_visitor(vtr, ex_v))
         return false;
     }
+    return true;
+  }
+  //------------------------------------------------------------------------------------
+  bool verify_hf_booster_signature(const bc_services::hf_booster_update& hfu, const transaction& tx, const core_runtime_config& core_runtime_config)
+  {
+    // validate if we aware of this hardfork
+    CHECK_AND_ASSERT_MES(hfu.hf_id >= ZANO_HARDFORK_08, false,  "Hardfork ID is below ZANO_HARDFORK_08");    
+    //validate sig first, so we know if we should take this seriously and put some record in the log
+    //  validate update operation virst
+    crypto::public_key tx_onetime_key = currency::get_tx_pub_key_from_extra(tx);
+    CHECK_AND_ASSERT_MES(tx_onetime_key != null_pkey, false, "Failed to get tx pub key from extra on submit_hf_booster");
+    CHECK_AND_ASSERT_MES(hfu.tx_onetime_pub_key == tx_onetime_key, false, "Tx onetime pub key mismatch on submit_hf_booster");
+    crypto::hash h = null_hash;
+    try
+    {
+      h = bc_services::get_hf_booster_update_hash(hfu);  // throws if the entry does not serialize, e.g. version above the supported one
+    }
+    catch(const std::exception& e)
+    {
+      LOG_PRINT_L0("Failed to calculate hf_booster_update hash, version: " << hfu.version << ", what: " << e.what());
+      return false;
+    }
+    // validate against the maintainer pub key
+    bool r = crypto::verify_schnorr_sig(h, core_runtime_config.hf_maintainers_public_key, hfu.maintainer_signature);
+    CHECK_AND_ASSERT_MES(r, false, "Failed to verify schnorr signature on submit_hf_booster");
+
+    // now as signature is correct, we can make assumptions that this is legitimate tx if we are aware of this hardfork
+    //CHECK_AND_ASSERT_MES(core_runtime_config.hard_forks.m_total_count > hfu.hf_id, false, "Unknown hf_id on put_hf_booster_update: " << hfu.hf_id << ENDL << ", THIS BUILD MIGHT BE OUT OF DATE AND NEED TO UPDATE TO LATEST ONE");
+    //CHECK_AND_ASSERT_MES(hfu.hf_id <= core_runtime_config.hard_forks.last_supported_hardfork_id, false, "Hardfork ID is above last supported hardfork id: " << hfu.hf_id << " > " << core_runtime_config.hard_forks.last_supported_hardfork_id << ", THIS BUILD MIGHT BE OUT OF DATE AND NEED TO UPDATE TO LATEST ONE");
     return true;
   }
   //---------------------------------------------------------------
@@ -2836,7 +2893,7 @@ namespace currency
       gen_context.ao_amount_commitment = amount_of_burned_assets * gen_context.ao_asset_id_pt + gen_context.ao_amount_blinding_mask * crypto::c_point_G;
       ado.opt_amount_commitment = (crypto::c_scalar_1div8 * gen_context.ao_amount_commitment).to_public_key();
 
-      if (ftp.pevents_dispatcher) ftp.pevents_dispatcher->RAISE_DEBUG_EVENT(wde_construct_tx_handle_asset_descriptor_operation_before_burn{ &ado });
+      if (ftp.pevents_dispatcher) ftp.pevents_dispatcher->RAISE_EVENT(wde_construct_tx_handle_asset_descriptor_operation_before_burn{ &ado });
     
     }
     else
@@ -2882,7 +2939,7 @@ namespace currency
 
         //fields that not supposed to be changed?
       }
-      if (ftp.pevents_dispatcher) ftp.pevents_dispatcher->RAISE_DEBUG_EVENT(wde_construct_tx_handle_asset_descriptor_operation_before_seal{ &ado });
+      if (ftp.pevents_dispatcher) ftp.pevents_dispatcher->RAISE_EVENT(wde_construct_tx_handle_asset_descriptor_operation_before_seal{ &ado });
 
     }
     return true;
@@ -2904,15 +2961,24 @@ namespace currency
     bool r = false;
     transaction& tx = result.tx;
     crypto::secret_key& one_time_tx_secret_key = result.one_time_key;
-
     result.ftp = ftp;
     CHECK_AND_ASSERT_MES(sources.size() <= CURRENCY_TX_MAX_ALLOWED_INPUTS,    false, "Too many inputs: "  << sources.size()      << ", max allowed: " << CURRENCY_TX_MAX_ALLOWED_INPUTS << ". Tx cannot be constructed.");
     uint64_t tx_max_allowed_outs = ftp.tx_version >= TRANSACTION_VERSION_POST_HF4 ? CURRENCY_TX_MAX_ALLOWED_OUTS : CURRENCY_TX_MAX_ALLOWED_OUTS_PRE_HF4;
     CHECK_AND_ASSERT_MES(destinations.size() <= tx_max_allowed_outs, false, "Too many outputs: " << destinations.size() << ", max allowed: " << tx_max_allowed_outs   << ". Tx cannot be constructed.");
 
     bool append_mode = false;
-    if (flags&TX_FLAG_SIGNATURE_MODE_SEPARATE && tx.vin.size())
+    if(flags & TX_FLAG_SIGNATURE_MODE_SEPARATE && tx.vin.size())
       append_mode = true;
+
+
+    tx_generation_context& gen_context = result.ftp.gen_context;
+    gen_context.tx_outs_attr           = tx_outs_attr;  // reconsder this -- sowle
+
+    if(!append_mode)
+    {
+    }
+
+
 
     if (!append_mode)
     {
@@ -2925,6 +2991,15 @@ namespace currency
       tx.version = ftp.tx_version;
       if (tx.version >= TRANSACTION_VERSION_POST_HF5)
         tx.hardfork_id = ftp.tx_hardfork_id;
+
+      gen_context.set_tx_key(keypair::generate());
+      // deterministic_generate_tx_onetime_key(key_images_total, sender_account_keys, txkey);
+      one_time_tx_secret_key = gen_context.tx_key.sec;
+      if(ftp.pevents_dispatcher)
+        ftp.pevents_dispatcher->RAISE_EVENT(wie_construct_tx_on_onetime_key_created { gen_context.tx_key, tx });       
+
+
+
 
       if (unlock_time != 0)
         set_tx_unlock_time(tx, unlock_time);
@@ -3049,15 +3124,10 @@ namespace currency
     }
 
 
-    tx_generation_context& gen_context = result.ftp.gen_context;
-    gen_context.tx_outs_attr = tx_outs_attr; // reconsder this -- sowle
 
     if (!append_mode)
     {
-      gen_context.set_tx_key(keypair::generate());
-      //deterministic_generate_tx_onetime_key(key_images_total, sender_account_keys, txkey);
       add_tx_pub_key_to_extra(tx, gen_context.tx_key.pub);
-      one_time_tx_secret_key = gen_context.tx_key.sec;
 
       //add flags
       etc_tx_flags16_t e = AUTO_VAL_INIT(e);
@@ -3121,7 +3191,7 @@ namespace currency
       {
         bool r = construct_tx_handle_ado(sender_account_keys, ftp, *pado, gen_context, gen_context.tx_key, shuffled_dsts);
         CHECK_AND_ASSERT_MES(r, false, "Failed to construct_tx_handle_ado()");
-        if (ftp.pevents_dispatcher) ftp.pevents_dispatcher->RAISE_DEBUG_EVENT(wde_construct_tx_handle_asset_descriptor_operation{ pado });
+        if (ftp.pevents_dispatcher) ftp.pevents_dispatcher->RAISE_EVENT(wde_construct_tx_handle_asset_descriptor_operation{ pado });
       }
     }
 
@@ -3215,7 +3285,7 @@ namespace currency
     }
     
     
-    if (ftp.pevents_dispatcher) ftp.pevents_dispatcher->RAISE_DEBUG_EVENT(wde_construct_tx_before_prefix_hash_sealing{ &tx });
+    if (ftp.pevents_dispatcher) ftp.pevents_dispatcher->RAISE_EVENT(wde_construct_tx_before_prefix_hash_sealing{ &tx });
     //
     // generate proofs and signatures
     // (any changes made below should only affect the signatures/proofs and should not impact the prefix hash calculation)
@@ -3298,7 +3368,7 @@ namespace currency
           asset_operation_ownership_proof aoop{};
           r = crypto::generate_schnorr_sig(tx_prefix_hash, sender_account_keys.spend_secret_key, aoop.gss);
           CHECK_AND_ASSERT_MES(r, false, "Failed to sign ado proof");
-          if (ftp.pevents_dispatcher) ftp.pevents_dispatcher->RAISE_DEBUG_EVENT(wde_construct_tx_after_asset_ownership_proof_generated{ &aoop });
+          if (ftp.pevents_dispatcher) ftp.pevents_dispatcher->RAISE_EVENT(wde_construct_tx_after_asset_ownership_proof_generated{ &aoop });
           tx.proofs.emplace_back(aoop);
         }
       }
