@@ -53,7 +53,7 @@ namespace currency
     return true;
   }
   //-----------------------------------------------------------------------------------------------
-  bool validate_tx_semantic(const transaction& tx, size_t tx_blob_size)
+  bool validate_tx_semantic(const transaction& tx, size_t tx_blob_size, bool miner_tx)
   {
     if (tx_blob_size >= CURRENCY_MAX_TRANSACTION_BLOB_SIZE)
     {
@@ -78,7 +78,7 @@ namespace currency
     }
     else
     {
-      if (!check_inputs_types_supported(tx))
+      if (!miner_tx && !check_inputs_types_supported(tx))
       {
         LOG_PRINT_RED_L0("tx has unsupported input types");
         return false;
@@ -118,7 +118,7 @@ namespace currency
 
     // inexpensive check for pre-HF4 txs
     // post-HF4 txs balance are being checked in check_tx_balance()
-    if (tx.version <= TRANSACTION_VERSION_PRE_HF4)
+    if (tx.version <= TRANSACTION_VERSION_PRE_HF4 && !miner_tx)
     {
       if (!check_tx_bare_balance(tx))
       {
@@ -127,6 +127,33 @@ namespace currency
       }
     }
 
+    if (miner_tx)
+    {
+      if (!is_coinbase(tx))
+      {
+        LOG_PRINT_RED_L0("miner tx doesn't satisfy is_coinbase rules");
+        return false;
+      }
+    }
+
     return true;
   }
+  //-----------------------------------------------------------------------------------------------
+  bool validate_tx_semantic(const transaction& tx, size_t tx_blob_size)
+  {
+    return validate_tx_semantic(tx, tx_blob_size, /* miner_tx = */ false);
+  }
+  //-----------------------------------------------------------------------------------------------
+  bool validate_miner_tx_semantic(const transaction& tx, size_t tx_blob_size)
+  {
+    // we assume that validate_tx_for_hardfork_specific_terms() down the road enforces tx.hardfork_id correctness
+    if (tx.version < TRANSACTION_VERSION_POST_HF5 || tx.hardfork_id < ZANO_HARDFORK_08) 
+      return true;
+
+    // miner_tx check is effective since HF8
+    return validate_tx_semantic(tx, tx_blob_size, /* miner_tx = */ true);
+  }
+  //-----------------------------------------------------------------------------------------------
+
+
 } // namespace currency

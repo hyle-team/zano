@@ -3770,6 +3770,10 @@ namespace currency
         if (gw_in.asset_id == currency::native_coin_asset_id_1div8)
           this_amount = gw_in.amount;
       }
+      else if (in.type() == typeid(txin_gen))
+      {
+        // ignore
+      }
       else
       {
         LOG_ERROR("wrong input type: " << in.type().name());

@@ -8462,6 +8462,13 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
       return false;
     }
   }
+
+  if (!validate_miner_tx_semantic(bl.miner_tx, coinbase_blob_size))
+  {
+    LOG_PRINT_L0("Block with id: " << id << " @ " << height << " failed to pass miner tx semantic check");
+    bvc.m_verification_failed = true;
+    return false;
+  }
   
   std::vector<uint64_t> block_fees;
   block_fees.reserve(bl.tx_hashes.size());
@@ -10090,6 +10097,8 @@ bool blockchain_storage::validate_alt_block_txs(const block& b, const crypto::ha
     // initialize alt chain entry with initial gindexes
     calculate_local_gindex_lookup_table_for_height(split_height, abei.gindex_lookup_table);
   }
+
+  CHECK_AND_ASSERT_MES(validate_miner_tx_semantic(b.miner_tx, get_object_blobsize(b.miner_tx)), false, "invalid alt block miner tx " << get_transaction_hash(b.miner_tx) << ": semantic validation failed");
 
   if (is_pos_block(b))
   {
