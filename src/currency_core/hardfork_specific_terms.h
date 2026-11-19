@@ -186,7 +186,7 @@ namespace currency
 
   inline bool validate_tx_for_hardfork_specific_terms_types_HF6(const transaction& tx, size_t current_hard_fork_id)
   {
-
+    TRY_ENTRY()
     // go over every container in tx and check if its type is allowed at current hardfork version
 
     hardfork_specific_terms::proxy_visitor vstr(current_hard_fork_id);
@@ -245,6 +245,7 @@ namespace currency
         return false;
       }
     }
+    CATCH_ENTRY_L0_RED("validate_tx_for_hardfork_specific_terms_types_HF6", false);
 
     return true;
   }
