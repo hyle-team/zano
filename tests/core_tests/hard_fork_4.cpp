@@ -657,6 +657,40 @@ bool hardfork_4_bare_decoy_indices::c1(currency::core& c, size_t ev_index, const
   CHECK_AND_ASSERT_MES(check_candidate_response(candidate_req, 0, response_indices), false, "empty bucket was not handled");
   candidate_req.batches[0].input_amount = bare_amount;
 
+  {
+    const auto saved_config = bcs.get_core_runtime_config();
+    auto restore_config = epee::misc_utils::create_scope_leave_handler(
+      [&]() { bcs.set_core_runtime_config(saved_config); });
+
+    auto config = saved_config;
+    auto pos_req = candidate_req;
+    pos_req.look_up_strategy = LOOK_UP_STRATEGY_POS_COINBASE;
+
+    // A zero PoS height limit must allow only the genesis output.
+    config.min_coinstake_age = FINAL_TOP_HEIGHT;
+    bcs.set_core_runtime_config(config);
+    CHECK_AND_ASSERT_MES(check_candidate_response(pos_req, 1, response_indices), false,
+      "PoS height zero was treated as an absent limit");
+    CHECK_AND_ASSERT_MES(response_indices.count(0), false, "PoS height zero omitted the genesis output");
+
+    // Ordinary bare requests must not inherit the PoS age restriction.
+    CHECK_AND_ASSERT_MES(check_candidate_response(candidate_req, DECOYS_COUNT + 1, response_indices), false,
+      "PoS age limit affected a regular bare request");
+
+    // A limit just below the decoy block must still exclude all its outputs.
+    config.min_coinstake_age = FINAL_TOP_HEIGHT - (DECOY_BLOCK_HEIGHT - 1);
+    bcs.set_core_runtime_config(config);
+    CHECK_AND_ASSERT_MES(check_candidate_response(pos_req, 1, response_indices), false,
+      "PoS lookup included outputs above its height limit");
+    CHECK_AND_ASSERT_MES(response_indices.count(0), false, "PoS height limit omitted the genesis output");
+
+    // Outputs exactly at the PoS height limit are allowed.
+    config.min_coinstake_age = FINAL_TOP_HEIGHT - DECOY_BLOCK_HEIGHT;
+    bcs.set_core_runtime_config(config);
+    CHECK_AND_ASSERT_MES(check_candidate_response(pos_req, DECOYS_COUNT + 1, response_indices), false,
+      "PoS lookup excluded outputs exactly at its height limit");
+  }
+
   auto check_rejected_request = [&](const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request& req, const std::string& status) -> bool
   {
     COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::response rsp{};

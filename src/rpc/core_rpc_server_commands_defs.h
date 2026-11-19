@@ -639,38 +639,6 @@ namespace currency
     };
   };
   //-----------------------------------------------
-  struct COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3
-  {
-    DOC_COMMAND("Version 3 of the command to retrieve random decoy outputs for specified amounts, focusing on either pre-zarcanum or post-zarcanum zones based on the amount value.");
-
-    struct offsets_distribution
-    {
-      uint64_t amount; //if amount is 0 then lookup in post-zarcanum zone only, if not 0 then pre-zarcanum only
-      std::vector<uint64_t> global_offsets; //[i] = global_index to pick up
-
-      BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(amount)                     DOC_DSCR("If set to 0, only ZC outputs are considered. If nonzero, only old bare outputs are considered.") DOC_EXMP_AUTO(0) DOC_END
-        KV_SERIALIZE(global_offsets)             DOC_DSCR("List of global indices for picking decoys. Each index corresponds to a potential decoy output.") DOC_EXMP_AGGR(1, 3, 5928, 2811) DOC_END
-      END_KV_SERIALIZE_MAP()
-    };
-
-    struct request
-    {
-      std::vector<offsets_distribution> amounts;
-      uint64_t            height_upper_limit; // if nonzero, all the decoy outputs must be either older than, or the same age as this height
-      bool                use_forced_mix_outs;
-      uint64_t            coinbase_percents;     //from 0 to 100, estimate percents of coinbase outputs included in decoy sets  
-      BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(amounts)                    DOC_DSCR("List of amount distributions specifying where to look for decoys, based on old bare outputs or ZC outputs.") DOC_EXMP_AUTO(1) DOC_END
-        KV_SERIALIZE(height_upper_limit)         DOC_DSCR("Maximum blockchain height from which decoys can be taken. If nonzero, decoys must be at this height or older.") DOC_EXMP(2555000) DOC_END
-        KV_SERIALIZE(use_forced_mix_outs)        DOC_DSCR("If true, only outputs with a 'mix_attr' greater than 0 are used as decoys.") DOC_EXMP(false) DOC_END
-        KV_SERIALIZE(coinbase_percents)          DOC_DSCR("Specifies the estimated percentage of coinbase outputs to be included in the decoy sets, ranging from 0 to 100.") DOC_EXMP(15) DOC_END
-      END_KV_SERIALIZE_MAP()
-    };
-
-    typedef COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::response response;
-  };
-
   // decoy strategy for regular TX
   #define LOOK_UP_STRATEGY_REGULAR_TX           "LOOK_UP_STRATEGY_REGULAR_TX"
   // decoy strategy for PoS coinbase
@@ -703,7 +671,7 @@ namespace currency
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(batches)                 DOC_DSCR("List of request batches, each containing an amount and corresponding heights to be processed.") DOC_EXMP_AUTO(1) DOC_END
         KV_SERIALIZE(height_upper_limit)      DOC_DSCR("Maximum blockchain height for height-based batches. If nonzero, decoys must be at this height or older. Ignored for bare index batches.") DOC_EXMP(2555000) DOC_END
-        KV_SERIALIZE(look_up_strategy)        DOC_DSCR("LOOK_UP_STRATEGY_REGULAR_TX or LOOK_UP_STRATEGY_POS_COINBASE") DOC_EXMP("LOOK_UP_STRATEGY_REGULAR_TX") DOC_END
+        KV_SERIALIZE(look_up_strategy)        DOC_DSCR("LOOK_UP_STRATEGY_REGULAR_TX or LOOK_UP_STRATEGY_POS_COINBASE, for indexed bare batches POS_COINBASE applies the daemons PoS height limit") DOC_EXMP("LOOK_UP_STRATEGY_REGULAR_TX") DOC_END
 
       END_KV_SERIALIZE_MAP()
     };
@@ -2241,6 +2209,35 @@ namespace currency
     END_KV_SERIALIZE_MAP()
 
     bool from_gateway_address_descriptor_base(const gateway_address_descriptor_base& gadb);
+  };
+
+  struct COMMAND_RPC_GATEWAY_GET_ADDRESSES
+  {
+    DOC_COMMAND("Retrieves a page of gateway addresses registered in the current main chain.");
+
+    struct request
+    {
+      uint64_t offset = 0;
+      uint64_t count = 100;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(offset) DOC_DSCR("Number of addresses to skip in database key order.") DOC_EXMP(0) DOC_END
+        KV_SERIALIZE(count)  DOC_DSCR("Maximum number of addresses to return. Defaults to 100.") DOC_EXMP(100) DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      std::string status;
+      uint64_t top_block_height = 0;
+      std::list<std::string> addresses;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(status)           DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
+        KV_SERIALIZE(top_block_height) DOC_DSCR("Height of the top block for the returned registry state, equal to the blockchain size minus one.") DOC_EXMP(1000) DOC_END
+        KV_SERIALIZE(addresses)        DOC_DSCR("Canonical gateway addresses without payment IDs. Omitted when the page is empty.") DOC_EXMP_AGGR("gwZ5sqZkre33rxhoo9ht5xcmzy5khvr2hFSfvk7TeXeMXxby7acC3fs1D") DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
   };
 
   struct COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO

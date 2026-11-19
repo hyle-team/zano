@@ -62,18 +62,28 @@ bool make_next_pos_block(test_generator& generator, std::vector<test_event_entry
 
   size_t height = get_block_height(prev_block) + 1;
   crypto::hash prev_id = get_block_hash(prev_block);
-  r = fill_tx_sources(sources, events, prev_block, stake_acc.get_keys(), amount_to_find, nmix, std::vector<tx_source_entry>{}, fts_flags);
+  r = fill_tx_sources(sources, events, prev_block, stake_acc.get_keys(), amount_to_find, nmix, std::vector<tx_source_entry>{}, fts_flags & ~fts_use_ref_by_id);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources failed");
   CHECK_AND_ASSERT_MES(shuffle_source_entries(sources), false, "");
   auto it = std::max_element(sources.begin(), sources.end(), [&](const tx_source_entry& lhs, const tx_source_entry& rhs){ return lhs.amount < rhs.amount; });
-  const tx_source_entry& se = *it;
-  const tx_source_entry::output_entry& oe = se.outputs[se.real_output];
+  tx_source_entry se = *it;
+  uint64_t stake_output_gindex = boost::get<uint64_t>(se.outputs[se.real_output].out_reference);
+
+  if (fts_flags & fts_use_ref_by_id)
+  {
+    // the stake kernel needs the gindex, so the same source is looked up once more with ref_by_id references
+    std::vector<tx_source_entry> sources_rbi;
+    r = fill_tx_sources(sources_rbi, events, prev_block, stake_acc.get_keys(), amount_to_find, nmix, std::vector<tx_source_entry>{}, fts_flags);
+    CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources failed");
+    auto it_rbi = std::find_if(sources_rbi.begin(), sources_rbi.end(), [&](const tx_source_entry& el){ return el.real_out_tx_key == se.real_out_tx_key && el.real_output_in_tx_index == se.real_output_in_tx_index; });
+    CHECK_AND_ASSERT_MES(it_rbi != sources_rbi.end(), false, "stake source with ref_by_id references not found");
+    se = *it_rbi;
+  }
 
   crypto::key_image stake_output_key_image  {};
   currency::keypair ephemeral_keys          {};
   r = generate_key_image_helper(stake_acc.get_keys(), se.real_out_tx_key, se.real_output_in_tx_index, ephemeral_keys, stake_output_key_image);
   CHECK_AND_ASSERT_MES(r, false, "generate_key_image_helper failed");
-  uint64_t stake_output_gindex = boost::get<uint64_t>(oe.out_reference);
 
   currency::wide_difficulty_type pos_diff{};
   crypto::hash last_pow_block_hash{}, last_pos_block_kernel_hash{};
@@ -1562,6 +1572,88 @@ bool alt_chain_ring_members_age::generate(std::vector<test_event_entry>& events)
   ADD_CUSTOM_EVENT(events, blk_5c);
 
   DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_8));
+
+  return true;
+}
+
+//------------------------------------------------------------------------------
+
+bool pos_block_stake_input_ref_by_id::generate(std::vector<test_event_entry>& events) const
+{
+  // Test idea: PoS block with the stake input referring to its ring by ref_by_id, in the main chain and in an alt chain:
+  // <  HF8 : accepted
+  // >= HF8 : rejected
+  // The same block with a gindex reference is accepted in both cases.
+
+  static_assert(CURRENCY_HF4_MANDATORY_MIN_COINAGE == 10);
+
+  bool r = false;
+  GENERATE_ACCOUNT(miner_acc);
+  GENERATE_ACCOUNT(alice_acc);
+  GENERATE_ACCOUNT(bob_acc);
+  GENERATE_ACCOUNT(carol_acc);
+  GENERATE_ACCOUNT(dan_acc);
+  uint64_t ts = test_core_time::get_time();
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
+  DO_CALLBACK(events, "configure_core");
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  std::vector<tx_destination_entry> destinations;
+  GENERATE_ACCOUNT(eve_acc);
+  for(const account_base* acc : { &alice_acc, &bob_acc, &carol_acc, &dan_acc, &eve_acc })
+    destinations.emplace_back(MK_TEST_COINS(100), acc->get_public_address());
+  transaction tx_0{};
+  r = construct_tx_to_key(m_hardforks, events, tx_0, blk_0r, miner_acc, destinations);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx_to_key failed");
+  ADD_CUSTOM_EVENT(events, tx_0);
+  MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_0);
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_1r, blk_1, miner_acc, CURRENCY_HF4_MANDATORY_MIN_COINAGE);
+
+  const bool hf8_active = m_hardforks.is_hardfork_active_for_height(ZANO_HARDFORK_08, get_block_height(blk_1r) + 1);
+
+  // main chain
+
+  block blk_2_rbi{};
+  r = make_next_pos_block(generator, events, blk_1r, alice_acc, MK_TEST_COINS(1), 0, std::vector<transaction>{}, fts_use_ref_by_id, blk_2_rbi);
+  CHECK_AND_ASSERT_MES(r, false, "make_next_pos_block failed");
+  generator.add_block_info(blk_2_rbi, std::list<transaction>{});
+  if (hf8_active)
+    DO_CALLBACK(events, "mark_invalid_block");
+  ADD_CUSTOM_EVENT(events, blk_2_rbi);
+  const block& blk_2 = hf8_active ? blk_1r : blk_2_rbi;
+  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_2));
+
+  block blk_3{};
+  r = make_next_pos_block(generator, events, blk_2, carol_acc, MK_TEST_COINS(1), 0, std::vector<transaction>{}, fts_none, blk_3);
+  CHECK_AND_ASSERT_MES(r, false, "make_next_pos_block failed");
+  generator.add_block_info(blk_3, std::list<transaction>{});
+  ADD_CUSTOM_EVENT(events, blk_3);
+  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_3));
+
+  block blk_4{}; // PoS, so a PoS alt block at the same height can't outweigh the main chain
+  r = make_next_pos_block(generator, events, blk_3, eve_acc, MK_TEST_COINS(1), 0, std::vector<transaction>{}, fts_none, blk_4);
+  CHECK_AND_ASSERT_MES(r, false, "make_next_pos_block failed");
+  generator.add_block_info(blk_4, std::list<transaction>{});
+  ADD_CUSTOM_EVENT(events, blk_4);
+  MAKE_NEXT_BLOCK(events, blk_5, blk_4, miner_acc);
+
+  // alt chain
+
+  block blk_4a_rbi{};
+  r = make_next_pos_block(generator, events, blk_3, bob_acc, MK_TEST_COINS(1), 0, std::vector<transaction>{}, fts_use_ref_by_id, blk_4a_rbi);
+  CHECK_AND_ASSERT_MES(r, false, "make_next_pos_block failed");
+  generator.add_block_info(blk_4a_rbi, std::list<transaction>{});
+  if (hf8_active)
+    DO_CALLBACK(events, "mark_invalid_block");
+  ADD_CUSTOM_EVENT(events, blk_4a_rbi);
+
+  block blk_4b{};
+  r = make_next_pos_block(generator, events, blk_3, dan_acc, MK_TEST_COINS(1), 0, std::vector<transaction>{}, fts_none, blk_4b);
+  CHECK_AND_ASSERT_MES(r, false, "make_next_pos_block failed");
+  generator.add_block_info(blk_4b, std::list<transaction>{});
+  ADD_CUSTOM_EVENT(events, blk_4b);
+
+  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_5));
 
   return true;
 }

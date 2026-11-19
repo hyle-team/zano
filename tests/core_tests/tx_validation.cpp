@@ -2561,6 +2561,120 @@ bool tx_coinbase_separate_sig_flag::generate(std::vector<test_event_entry>& even
   return true;
 }
 
+bool tx_coinbase_outs_with_invalid_points::generate(std::vector<test_event_entry>& events) const
+{
+  // Test idea: PoW block with a coinbase output having an undecodable stealth address or concealing point, in the main chain and in an alt chain:
+  // <  HF8 : accepted
+  // >= HF8 : rejected
+  // The same coinbase with valid points is accepted in both cases.
+
+  GENERATE_ACCOUNT(miner);
+
+  uint64_t ts = test_core_time::get_time();
+  MAKE_GENESIS_BLOCK(events, blk_0, miner, ts);
+  DO_CALLBACK(events, "configure_core");
+  MAKE_NEXT_BLOCK(events, blk_1, blk_0, miner);
+  MAKE_NEXT_BLOCK(events, blk_2, blk_1, miner);
+
+  const bool hf8_active = m_hardforks.is_hardfork_active_for_height(ZANO_HARDFORK_08, get_block_height(blk_2) + 1);
+
+  crypto::public_key pk_off_curve{};
+  while(crypto::check_key(pk_off_curve))
+    ++pk_off_curve.data[0];
+
+  enum class bad_point { none, stealth_address, concealing_point };
+
+  auto make_block = [&](const block& prev_block, bad_point bp, block& result) -> bool
+  {
+    auto coinbase_cb = [&](transaction& miner_tx, const keypair& tx_key) -> bool
+    {
+      bool r = false;
+      uint64_t block_reward = get_outs_money_amount(miner_tx, miner.get_keys());
+      miner_tx.vout.clear();
+
+      tx_generation_context tx_gen_context{};
+      tx_gen_context.set_tx_key(tx_key);
+      std::set<uint16_t> deriv_cache;
+      for(size_t i = 0; i < CURRENCY_TX_MIN_ALLOWED_OUTS; ++i)
+      {
+        tx_destination_entry de{i == 0 ? block_reward / 2 : block_reward - block_reward / 2, miner.get_public_address()};
+        de.flags |= tx_destination_entry_flags::tdef_explicit_native_asset_id;
+        r = construct_tx_out(de, i, miner_tx, deriv_cache, tx_gen_context);
+        CHECK_AND_ASSERT_MES(r, false, "construct_tx_out failed for output " << i);
+      }
+
+      tx_out_zarcanum& out = boost::get<tx_out_zarcanum>(miner_tx.vout[0]);
+      switch(bp)
+      {
+      case bad_point::stealth_address:  out.stealth_address = pk_off_curve;   break;
+      case bad_point::concealing_point: out.concealing_point = pk_off_curve;  break;
+      default:                                                                break;
+      }
+
+      crypto::hash tx_id = get_transaction_hash(miner_tx);
+      miner_tx.proofs.clear();
+      miner_tx.proofs.emplace_back(zc_asset_surjection_proof{});
+      r = generate_zc_outs_range_proof(tx_id, tx_gen_context, miner_tx);
+      CHECK_AND_ASSERT_MES(r, false, "generate_zc_outs_range_proof failed");
+      r = generate_tx_balance_proof(tx_id, tx_gen_context, block_reward, miner_tx);
+      CHECK_AND_ASSERT_MES(r, false, "generate_tx_balance_proof failed");
+      return true;
+    };
+
+    bool r = generator.construct_block_gentime_with_coinbase_cb(prev_block, miner, coinbase_cb, result);
+    CHECK_AND_ASSERT_MES(r, false, "construct_block_gentime_with_coinbase_cb failed");
+    return true;
+  };
+
+  // main chain
+
+  block blk_3_bad_sa{};
+  CHECK_AND_ASSERT_MES(make_block(blk_2, bad_point::stealth_address, blk_3_bad_sa), false, "");
+  if (hf8_active)
+    DO_CALLBACK(events, "mark_invalid_block");
+  events.push_back(blk_3_bad_sa);
+  const block& blk_3 = hf8_active ? blk_2 : blk_3_bad_sa;
+  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_3));
+
+  block blk_4_bad_cp{};
+  CHECK_AND_ASSERT_MES(make_block(blk_3, bad_point::concealing_point, blk_4_bad_cp), false, "");
+  if (hf8_active)
+    DO_CALLBACK(events, "mark_invalid_block");
+  events.push_back(blk_4_bad_cp);
+  const block& blk_4 = hf8_active ? blk_3 : blk_4_bad_cp;
+  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_4));
+
+  block blk_5{};
+  CHECK_AND_ASSERT_MES(make_block(blk_4, bad_point::none, blk_5), false, "");
+  events.push_back(blk_5);
+  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_5));
+
+  MAKE_NEXT_BLOCK(events, blk_6, blk_5, miner);
+  MAKE_NEXT_BLOCK(events, blk_7, blk_6, miner);
+
+  // alt chain
+
+  block blk_6a_bad_sa{};
+  CHECK_AND_ASSERT_MES(make_block(blk_5, bad_point::stealth_address, blk_6a_bad_sa), false, "");
+  if (hf8_active)
+    DO_CALLBACK(events, "mark_invalid_block");
+  events.push_back(blk_6a_bad_sa);
+
+  block blk_6b_bad_cp{};
+  CHECK_AND_ASSERT_MES(make_block(blk_5, bad_point::concealing_point, blk_6b_bad_cp), false, "");
+  if (hf8_active)
+    DO_CALLBACK(events, "mark_invalid_block");
+  events.push_back(blk_6b_bad_cp);
+
+  block blk_6c{};
+  CHECK_AND_ASSERT_MES(make_block(blk_5, bad_point::none, blk_6c), false, "");
+  events.push_back(blk_6c);
+
+  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_7));
+
+  return true;
+}
+
 tx_input_mixins::tx_input_mixins()
 {
   REGISTER_CALLBACK_METHOD(tx_input_mixins, configure_core);

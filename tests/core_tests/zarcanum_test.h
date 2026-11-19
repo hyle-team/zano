@@ -76,3 +76,8 @@ struct alt_chain_ring_members_age : public test_chain_unit_enchanced
 {
   bool generate(std::vector<test_event_entry>& events) const;
 };
+
+struct pos_block_stake_input_ref_by_id : public test_chain_unit_enchanced
+{
+  bool generate(std::vector<test_event_entry>& events) const;
+};

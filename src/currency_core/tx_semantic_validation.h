@@ -11,5 +11,9 @@ namespace currency
 {
   //check correct values, ins and outs types, amounts and all lightweight checks not related to the database
   bool validate_tx_semantic(const transaction& tx, size_t tx_blob_size);
+  bool validate_miner_tx_semantic(const transaction& tx, size_t tx_blob_size);
+
+  bool validate_tx_semantic(const transaction& tx, size_t tx_blob_size, bool miner_tx);
+
   bool check_inputs_and_outputs_size(const transaction& tx);
 }

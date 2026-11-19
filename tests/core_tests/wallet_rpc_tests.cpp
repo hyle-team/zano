@@ -2175,6 +2175,37 @@ bool wallet_rpc_gateway_address::c1(currency::core& c, size_t ev_index, const st
   r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, 3);
   CHECK_AND_ASSERT_TRUE(r);
 
+  currency::COMMAND_RPC_GATEWAY_GET_ADDRESSES::request gw_get_addresses_req = {};
+  currency::COMMAND_RPC_GATEWAY_GET_ADDRESSES::response gw_get_addresses_resp = {};
+  gw_get_addresses_req.count = 100;
+
+#ifndef TESTNET
+  core_rpc_wrapper.set_ignore_connectivity_status(false);
+  r = invoke_text_json_for_rpc(core_rpc_wrapper, "gateway_get_addresses", gw_get_addresses_req, gw_get_addresses_resp);
+  core_rpc_wrapper.set_ignore_connectivity_status(true);
+  CHECK_AND_ASSERT_TRUE(r);
+  CHECK_AND_ASSERT_EQ(gw_get_addresses_resp.status, API_RETURN_CODE_BUSY);
+  gw_get_addresses_resp = {};
+#endif
+
+  r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_get_addresses", gw_get_addresses_req, gw_get_addresses_resp);
+  CHECK_AND_ASSERT_TRUE(r);
+  CHECK_AND_ASSERT_EQ(gw_get_addresses_resp.addresses.size(), 1);
+  CHECK_AND_ASSERT_EQ(gw_get_addresses_resp.addresses.front(), gw_reg_resp.address);
+  CHECK_AND_ASSERT_EQ(gw_get_addresses_resp.top_block_height, c.get_top_block_height());
+
+  gw_get_addresses_req.offset = 1;
+  gw_get_addresses_resp = {};
+  r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_get_addresses", gw_get_addresses_req, gw_get_addresses_resp);
+  CHECK_AND_ASSERT_TRUE(r);
+  CHECK_AND_ASSERT_TRUE(gw_get_addresses_resp.addresses.empty());
+
+  ++gw_get_addresses_req.count;
+  gw_get_addresses_resp = {};
+  r = invoke_text_json_for_rpc(core_rpc_wrapper, "gateway_get_addresses", gw_get_addresses_req, gw_get_addresses_resp);
+  CHECK_AND_ASSERT_TRUE(r);
+  CHECK_AND_ASSERT_EQ(gw_get_addresses_resp.status, API_RETURN_CODE_ARG_OUT_OF_LIMITS);
+
   // request gw address info for that freshly genereated gw address and validate the response
   currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO::request gw_get_info_req = {};
   currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO::response gw_get_info_resp = {};
@@ -5935,8 +5966,12 @@ bool wallet_rpc_get_outputs_and_utxo_stats::c1(currency::core& c, size_t ev_inde
   {
     MK_TEST_COINS(3), MK_TEST_COINS(7), MK_TEST_COINS(25), MK_TEST_COINS(90), MK_TEST_COINS(300)
   };
+  // all the amounts go in a single tx: a tx with one destination and no change gets that destination split in two outputs by the wallet
+  // (to satisfy CURRENCY_TX_MIN_ALLOWED_OUTS), which happens whenever the miner has a UTXO of exactly amount + fee, and Alice would get an extra UTXO
+  std::vector<currency::tx_destination_entry> alice_native_dsts;
   for (uint64_t a : alice_native_amounts)
-    miner_wlt->transfer(a, alice_wlt->get_account().get_public_address(), currency::native_coin_asset_id);
+    alice_native_dsts.emplace_back(a, alice_wlt->get_account().get_public_address());
+  miner_wlt->transfer(alice_native_dsts, 0 /* fake outs count */, 0, TESTS_DEFAULT_FEE, empty_extra, empty_attachment);
 
   // seed Alice with two custom asset UTXOs of different magnitude so we exercise asset filtering as well
   const uint64_t alice_asset_small = 5ull * 1000000ull;
