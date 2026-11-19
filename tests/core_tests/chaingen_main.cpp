@@ -1436,6 +1436,11 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY(gw_addr_altchain_owner_change);
     GENERATE_AND_PLAY(gw_addr_register_output_rollback);
 
+    // GW address nonce tests
+    GENERATE_AND_PLAY_HF(gw_nonce_strict_order, "6,8-*");
+    GENERATE_AND_PLAY_HF(gw_nonce_per_tx_and_per_address, "6,8-*");
+    GENERATE_AND_PLAY_HF(gw_nonce_chain_switch, "6,8-*");
+
     GENERATE_AND_PLAY_HF(isolate_auditable_and_proof, "2-*");
     
     GENERATE_AND_PLAY(zarcanum_basic_test);

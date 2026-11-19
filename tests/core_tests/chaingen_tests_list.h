@@ -43,6 +43,7 @@
 #include "hard_fork_6.h"
 #include "hf_booster_tests.h"
 #include "gw_address_altchain_test.h"
+#include "gw_nonce_tests.h"
 #include "isolate_auditable_and_proof.h"
 #include "zarcanum_test.h"
 #include "multiassets_test.h"
