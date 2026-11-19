@@ -5966,8 +5966,12 @@ bool wallet_rpc_get_outputs_and_utxo_stats::c1(currency::core& c, size_t ev_inde
   {
     MK_TEST_COINS(3), MK_TEST_COINS(7), MK_TEST_COINS(25), MK_TEST_COINS(90), MK_TEST_COINS(300)
   };
+  // all the amounts go in a single tx: a tx with one destination and no change gets that destination split in two outputs by the wallet
+  // (to satisfy CURRENCY_TX_MIN_ALLOWED_OUTS), which happens whenever the miner has a UTXO of exactly amount + fee, and Alice would get an extra UTXO
+  std::vector<currency::tx_destination_entry> alice_native_dsts;
   for (uint64_t a : alice_native_amounts)
-    miner_wlt->transfer(a, alice_wlt->get_account().get_public_address(), currency::native_coin_asset_id);
+    alice_native_dsts.emplace_back(a, alice_wlt->get_account().get_public_address());
+  miner_wlt->transfer(alice_native_dsts, 0 /* fake outs count */, 0, TESTS_DEFAULT_FEE, empty_extra, empty_attachment);
 
   // seed Alice with two custom asset UTXOs of different magnitude so we exercise asset filtering as well
   const uint64_t alice_asset_small = 5ull * 1000000ull;
