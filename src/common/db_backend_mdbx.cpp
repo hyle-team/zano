@@ -43,7 +43,7 @@ namespace tools
       res = mdbx_env_create(&m_penv);
       CHECK_AND_ASSERT_MESS_MDBX_DB(res, false, "Unable to mdbx_env_create");
       
-      res = mdbx_env_set_maxdbs(m_penv, 15);
+      res = mdbx_env_set_maxdbs(m_penv, 20);
       CHECK_AND_ASSERT_MESS_MDBX_DB(res, false, "Unable to mdbx_env_set_maxdbs");
 
       intptr_t size_lower = 0;

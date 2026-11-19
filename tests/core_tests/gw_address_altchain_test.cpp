@@ -45,6 +45,7 @@ static bool sign_gw_inputs(transaction& tx, const crypto::public_key& gw_view_pu
 }
 
 // construct a tx that spends gw_spend_amount from a GW address to recipient, ZC source covers fee only
+// gw_nonce is the nonce the GW address expects next on the chain that head_block belongs to (the first spend of an address uses CURRENCY_GATEWAY_ADDRESS_NONCE_STARTER)
 static bool construct_gw_spend_tx(
   const hard_forks_descriptor& hardforks,
   std::vector<test_event_entry>& events,
@@ -53,6 +54,7 @@ static bool construct_gw_spend_tx(
   const crypto::public_key& gw_view_pub,
   const keypair& gw_spend_kp,
   uint64_t gw_spend_amount,
+  uint64_t gw_nonce,
   const account_public_address& recipient,
   transaction& result_tx)
 {
@@ -73,6 +75,7 @@ static bool construct_gw_spend_tx(
     tse.gateway_origin = gw_view_pub;
     tse.asset_id = native_coin_asset_id;
     tse.amount = gw_spend_amount;
+    tse.nonce = gw_nonce;
   }
 
   std::vector<tx_destination_entry> destinations;
@@ -171,7 +174,7 @@ bool gw_addr_altchain_spend_in_both_chains::generate(std::vector<test_event_entr
 
   // chain B: spend 3 -> bob
   transaction tx_b1{};
-  r = construct_gw_spend_tx(m_hardforks, events, blk_3r, alice_acc, m_gw_addr_view.pub, m_gw_addr_spend, MK_TEST_COINS(3), bob_acc.get_public_address(), tx_b1);
+  r = construct_gw_spend_tx(m_hardforks, events, blk_3r, alice_acc, m_gw_addr_view.pub, m_gw_addr_spend, MK_TEST_COINS(3), CURRENCY_GATEWAY_ADDRESS_NONCE_STARTER, bob_acc.get_public_address(), tx_b1);
   CHECK_AND_ASSERT_MES(r, false, "construct_gw_spend_tx B1 failed");
   ADD_CUSTOM_EVENT(events, tx_b1);
   MAKE_NEXT_BLOCK_TX1(events, blk_b1, blk_3r, miner_acc, tx_b1);
@@ -181,7 +184,7 @@ bool gw_addr_altchain_spend_in_both_chains::generate(std::vector<test_event_entr
 
   // chain B: spend 5 -> bob
   transaction tx_b2{};
-  r = construct_gw_spend_tx(m_hardforks, events, blk_b1, alice_acc, m_gw_addr_view.pub, m_gw_addr_spend, MK_TEST_COINS(5), bob_acc.get_public_address(), tx_b2);
+  r = construct_gw_spend_tx(m_hardforks, events, blk_b1, alice_acc, m_gw_addr_view.pub, m_gw_addr_spend, MK_TEST_COINS(5), CURRENCY_GATEWAY_ADDRESS_NONCE_STARTER + 1, bob_acc.get_public_address(), tx_b2);
   CHECK_AND_ASSERT_MES(r, false, "construct_gw_spend_tx B2 failed");
   ADD_CUSTOM_EVENT(events, tx_b2);
   MAKE_NEXT_BLOCK_TX1(events, blk_b2, blk_b1, miner_acc, tx_b2);
@@ -191,14 +194,14 @@ bool gw_addr_altchain_spend_in_both_chains::generate(std::vector<test_event_entr
 
   // chain C (alt, from blk_3r): spend 4 -> bob
   transaction tx_c1{};
-  r = construct_gw_spend_tx(m_hardforks, events, blk_3r, alice_acc, m_gw_addr_view.pub, m_gw_addr_spend, MK_TEST_COINS(4), bob_acc.get_public_address(), tx_c1);
+  r = construct_gw_spend_tx(m_hardforks, events, blk_3r, alice_acc, m_gw_addr_view.pub, m_gw_addr_spend, MK_TEST_COINS(4), CURRENCY_GATEWAY_ADDRESS_NONCE_STARTER, bob_acc.get_public_address(), tx_c1); // the same nonce as tx_b1: the first spend on chain C
   CHECK_AND_ASSERT_MES(r, false, "construct_gw_spend_tx C1 failed");
   ADD_CUSTOM_EVENT(events, tx_c1);
   MAKE_NEXT_BLOCK_TX1(events, blk_c1, blk_3r, miner_acc, tx_c1);
 
   // chain C: spend 2 -> bob
   transaction tx_c2{};
-  r = construct_gw_spend_tx(m_hardforks, events, blk_c1, alice_acc, m_gw_addr_view.pub, m_gw_addr_spend, MK_TEST_COINS(2), bob_acc.get_public_address(), tx_c2);
+  r = construct_gw_spend_tx(m_hardforks, events, blk_c1, alice_acc, m_gw_addr_view.pub, m_gw_addr_spend, MK_TEST_COINS(2), CURRENCY_GATEWAY_ADDRESS_NONCE_STARTER + 1, bob_acc.get_public_address(), tx_c2);
   CHECK_AND_ASSERT_MES(r, false, "construct_gw_spend_tx C2 failed");
   ADD_CUSTOM_EVENT(events, tx_c2);
   MAKE_NEXT_BLOCK_TX1(events, blk_c2, blk_c1, miner_acc, tx_c2);
@@ -300,7 +303,7 @@ bool gw_addr_altchain_created_in_fork::generate(std::vector<test_event_entry>& e
 
   // spend from gw in B: 6 -> bob
   transaction tx_spend{};
-  r = construct_gw_spend_tx(m_hardforks, events, blk_b2, alice_acc, m_gw_addr_view.pub, m_gw_addr_spend, MK_TEST_COINS(6), bob_acc.get_public_address(), tx_spend);
+  r = construct_gw_spend_tx(m_hardforks, events, blk_b2, alice_acc, m_gw_addr_view.pub, m_gw_addr_spend, MK_TEST_COINS(6), CURRENCY_GATEWAY_ADDRESS_NONCE_STARTER, bob_acc.get_public_address(), tx_spend);
   CHECK_AND_ASSERT_MES(r, false, "construct_gw_spend_tx failed");
   ADD_CUSTOM_EVENT(events, tx_spend);
   MAKE_NEXT_BLOCK_TX1(events, blk_b3, blk_b2, miner_acc, tx_spend);
@@ -492,7 +495,7 @@ bool gw_addr_altchain_owner_change::generate(std::vector<test_event_entry>& even
     // chain B: spend 7 with original owner
     // B extends from blk_3r, becomes main (1 block from split, only chain)
     transaction tx_b_spend{};
-    r = construct_gw_spend_tx(m_hardforks, events, blk_3r, alice_acc, m_gw_addr_view.pub, m_gw_addr_spend, MK_TEST_COINS(7), bob_acc.get_public_address(), tx_b_spend);
+    r = construct_gw_spend_tx(m_hardforks, events, blk_3r, alice_acc, m_gw_addr_view.pub, m_gw_addr_spend, MK_TEST_COINS(7), CURRENCY_GATEWAY_ADDRESS_NONCE_STARTER, bob_acc.get_public_address(), tx_b_spend);
     CHECK_AND_ASSERT_MES(r, false, "construct_gw_spend_tx B failed");
     ADD_CUSTOM_EVENT(events, tx_b_spend);
     MAKE_NEXT_BLOCK_TX1(events, blk_b1, blk_3r, miner_acc, tx_b_spend);
@@ -566,7 +569,7 @@ bool gw_addr_altchain_owner_change::generate(std::vector<test_event_entry>& even
 
     // now tx_c_spend (signed by new owner) will pass pool validation
     transaction tx_c_spend{};
-    r = construct_gw_spend_tx(m_hardforks, events, blk_c3, alice_acc, m_gw_addr_view.pub, m_gw_addr_new_spend, MK_TEST_COINS(5), bob_acc.get_public_address(), tx_c_spend);
+    r = construct_gw_spend_tx(m_hardforks, events, blk_c3, alice_acc, m_gw_addr_view.pub, m_gw_addr_new_spend, MK_TEST_COINS(5), CURRENCY_GATEWAY_ADDRESS_NONCE_STARTER, bob_acc.get_public_address(), tx_c_spend); // the first spend on chain C: tx_c_update has no gw inputs and takes no nonce
     CHECK_AND_ASSERT_MES(r, false, "construct_gw_spend_tx C failed");
     ADD_CUSTOM_EVENT(events, tx_c_spend);
     MAKE_NEXT_BLOCK_TX1(events, blk_c4, blk_c3, miner_acc, tx_c_spend);
@@ -582,7 +585,7 @@ bool gw_addr_altchain_owner_change::generate(std::vector<test_event_entry>& even
 
     // B: spend 3 with old owner (B is main, old owner valid for pool)
     transaction tx_b_spend2{};
-    r = construct_gw_spend_tx(m_hardforks, events, blk_b5, alice_acc, m_gw_addr_view.pub, m_gw_addr_spend, MK_TEST_COINS(3), bob_acc.get_public_address(), tx_b_spend2);
+    r = construct_gw_spend_tx(m_hardforks, events, blk_b5, alice_acc, m_gw_addr_view.pub, m_gw_addr_spend, MK_TEST_COINS(3), CURRENCY_GATEWAY_ADDRESS_NONCE_STARTER + 1, bob_acc.get_public_address(), tx_b_spend2);
     CHECK_AND_ASSERT_MES(r, false, "construct_gw_spend_tx B2 failed");
     ADD_CUSTOM_EVENT(events, tx_b_spend2);
     MAKE_NEXT_BLOCK_TX1(events, blk_b6, blk_b5, miner_acc, tx_b_spend2);
@@ -598,7 +601,7 @@ bool gw_addr_altchain_owner_change::generate(std::vector<test_event_entry>& even
 
     // C: spend 8 with new owner (C is main, new owner valid for pool)
     transaction tx_c_spend2{};
-    r = construct_gw_spend_tx(m_hardforks, events, blk_c7, alice_acc, m_gw_addr_view.pub, m_gw_addr_new_spend, MK_TEST_COINS(8), bob_acc.get_public_address(), tx_c_spend2);
+    r = construct_gw_spend_tx(m_hardforks, events, blk_c7, alice_acc, m_gw_addr_view.pub, m_gw_addr_new_spend, MK_TEST_COINS(8), CURRENCY_GATEWAY_ADDRESS_NONCE_STARTER + 1, bob_acc.get_public_address(), tx_c_spend2);
     CHECK_AND_ASSERT_MES(r, false, "construct_gw_spend_tx C2 failed");
     ADD_CUSTOM_EVENT(events, tx_c_spend2);
     MAKE_NEXT_BLOCK_TX1(events, blk_c8, blk_c7, miner_acc, tx_c_spend2);

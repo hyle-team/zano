@@ -135,7 +135,7 @@ namespace tools
       res = mdb_env_create(&m_penv);
       CHECK_AND_ASSERT_MESS_LMDB_DB(res, false, "Unable to mdb_env_create");
       
-      res = mdb_env_set_maxdbs(m_penv, 15);
+      res = mdb_env_set_maxdbs(m_penv, 20);
       CHECK_AND_ASSERT_MESS_LMDB_DB(res, false, "Unable to mdb_env_set_maxdbs");
 
       res = mdb_env_set_mapsize(m_penv, cache_sz);

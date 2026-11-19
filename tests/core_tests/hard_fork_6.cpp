@@ -1213,8 +1213,14 @@ bool hard_fork_6_full_gw_tx_test::generate(std::vector<test_event_entry>& events
   }
   MAKE_NEXT_BLOCK_TX_LIST(events, blk_3, blk_2r, miner_acc, std::list<transaction>({ tx_1, tx_2 }));
 
-  // register 1st gw address
+  // gw inputs of a tx are sorted by gw address, and before HF8 the nonce of a tx is checked against (and taken from) the gw address of its last gw input only;
+  // make the 2nd gw address the greater one, so a tx that spends from both addresses always uses the nonce of the 2nd one
   m_gw_addr1_view  = keypair::generate();
+  m_gw_addr2_view  = keypair::generate();
+  if (!(m_gw_addr1_view.pub < m_gw_addr2_view.pub))
+    std::swap(m_gw_addr1_view, m_gw_addr2_view);
+
+  // register 1st gw address
   m_gw_addr1_spend = keypair::generate();
 
   gateway_address_descriptor_operation gwdo{};
@@ -1226,8 +1232,7 @@ bool hard_fork_6_full_gw_tx_test::generate(std::vector<test_event_entry>& events
   MAKE_TX_EXTRA_ATTACH_FEE(events, tx_3, miner_acc, miner_acc, 0, CURRENCY_GATEWAY_ADDRESS_REGISTRATION_FEE, blk_3, std::vector<extra_v>({ gwdo }), empty_attachment);
   MAKE_NEXT_BLOCK_TX1(events, blk_4, blk_3, miner_acc, tx_3);
 
-  // register 2nd gw address
-  m_gw_addr2_view  = keypair::generate();
+  // register 2nd gw address (its view keys are generated above)
   m_gw_addr2_spend = keypair::generate();
 
   gwdo_reg.view_pub_key = m_gw_addr2_view.pub;
@@ -1295,12 +1300,14 @@ bool hard_fork_6_full_gw_tx_test::generate(std::vector<test_event_entry>& events
     tse.gateway_origin = m_gw_addr1_view.pub;
     tse.asset_id = native_coin_asset_id;
     tse.amount = MK_TEST_COINS(13);
+    tse.nonce = CURRENCY_GATEWAY_ADDRESS_NONCE_STARTER; // all gw inputs of a tx carry the same nonce, here it is the nonce of the 2nd gw address (its 1st spend)
   }
   {
     tx_source_entry& tse = sources.emplace_back();
     tse.gateway_origin = m_gw_addr2_view.pub;
     tse.asset_id = m_asset2_id;
     tse.amount = 7;
+    tse.nonce = CURRENCY_GATEWAY_ADDRESS_NONCE_STARTER;
   }
   
   destinations.clear();
@@ -1383,12 +1390,14 @@ bool hard_fork_6_full_gw_tx_test::generate(std::vector<test_event_entry>& events
     tse.gateway_origin = m_gw_addr2_view.pub;
     tse.asset_id = native_coin_asset_id;
     tse.amount = MK_TEST_COINS(13);
+    tse.nonce = CURRENCY_GATEWAY_ADDRESS_NONCE_STARTER + 1; // the 2nd spend of the 2nd gw address (after tx_7)
   }
   {
     tx_source_entry& tse = sources.emplace_back();
     tse.gateway_origin = m_gw_addr1_view.pub;
     tse.asset_id = m_asset1_id;
     tse.amount = 7;
+    tse.nonce = CURRENCY_GATEWAY_ADDRESS_NONCE_STARTER + 1; // the same nonce: the 1st gw address is not the last gw input, so its own nonce is not used
   }
 
   uint64_t tx8_gw1_native_out_tx_amount = change_native + MK_TEST_COINS(33) - TESTS_DEFAULT_FEE;
@@ -1453,6 +1462,7 @@ bool hard_fork_6_full_gw_tx_test::generate(std::vector<test_event_entry>& events
     tse.gateway_origin = m_gw_addr2_view.pub;
     tse.asset_id = native_coin_asset_id;
     tse.amount = MK_TEST_COINS(10);
+    tse.nonce = CURRENCY_GATEWAY_ADDRESS_NONCE_STARTER + 2; // the 3rd spend of the 2nd gw address (after tx_7 and tx_8)
   }
 
   uint64_t tx9_gw1_native_out_tx_amount = MK_TEST_COINS(10) - TESTS_DEFAULT_FEE;
@@ -2352,6 +2362,7 @@ bool hard_fork_6_gw_bad_ins_outs_base::generate(std::vector<test_event_entry>& e
     tse.gateway_origin = gw_addr;
     tse.asset_id = asset_id;
     tse.amount = amount;
+    tse.nonce = CURRENCY_GATEWAY_ADDRESS_NONCE_STARTER; // every gw tx of this test is the first spend of its gw address on the chain it is tried on
     return tse;
   };
 
@@ -2799,12 +2810,14 @@ bool hard_fork_6_gw_reorg_refund_overflow::generate(std::vector<test_event_entry
     tse.gateway_origin = gw_addr_view.pub;
     tse.asset_id = asset_id;
     tse.amount = loop_amount;
+    tse.nonce = CURRENCY_GATEWAY_ADDRESS_NONCE_STARTER; // tx_4 is the first spend of the gw address; it keeps this nonce when it is confirmed again in blk_8a
   }
   {
     tx_source_entry& tse = sources.emplace_back();
     tse.gateway_origin = gw_addr_view.pub;
     tse.asset_id = native_coin_asset_id;
     tse.amount = TESTS_DEFAULT_FEE;
+    tse.nonce = CURRENCY_GATEWAY_ADDRESS_NONCE_STARTER; // all gw inputs of a tx carry the same nonce
   }
   destinations.clear();
   destinations.emplace_back(loop_amount, gw_addr_view.pub, asset_id);
@@ -2874,6 +2887,7 @@ bool hard_fork_6_gw_reorg_refund_overflow::generate(std::vector<test_event_entry
     tse.gateway_origin = gw_addr_view.pub;
     tse.asset_id = native_coin_asset_id;
     tse.amount = deposit_amount;
+    tse.nonce = CURRENCY_GATEWAY_ADDRESS_NONCE_STARTER + 1; // tx_7 is the second spend of the gw address (after tx_4)
   }
   destinations.clear();
   destinations.emplace_back(deposit_amount - TESTS_DEFAULT_FEE, gw_addr_2_view.pub);
@@ -2945,9 +2959,13 @@ bool hard_fork_8_gw_input_composition::generate(std::vector<test_event_entry>& e
   REWIND_BLOCKS_N(events, blk_2r, blk_2, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
   // register two gw addresses
-  const keypair gw_1_view  = keypair::generate();
+  // gw inputs of a tx are sorted by gw address, and before HF8 the nonce of a tx is checked against (and taken from) the gw address of its last gw input only;
+  // make the address 2 the greater one, so M2 (which spends from both addresses) always uses the nonce of the address 2
+  keypair gw_1_view  = keypair::generate();
+  keypair gw_2_view  = keypair::generate();
+  if (!(gw_1_view.pub < gw_2_view.pub))
+    std::swap(gw_1_view, gw_2_view);
   const keypair gw_1_spend = keypair::generate();
-  const keypair gw_2_view  = keypair::generate();
   const keypair gw_2_spend = keypair::generate();
   gateway_address_descriptor_operation gwdo{};
   gateway_address_descriptor_operation_register gwdo_reg{};
@@ -3035,13 +3053,21 @@ bool hard_fork_8_gw_input_composition::generate(std::vector<test_event_entry>& e
     w.tx->extra.push_back(zarcanum_tx_data_v1{ TESTS_DEFAULT_FEE });
   });
 
-  auto gw_source = [](const crypto::public_key& gw_addr, const crypto::public_key& asset_id, uint64_t amount) -> tx_source_entry {
+  auto gw_source = [](const crypto::public_key& gw_addr, const crypto::public_key& asset_id, uint64_t amount, uint64_t nonce) -> tx_source_entry {
     tx_source_entry tse{};
     tse.gateway_origin = gw_addr;
     tse.asset_id = asset_id;
     tse.amount = amount;
+    tse.nonce = nonce;
     return tse;
   };
+
+  // gw nonces: before HF8 all three txs are confirmed in blk_8 in the order M1, M2, M3; from HF8 only M3 is confirmed
+  // M1 is the 1st spend of the address 1; M2 uses the nonce of the address 2 (its 1st spend, the nonce of the address 1 is not touched by M2);
+  // M3 is the 2nd spend of the address 1 before HF8 (after M1), and the 1st one from HF8
+  const uint64_t m1_nonce = CURRENCY_GATEWAY_ADDRESS_NONCE_STARTER;
+  const uint64_t m2_nonce = CURRENCY_GATEWAY_ADDRESS_NONCE_STARTER;
+  const uint64_t m3_nonce = hf8_rule_active ? CURRENCY_GATEWAY_ADDRESS_NONCE_STARTER : CURRENCY_GATEWAY_ADDRESS_NONCE_STARTER + 1;
 
   auto construct_gw_tx = [&](const std::vector<tx_source_entry>& sources, const std::vector<tx_destination_entry>& destinations, transaction& tx) -> bool {
     finalize_tx_param ftp{};
@@ -3080,7 +3106,7 @@ bool hard_fork_8_gw_input_composition::generate(std::vector<test_event_entry>& e
 
   // M1: Alice's ZC input pays the fee, a gw input of address 1 gives 7 units of A to Bob
   std::vector<tx_source_entry> sources = sources_zc;
-  sources.push_back(gw_source(gw_1_view.pub, asset_id, 7));
+  sources.push_back(gw_source(gw_1_view.pub, asset_id, 7, m1_nonce));
   destinations.clear();
   destinations.emplace_back(change_native,                    alice_addr);
   destinations.emplace_back(7,                                bob_addr,             asset_id);
@@ -3089,8 +3115,8 @@ bool hard_fork_8_gw_input_composition::generate(std::vector<test_event_entry>& e
 
   // M2: native gw inputs of address 1 (covers the fee) and of address 2
   sources.clear();
-  sources.push_back(gw_source(gw_1_view.pub, native_coin_asset_id, TESTS_DEFAULT_FEE + MK_TEST_COINS(1)));
-  sources.push_back(gw_source(gw_2_view.pub, native_coin_asset_id, MK_TEST_COINS(1)));
+  sources.push_back(gw_source(gw_1_view.pub, native_coin_asset_id, TESTS_DEFAULT_FEE + MK_TEST_COINS(1), m2_nonce));
+  sources.push_back(gw_source(gw_2_view.pub, native_coin_asset_id, MK_TEST_COINS(1), m2_nonce));
   destinations.clear();
   destinations.emplace_back(MK_TEST_COINS(1),                 alice_addr);
   destinations.emplace_back(MK_TEST_COINS(1),                 alice_addr);
@@ -3099,8 +3125,8 @@ bool hard_fork_8_gw_input_composition::generate(std::vector<test_event_entry>& e
 
   // M3: two gw inputs of address 1: native coins (covers the fee) and 5 units of A to Bob
   sources.clear();
-  sources.push_back(gw_source(gw_1_view.pub, native_coin_asset_id, TESTS_DEFAULT_FEE + MK_TEST_COINS(1)));
-  sources.push_back(gw_source(gw_1_view.pub, asset_id, 5));
+  sources.push_back(gw_source(gw_1_view.pub, native_coin_asset_id, TESTS_DEFAULT_FEE + MK_TEST_COINS(1), m3_nonce));
+  sources.push_back(gw_source(gw_1_view.pub, asset_id, 5, m3_nonce));
   destinations.clear();
   destinations.emplace_back(MK_TEST_COINS(1),                 alice_addr);
   destinations.emplace_back(5,                                bob_addr,             asset_id);
