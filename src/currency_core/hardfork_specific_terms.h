@@ -125,6 +125,7 @@ namespace currency
     DEFINE_TERMS(   no,   no,   no,   no,   many, many, many, many, many,   proofs,            zc_outs_range_proof                 );
     DEFINE_TERMS(   no,   no,   no,   no,   one,  one,  one,  one,  one,    proofs,            zc_balance_proof                    );
     DEFINE_TERMS(   no,   no,   no,   no,   no,   no,   one,  no,   one,    proofs,            zc_gw_balance_proof                 );
+    DEFINE_TERMS(   no,   no,   no,   no,   no,   no,   one,  no,   one,    proofs,            zc_tx_pub_key_proof                 );
     DEFINE_TERMS(   no,   no,   no,   no,   one,  one,  one,  one,  one,    proofs,            asset_operation_proof               );
     DEFINE_TERMS(   no,   no,   no,   no,   one,  one,  one,  one,  one,    proofs,            asset_operation_ownership_proof     );
     DEFINE_TERMS(   no,   no,   no,   no,   one,  one,  one,  one,  one,    proofs,            asset_operation_ownership_proof_eth );

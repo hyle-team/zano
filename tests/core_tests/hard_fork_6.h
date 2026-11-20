@@ -122,3 +122,8 @@ struct hard_fork_8_gw_input_composition : public wallet_test
 {
   bool generate(std::vector<test_event_entry>& events) const;
 };
+
+struct hard_fork_6_gw_to_gw_transfer : public wallet_test
+{
+  bool generate(std::vector<test_event_entry>& events) const;
+};

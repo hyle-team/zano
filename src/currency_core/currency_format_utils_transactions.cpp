@@ -7,6 +7,7 @@
 #include "currency_format_utils_abstract.h"
 #include "common/variant_helper.h"
 #include "crypto/zarcanum.h"
+#include "crypto_config.h"
 
 #define DBG_VAL_PRINT(x) ((void)0) // LOG_PRINT_CYAN(std::setw(42) << std::left << #x ":" << x, LOG_LEVEL_0)
 
@@ -295,6 +296,11 @@ namespace currency
           // but asset operations are not allowed
           CHECK_AND_ASSERT_MES(ogc.ao_amount_blinding_mask.is_zero(), false, "asset emmission is not allowed for txs no confidential inputs and outputs");
           CHECK_AND_ASSERT_MES(commitment_to_zero.is_zero(), false, "commitment_to_zero must be zero");
+
+          zc_tx_pub_key_proof pk_proof{};
+          r = crypto::generate_schnorr_sig(crypto::hash_helper_t::h(CRYPTO_HDS_ZC_TX_PUB_KEY_PROOF, tx_id), ogc.tx_key.sec, pk_proof.ss);
+          CHECK_AND_ASSERT_MES(r, false, "generate_schnorr_sig (G) failed");
+          tx.proofs.push_back(std::move(pk_proof));
         }
         else
         {
@@ -483,6 +489,17 @@ namespace currency
           // but asset operations are not allowed
           CHECK_AND_ASSERT_MES(commitment_to_zero.is_zero(), false, "commitment_to_zero is nonzero (no confidential inputs and outputs)");
           CHECK_AND_ASSERT_MES(!has_asset_operation, false, "asset operation is not allowed (no confidential inputs and outputs)");
+
+#if defined(TESTNET) && (CURRENCY_FORMATION_VERSION != 103)
+#  error remove "if (tx.hardfork_id >= ZANO_HARDFORK_08)" below
+#endif
+          if (tx.hardfork_id >= ZANO_HARDFORK_08) // TODO: remove this condition once testnet is relaunched to make things clear, keeping the verification as is -- sowle
+          {
+            const zc_tx_pub_key_proof* p_pk_proof = get_type_in_variant_container<const zc_tx_pub_key_proof>(tx.proofs);
+            CHECK_AND_ASSERT_MES(p_pk_proof, false, "zc_tx_pub_key_proof is missing in tx proofs");
+            r = crypto::verify_schnorr_sig(crypto::hash_helper_t::h(CRYPTO_HDS_ZC_TX_PUB_KEY_PROOF, tx_id), tx_pub_key, p_pk_proof->ss);
+            CHECK_AND_ASSERT_MES(r, false, "verify_schnorr_sig (G) failed");
+          }
         }
         else
         {

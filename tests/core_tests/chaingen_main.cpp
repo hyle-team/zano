@@ -1418,6 +1418,7 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY_HF(hard_fork_6_gw_bad_ins, "6,8-*");
     GENERATE_AND_PLAY_HF(hard_fork_6_gw_reorg_refund_overflow, "6,8-*");
     GENERATE_AND_PLAY_HF(hard_fork_8_gw_input_composition, "6,8-*");
+    GENERATE_AND_PLAY_HF(hard_fork_6_gw_to_gw_transfer, "6,8-*");
 
     GENERATE_AND_PLAY(hf_booster_hf8_activation_basic);
     GENERATE_AND_PLAY(hf_booster_gentime_basic);
