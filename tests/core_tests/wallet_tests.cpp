@@ -760,33 +760,41 @@ bool gen_wallet_unconfirmed_outdated_tx::generate(std::vector<test_event_entry>&
   REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
 
   // create tx_0 like it's 20 sec after blk_0r
-  events.push_back(event_core_time(blk_0r.timestamp + 20));
+  const uint64_t tx_0_time = blk_0r.timestamp + 20;
+  events.push_back(event_core_time(tx_0_time));
   MAKE_TX_FEE(events, tx_0, miner_acc, alice_acc, MK_TEST_COINS(200), TESTS_DEFAULT_FEE, blk_0r);
 
   // check balances and populate unconfirmed tx list in a wallet
-  DO_CALLBACK(events, "c1");
+  DO_CALLBACK_PARAMS(events, "c1", tx_0_time);
 
   // create tx_1 like it's 25 sec after blk_0r
-  events.push_back(event_core_time(blk_0r.timestamp + 25));
+  const uint64_t tx_1_time = blk_0r.timestamp + 25;
+  events.push_back(event_core_time(tx_1_time));
   MAKE_TX_FEE(events, tx_1, miner_acc, alice_acc, MK_TEST_COINS(500), TESTS_DEFAULT_FEE, blk_0r);
 
   // check balances and populate unconfirmed tx list in a wallet
-  DO_CALLBACK(events, "c2");
+  DO_CALLBACK_PARAMS(events, "c2", tx_1_time);
 
   // add a block with no txs, so the next refresh in the wallet triggers unconfirmed txs cleaning
   MAKE_NEXT_BLOCK(events, blk_1, blk_0r, miner_acc);
 
-  // forward the time a lot, tx_0 should now be beyound the allowed livetime limit
-  events.push_back(event_core_time(blk_0r.timestamp + 23 + CURRENCY_MEMPOOL_TX_LIVETIME));
-
-  // check again
-  DO_CALLBACK(events, "c3");
+  // сheck after tx_0 has expired and before tx_1 expires.
+  const uint64_t check_time = tx_0_time + CURRENCY_MEMPOOL_TX_LIVETIME + 3;
+  DO_CALLBACK_PARAMS(events, "c3", check_time);
 
   return true;
 }
 
+static uint64_t wallet_expiration_check_time(const test_event_entry& event)
+{
+  uint64_t timestamp = 0;
+  CHECK_AND_ASSERT_THROW_MES(string_tools::hex_to_pod(boost::get<callback_entry>(event).callback_params, timestamp), "Invalid wallet expiration test timestamp");
+  return timestamp;
+}
+
 bool gen_wallet_unconfirmed_outdated_tx::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
+  const test_core_time::scoped_time core_time(wallet_expiration_check_time(events[ev_index]));
   std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
   size_t blocks_fetched = 0;
   bool received_money;
@@ -810,6 +818,7 @@ bool gen_wallet_unconfirmed_outdated_tx::c1(currency::core& c, size_t ev_index, 
 
 bool gen_wallet_unconfirmed_outdated_tx::c2(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
+  const test_core_time::scoped_time core_time(wallet_expiration_check_time(events[ev_index]));
   std::shared_ptr<tools::wallet2> alice_wlt(new tools::wallet2);
   alice_wlt->load(g_wallet_filename, g_wallet_password);
   alice_wlt->set_core_proxy(m_core_proxy);
@@ -839,6 +848,7 @@ bool gen_wallet_unconfirmed_outdated_tx::c2(currency::core& c, size_t ev_index, 
 
 bool gen_wallet_unconfirmed_outdated_tx::c3(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
+  const test_core_time::scoped_time core_time(wallet_expiration_check_time(events[ev_index]));
   std::shared_ptr<tools::wallet2> alice_wlt(new tools::wallet2);
   alice_wlt->load(g_wallet_filename, g_wallet_password);
   alice_wlt->set_core_proxy(m_core_proxy);
@@ -2316,7 +2326,7 @@ bool gen_wallet_fake_outputs_not_enough::c1(currency::core& c, size_t ev_index, 
   // make sure that the same input was not used as real in the half of trials
   for (auto idx : real_inputs)
   {
-    CHECK_AND_ASSERT_MES(real_inputs.count(idx) < real_inputs.size() / 2, false, "Real inputs were selected quite predictable, they expected to be randomly distributed.");
+    CHECK_AND_ASSERT_MES(real_inputs.count(idx) * 2 < real_inputs.size(), false, "Real inputs were selected quite predictable, they expected to be randomly distributed.");
   }
 
   return true;
@@ -2545,7 +2555,8 @@ bool generate_oversized_offer(size_t min_size, size_t max_size, bc_services::off
     if (sz > min_size)
       return true;
 
-    result.comment += get_random_text((min_size - sz) * 5 / 4);
+    const size_t chars_to_append = std::max(static_cast<size_t>(1), (min_size - sz) * 5 / 4);
+    result.comment += get_random_text(chars_to_append);
   }
 
   return false;
