@@ -991,6 +991,63 @@ namespace db_test
   }
 #endif
 
+  template<typename db_backend_t>
+  void enumerate_items_from_key_test()
+  {
+    auto backend = std::make_shared<db_backend_t>();
+    epee::shared_recursive_mutex db_lock;
+    db::basic_db_accessor dbb(backend, db_lock);
+    ASSERT_TRUE(dbb.open(get_db_decorated_name<db_backend_t>() + "_enumerate_items_from_key"));
+
+    db::basic_key_value_accessor<char, uint64_t, false> items(dbb);
+    ASSERT_TRUE(items.init("items"));
+    ASSERT_TRUE(items.begin_transaction());
+    ASSERT_TRUE(items.clear());
+    items.set('f', 300);
+    items.set('b', 100);
+    items.set('d', 200);
+    items.commit_transaction();
+
+    using entry = std::pair<char, uint64_t>;
+    const auto expect_items = [&](const char* start, const std::vector<entry>& expected, bool stop_after_first = false)
+    {
+      std::vector<entry> seen;
+      EXPECT_TRUE(items.enumerate_items([&](uint64_t index, char key, uint64_t value)
+      {
+        EXPECT_EQ(seen.size(), index);
+        seen.emplace_back(key, value);
+        return !stop_after_first;
+      }, start));
+      EXPECT_EQ(expected, seen);
+    };
+
+    const char existing_key = 'd';
+    const char missing_key = 'c';
+    const char past_end = 'g';
+    expect_items(nullptr, {{'b', 100}, {'d', 200}, {'f', 300}});
+    expect_items(&existing_key, {{'d', 200}, {'f', 300}});
+    expect_items(&missing_key, {{'d', 200}, {'f', 300}});
+    expect_items(&past_end, {});
+    expect_items(&existing_key, {{'d', 200}}, true);
+
+    ASSERT_TRUE(items.begin_transaction());
+    ASSERT_TRUE(items.erase_validate(existing_key));
+    items.commit_transaction();
+    expect_items(&existing_key, {{'f', 300}});
+  }
+
+  TEST(lmdb, enumerate_items_from_key)
+  {
+    enumerate_items_from_key_test<db::lmdb_db_backend>();
+  }
+
+#ifdef ENABLED_ENGINE_MDBX
+  TEST(mdbx, enumerate_items_from_key)
+  {
+    enumerate_items_from_key_test<db::mdbx_db_backend>();
+  }
+#endif
+
 
   //////////////////////////////////////////////////////////////////////////////
   // 2gb_test

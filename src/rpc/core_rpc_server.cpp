@@ -1727,13 +1727,21 @@ namespace currency
   {
     CHECK_CORE_READY();
     CHECK_RPC_LIMITS(req.count, RPC_LIMIT_COMMAND_RPC_GET_ASSETS_LIST);
-
-    if (!m_core.get_blockchain_storage().get_assets(req.offset, req.count, res.assets))
+    if (req.after_asset_id && (req.offset != 0 || req.count == 0)) // after_asset_id requires offset = 0 and count > 0
     {
+      res.status = API_RETURN_CODE_BAD_ARG;
+      return true;
+    }
+
+    const crypto::public_key* after = req.after_asset_id ? &(*req.after_asset_id) : nullptr;
+
+    if (!m_core.get_blockchain_storage().get_assets(req.offset, req.count, after, res.assets))
+    {
+      res.assets.clear();
       res.status = API_RETURN_CODE_NOT_FOUND;
       return true;
     }
-    res.status = API_RETURN_CODE_OK;
+    res.status = res.assets.empty() ? API_RETURN_CODE_NOT_FOUND : API_RETURN_CODE_OK;
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------

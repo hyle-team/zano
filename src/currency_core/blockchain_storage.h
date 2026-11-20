@@ -334,7 +334,7 @@ namespace currency
     bool get_asset_history(const crypto::public_key& asset_id, std::list<asset_descriptor_operation>& result) const;
     bool get_asset_info(const crypto::public_key& asset_id, asset_descriptor_base& info)const;
     uint64_t get_assets_count() const;
-    uint64_t get_assets(uint64_t offset, uint64_t count, std::list<asset_descriptor_with_id>& assets) const;
+    bool get_assets(uint64_t offset, uint64_t count, const crypto::public_key* after, std::list<asset_descriptor_with_id>& assets) const;
     bool check_tx_input(const transaction& tx, size_t in_index, const txin_to_key& txin, const crypto::hash& tx_prefix_hash, uint64_t& max_related_block_height, uint64_t& source_max_unlock_time_for_pos_coinbase)const;
     bool check_tx_input(const transaction& tx, size_t in_index, const txin_multisig& txin, const crypto::hash& tx_prefix_hash, uint64_t& max_related_block_height)const;
     bool check_tx_input(const transaction& tx, size_t in_index, const txin_zc_input& zc_in, const crypto::hash& tx_prefix_hash, check_tx_inputs_context& ctic) const;

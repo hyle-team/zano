@@ -4663,14 +4663,18 @@ bool blockchain_storage::get_asset_info(const crypto::public_key& asset_id, asse
   return true;
 }
 //------------------------------------------------------------------
-uint64_t blockchain_storage::get_assets(uint64_t offset, uint64_t count, std::list<asset_descriptor_with_id>& assets) const
+bool blockchain_storage::get_assets(uint64_t offset, uint64_t count, const crypto::public_key* after, std::list<asset_descriptor_with_id>& assets) const
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
   assets.clear();
-  m_db_assets.enumerate_items([&](uint64_t i, const crypto::public_key& asset_id, const std::list<asset_descriptor_operation>& asset_descriptor_history)
+  
+  return m_db_assets.enumerate_items([&](uint64_t i, const crypto::public_key& asset_id, const std::list<asset_descriptor_operation>& asset_descriptor_history)
   {
     if (i < offset)
       return true; // continue
+
+    if(i == 0 && after && asset_id == *after) //already saw that asset, skip it
+      return true;
 
     CHECK_AND_ASSERT_THROW_MES(asset_descriptor_history.size(), "unexpectedly, the asset_descriptor_history is empty; asset_id: " << asset_id);
     CHECK_AND_ASSERT_THROW_MES(asset_descriptor_history.back().opt_descriptor.has_value(), "the last element of asset_descriptor_history doesn't have descriptor; asset_id: " << asset_id);
@@ -4680,13 +4684,8 @@ uint64_t blockchain_storage::get_assets(uint64_t offset, uint64_t count, std::li
     replace_asset_ticker_and_full_name_if_invalid(added_item_adb, asset_id);
     added_item.asset_id = asset_id;
 
-    if (assets.size() >= count)
-    {
-      return false; // stop
-    }
-    return true; // continue
-  });
-  return assets.size();
+    return assets.size() < count;
+  }, after);
 }
 //------------------------------------------------------------------
 uint64_t blockchain_storage::get_assets_count() const
