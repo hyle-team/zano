@@ -167,6 +167,13 @@ namespace epee
     bool portable_storage_base<t_section>::load_from_binary(const binarybuffer& source, const portable_storage_limits& limits)
     {
       m_root.m_entries.clear();
+
+      if (source.size() > limits.max_serialized_size)
+      {
+        LOG_ERROR("portable_storage: binary size " << source.size() << " exceeds limit " << limits.max_serialized_size);
+        return false;
+      }
+
       if(source.size() < sizeof(storage_block_header))
       {
         LOG_ERROR("portable_storage: wrong binary format, packet size = " << source.size() << " less than expected sizeof(storage_block_header)=" << sizeof(storage_block_header));

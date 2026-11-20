@@ -2741,7 +2741,7 @@ bool generate_pos_block_with_extra_nonce(test_generator& generator, const std::v
     std::vector<tx_source_entry> sources;
     fill_tx_sources(
       sources, events, prev_block, miner.get_keys(),
-      UINT64_MAX, 0, false, false, true
+      UINT64_MAX, 0, false, false, false
     );
 
     auto it = std::find_if(sources.begin(), sources.end(),

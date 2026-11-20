@@ -1610,12 +1610,20 @@ bool pos_block_stake_input_ref_by_id::generate(std::vector<test_event_entry>& ev
   REWIND_BLOCKS_N_WITH_TIME(events, blk_1r, blk_1, miner_acc, CURRENCY_HF4_MANDATORY_MIN_COINAGE);
 
   const bool hf8_active = m_hardforks.is_hardfork_active_for_height(ZANO_HARDFORK_08, get_block_height(blk_1r) + 1);
+  DO_CALLBACK_PARAMS(events, hf8_active ? "check_hardfork_active" : "check_hardfork_inactive", static_cast<size_t>(ZANO_HARDFORK_08));
+
+  auto is_stake_input_ref_by_id = [](const block& b) -> bool
+  {
+    const std::vector<txout_ref_v>& key_offsets = boost::get<txin_zc_input>(b.miner_tx.vin[1]).key_offsets;
+    return !key_offsets.empty() && std::all_of(key_offsets.begin(), key_offsets.end(), [](const txout_ref_v& ref){ return ref.type() == typeid(ref_by_id); });
+  };
 
   // main chain
 
   block blk_2_rbi{};
   r = make_next_pos_block(generator, events, blk_1r, alice_acc, MK_TEST_COINS(1), 0, std::vector<transaction>{}, fts_use_ref_by_id, blk_2_rbi);
   CHECK_AND_ASSERT_MES(r, false, "make_next_pos_block failed");
+  CHECK_AND_ASSERT_MES(is_stake_input_ref_by_id(blk_2_rbi), false, "blk_2_rbi: stake input doesn't use ref_by_id");
   generator.add_block_info(blk_2_rbi, std::list<transaction>{});
   if (hf8_active)
     DO_CALLBACK(events, "mark_invalid_block");
@@ -1642,6 +1650,7 @@ bool pos_block_stake_input_ref_by_id::generate(std::vector<test_event_entry>& ev
   block blk_4a_rbi{};
   r = make_next_pos_block(generator, events, blk_3, bob_acc, MK_TEST_COINS(1), 0, std::vector<transaction>{}, fts_use_ref_by_id, blk_4a_rbi);
   CHECK_AND_ASSERT_MES(r, false, "make_next_pos_block failed");
+  CHECK_AND_ASSERT_MES(is_stake_input_ref_by_id(blk_4a_rbi), false, "blk_4a_rbi: stake input doesn't use ref_by_id");
   generator.add_block_info(blk_4a_rbi, std::list<transaction>{});
   if (hf8_active)
     DO_CALLBACK(events, "mark_invalid_block");

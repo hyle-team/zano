@@ -533,6 +533,15 @@ namespace currency
     END_SERIALIZE()
   };
 
+  // Proof of knowing transaction secret key (DL for tx pub key with respect to G)
+  struct zc_tx_pub_key_proof
+  {
+    crypto::generic_schnorr_sig_s ss;
+
+    BEGIN_SERIALIZE_OBJECT()
+      FIELD(ss)
+    END_SERIALIZE()
+  };
 
   struct zarcanum_sig : public crypto::zarcanum_proof
   {
@@ -1195,7 +1204,7 @@ namespace currency
 
   typedef boost::variant<NLSAG_sig, void_sig, ZC_sig, zarcanum_sig, gateway_sig> signature_v;
 
-  typedef boost::variant<zc_asset_surjection_proof, zc_outs_range_proof, zc_balance_proof, asset_operation_proof, asset_operation_ownership_proof, asset_operation_ownership_proof_eth, gateway_address_ownership_proof, zc_gw_balance_proof> proof_v;
+  typedef boost::variant<zc_asset_surjection_proof, zc_outs_range_proof, zc_balance_proof, asset_operation_proof, asset_operation_ownership_proof, asset_operation_ownership_proof_eth, gateway_address_ownership_proof, zc_gw_balance_proof, zc_tx_pub_key_proof> proof_v;
 
 
   //include backward compatibility defintions
@@ -1497,6 +1506,7 @@ SET_VARIANT_TAGS(currency::zc_gw_balance_proof, 77, "zc_gw_balance_proof");
 
 SET_VARIANT_TAGS(currency::etc_coinbase_block_cumulative_size, 78, "etc_coinbase_block_cumulative_size");
 
+SET_VARIANT_TAGS(currency::zc_tx_pub_key_proof, 79, "zc_tx_pub_key_proof");
 
 
 
