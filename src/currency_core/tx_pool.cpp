@@ -47,6 +47,105 @@ using namespace epee;
 
 namespace currency
 {
+
+
+  // `validate_and_process_nonce` is intentionally templated and called in two modes:
+  // 1) pre-validation (`do_actual_insert_nonce == false`) and
+  // 2) state mutation (`do_actual_insert_nonce == true`).
+  //
+  // Both modes share identical validation logic to prevent divergence. In pre-validation
+  // mode, `self_t` is treated as const (read-only); in insert mode, `self_t` is non-const
+  // (cache updates/removals allowed). This enforces compile-time safety against accidental
+  // state changes in the read-only path.
+  template<bool do_actual_insert_nonce, class self_t>
+  bool tx_memory_pool::validate_and_process_nonce(self_t& self, const crypto::hash& tx_id, const transaction& tx, bool kept_by_block, bool from_core)
+  {
+    CRITICAL_REGION_LOCAL(self.m_cache_lock);
+    for(const auto& in : tx.vin)
+    {
+      if(in.type() == typeid(txin_gateway))
+      {
+        const txin_gateway& gw_in = boost::get<txin_gateway>(in);
+
+        // check if nonce exist in blockchain, if so reject immidiately
+        if (!from_core)
+        {
+          uint64_t bcs_next_nonce = self.m_blockchain.get_gw_next_nonce(gw_in.gateway_addr);
+          if(gw_in.nonce < bcs_next_nonce)
+          {
+            LOG_ERROR("tx pool: nonce " << gw_in.nonce << " for gateway address " << gw_in.gateway_addr << " is less than next expected nonce in blockchain: " << bcs_next_nonce << ", from tx " << tx_id);
+            return false;
+          }
+          uint64_t max_gap = self.m_blockchain.get_core_runtime_config().gw_nonce_max_gap;
+          if(gw_in.nonce - bcs_next_nonce >= max_gap)
+          {
+            // outside the window, reject
+            LOG_ERROR("tx pool: nonce " << gw_in.nonce << " for gateway address " << gw_in.gateway_addr << " is outside the allowed window of next expected nonce in blockchain: " << bcs_next_nonce << ", max gap: " << max_gap << ", from tx " << tx_id);
+            return false;
+          }
+
+
+        }
+
+        auto addr_it = self.m_gw_nonce_cache.find(gw_in.gateway_addr);
+        if(addr_it == self.m_gw_nonce_cache.end())
+        {
+          if constexpr (!do_actual_insert_nonce)
+            continue;
+          else
+          {
+            addr_it = self.m_gw_nonce_cache.emplace(gw_in.gateway_addr, std::map<uint64_t, crypto::hash>()).first;
+          }
+          
+        }
+
+        auto& nonces_for_the_addr = addr_it->second;
+
+        // try to find the nonce in the cache, if it is already there, then we should consider replace by fee
+        auto it = nonces_for_the_addr.find(gw_in.nonce);
+        if(it != nonces_for_the_addr.end())
+        {
+          // check it it's the same tx(probably exist from prev rounds)
+          if(it->second == tx_id)
+            continue;
+
+          // nonce already exist in the cache, let's see if we should replace it by fee
+          auto existing_tx_ptr = self.m_db_transactions.get(it->second);
+          CHECK_AND_ASSERT_MES(existing_tx_ptr, false, "tx pool: internal error: tx " << it->second << " for gateway address " << gw_in.gateway_addr << " and nonce " << gw_in.nonce << " is not found in the pool");
+          uint64_t old_tx_fee = get_tx_fee(existing_tx_ptr->tx);
+          uint64_t new_tx_fee = get_tx_fee(tx);
+          if(from_core || (new_tx_fee > old_tx_fee + self.m_blockchain.get_core_runtime_config().gw_nonce_fee_window) )
+          {
+            if constexpr (do_actual_insert_nonce)
+            {
+              // copy to local variable to avoid iterator invalidation after removal
+              crypto::hash removed_tx_id = it->second;
+
+              bool r = self.remove_tx(removed_tx_id);  // TODO: evaluate if it's safe to call it from here, or we should put txs to remove in a list and remove later
+              CHECK_AND_ASSERT_MES(r, false, "tx pool: internal error: failed to remove tx " << removed_tx_id << " for gateway address " << gw_in.gateway_addr << " and nonce " << gw_in.nonce << " from the pool");
+            }
+          }
+          else
+          {
+            // fee not enough to replace existing tx, reject it
+            LOG_ERROR("tx pool: nonce " << gw_in.nonce << " for gateway address " << gw_in.gateway_addr << " already exist in the pool from tx " << it->second << ", new tx fee: " << new_tx_fee << ", old tx fee: " << old_tx_fee << ", fee window: " << self.m_blockchain.get_core_runtime_config().gw_nonce_fee_window);
+            return false;
+          }
+        }
+        
+
+
+        if constexpr (do_actual_insert_nonce)
+        {
+          self.m_gw_nonce_cache[gw_in.gateway_addr][gw_in.nonce] = tx_id;
+          LOG_PRINT_L2("tx pool: nonce added: " << gw_in.gateway_addr << "|" << gw_in.nonce << ", from tx " << tx_id);
+        }
+      }
+    }
+
+    return true;
+  }
+
   //---------------------------------------------------------------------------------
   tx_memory_pool::tx_memory_pool(blockchain_storage& bchs, i_currency_protocol* pprotocol) :
     m_blockchain(bchs),
@@ -104,6 +203,16 @@ namespace currency
     return true;
   }
   //---------------------------------------------------------------------------------
+  bool tx_memory_pool::check_nonce_and_fee_for_gw_address(const crypto::hash& tx_id, const transaction& tx, bool kept_by_block, bool from_core) const
+  {
+    return validate_and_process_nonce<false>(*this, tx_id, tx, kept_by_block, from_core);
+  }
+  //---------------------------------------------------------------------------------
+  bool tx_memory_pool::insert_nonce_for_gw_address(const crypto::hash& tx_id, const transaction& tx, bool kept_by_block, bool from_core)
+  {
+    return validate_and_process_nonce<true>(*this, tx_id, tx, kept_by_block, from_core);
+  }
+  //---------------------------------------------------------------------------------
   bool tx_memory_pool::add_tx(const transaction &tx, const crypto::hash &id, uint64_t blob_size, tx_verification_context& tvc, bool kept_by_block, bool from_core)
   {
     // ------------------ UNSECURE CODE FOR TESTS ---------------------
@@ -111,7 +220,7 @@ namespace currency
     {
       uint64_t tx_fee = 0;
       CHECK_AND_ASSERT_MES(get_tx_fee(tx, tx_fee), false, "get_tx_fee failed");
-      do_insert_transaction(tx, id, blob_size, kept_by_block, tx_fee, null_hash, 0);
+      do_insert_transaction(tx, id, blob_size, kept_by_block, tx_fee, null_hash, 0, from_core);
       tvc.m_added_to_pool = true;
       tvc.m_should_be_relayed = true;
       tvc.m_verification_failed = false;
@@ -185,6 +294,9 @@ namespace currency
     r = from_core || validate_alias_info(tx, kept_by_block);
     CHECK_AND_ASSERT_MES(r, false, "validate_alias_info failed");
     TIME_MEASURE_FINISH_PD(validate_alias_time);
+
+    r = check_nonce_and_fee_for_gw_address(id, tx, kept_by_block, from_core); 
+    CHECK_AND_ASSERT_MES(r, false, "check_nonce_and_fee_for_gw_address failed");
 
     TIME_MEASURE_START_PD(check_keyimages_ws_ms_time);
     //check key images for transaction if it is not kept by block
@@ -288,7 +400,13 @@ namespace currency
       }
     }
 
-    do_insert_transaction(tx, id, blob_size, kept_by_block, tx_fee, ch_inp_res ? ctic.max_used_block_id : null_hash, ch_inp_res ? ctic.max_used_block_height : 0);
+    r = do_insert_transaction(tx, id, blob_size, kept_by_block, tx_fee, ch_inp_res ? ctic.max_used_block_id : null_hash, ch_inp_res ? ctic.max_used_block_height : 0, from_core);
+    if (!r)
+    {
+      LOG_PRINT_L0("Failed to insert transaction " << id << " to the pool");
+      tvc.m_verification_failed = true;
+      return false; 
+    }
     
     TIME_MEASURE_FINISH_PD(tx_processing_time);
     tvc.m_added_to_pool = true;
@@ -343,18 +461,27 @@ namespace currency
 //  });
 
 
-  bool tx_memory_pool::do_insert_transaction(const transaction &tx, const crypto::hash &id, uint64_t blob_size, bool kept_by_block, uint64_t fee, const crypto::hash& max_used_block_id, uint64_t max_used_block_height)
+  bool tx_memory_pool::do_insert_transaction(const transaction &tx, const crypto::hash &id, uint64_t blob_size, bool kept_by_block, uint64_t fee, const crypto::hash& max_used_block_id, uint64_t max_used_block_height, bool from_core)
   {
     TIME_MEASURE_START_PD(begin_tx_time);
     auto db_tx_ptr = m_db.begin_transaction_obj();
     TIME_MEASURE_FINISH_PD(begin_tx_time);
 
+    bool inserted_successfully = false;
     TIME_MEASURE_START_PD(update_db_time);
     misc_utils::auto_scope_leave_caller seh = misc_utils::create_scope_leave_handler([&]()
     {
-      TIME_MEASURE_START_PD(db_commit_time);
-      db_tx_ptr->commit_transaction();
-      TIME_MEASURE_FINISH_PD(db_commit_time);
+      if(!inserted_successfully)
+      {
+        db_tx_ptr->abort_transaction();
+        load_keyimages_and_nonce_cache();
+      }
+      else
+      {
+        TIME_MEASURE_START_PD(db_commit_time);
+        db_tx_ptr->commit_transaction();
+        TIME_MEASURE_FINISH_PD(db_commit_time);
+      }
 
     });
     //CHECK_AND_ASSERT_MES_CUSTOM(!m_db_transactions.get(id), false, (tvc.m_added_to_pool = false, tvc.m_verification_failed = true), "internal error: failed to add transaction " << id << "     to the pool as it already exists");
@@ -370,9 +497,11 @@ namespace currency
     td.receive_time = get_core_time();
 
     m_db_transactions.set(id, td);
-    on_tx_add(id, tx, kept_by_block);
+    bool r = on_tx_add(id, tx, kept_by_block, from_core);
+    CHECK_AND_ASSERT_MES(r, false, "failed to add tx " << id << " to the pool");
 
     TIME_MEASURE_FINISH_PD(update_db_time);
+    inserted_successfully = true;
     return true;
   }
   //---------------------------------------------------------------------------------
@@ -494,6 +623,14 @@ namespace currency
 
     get_transaction_hash(tx, h, blob_size);
     return add_tx(tx, h, blob_size, tvc, kept_by_block, from_core);
+  }
+  //---------------------------------------------------------------------------------
+  bool tx_memory_pool::remove_tx(const crypto::hash& id)
+  {
+    transaction tx;
+    size_t blob_size = 0;
+    uint64_t fee = 0;
+    return take_tx(id, tx, blob_size, fee);
   }
   //---------------------------------------------------------------------------------
   bool tx_memory_pool::take_tx(const crypto::hash &id, transaction &tx, size_t& blob_size, uint64_t& fee)
@@ -843,7 +980,7 @@ namespace currency
   //---------------------------------------------------------------------------------
   bool tx_memory_pool::insert_key_images(const crypto::hash &tx_id, const transaction& tx, bool kept_by_block)
   {
-    CRITICAL_REGION_LOCAL(m_key_images_lock);
+    CRITICAL_REGION_LOCAL(m_cache_lock);
     for(const auto& in : tx.vin)
     {
       crypto::key_image k_image = AUTO_VAL_INIT(k_image);
@@ -855,20 +992,61 @@ namespace currency
         LOG_PRINT_L2("tx pool: key image added: " << k_image << ", from tx " << tx_id << ", counter: " << sz_before << " -> " << id_set.size());
       }
     }
-    return false;
+    return true;
+  }
+  //---------------------------------------------------------------------------------
+  //---------------------------------------------------------------------------------
+  bool tx_memory_pool::remove_nonce(const crypto::hash& tx_id, const transaction& tx, bool kept_by_block)
+  {
+    CRITICAL_REGION_LOCAL(m_cache_lock);
+
+    std::unordered_map<gateway_address_id_type, std::map<uint64_t, crypto::hash>> nonces_to_remove;
+
+    for(const auto& in : tx.vin)
+    {
+      if(in.type() == typeid(txin_gateway))
+      {
+        const txin_gateway& gw_in = boost::get<txin_gateway>(in);
+        nonces_to_remove[gw_in.gateway_addr][gw_in.nonce] = tx_id;
+      }
+    }
+
+    for(const auto& addr_nonces : nonces_to_remove)
+    {
+      auto it = m_gw_nonce_cache.find(addr_nonces.first);
+      CHECK_AND_ASSERT_MES(it != m_gw_nonce_cache.end(), false, "tx pool: internal error: gateway address " << addr_nonces.first << " not found in the nonce cache");
+      for(const auto& nonce_tx : addr_nonces.second)
+      {
+        auto it_nonce = it->second.find(nonce_tx.first);
+        CHECK_AND_ASSERT_MES(it_nonce != it->second.end(), false, "tx pool: internal error: nonce " << nonce_tx.first << " for gateway address " << addr_nonces.first << " not found in the nonce cache");
+        CHECK_AND_ASSERT_MES(it_nonce->second == tx_id, false, "tx pool: internal error: nonce " << nonce_tx.first << " for gateway address " << addr_nonces.first << " is associated with tx " << it_nonce->second << ", expected tx " << tx_id);
+        it->second.erase(it_nonce);
+        if(it->second.empty())
+        {
+          m_gw_nonce_cache.erase(it);
+        }
+      }
+    }
+    return true;
   }
   //--------------------------------------------------------------------------------- 
-  bool tx_memory_pool::on_tx_add(crypto::hash tx_id, const transaction& tx, bool kept_by_block)
+  bool tx_memory_pool::on_tx_add(crypto::hash tx_id, const transaction& tx, bool kept_by_block, bool from_core)
   {
-    insert_key_images(tx_id, tx, kept_by_block);
-    insert_alias_info(tx);
+    bool r = insert_key_images(tx_id, tx, kept_by_block);
+    CHECK_AND_ASSERT_MES(r, false, "failed to insert key images for tx " << tx_id);
+    r = insert_nonce_for_gw_address(tx_id, tx, kept_by_block, from_core);
+    CHECK_AND_ASSERT_MES(r, false, "failed to insert nonce for tx " << tx_id);
+    r = insert_alias_info(tx);
+    CHECK_AND_ASSERT_MES(r, false, "failed to insert alias info for tx " << tx_id);
     return true;
   }
   //--------------------------------------------------------------------------------- 
   bool tx_memory_pool::on_tx_remove(const crypto::hash &id, const transaction& tx, bool kept_by_block)
   {
     remove_key_images(id, tx, kept_by_block);
+    remove_nonce(id, tx, kept_by_block);
     remove_alias_info(tx);
+
     return true;
   }
   //--------------------------------------------------------------------------------- 
@@ -903,7 +1081,7 @@ namespace currency
   //--------------------------------------------------------------------------------- 
   bool tx_memory_pool::remove_key_images(const crypto::hash &tx_id, const transaction& tx, bool kept_by_block)
   {
-    CRITICAL_REGION_LOCAL(m_key_images_lock);
+    CRITICAL_REGION_LOCAL(m_cache_lock);
     for(const auto& in : tx.vin)
     {
       crypto::key_image k_image = AUTO_VAL_INIT(k_image);
@@ -926,8 +1104,11 @@ namespace currency
     return false;
   }
   //---------------------------------------------------------------------------------
-  bool tx_memory_pool::get_key_images_from_tx_pool(key_image_cache& key_images) const
+  bool tx_memory_pool::get_key_images_and_nonces_from_tx_pool(key_image_cache& key_images, gw_nonce_cache& gw_nonces) const
   {    
+    key_images.clear();
+    gw_nonces.clear();
+
     m_db_transactions.enumerate_items([&](uint64_t i, const crypto::hash& h, const tx_details &tx_entry)
     {
       for (auto& in : tx_entry.tx.vin)
@@ -936,6 +1117,20 @@ namespace currency
         if (get_key_image_from_txin_v(in, k_image))
         {
           key_images[k_image].insert(h);
+        }
+
+        if (in.type() == typeid(txin_gateway))
+        {
+          const txin_gateway& gw_in = boost::get<txin_gateway>(in);
+          // self check for duplicates, should never happen for two differen txs, but just in case
+          auto it = gw_nonces[gw_in.gateway_addr].find(gw_in.nonce);
+          if (it != gw_nonces[gw_in.gateway_addr].end())
+          {
+            CHECK_AND_ASSERT_THROW_MES(it->second == h, "Internal error: duplicate with nonce found on the address "
+              << gw_in.gateway_addr << ":nonce:" << gw_in.nonce << " but with differen tx hashes: " << it->second << " vs " << h);
+          }
+
+          gw_nonces[gw_in.gateway_addr][gw_in.nonce] = h;
         }
       }
       return true;
@@ -946,7 +1141,7 @@ namespace currency
   //---------------------------------------------------------------------------------
   bool tx_memory_pool::have_tx_keyimg_as_spent(const crypto::key_image& key_im)const
   {
-    CRITICAL_REGION_LOCAL(m_key_images_lock);
+    CRITICAL_REGION_LOCAL(m_cache_lock);
     auto it = m_key_images.find(key_im);
     if (it != m_key_images.end())
       return true;
@@ -963,14 +1158,21 @@ namespace currency
     CRITICAL_SECTION_UNLOCK(m_remove_stuck_txs_lock);
   }
   //---------------------------------------------------------------------------------
+  void tx_memory_pool::purge_caches()
+  {
+    CRITICAL_REGION_LOCAL(m_cache_lock);
+    m_key_images.clear();
+    m_gw_nonce_cache.clear();
+    // should m_db_black_tx_list be cleared here?
+  }
+  //---------------------------------------------------------------------------------
   void tx_memory_pool::purge_transactions()
   {
     
     auto db_tx_ptr = m_db.begin_transaction_obj();
     m_db_transactions.clear();
     db_tx_ptr->commit_transaction();
-    // should m_db_black_tx_list be cleared here?
-    CIRITCAL_OPERATION(m_key_images,clear());
+    purge_caches();
   }
   //---------------------------------------------------------------------------------
   void tx_memory_pool::clear()
@@ -979,7 +1181,7 @@ namespace currency
     m_db_transactions.clear();
     m_db_black_tx_list.clear();
     db_tx_ptr->commit_transaction();
-    CIRITCAL_OPERATION(m_key_images,clear());
+    purge_caches();
   }
   //---------------------------------------------------------------------------------
   bool tx_memory_pool::is_transaction_ready_to_go(tx_details& txd, const crypto::hash& id)const 
@@ -1432,7 +1634,7 @@ namespace currency
       LOG_PRINT_L2(ss.str());
     }
 
-    load_keyimages_cache();
+    load_keyimages_and_nonce_cache();
 
     m_use_partial_tx_proof_validation = (command_line::has_arg(vm, arg_use_partial_tx_proof_validation) && command_line::get_arg(vm, arg_use_partial_tx_proof_validation));
 
@@ -1468,14 +1670,21 @@ namespace currency
   //---------------------------------------------------------------------------------
   uint64_t tx_memory_pool::get_next_available_nonce_for_gw(const currency::gateway_address_id_type& addr) const
   {
-    //TODO;
-    return 0;
+    CRITICAL_REGION_LOCAL(m_cache_lock);
+    auto it = m_gw_nonce_cache.find(addr);
+    if(it == m_gw_nonce_cache.end())
+      return 0;
+    
+    if(it->second.empty())
+      return 0;
+
+    return it->second.rbegin()->first + 1;
   }
   //---------------------------------------------------------------------------------
-  bool tx_memory_pool::load_keyimages_cache()
+  bool tx_memory_pool::load_keyimages_and_nonce_cache()
   {
-    CRITICAL_REGION_LOCAL(m_key_images_lock);
-    return get_key_images_from_tx_pool(m_key_images);    
+    CRITICAL_REGION_LOCAL(m_cache_lock);
+    return get_key_images_and_nonces_from_tx_pool(m_key_images, m_gw_nonce_cache);    
   }
   //---------------------------------------------------------------------------------
   bool tx_memory_pool::deinit()

@@ -4101,7 +4101,7 @@ bool block_template_blacklist_test::c1(currency::core& c, size_t ev_index, const
 
   broken_tx.signatures.resize(broken_tx.signatures.size() - 1);
   //manually add completely broken tx to pool
-  c.get_tx_pool().do_insert_transaction(broken_tx, get_transaction_hash(broken_tx), currency::get_object_blobsize(broken_tx), false, get_tx_fee(broken_tx), c.get_block_id_by_height(0), 0);
+  c.get_tx_pool().do_insert_transaction(broken_tx, get_transaction_hash(broken_tx), currency::get_object_blobsize(broken_tx), false, get_tx_fee(broken_tx), c.get_block_id_by_height(0), 0, false);
   
   CHECK_AND_ASSERT_MES(c.get_tx_pool().get_transactions_count() == 2, false, "wrong tx count");
   

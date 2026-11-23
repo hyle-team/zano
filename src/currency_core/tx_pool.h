@@ -85,14 +85,16 @@ namespace currency
     };
 
     typedef std::unordered_map<crypto::key_image, std::set<crypto::hash>> key_image_cache;
+    typedef std::unordered_map<gateway_address_id_type, std::map<uint64_t, crypto::hash>> gw_nonce_cache;  // gw_address -> { nonce -> tx_id }
 
     tx_memory_pool(blockchain_storage& bchs, i_currency_protocol* pprotocol);
     bool add_tx(const transaction &tx, const crypto::hash &id, uint64_t blob_size, tx_verification_context& tvc, bool kept_by_block, bool from_core = false);
     bool add_tx(const transaction &tx, tx_verification_context& tvc, bool kept_by_block, bool from_core = false);
 
-    bool do_insert_transaction(const transaction &tx, const crypto::hash &id, uint64_t blob_size, bool kept_by_block, uint64_t fee, const crypto::hash& max_used_block_id, uint64_t max_used_block_height);
+    bool do_insert_transaction(const transaction &tx, const crypto::hash &id, uint64_t blob_size, bool kept_by_block, uint64_t fee, const crypto::hash& max_used_block_id, uint64_t max_used_block_height, bool from_core);
     //gets tx and remove it from pool
     bool take_tx(const crypto::hash &id, transaction &tx, size_t& blob_size, uint64_t& fee);
+    bool remove_tx(const crypto::hash& id);
 
 
     bool have_tx(const crypto::hash &id)const;
@@ -116,6 +118,7 @@ namespace currency
     void lock();
     void unlock();
     void purge_transactions();
+    void purge_caches();
     void clear();
 
     static void init_options(boost::program_options::options_description& desc);
@@ -157,10 +160,14 @@ namespace currency
     void set_cli_flag_use_partial_tx_proof_validation(bool value) { m_use_partial_tx_proof_validation = value; } // made for tests, reflect CLI option
 
   private:
-    bool on_tx_add(crypto::hash tx_id, const transaction& tx, bool kept_by_block);
+    bool on_tx_add(crypto::hash tx_id, const transaction& tx, bool kept_by_block, bool from_core);
     bool on_tx_remove(const crypto::hash &tx_id, const transaction& tx, bool kept_by_block);
     bool insert_key_images(const crypto::hash& tx_id, const transaction& tx, bool kept_by_block);
     bool remove_key_images(const crypto::hash &tx_id, const transaction& tx, bool kept_by_block);
+    bool check_nonce_and_fee_for_gw_address(const crypto::hash& tx_id, const transaction& tx, bool kept_by_block, bool from_core) const;
+    bool insert_nonce_for_gw_address(const crypto::hash& tx_id, const transaction& tx, bool kept_by_block, bool from_core);
+
+    bool remove_nonce(const crypto::hash &tx_id, const transaction& tx, bool kept_by_block);
     bool insert_alias_info(const transaction& tx);
     bool remove_alias_info(const transaction& tx);
     bool check_tx_fee(const transaction &tx, uint64_t amount_fee) const;
@@ -170,12 +177,15 @@ namespace currency
     void store_db_solo_options_values();
     bool is_transaction_ready_to_go(tx_details& txd, const crypto::hash& id)const;
     bool validate_alias_info(const transaction& tx, bool is_in_block)const;
-    bool get_key_images_from_tx_pool(key_image_cache& key_images) const;
+    bool get_key_images_and_nonces_from_tx_pool(key_image_cache& key_images, gw_nonce_cache& gw_nonces) const;
     bool check_is_taken(const crypto::hash& id) const;
     void set_taken(const crypto::hash& id);
     void reset_all_taken();
-    bool load_keyimages_cache();
+    bool load_keyimages_and_nonce_cache();
     bool check_hf_booster_entries(const transaction& tx)const;
+    
+    template<bool do_actual_insert_nonce, class self_t>
+    static bool validate_and_process_nonce(self_t& self, const crypto::hash& tx_id, const transaction& tx, bool kept_by_block, bool from_core);
     
     typedef tools::db::cached_key_value_accessor<crypto::hash, tx_details, true, false> transactions_container;
     typedef tools::db::cached_key_value_accessor<crypto::hash, bool, false, false> hash_container; 
@@ -208,8 +218,10 @@ namespace currency
     mutable epee::critical_section m_taken_txs_lock;
     std::unordered_set<crypto::hash> m_taken_txs;
 
-    mutable epee::critical_section m_key_images_lock;
+    mutable epee::critical_section m_cache_lock;
     key_image_cache m_key_images;
+    gw_nonce_cache m_gw_nonce_cache;
+
     mutable epee::critical_section m_remove_stuck_txs_lock;
 
     bool m_unsecure_disable_tx_validation_on_addition = false;

@@ -49,6 +49,8 @@ namespace currency
     wide_difficulty_type max_pos_difficulty;
     uint64_t pre_hardfork_tx_freeze_period; // number of blocks before the hardfork activatio when no new txs are accepted (effective from HF5); 0 means feature is switched off
     uint64_t minimal_distance_between_boost_and_hf = 0;
+    uint64_t gw_nonce_max_gap = 0;  // maximum gap between the last used nonce and the next nonce for a given gateway address, if the gap is bigger than this value, the nonce is considered invalid and tx with such nonce will be rejected
+    uint64_t gw_nonce_fee_window = 0;  // the fee window for the gateway nonce replacement, if a new tx with the same nonce is submitted, it will be accepted only if its fee is bigger than the previous one by this value
 
     hard_forks_descriptor hard_forks;
     std::array<int, ZANO_HARDFORKS_TOTAL> min_build_numbers_for_hard_forks;

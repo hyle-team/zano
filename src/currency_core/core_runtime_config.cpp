@@ -113,6 +113,8 @@ namespace currency
     pc.pre_hardfork_tx_freeze_period = CURRENCY_PRE_HARDFORK_TX_FREEZE_PERIOD;
     pc.minimal_distance_between_boost_and_hf = BOOST_HF_MINIMAL_DISTANCE_BETWEEN_BOOST_AND_HF;
     pc.hard_forks.last_supported_hardfork_id = ZANO_LAST_SUPPORTED_HARDFORK_ID;
+    pc.gw_nonce_max_gap = CURRENCY_GATEWAY_NONCE_MAX_GAP;
+    pc.gw_nonce_fee_window = CURRENCY_GATEWAY_NONCE_FEE_WINDOW;
     
     // TODO: refactor the following
     pc.hard_forks.set_hardfork_height(1, ZANO_HARDFORK_01_AFTER_HEIGHT);
