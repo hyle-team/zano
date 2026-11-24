@@ -1416,7 +1416,7 @@ namespace currency
           gw_cache_local.erase(it++);
           continue;
         }
-        txs_v_candidates.push_back(txv{it_nonce->second});
+        txs_v_candidates.push_back(txv(it_nonce->second, nullptr));
         it++;
       }
 
@@ -1648,7 +1648,7 @@ namespace currency
       // std::vector<size_t> txs;  // selected transactions, vector of indices of txs_v
 
       m_db_transactions.enumerate_keys([&](uint64_t i, crypto::hash& k)
-                                       { txs_v.push_back({k}); return true; });
+                                       { txs_v.push_back(txv(k, nullptr)); return true; });
 
       bool r = load_txs_from_ids_and_sort(txs_v, true);
       CHECK_AND_ASSERT_MES(r, false, "load_txs_from_ids_and_sort failed");
