@@ -3062,7 +3062,7 @@ bool hard_fork_8_gw_input_composition::generate(std::vector<test_event_entry>& e
     return tse;
   };
 
-  // gw nonces: before HF8 all three txs are confirmed in blk_8 in the order M1, M2, M3; from HF8 only M3 is confirmed
+  // gw nonces: before HF8 all three txs are confirmed: M2 in blk_8, then M1 and M3 in blk_9; from HF8 only M3 is confirmed
   // M1 is the 1st spend of the address 1; M2 uses the nonce of the address 2 (its 1st spend, the nonce of the address 1 is not touched by M2);
   // M3 is the 2nd spend of the address 1 before HF8 (after M1), and the 1st one from HF8
   const uint64_t m1_nonce = CURRENCY_GATEWAY_ADDRESS_NONCE_STARTER;
@@ -3133,24 +3133,29 @@ bool hard_fork_8_gw_input_composition::generate(std::vector<test_event_entry>& e
   transaction tx_m3{};
   CHECK_AND_ASSERT_TRUE(construct_gw_tx(sources, destinations, tx_m3));
 
-  std::list<transaction> accepted_txs;
   if (hf8_rule_active)
   {
     play_rejected_tx(tx_m1);
     play_rejected_tx(tx_m2);
+
+    ADD_CUSTOM_EVENT(events, tx_m3);
+    DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(1));
+    MAKE_NEXT_BLOCK_TX_LIST(events, blk_8, blk_7, miner_acc, std::list<transaction>({ tx_m3 }));
   }
   else
   {
-    ADD_CUSTOM_EVENT(events, tx_m1);
+    // the pool tracks the nonce of every gw input of a tx, so M1 and M2 can't wait in the pool together (both carry the nonce 1 for the address 1):
+    // M2 is confirmed first (it takes the nonce of the address 2 only), then M1 and M3 are confirmed one after another
     ADD_CUSTOM_EVENT(events, tx_m2);
-    accepted_txs.push_back(tx_m1);
-    accepted_txs.push_back(tx_m2);
-  }
-  ADD_CUSTOM_EVENT(events, tx_m3);
-  accepted_txs.push_back(tx_m3);
+    DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(1));
+    MAKE_NEXT_BLOCK_TX_LIST(events, blk_8, blk_7, miner_acc, std::list<transaction>({ tx_m2 }));
+    DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(0));
 
-  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", accepted_txs.size());
-  MAKE_NEXT_BLOCK_TX_LIST(events, blk_8, blk_7, miner_acc, accepted_txs);
+    ADD_CUSTOM_EVENT(events, tx_m1);
+    ADD_CUSTOM_EVENT(events, tx_m3);
+    DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(2));
+    MAKE_NEXT_BLOCK_TX_LIST(events, blk_9, blk_8, miner_acc, std::list<transaction>({ tx_m1, tx_m3 }));
+  }
   DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(0));
 
   const uint64_t gw_native_spend = TESTS_DEFAULT_FEE + MK_TEST_COINS(1); // native coins taken from gw address 1 by M2 and by M3
@@ -3278,11 +3283,15 @@ bool hard_fork_6_gw_to_gw_transfer::generate(std::vector<test_event_entry>& even
   destinations.clear();
   destinations.emplace_back(transfer_amount, gw_2_view.pub, asset_id);
 
-  auto construct_gw_to_gw_tx = [&](transaction& tx, crypto::secret_key& tx_secret_key) -> bool {
+  // gw_nonce is the nonce the gw address 1 expects next (all gw inputs of a tx carry the same nonce);
+  // none of the bad txs is ever confirmed, so each of them is the first spend of the gw address 1
+  auto construct_gw_to_gw_tx = [&](transaction& tx, crypto::secret_key& tx_secret_key, uint64_t gw_nonce = CURRENCY_GATEWAY_ADDRESS_NONCE_STARTER) -> bool {
     finalize_tx_param ftp{};
     ftp.tx_version = tx_version;
     ftp.tx_hardfork_id = tx_hardfork_id;
     ftp.sources = sources;
+    for (auto& src : ftp.sources)
+      src.nonce = gw_nonce;
     ftp.prepared_destinations = destinations;
     ftp.shuffle = true;
     ftp.pevents_dispatcher = &ed_replace_fee_by_standard;
@@ -3360,17 +3369,18 @@ bool hard_fork_6_gw_to_gw_transfer::generate(std::vector<test_event_entry>& even
   play_bad_tx(tx, false);
 
   std::list<transaction> accepted_txs;
+  uint64_t next_gw_nonce = CURRENCY_GATEWAY_ADDRESS_NONCE_STARTER; // accepted txs are confirmed in blk_6 one after another, so each of them takes the next nonce
   if (!hf8_active)
   {
     // T1, kept after T4 because play_bad_tx expects an empty pool
-    CHECK_AND_ASSERT_TRUE(construct_gw_to_gw_tx(tx, tx_secret_key));
+    CHECK_AND_ASSERT_TRUE(construct_gw_to_gw_tx(tx, tx_secret_key, next_gw_nonce++));
     remove_tx_key_proof(tx);
     ADD_CUSTOM_EVENT(events, tx);
     accepted_txs.push_back(tx);
   }
 
   // control
-  CHECK_AND_ASSERT_TRUE(construct_gw_to_gw_tx(tx, tx_secret_key));
+  CHECK_AND_ASSERT_TRUE(construct_gw_to_gw_tx(tx, tx_secret_key, next_gw_nonce++));
   ADD_CUSTOM_EVENT(events, tx);
   accepted_txs.push_back(tx);
 

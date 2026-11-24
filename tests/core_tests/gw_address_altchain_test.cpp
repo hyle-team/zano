@@ -46,6 +46,7 @@ static bool sign_gw_inputs(transaction& tx, const crypto::public_key& gw_view_pu
 
 // construct a tx that spends gw_spend_amount from a GW address to recipient, ZC source covers fee only
 // gw_nonce is the nonce the GW address expects next on the chain that head_block belongs to (the first spend of an address uses CURRENCY_GATEWAY_ADDRESS_NONCE_STARTER)
+// fee is paid by the ZC source; a tx that has to replace a pooled tx with the same gw nonce must pay at least the fee of that tx + TX_DEFAULT_FEE
 static bool construct_gw_spend_tx(
   const hard_forks_descriptor& hardforks,
   std::vector<test_event_entry>& events,
@@ -56,19 +57,20 @@ static bool construct_gw_spend_tx(
   uint64_t gw_spend_amount,
   uint64_t gw_nonce,
   const account_public_address& recipient,
-  transaction& result_tx)
+  transaction& result_tx,
+  uint64_t fee = TESTS_DEFAULT_FEE)
 {
   bool r = false;
 
   std::unordered_map<crypto::public_key, uint64_t> amounts;
-  amounts[native_coin_asset_id] = TESTS_DEFAULT_FEE;
+  amounts[native_coin_asset_id] = fee;
   std::vector<tx_source_entry> sources;
   r = fill_tx_sources(sources, events, head_block, fee_payer.get_keys(), amounts, 0, std::vector<tx_source_entry>(), fts_default);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources failed");
 
   std::unordered_map<crypto::public_key, uint64_t> found_amounts;
   get_sources_total_amount(sources, found_amounts);
-  uint64_t change = found_amounts[native_coin_asset_id] - TESTS_DEFAULT_FEE;
+  uint64_t change = found_amounts[native_coin_asset_id] - fee;
 
   {
     tx_source_entry& tse = sources.emplace_back();
@@ -193,6 +195,9 @@ bool gw_addr_altchain_spend_in_both_chains::generate(std::vector<test_event_entr
   DO_CALLBACK_PARAMS_STR(events, "check_gw_balance", t_serializable_object_to_blob(gw_address_balance_check_param{ m_gw_addr_view.pub, MK_TEST_COINS(12) }));
 
   // chain C (alt, from blk_3r): spend 4 -> bob
+  // the pool checks gw nonces against the main chain (B at this point, where both nonces are already used),
+  // so the txs of chain C can't go through the pool: they are delivered inside their alt blocks
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, true));
   transaction tx_c1{};
   r = construct_gw_spend_tx(m_hardforks, events, blk_3r, alice_acc, m_gw_addr_view.pub, m_gw_addr_spend, MK_TEST_COINS(4), CURRENCY_GATEWAY_ADDRESS_NONCE_STARTER, bob_acc.get_public_address(), tx_c1); // the same nonce as tx_b1: the first spend on chain C
   CHECK_AND_ASSERT_MES(r, false, "construct_gw_spend_tx C1 failed");
@@ -205,6 +210,7 @@ bool gw_addr_altchain_spend_in_both_chains::generate(std::vector<test_event_entr
   CHECK_AND_ASSERT_MES(r, false, "construct_gw_spend_tx C2 failed");
   ADD_CUSTOM_EVENT(events, tx_c2);
   MAKE_NEXT_BLOCK_TX1(events, blk_c2, blk_c1, miner_acc, tx_c2);
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, false));
 
   // add one more C block to make C heavier (3 vs B's 2)
   MAKE_NEXT_BLOCK(events, blk_c3, blk_c2, miner_acc);
@@ -568,8 +574,11 @@ bool gw_addr_altchain_owner_change::generate(std::vector<test_event_entry>& even
     // C: 3 blocks from split > B: 2 blocks => C is now main, owner change is in effect
 
     // now tx_c_spend (signed by new owner) will pass pool validation
+    // tx_b_spend returned to the pool when chain B was popped, and it still holds the same gw nonce there (although it is signed by the old owner
+    // and can't be confirmed in chain C), so tx_c_spend has to replace it by fee
     transaction tx_c_spend{};
-    r = construct_gw_spend_tx(m_hardforks, events, blk_c3, alice_acc, m_gw_addr_view.pub, m_gw_addr_new_spend, MK_TEST_COINS(5), CURRENCY_GATEWAY_ADDRESS_NONCE_STARTER, bob_acc.get_public_address(), tx_c_spend); // the first spend on chain C: tx_c_update has no gw inputs and takes no nonce
+    r = construct_gw_spend_tx(m_hardforks, events, blk_c3, alice_acc, m_gw_addr_view.pub, m_gw_addr_new_spend, MK_TEST_COINS(5), CURRENCY_GATEWAY_ADDRESS_NONCE_STARTER, bob_acc.get_public_address(), tx_c_spend, // the first spend on chain C: tx_c_update has no gw inputs and takes no nonce
+      TESTS_DEFAULT_FEE + TX_DEFAULT_FEE);
     CHECK_AND_ASSERT_MES(r, false, "construct_gw_spend_tx C failed");
     ADD_CUSTOM_EVENT(events, tx_c_spend);
     MAKE_NEXT_BLOCK_TX1(events, blk_c4, blk_c3, miner_acc, tx_c_spend);
@@ -600,8 +609,10 @@ bool gw_addr_altchain_owner_change::generate(std::vector<test_event_entry>& even
     DO_CALLBACK_PARAMS_STR(events, "check_gw_balance", t_serializable_object_to_blob(gw_address_balance_check_param{ m_gw_addr_view.pub, MK_TEST_COINS(25) }));
 
     // C: spend 8 with new owner (C is main, new owner valid for pool)
+    // the same story: tx_b_spend2 returned to the pool with the same gw nonce, tx_c_spend2 replaces it by fee
     transaction tx_c_spend2{};
-    r = construct_gw_spend_tx(m_hardforks, events, blk_c7, alice_acc, m_gw_addr_view.pub, m_gw_addr_new_spend, MK_TEST_COINS(8), CURRENCY_GATEWAY_ADDRESS_NONCE_STARTER + 1, bob_acc.get_public_address(), tx_c_spend2);
+    r = construct_gw_spend_tx(m_hardforks, events, blk_c7, alice_acc, m_gw_addr_view.pub, m_gw_addr_new_spend, MK_TEST_COINS(8), CURRENCY_GATEWAY_ADDRESS_NONCE_STARTER + 1, bob_acc.get_public_address(), tx_c_spend2,
+      TESTS_DEFAULT_FEE + TX_DEFAULT_FEE);
     CHECK_AND_ASSERT_MES(r, false, "construct_gw_spend_tx C2 failed");
     ADD_CUSTOM_EVENT(events, tx_c_spend2);
     MAKE_NEXT_BLOCK_TX1(events, blk_c8, blk_c7, miner_acc, tx_c_spend2);

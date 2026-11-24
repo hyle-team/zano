@@ -3820,13 +3820,16 @@ bool wallet_rpc_gateway_owner_change_altchain::c1(currency::core& c, size_t ev_i
   };
 
   // create + sign a gw transfer via rpc, return deserialized tx
-  auto create_gw_transfer = [&](uint64_t amount, const crypto::secret_key& owner_sec, currency::transaction& out_tx) -> bool
+  // gw_nonce is given explicitly: the txs of this test are made for a particular chain (B or C) and are mined directly into its blocks,
+  // while the daemon would pick a nonce from the pool and the current main chain, which may be the other one
+  auto create_gw_transfer = [&](uint64_t amount, const crypto::secret_key& owner_sec, uint64_t gw_nonce, currency::transaction& out_tx) -> bool
   {
     currency::COMMAND_RPC_GATEWAY_CREATE_TRANSFER::request ct_req = {};
     currency::COMMAND_RPC_GATEWAY_CREATE_TRANSFER::response ct_resp = {};
     ct_req.origin_gateway_id = gw_view_pub;
     ct_req.destinations.push_back({ amount, bob_addr_str });
     ct_req.fee = TESTS_DEFAULT_FEE;
+    ct_req.nonce = gw_nonce;
     ct_req.gateway_view_secret_key = gw_view_sec;
     bool ok = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_create_transfer", ct_req, ct_resp);
     CHECK_AND_ASSERT_MES(ok, false, "gateway_create_transfer failed");
@@ -3847,13 +3850,14 @@ bool wallet_rpc_gateway_owner_change_altchain::c1(currency::core& c, size_t ev_i
   };
 
   // create + sign an owner change via our new rpc API, return deserialized tx
-  auto create_gw_owner_change = [&](const crypto::public_key& new_pub, const crypto::secret_key& current_owner_sec, currency::transaction& out_tx) -> bool
+  auto create_gw_owner_change = [&](const crypto::public_key& new_pub, const crypto::secret_key& current_owner_sec, uint64_t gw_nonce, currency::transaction& out_tx) -> bool
   {
     currency::COMMAND_RPC_GATEWAY_CREATE_OWNER_CHANGE::request oc_req = {};
     currency::COMMAND_RPC_GATEWAY_CREATE_OWNER_CHANGE::response oc_resp = {};
     oc_req.address_id = gw_view_pub;
     oc_req.new_descriptor_info.opt_owner_custom_schnorr_pub_key = new_pub;
     oc_req.fee = TESTS_DEFAULT_FEE;
+    oc_req.nonce = gw_nonce;
     bool ok = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_create_owner_change", oc_req, oc_resp);
     CHECK_AND_ASSERT_MES(ok, false, "gateway_create_owner_change failed");
 
@@ -3929,14 +3933,18 @@ bool wallet_rpc_gateway_owner_change_altchain::c1(currency::core& c, size_t ev_i
 
   // at fork point - prepare txs for both chains
 
+  // gw nonces: each chain has its own sequence starting from the fork point
+  // chain C: owner change (1), spend1 (2), spend2 (3); chain B: spend1 (1), spend2 (2)
+  const uint64_t gw_first_nonce = CURRENCY_GATEWAY_ADDRESS_NONCE_STARTER;
+
   // owner change tx (for chain C): changes owner from old_owner to new_owner
   currency::transaction tx_c_owner_change{};
-  r = create_gw_owner_change(new_owner_pub, old_owner_sec, tx_c_owner_change);
+  r = create_gw_owner_change(new_owner_pub, old_owner_sec, gw_first_nonce, tx_c_owner_change);
   CHECK_AND_ASSERT_MES(r, false, "create_gw_owner_change failed");
 
   // spend 7 tx (for chain B): signed by old owner
   currency::transaction tx_b_spend1{};
-  r = create_gw_transfer(MK_TEST_COINS(7), old_owner_sec, tx_b_spend1);
+  r = create_gw_transfer(MK_TEST_COINS(7), old_owner_sec, gw_first_nonce, tx_b_spend1);
   CHECK_AND_ASSERT_MES(r, false, "create_gw_transfer for B spend1 failed");
 
   // B: 2 blocks (spend 7 with old owner + 1 empty)
@@ -3962,7 +3970,7 @@ bool wallet_rpc_gateway_owner_change_altchain::c1(currency::core& c, size_t ev_i
 
   // C: spend 5 with NEW owner
   currency::transaction tx_c_spend1{};
-  r = create_gw_transfer(MK_TEST_COINS(5), new_owner_sec, tx_c_spend1);
+  r = create_gw_transfer(MK_TEST_COINS(5), new_owner_sec, gw_first_nonce + 1, tx_c_spend1);
   CHECK_AND_ASSERT_MES(r, false, "create_gw_transfer for C spend1 failed");
 
   r = mine_block_with_txs_on_tip({ tx_c_spend1 });
@@ -3987,7 +3995,7 @@ bool wallet_rpc_gateway_owner_change_altchain::c1(currency::core& c, size_t ev_i
 
   // B: spend 3 with OLD owner
   currency::transaction tx_b_spend2{};
-  r = create_gw_transfer(MK_TEST_COINS(3), old_owner_sec, tx_b_spend2);
+  r = create_gw_transfer(MK_TEST_COINS(3), old_owner_sec, gw_first_nonce + 1, tx_b_spend2);
   CHECK_AND_ASSERT_MES(r, false, "create_gw_transfer for B spend2 failed");
 
   r = mine_block_with_txs_on_tip({ tx_b_spend2 });
@@ -4011,7 +4019,7 @@ bool wallet_rpc_gateway_owner_change_altchain::c1(currency::core& c, size_t ev_i
 
   // C: spend 8 with NEW owner
   currency::transaction tx_c_spend2{};
-  r = create_gw_transfer(MK_TEST_COINS(8), new_owner_sec, tx_c_spend2);
+  r = create_gw_transfer(MK_TEST_COINS(8), new_owner_sec, gw_first_nonce + 2, tx_c_spend2);
   CHECK_AND_ASSERT_MES(r, false, "create_gw_transfer for C spend2 failed");
 
   r = mine_block_with_txs_on_tip({ tx_c_spend2 });
