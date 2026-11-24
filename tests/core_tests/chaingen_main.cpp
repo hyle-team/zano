@@ -610,7 +610,9 @@ public:
         tvc = AUTO_VAL_INIT(tvc);
         tvc.m_verification_failed = true;
       }
-      bool tx_added = pool_size + 1 == m_c.get_pool_transactions_count();
+      size_t pool_size_after = m_c.get_pool_transactions_count();
+      // a tx that replaces a pooled one (the same gw nonce, higher fee) is added while the pool size stays the same
+      bool tx_added = pool_size + 1 == pool_size_after || (tvc.m_added_to_pool && pool_size == pool_size_after);
       bool r = check_tx_verification_context(tvc, tx_added, m_ev_index, tx, m_validator);
       LOCAL_ASSERT(r);
       CHECK_AND_NO_ASSERT_MES(r, false, "tx verification context check failed");
