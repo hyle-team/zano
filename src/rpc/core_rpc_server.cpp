@@ -1738,7 +1738,7 @@ namespace currency
     if (!m_core.get_blockchain_storage().get_assets(req.offset, req.count, after, res.assets))
     {
       res.assets.clear();
-      res.status = API_RETURN_CODE_NOT_FOUND;
+      res.status = API_RETURN_CODE_INTERNAL_ERROR;
       return true;
     }
     res.status = res.assets.empty() ? API_RETURN_CODE_NOT_FOUND : API_RETURN_CODE_OK;

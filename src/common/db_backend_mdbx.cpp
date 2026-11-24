@@ -381,6 +381,7 @@ namespace tools
       mdbx_cursor_close(cursor_ptr);
       if (need_to_commit)
         commit_transaction();
+      CHECK_AND_ASSERT_MES(res == MDBX_SUCCESS || res == MDBX_NOTFOUND, false, "Unable to enumerate MDBX container: " << mdbx_strerror(res));
       return true;
     }
 
