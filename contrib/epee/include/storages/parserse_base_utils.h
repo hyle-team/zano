@@ -242,17 +242,20 @@ namespace misc_utils
             const unsigned char byte = *it;
             if (byte < 0x20)
               ASSERT_MES_AND_THROW("JSON unescaped control character");
-            if (byte >= 0x80)
-            {
-              auto next = it;
-              auto value = boost::locale::utf::utf_traits<char>::decode(next, buf_end);
-              if (value == boost::locale::utf::illegal || value == boost::locale::utf::incomplete)
-                ASSERT_MES_AND_THROW("JSON invalid UTF-8 string");
-              val.append(it, next);
-              it = next - 1;
-              continue;
-            }
-            val.push_back(*it); 
+            // for older versions writers emitted high bytes verbatim inside strings
+            /*
+              if (byte >= 0x80)
+              {
+                auto next = it;
+                auto value = boost::locale::utf::utf_traits<char>::decode(next, buf_end);
+                if (value == boost::locale::utf::illegal || value == boost::locale::utf::incomplete)
+                  ASSERT_MES_AND_THROW("JSON invalid UTF-8 string");
+                val.append(it, next);
+                it = next - 1;
+                continue;
+              }
+            */
+            val.push_back(*it);
           }
         }
         ASSERT_MES_AND_THROW("Failed to match string in json entry: " << std::string(star_end_string, buf_end));
