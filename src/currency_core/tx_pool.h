@@ -184,13 +184,7 @@ namespace currency
     bool load_keyimages_and_nonce_cache();
     bool check_hf_booster_entries(const transaction& tx)const;
 
-    struct txv
-    {
-      crypto::hash first;
-      std::shared_ptr<const tx_details> second;
-      bool invalid = false;
-    };
-    //typedef std::pair<crypto::hash, std::shared_ptr<const tx_details>> txv;
+    typedef std::pair<crypto::hash, std::shared_ptr<const tx_details>> txv;
     struct fill_block_template_context
     {
       bool pos = false;

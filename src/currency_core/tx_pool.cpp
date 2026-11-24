@@ -724,6 +724,7 @@ namespace currency
       {
         LOG_PRINT_L0("tx " << h << " is about to be removed from tx pool, reason: outdated, age: " << tx_age << " = " << misc_utils::get_time_interval_string(tx_age));
         to_delete.push_back(tx_to_delete_entry(h, tx_entry.tx, tx_entry.kept_by_block));
+        return true; // one reason is enough, a tx must be put to to_delete only once
       }
 
       // expiration time check - remove expired
@@ -731,6 +732,7 @@ namespace currency
       {
         LOG_PRINT_L0("tx " << h << " is about to be removed from tx pool, reason: expired, expiration time: " << get_tx_expiration_time(tx_entry.tx) << ", blockchain median: " << tx_expiration_ts_median);
         to_delete.push_back(tx_to_delete_entry(h, tx_entry.tx, tx_entry.kept_by_block));
+        return true; // one reason is enough, a tx must be put to to_delete only once
       }
 
       // if a tx has at least one key image already used in blockchain (deep enough) -- remove such tx, as it cannot be added to any block
