@@ -47,7 +47,7 @@ TEST(block_rpc_details, miner_userdata_does_not_break_json_utf8)
   EXPECT_NE(std::string::npos, json.find(R"(miner\u00e8)"));
   ASSERT_TRUE(epee::serialization::load_t_from_json(decoded, json));
   ASSERT_EQ(1u, decoded.blocks.size());
-  EXPECT_EQ("miner\xC3\xA8", decoded.blocks.front().miner_text_info);
+  EXPECT_EQ(historical, decoded.blocks.front().miner_text_info);
 }
 
 TEST(parse_and_validate_tx_extra, is_correct_extranonce_too_big)

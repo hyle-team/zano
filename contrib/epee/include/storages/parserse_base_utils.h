@@ -217,7 +217,11 @@ namespace misc_utils
                 }
                 else if (value >= 0xdc00 && value <= 0xdfff)
                   ASSERT_MES_AND_THROW("JSON unexpected low surrogate in \\u escape sequence");
-                boost::locale::utf::utf_traits<char>::encode(static_cast<boost::locale::utf::code_point>(value), std::back_inserter(val));
+                // json writer uses \u00XX to preserve individual bytes like latin-1 characters
+                if (value <= 0xff)
+                  val.push_back(static_cast<char>(value));
+                else
+                  boost::locale::utf::utf_traits<char>::encode(static_cast<boost::locale::utf::code_point>(value), std::back_inserter(val));
               }
               break;
             default:

@@ -1,4 +1,6 @@
+#include <iostream>
 #include "gtest/gtest.h"
+#include "string_tools.h"
 #include "epee/include/serialization/keyvalue_serialization.h"
 #include "epee/include/storages/portable_storage_template_helper.h"
 
@@ -30,22 +32,15 @@ TEST(portable_storage_tests, json_string_escaping)
 
 TEST(portable_storage_tests, json_string_unescaping_match_string2)
 {
-  // 1. decode U+0000 through U+00FF to UTF-8
+  // 1. recover the original bytes 00..FF
   std::string sample_json_string = std::string("\"") + g_json_str_256 + "\"";
   std::string output_buffer;
   std::string::const_iterator it = sample_json_string.begin();
   epee::misc_utils::parse::match_string2(it, sample_json_string.end(), output_buffer);
-  ASSERT_EQ(384, output_buffer.size());
-  for (size_t i = 0; i < 128; ++i)
+  ASSERT_EQ(256u, output_buffer.size());
+  for (size_t i = 0; i < 256; ++i)
   {
     ASSERT_EQ(output_buffer[i], static_cast<char>(i));
-  }
-
-  for (size_t code_point = 0x80; code_point <= 0xff; ++code_point)
-  {
-    const size_t offset = 0x80 + 2 * (code_point - 0x80);
-    ASSERT_EQ(static_cast<char>(code_point < 0xc0 ? 0xc2 : 0xc3), output_buffer[offset]);
-    ASSERT_EQ(static_cast<char>(0x80 + (code_point & 0x3f)), output_buffer[offset + 1]);
   }
 
   sample_json_string = R"("\u0100\u7707\uD83D\uDE00")";
@@ -132,10 +127,16 @@ TEST(portable_storage_tests, json_unicode_round_trip)
   for (const auto& json : {literal, escaped})
   {
     test_struct_1 value, decoded;
+    std::cout << "\ninput json: " << json << '\n';
     ASSERT_TRUE(epee::serialization::load_t_from_json(value, json));
-    EXPECT_EQ(utf8, value.str);
-    ASSERT_TRUE(epee::serialization::load_t_from_json(decoded, epee::serialization::store_t_to_json(value)));
-    EXPECT_EQ(utf8, decoded.str);
+    std::cout << "parsed bytes (" << value.str.size() << "): " << epee::string_tools::buff_to_hex(value.str) << '\n';
+    const std::string expected = json == literal ? utf8 : "\xE8\xF0\x9F\x98\x80";
+    EXPECT_EQ(expected, value.str);
+    const std::string serialized = epee::serialization::store_t_to_json(value);
+    std::cout << "ser JSON: " << serialized << '\n';
+    ASSERT_TRUE(epee::serialization::load_t_from_json(decoded, serialized));
+    std::cout << "reparsed bytes (" << decoded.str.size() << "): " << epee::string_tools::buff_to_hex(decoded.str) << '\n';
+    EXPECT_EQ(expected, decoded.str);
   }
 }
 
