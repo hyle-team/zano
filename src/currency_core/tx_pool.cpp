@@ -114,7 +114,10 @@ namespace currency
           CHECK_AND_ASSERT_MES(existing_tx_ptr, false, "tx pool: internal error: tx " << it->second << " for gateway address " << gw_in.gateway_addr << " and nonce " << gw_in.nonce << " is not found in the pool");
           uint64_t old_tx_fee = get_tx_fee(existing_tx_ptr->tx);
           uint64_t new_tx_fee = get_tx_fee(tx);
-          if(from_core || (new_tx_fee > old_tx_fee + self.m_blockchain.get_core_runtime_config().gw_nonce_fee_window) )
+          // a blacklisted tx is never selected by fill_block_template(), so while it holds the nonce all the following nonces
+          // of this address are blocked; let any valid tx with the same nonce replace it regardless of the fee
+          bool existing_tx_is_blacklisted = self.is_tx_blacklisted(it->second);
+          if(from_core || existing_tx_is_blacklisted || (new_tx_fee > old_tx_fee + self.m_blockchain.get_core_runtime_config().gw_nonce_fee_window) )
           {
             if constexpr (do_actual_insert_nonce)
             {
@@ -688,6 +691,15 @@ namespace currency
       //altchain if it won, and node stuck forever).
       if (m_blockchain.is_tx_related_to_altblock(h))
         return true;
+
+      // a blacklisted tx is never selected by fill_block_template(); if it spends from a gateway address it also holds
+      // the nonce and so blocks all the following nonces of that address -- remove it to free the nonce
+      if (is_tx_blacklisted(h) && have_type_in_variant_container<txin_gateway>(tx_entry.tx.vin))
+      {
+        LOG_PRINT_L0("tx " << h << " is about to be removed from tx pool, reason: blacklisted tx holds a gw nonce");
+        to_delete.push_back(tx_to_delete_entry(h, tx_entry.tx, tx_entry.kept_by_block));
+        return true;
+      }
 
       // maximum age check - remove too old
       int64_t tx_age = get_core_time() - tx_entry.receive_time;

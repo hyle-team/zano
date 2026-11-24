@@ -6222,12 +6222,16 @@ bool blockchain_storage::add_transaction_from_block(const transaction& tx, const
   m_tvc = transaction_verification_context { };
 
   bool tx_validated = false;
+  bool gw_nonce_mismatch = false;
   bool is_coinbase_ = is_coinbase(tx);
   bool need_to_profile = !is_coinbase_;
 
   auto a = epee::misc_utils::create_scope_leave_handler([&]()
     {
-      if (taken_from_pool && !tx_validated && !is_coinbase_)
+      // a gw nonce mismatch means the tx is misplaced in this particular block (wrong order or a missing predecessor),
+      // the tx itself may be valid, so it must not be blacklisted: otherwise anyone who creates a block
+      // would be able to get someone else's queued gw transactions blacklisted on all the nodes
+      if (taken_from_pool && !tx_validated && !is_coinbase_ && !gw_nonce_mismatch)
       {
         m_tx_pool.add_transaction_to_black_list(tx);
       }
@@ -6243,7 +6247,11 @@ bool blockchain_storage::add_transaction_from_block(const transaction& tx, const
 
   CHECK_AND_ASSERT_THROW_MES(validate_tx_for_hardfork_specific_terms(tx, tx_id, bl_height, m_tvc), "tx " << tx_id << ": hardfork-specific validation failed");
   CHECK_AND_ASSERT_THROW_MES(validate_tx_gw_asset_ids(tx, bl_height), "tx " << tx_id << ": gateway asset id validation failed");
-  CHECK_AND_ASSERT_THROW_MES(validate_tx_gateway_nonce(tx), "Transaction can't be added to the blockchain due to gw nonce doesn't fit");
+  if (!validate_tx_gateway_nonce(tx))
+  {
+    gw_nonce_mismatch = true; // see the scope leave handler above
+    CHECK_AND_ASSERT_THROW_MES(false, "Transaction " << tx_id << " can't be added to the blockchain due to gw nonce doesn't fit");
+  }
 
 
   TIME_MEASURE_START_PD(tx_process_extra);
