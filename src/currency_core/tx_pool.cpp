@@ -887,8 +887,6 @@ namespace currency
   //---------------------------------------------------------------------------------
   bool tx_memory_pool::on_blockchain_inc(uint64_t new_block_height, const crypto::hash& top_block_id, const std::list<crypto::key_image>& bsk)
   {
-
-
     return true;
   }
   //---------------------------------------------------------------------------------
@@ -1344,178 +1342,318 @@ namespace currency
 
     return ss.str();
   }
+  
   //---------------------------------------------------------------------------------
-  bool tx_memory_pool::fill_block_template(block &bl, 
-    bool pos, 
-    size_t median_size, 
-    const boost::multiprecision::uint128_t& already_generated_coins,
-    size_t &total_size, 
-    uint64_t &fee, 
-    uint64_t height, 
-    const std::list<transaction>& explicit_txs
-  )
+  bool tx_memory_pool::fill_template_with_gw_transactions(fill_block_template_context& context, std::list<txv>& txs_v_selected)
   {
-    LOCAL_READONLY_TRANSACTION();
-    //typedef transactions_container::value_type txv;
-    typedef std::pair<crypto::hash, std::shared_ptr<const tx_details> > txv;
-    
+    const uint64_t max_nonce_iterations = 100;
+    gw_nonce_cache gw_cache_local;
+    {
+      CRITICAL_REGION_LOCAL(m_cache_lock);
+      gw_cache_local = m_gw_nonce_cache;
+    }
+    std::unordered_map < gateway_address_id_type, uint64_t> gw_addr_to_next_nonce;
 
-    std::vector<txv> txs_v;
-    txs_v.reserve(m_db_transactions.size());
-    std::vector<size_t> txs; // selected transactions, vector of indices of txs_v
+    for(uint64_t i_offset = 0; i_offset != max_nonce_iterations; i_offset++)
+    {
+      std::list<txv> txs_v_candidates;
+      
+      for(auto it = gw_cache_local.begin(); it != gw_cache_local.end();)
+      {
+        uint64_t next_nonce = 0;
+        if(i_offset == 0)
+        {
+          next_nonce = m_blockchain.get_gw_next_nonce(it->first);
+          CHECK_AND_ASSERT_THROW_MES(next_nonce, "Internal error: GW not exist" << it->first << "in fill_template_with_gw_transactions");
+          gw_addr_to_next_nonce[it->first] = next_nonce;
+        }
+        else
+        {
+          auto it_addr = gw_addr_to_next_nonce.find(it->first);
+          if(it_addr == gw_addr_to_next_nonce.end())
+          {
+            LOG_PRINT_L0("Internal error: GW address " << it->first << " not found in the next nonce map");
+            return false;
+          }
+          next_nonce = it_addr->second + i_offset;
+        }
 
-    
-    //keep getting it as a values cz db items cache will keep it as unserialised object stored by shared ptrs 
-    m_db_transactions.enumerate_keys([&](uint64_t i, crypto::hash& k){txs_v.resize(i + 1); txs_v[i].first = k; return true;});
-    txs.resize(txs_v.size(), SIZE_MAX);
-    
-    for (uint64_t i = 0; i != txs_v.size(); i++)
-    {      
-      auto& k = txs_v[i].first;
-      txs_v[i].second = m_db_transactions.get(k);
-      if (!txs_v[i].second)
+        // check if next_nonce is present in the cache, if not, skip this address now and for all next iterations
+        auto it_nonce = it->second.find(next_nonce);
+        if(it_nonce == it->second.end())
+        {
+          gw_cache_local.erase(it++);
+          continue;
+        }
+        txs_v_candidates.push_back(txv{it_nonce->second});
+        it++;
+      }
+
+      if(txs_v_candidates.empty())
+        break;
+
+      // load txs from the pool and check if they are ready to go
+      // typedef transactions_container::value_type txv;
+      bool r = load_txs_from_ids_and_sort(txs_v_candidates, false);
+      CHECK_AND_ASSERT_MES(r, false, "load_txs_from_ids_and_sort failed");
+      
+      // walk along the sorted txs and add them to the block template if they fit within the size limit and other checks
+      r = verify_candidate_entries(txs_v_candidates, context);
+      CHECK_AND_ASSERT_MES(r, false, "verify_candidate_entries failed");
+
+      //feel addresses that have left in the selection
+      std::set<gateway_address_id_type> addrs_left;
+      for (auto& txv : txs_v_candidates)
+      {
+        for (auto& in : txv.second->tx.vin)
+        {
+          if (in.type() == typeid(txin_gateway))
+          {
+            addrs_left.insert(boost::get<txin_gateway>(in).gateway_addr); 
+          }
+        }        
+      }
+      
+      //filter out gw_cache_local and leave there only "addrs_left"
+      for(auto it = gw_cache_local.begin(); it != gw_cache_local.end(); )
+      {
+        if (!addrs_left.count(it->first))
+        {
+          gw_cache_local.erase(it++);
+          continue;
+        }
+        it++;
+      }
+      
+      // look into txs that passed all checks and add them to txs_v_selected, the one that didn't work should be dismissed with it's whole gw branch
+      txs_v_selected.insert(txs_v_selected.end(), txs_v_candidates.begin(), txs_v_candidates.end());
+      if(context.size_limit_reached || context.manual_size_limit_reached)
+      {
+        break;
+      }
+    }
+    return true;
+  }
+  //---------------------------------------------------------------------------------
+  bool tx_memory_pool::load_txs_from_ids_and_sort(std::list<txv>& txs_v, bool exclude_gw)
+  {
+
+    for(auto it = txs_v.begin(); it != txs_v.end();)
+    {
+      auto& k = it->first;
+      it->second = m_db_transactions.get(k);
+      if(!it->second)
       {
         LOG_ERROR("Internal tx pool db error: key " << k << " was enumerated as key but couldn't get value");
         return false;
       }
-      txs[i] = i;
-    }
-
-    
-    
-    std::sort(txs.begin(), txs.end(), [&txs_v](size_t a, size_t b) -> bool {
-      boost::multiprecision::uint128_t a_, b_;
-      a_ = boost::multiprecision::uint128_t(txs_v[a].second->fee) * txs_v[b].second->blob_size;
-      b_ = boost::multiprecision::uint128_t(txs_v[b].second->fee) * txs_v[a].second->blob_size;
-      return a_ > b_;
-    });
-
-
-    size_t explicit_total_size = get_objects_blobsize(explicit_txs);
-    size_t current_size = explicit_total_size;
-    uint64_t current_fee = 0;
-    uint64_t best_money;
-
-    size_t blob_reserved_size = CURRENCY_COINBASE_BLOB_RESERVED_SIZE;
-    if (m_blockchain.is_hardfork_active(ZANO_HARDFORK_06))
-    {
-      blob_reserved_size = CURRENCY_COINBASE_BLOB_RESERVED_SIZE_HF6;
-    }
-
-    if (!get_block_reward(pos, median_size, blob_reserved_size, already_generated_coins, best_money, height)) {
-      LOG_ERROR("Block with just a miner transaction is already too large!");
-      return false;
-    }
-    size_t best_position = 0;
-    total_size = 0;
-    fee = 0;
-    uint64_t alias_count = 0;
-
-    // scan txs for alias reg requests - if there are such requests, don't process alias updates
-    bool alias_regs_exist = false;
-    for (auto txi : txs) 
-    {
-      tx_extra_info ei = AUTO_VAL_INIT(ei);
-      bool r = parse_and_validate_tx_extra(txs_v[txi].second->tx, ei);
-      CHECK_AND_ASSERT_MES(r, false, "parse_and_validate_tx_extra failed while looking up the tx pool");
-      if (!ei.m_alias.m_alias.empty() && !ei.m_alias.m_sign.size()) {
-        alias_regs_exist = true;
-        break;
-      }
-    }
-
-    const uint64_t tx_expiration_ts_median = m_blockchain.get_tx_expiration_median();
-
-    std::unordered_set<crypto::key_image> k_images;
-
-    for (size_t i = 0; i < txs.size(); i++)
-    {
-      txv &tx(txs_v[txs[i]]);
-
-      // expiration time check -- skip expired transactions
-      if (is_tx_expired(tx.second->tx, tx_expiration_ts_median))
+      CHECK_AND_ASSERT_THROW_MES(it->second->tx.vin.size(), "Internal error: unexpecteed transaction with empty inputs");
+      if(exclude_gw && it->second->tx.vin[0].type() == typeid(txin_gateway))
       {
-          txs[i] = SIZE_MAX;
-          continue;
-      } 
-      
+        // skip GW txs as it require differen order ruls
+        txs_v.erase(it++);
+        continue;
+      }
+      it++;
+    }
+
+    //trim if there was gw txs
+
+    txs_v.sort([](const txv& a, const txv& b) -> bool
+      {
+        CHECK_AND_ASSERT_THROW_MES(a.second && b.second, "Internal error: invalid txv in sorting");
+        boost::multiprecision::uint128_t a_, b_;
+        a_ = boost::multiprecision::uint128_t(a.second->fee) * b.second->blob_size;
+        b_ = boost::multiprecision::uint128_t(b.second->fee) * a.second->blob_size;
+        return a_ > b_;
+      });
+
+    return true;
+  }
+  //---------------------------------------------------------------------------------
+  bool tx_memory_pool::verify_candidate_entries(std::list<txv>& txs_v, fill_block_template_context& context)
+  {
+    context.manual_size_limit_reached = false;
+    context.size_limit_reached = false;
+    for(auto it = txs_v.begin(); it != txs_v.end();)
+    {
+      auto& tx = *it;
+      // expiration time check -- skip expired transactions
+      if(is_tx_expired(tx.second->tx, context.tx_expiration_ts_median))
+      {
+        txs_v.erase(it++);
+        continue;
+      }
+
       // alias checks
       tx_extra_info ei = AUTO_VAL_INIT(ei);
       bool r = parse_and_validate_tx_extra(tx.second->tx, ei);
       CHECK_AND_ASSERT_MES(r, false, "failed to validate transaction extra on unprocess_blockchain_tx_extra");
-      if (!ei.m_alias.m_alias.empty())
+      if(!ei.m_alias.m_alias.empty())
       {
         bool update_an_alias = !ei.m_alias.m_sign.empty();
-        if ((alias_count >= MAX_ALIAS_PER_BLOCK) ||                   // IF this tx registers/updates an alias AND alias per block threshold exceeded
-          (update_an_alias && alias_regs_exist))                      // OR this tx updates an alias AND there are alias reg requests...
+        if((context.alias_count >= MAX_ALIAS_PER_BLOCK) ||  // IF this tx registers/updates an alias AND alias per block threshold exceeded
+           (update_an_alias && context.alias_regs_exist))  // OR this tx updates an alias AND there are alias reg requests...
         {
-          txs[i] = SIZE_MAX;                                          // ...skip this tx
+          txs_v.erase(it++);
           continue;
         }
       }
 
-      //is_transaction_ready_to_go can change tx_details in case of some errors, so we make local copy, 
-      //do check if it's changed and reassign it to db if needed
+      // is_transaction_ready_to_go can change tx_details in case of some errors, so we make local copy,
+      // do check if it's changed and reassign it to db if needed
       tx_details local_copy_txd = *(tx.second);
       bool is_tx_ready_to_go_result = is_transaction_ready_to_go(local_copy_txd, tx.first);
-      if (!is_tx_ready_to_go_result && 
-        (local_copy_txd.last_failed_height != tx.second->last_failed_height || local_copy_txd.last_failed_id != tx.second->last_failed_id))
+      if(!is_tx_ready_to_go_result &&
+         (local_copy_txd.last_failed_height != tx.second->last_failed_height || local_copy_txd.last_failed_id != tx.second->last_failed_id))
       {
         m_db_transactions.begin_transaction();
         m_db_transactions.set(get_transaction_hash(local_copy_txd.tx), local_copy_txd);
         m_db_transactions.commit_transaction();
       }
 
-      if (!is_tx_ready_to_go_result || have_key_images(k_images, tx.second->tx)) {
-        txs[i] = SIZE_MAX;
+      if(!is_tx_ready_to_go_result || have_key_images(context.k_images, tx.second->tx))
+      {
+        txs_v.erase(it++);
         continue;
       }
-      append_key_images(k_images, tx.second->tx);
 
-      current_size += tx.second->blob_size;
-      current_fee += tx.second->fee;
+      uint64_t new_total_size = context.total_size + tx.second->blob_size;
+      if(context.manual_size_limit && new_total_size > context.manual_size_limit)
+      {
+        context.manual_size_limit_reached = true;
+        txs_v.erase(it, txs_v.end());
+        break;  // current block size is too big
+      }
 
       uint64_t current_reward;
-      if (!get_block_reward(pos, median_size, current_size + blob_reserved_size, already_generated_coins, current_reward, height))
+      if(!get_block_reward(context.pos, context.median_size, new_total_size + context.blob_reserved_size, *context.already_generated_coins, current_reward, context.height))
       {
-        break; // current block size is too big
+        context.size_limit_reached = true;
+        txs_v.erase(it, txs_v.end());
+        break;  // current block size is too big
       }
 
-      if (best_money < current_reward + current_fee) {
-        best_money = current_reward + current_fee;
-        best_position = i + 1;
-        total_size = current_size;
-        fee = current_fee;
+      if(context.best_money <= current_reward )
+      {
+        context.current_fee += tx.second->fee;
+        context.best_money = current_reward;
+        context.total_size += tx.second->blob_size;
+        context.fee = context.current_fee;
+        append_key_images(context.k_images, tx.second->tx);
+
+
+      }
+      else
+      {
+        //should we do low-reward for miners in penalty zone? for now probably not (open for reconsideration)
+        context.size_limit_reached = true;
+        txs_v.erase(it, txs_v.end());
+        break;  // current block size is too big
       }
 
-      if (!ei.m_alias.m_alias.empty())
-        ++alias_count;
+      if(!ei.m_alias.m_alias.empty())
+        ++context.alias_count;
+      
+      it++;
     }
+    return true;
+  }
+  //---------------------------------------------------------------------------------
+  bool tx_memory_pool::fill_block_template(block &bl,
+    bool pos,
+    size_t median_size,
+    const boost::multiprecision::uint128_t& already_generated_coins,
+    size_t &total_size,
+    uint64_t &fee,
+    uint64_t height,
+    const std::list<transaction>& explicit_txs
+  )
+  {
+    LOCAL_READONLY_TRANSACTION();
 
-    for (size_t i = 0; i != txs.size(); i++)
+    fill_block_template_context fbt_context = {};
+    fbt_context.pos = pos;
+    fbt_context.median_size = median_size;
+    fbt_context.already_generated_coins = &already_generated_coins;
+    fbt_context.height = height;
+
+    const size_t explicit_total_size = get_objects_blobsize(explicit_txs);
+    fbt_context.total_size = explicit_total_size;
+    fbt_context.current_fee = 0;
+
+    fbt_context.blob_reserved_size = CURRENCY_COINBASE_BLOB_RESERVED_SIZE;
+    if (m_blockchain.is_hardfork_active(ZANO_HARDFORK_06))
+      fbt_context.blob_reserved_size = CURRENCY_COINBASE_BLOB_RESERVED_SIZE_HF6;
+
+    if (!get_block_reward(fbt_context.pos, fbt_context.median_size, fbt_context.blob_reserved_size, *fbt_context.already_generated_coins, fbt_context.best_money, fbt_context.height))
     {
-      if (txs[i] != SIZE_MAX)
+      LOG_ERROR("Block with just a miner transaction is already too large!");
+      return false;
+    }
+
+    fbt_context.fee = 0;
+    fbt_context.alias_count = 0;
+
+    // scan txs for alias reg requests - if there are such requests, don't process alias updates
+    fbt_context.alias_regs_exist = false;
+
+    fbt_context.tx_expiration_ts_median = m_blockchain.get_tx_expiration_median();
+    //load GW transactions first
+    std::list<txv> txs_v_gw;
+    fbt_context.manual_size_limit = (CURRENCY_BLOCK_GRANTED_FULL_REWARD_ZONE - CURRENCY_BLOCK_GRANTED_FULL_REWARD_ZONE / 5);
+    bool r = fill_template_with_gw_transactions(fbt_context, txs_v_gw);
+    CHECK_AND_ASSERT_MES(r, false, "fill_template_with_gw_transactions failed");
+    
+    for(const auto& tx : txs_v_gw)
+    {
+      bl.tx_hashes.push_back(tx.first);
+      LOG_PRINT_L2("[fill_block_template]: Added tx[gw] to block: " << tx.first);
+    }
+
+    if (!fbt_context.size_limit_reached)
+    {
+      std::list<txv> txs_v;
+      // std::vector<size_t> txs;  // selected transactions, vector of indices of txs_v
+
+      m_db_transactions.enumerate_keys([&](uint64_t i, crypto::hash& k)
+                                       { txs_v.push_back({k}); return true; });
+
+      bool r = load_txs_from_ids_and_sort(txs_v, true);
+      CHECK_AND_ASSERT_MES(r, false, "load_txs_from_ids_and_sort failed");
+
+
+      for(auto txv : txs_v)
       {
-        txv &tx(txs_v[txs[i]]);
-        if (i < best_position)
+        tx_extra_info ei = AUTO_VAL_INIT(ei);
+        bool r2 = parse_and_validate_tx_extra(txv.second->tx, ei);
+        CHECK_AND_ASSERT_MES(r2, false, "parse_and_validate_tx_extra failed while looking up the tx pool");
+        if(!ei.m_alias.m_alias.empty() && !ei.m_alias.m_sign.size())
         {
-          bl.tx_hashes.push_back(tx.first);
-          LOG_PRINT_L2("[fill_block_template]: Added tx to block: " << tx.first);
+          fbt_context.alias_regs_exist = true;
+          break;
         }
-        /*else if (have_attachment_service_in_container(tx.second->tx.attachment, BC_OFFERS_SERVICE_ID, BC_OFFERS_SERVICE_INSTRUCTION_DEL))
-        {
-          // BC_OFFERS_SERVICE_INSTRUCTION_DEL transactions has zero fee, so include them here regardless of reward effectiveness
-          bl.tx_hashes.push_back(tx.first);
-          total_size += tx.second->blob_size;
-        }*/
+      }
+      fbt_context.manual_size_limit = 0;
+      r = verify_candidate_entries(txs_v, fbt_context);
+      CHECK_AND_ASSERT_MES(r, false, "verify_candidate_entries failed");
+   
+      for(auto& txv : txs_v)
+      {
+        bl.tx_hashes.push_back(txv.first);
+        LOG_PRINT_L2("[fill_block_template]: Added tx to block: " << txv.first);
       }
     }
-    // add explicit transactions 
+
+    // add explicit transactions
     for (const auto& tx : explicit_txs)
     {
-      fee += get_tx_fee(tx);
+      fbt_context.fee += get_tx_fee(tx);
       bl.tx_hashes.push_back(get_transaction_hash(tx));
     }
+
+    total_size = fbt_context.total_size;
+    fee = fbt_context.fee;
     return true;
   }
   //---------------------------------------------------------------------------------
@@ -1793,8 +1931,5 @@ namespace currency
     return true;
   }
 }
-
-#undef LOG_DEFAULT_CHANNEL 
-#define LOG_DEFAULT_CHANNEL NULL
 
 

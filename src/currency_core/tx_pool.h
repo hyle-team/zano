@@ -183,6 +183,43 @@ namespace currency
     void reset_all_taken();
     bool load_keyimages_and_nonce_cache();
     bool check_hf_booster_entries(const transaction& tx)const;
+
+    struct txv
+    {
+      crypto::hash first;
+      std::shared_ptr<const tx_details> second;
+      bool invalid = false;
+    };
+    //typedef std::pair<crypto::hash, std::shared_ptr<const tx_details>> txv;
+    struct fill_block_template_context
+    {
+      bool pos = false;
+      size_t median_size = 0;
+      const boost::multiprecision::uint128_t* already_generated_coins = nullptr;
+      uint64_t height = 0;
+
+      size_t blob_reserved_size = 0;
+      uint64_t tx_expiration_ts_median = 0;
+
+      //size_t current_size = 0;
+      uint64_t current_fee = 0;
+      uint64_t best_money = 0;
+
+      size_t total_size = 0;
+      uint64_t fee = 0;
+
+      uint64_t alias_count = 0;
+      bool alias_regs_exist = false;
+      std::unordered_set<crypto::key_image> k_images;
+
+      uint64_t manual_size_limit = 0;
+      bool size_limit_reached = false;
+      bool manual_size_limit_reached = false;
+    };
+
+    bool fill_template_with_gw_transactions(fill_block_template_context& context, std::list<txv>& txs_v_selected);
+    bool load_txs_from_ids_and_sort(std::list<txv>& txs_v, bool exclude_gw);
+    bool verify_candidate_entries(std::list<txv>& txs_v, fill_block_template_context& context);
     
     template<bool do_actual_insert_nonce, class self_t>
     static bool validate_and_process_nonce(self_t& self, const crypto::hash& tx_id, const transaction& tx, bool kept_by_block, bool from_core);
