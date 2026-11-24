@@ -60,7 +60,7 @@ namespace currency
   template<bool do_actual_insert_nonce, class self_t>
   bool tx_memory_pool::validate_and_process_nonce(self_t& self, const crypto::hash& tx_id, const transaction& tx, bool kept_by_block, bool from_core)
   {
-    CRITICAL_REGION_LOCAL(self.m_cache_lock);
+    
     for(const auto& in : tx.vin)
     {
       if(in.type() == typeid(txin_gateway))
@@ -86,7 +86,7 @@ namespace currency
 
 
         }
-
+        CRITICAL_REGION_LOCAL(self.m_cache_lock);
         auto addr_it = self.m_gw_nonce_cache.find(gw_in.gateway_addr);
         if(addr_it == self.m_gw_nonce_cache.end())
         {
@@ -117,7 +117,7 @@ namespace currency
           // a blacklisted tx is never selected by fill_block_template(), so while it holds the nonce all the following nonces
           // of this address are blocked; let any valid tx with the same nonce replace it regardless of the fee
           bool existing_tx_is_blacklisted = self.is_tx_blacklisted(it->second);
-          if(from_core || existing_tx_is_blacklisted || (new_tx_fee > old_tx_fee + self.m_blockchain.get_core_runtime_config().gw_nonce_fee_window) )
+          if(from_core || existing_tx_is_blacklisted || (new_tx_fee >= old_tx_fee + self.m_blockchain.get_core_runtime_config().gw_nonce_fee_window) )
           {
             if constexpr (do_actual_insert_nonce)
             {
@@ -699,6 +699,23 @@ namespace currency
         LOG_PRINT_L0("tx " << h << " is about to be removed from tx pool, reason: blacklisted tx holds a gw nonce");
         to_delete.push_back(tx_to_delete_entry(h, tx_entry.tx, tx_entry.kept_by_block));
         return true;
+      }
+
+      // a tx spending from a gateway address with a nonce that is already used in the blockchain can't be added to any block;
+      // if the block that used this nonce is popped, its own tx returns to the pool and takes the nonce back, so the stale one is not needed
+      for (const auto& in : tx_entry.tx.vin)
+      {
+        if (in.type() != typeid(txin_gateway))
+          continue;
+
+        const txin_gateway& gw_in = boost::get<txin_gateway>(in);
+        uint64_t bcs_next_nonce = m_blockchain.get_gw_next_nonce(gw_in.gateway_addr);
+        if (gw_in.nonce < bcs_next_nonce)
+        {
+          LOG_PRINT_L0("tx " << h << " is about to be removed from tx pool, reason: gw nonce " << gw_in.nonce << " is already used in the blockchain, next expected nonce: " << bcs_next_nonce);
+          to_delete.push_back(tx_to_delete_entry(h, tx_entry.tx, tx_entry.kept_by_block));
+          return true;
+        }
       }
 
       // maximum age check - remove too old
