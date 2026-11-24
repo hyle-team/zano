@@ -26,7 +26,6 @@
 
 
 #pragma once 
-#include <boost/locale/utf.hpp>
 #include "serialization/keyvalue_serialization.h"
 #include "storages/portable_storage_template_helper.h"
 #include "http_base.h"
@@ -295,43 +294,6 @@ namespace epee {
 
         static inline documentation m_empty_documentation;
       };
-
-      template<class t_struct>
-      bool store_json_response(const t_struct& str_in, std::string& json_buff)
-      {
-        if (!epee::serialization::store_t_to_json(str_in, json_buff))
-          return false;
-
-        // escape invalid utf-8 only in httpJson, not in stored or signed payloads
-        std::string escaped;
-        const char* current = json_buff.data();
-        const char* end = current + json_buff.size();
-        const char* unchanged = current;
-        while (current != end)
-        {
-          // failed decode can consume the following JSON quote or backslash
-          const char* next = current;
-          auto value = boost::locale::utf::utf_traits<char>::decode(next, end);
-          if (value == boost::locale::utf::illegal || value == boost::locale::utf::incomplete)
-          {
-            escaped.append(unchanged, current - unchanged);
-            static const char hex_map[] = "0123456789abcdef";
-            const auto byte = static_cast<unsigned char>(*current);
-            escaped += "\\u00";
-            escaped.push_back(hex_map[byte >> 4]);
-            escaped.push_back(hex_map[byte & 0xf]);
-            unchanged = ++current;
-          }
-          else
-            current = next;
-        }
-        if (unchanged != json_buff.data())
-        {
-          escaped.append(unchanged, end - unchanged);
-          json_buff.swap(escaped);
-        }
-        return true;
-      }
     }
   }
 } 
@@ -386,7 +348,7 @@ namespace epee {
       res = callback_f(static_cast<command_type::request&>(req), static_cast<command_type::response&>(resp), m_conn_context); \
       CHECK_AND_ASSERT_MES(res, false, "Failed to call " << #callback_f << "() while handling " << s_pattern); \
       uint64_t ticks2 = epee::misc_utils::get_tick_count(); \
-      epee::net_utils::http::store_json_response(static_cast<command_type::response&>(resp), response_info.m_body); \
+      epee::serialization::store_t_to_json(static_cast<command_type::response&>(resp), response_info.m_body); \
       uint64_t ticks3 = epee::misc_utils::get_tick_count(); \
       response_info.m_mime_tipe = "application/json"; \
       response_info.m_header_info.m_content_type = " application/json"; \
@@ -406,7 +368,7 @@ namespace epee {
       res = callback_f(static_cast<command_type::request&>(req), static_cast<command_type::response&>(resp), m_conn_context); \
       CHECK_AND_ASSERT_MES(res, false, "Failed to call " << #callback_f << "() while handling " << s_pattern); \
       uint64_t ticks2 = epee::misc_utils::get_tick_count(); \
-      epee::net_utils::http::store_json_response(static_cast<command_type::response&>(resp), response_info.m_body); \
+      epee::serialization::store_t_to_json(static_cast<command_type::response&>(resp), response_info.m_body); \
       uint64_t ticks3 = epee::misc_utils::get_tick_count(); \
       response_info.m_mime_tipe = "application/json"; \
       response_info.m_header_info.m_content_type = " application/json"; \
@@ -462,7 +424,7 @@ namespace epee {
        boost::value_initialized<epee::json_rpc::error_response> rsp; \
        static_cast<epee::json_rpc::error_response&>(rsp).error.code = -32700; \
        static_cast<epee::json_rpc::error_response&>(rsp).error.message = "Parse error"; \
-       epee::net_utils::http::store_json_response(static_cast<epee::json_rpc::error_response&>(rsp), response_info.m_body); \
+       epee::serialization::store_t_to_json(static_cast<epee::json_rpc::error_response&>(rsp), response_info.m_body); \
        return true; \
     } \
     epee::serialization::storage_entry id_; \
@@ -475,7 +437,7 @@ namespace epee {
       rsp.jsonrpc = "2.0"; \
       rsp.error.code = -32600; \
       rsp.error.message = "Invalid Request"; \
-      epee::net_utils::http::store_json_response(static_cast<epee::json_rpc::error_response&>(rsp), response_info.m_body); \
+      epee::serialization::store_t_to_json(static_cast<epee::json_rpc::error_response&>(rsp), response_info.m_body); \
       return true; \
     } \
     LOG_PRINT_L4("[JSON_REQUEST]: [" << callback_name << "]"); \
@@ -495,7 +457,7 @@ namespace epee {
     fail_resp.id = req.id; \
     fail_resp.error.code = -32602; \
     fail_resp.error.message = "Invalid params"; \
-    epee::net_utils::http::store_json_response(static_cast<epee::json_rpc::error_response&>(fail_resp), response_info.m_body); \
+    epee::serialization::store_t_to_json(static_cast<epee::json_rpc::error_response&>(fail_resp), response_info.m_body); \
     return true; \
   } \
   uint64_t ticks1 = epee::misc_utils::get_tick_count(); \
@@ -506,7 +468,7 @@ namespace epee {
 
 #define FINALIZE_OBJECTS_TO_JSON(method_name) \
   uint64_t ticks2 = epee::misc_utils::get_tick_count(); \
-  epee::net_utils::http::store_json_response(resp, response_info.m_body); \
+  epee::serialization::store_t_to_json(resp, response_info.m_body); \
   uint64_t ticks3 = epee::misc_utils::get_tick_count(); \
   response_info.m_mime_tipe = "application/json"; \
   response_info.m_header_info.m_content_type = " application/json"; \
@@ -530,7 +492,7 @@ namespace epee {
   fail_resp.id = req.id; \
   if(!callback_f(req.params, resp.result, fail_resp.error, m_conn_context)) \
   { \
-    epee::net_utils::http::store_json_response(static_cast<epee::json_rpc::error_response&>(fail_resp), response_info.m_body); \
+    epee::serialization::store_t_to_json(static_cast<epee::json_rpc::error_response&>(fail_resp), response_info.m_body); \
     return true; \
   } \
   FINALIZE_OBJECTS_TO_JSON(method_name) \
@@ -575,7 +537,7 @@ namespace epee {
   fail_resp.id = req.id; \
   if(!callback_f(req.params, resp.result, fail_resp.error, m_conn_context, response_info)) \
   { \
-    epee::net_utils::http::store_json_response(static_cast<epee::json_rpc::error_response&>(fail_resp), response_info.m_body); \
+    epee::serialization::store_t_to_json(static_cast<epee::json_rpc::error_response&>(fail_resp), response_info.m_body); \
     return true; \
   } \
   FINALIZE_OBJECTS_TO_JSON(method_name) \
@@ -597,7 +559,7 @@ namespace epee {
     fail_resp.id = req.id; \
     fail_resp.error.code = -32603; \
     fail_resp.error.message = "Internal error"; \
-    epee::net_utils::http::store_json_response(static_cast<epee::json_rpc::error_response&>(fail_resp), response_info.m_body); \
+    epee::serialization::store_t_to_json(static_cast<epee::json_rpc::error_response&>(fail_resp), response_info.m_body); \
     return true; \
   } \
   FINALIZE_OBJECTS_TO_JSON(method_name) \
@@ -619,7 +581,7 @@ namespace epee {
     fail_resp.id = req.id; \
     fail_resp.error.code = -32603; \
     fail_resp.error.message = "Internal error"; \
-    epee::net_utils::http::store_json_response(static_cast<epee::json_rpc::error_response&>(fail_resp), response_info.m_body); \
+    epee::serialization::store_t_to_json(static_cast<epee::json_rpc::error_response&>(fail_resp), response_info.m_body); \
     return true; \
   } \
   FINALIZE_OBJECTS_TO_JSON(method_name) \
@@ -635,7 +597,7 @@ namespace epee {
   rsp.method = callback_name; \
   rsp.error.code = -32601; \
   rsp.error.message = "Method not found"; \
-  epee::net_utils::http::store_json_response(static_cast<epee::json_rpc::error_response&>(rsp), response_info.m_body); \
+  epee::serialization::store_t_to_json(static_cast<epee::json_rpc::error_response&>(rsp), response_info.m_body); \
   LOG_PRINT_L4("[JSON_METHOD]: [" << callback_name << "]"); \
   return true; \
   }

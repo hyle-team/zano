@@ -86,6 +86,19 @@ namespace misc_utils
       for(size_t i = 0, len = str.length(); i < len; ++i)
       {
         char c = c_str[i];
+        const unsigned char byte = c;
+        if (byte >= 0x80)
+        {
+          const char* current = c_str + i;
+          const char* next = current;
+          const auto value = boost::locale::utf::utf_traits<char>::decode(next, c_str + len);
+          if (value != boost::locale::utf::illegal && value != boost::locale::utf::incomplete)
+          {
+            result.append(current, next - current);
+            i += next - current - 1;
+            continue;
+          }
+        }
         switch(c)
         {
         case '\b':   // ASCII 08h
@@ -111,8 +124,8 @@ namespace misc_utils
           break;
 
         default:
-          if (static_cast<unsigned char>(c) < 0x20)
-            result += su00 + hex_map[(c >> 4) & 0xf] + hex_map[c & 0xf]; // encode all other control characters as \uDDDD
+          if (byte < 0x20 || byte >= 0x80)
+            result += su00 + hex_map[byte >> 4] + hex_map[byte & 0xf];
           else
             result.push_back(c);
         }
@@ -131,7 +144,7 @@ namespace misc_utils
       \'     Apostrophe or single quote
       \"     Double quote
       \\     Backslash character
-      \u00XY ASCII character with code 0xXY
+      \uXXXX Unicode code unit
 
       */
       inline void match_string2(std::string::const_iterator& star_end_string, std::string::const_iterator buf_end, std::string& val)
@@ -208,8 +221,8 @@ namespace misc_utils
               }
               break;
             default:
-              val.push_back(*it);
               LOG_PRINT_L0("JSON unknown escape sequence :0x" << std::hex << (int)(uint8_t)*it);
+              --it; // drop the backslash and read the character normally on the next iteration
             }
             escape_mode = false;
           }else if(*it == '"')
@@ -222,6 +235,19 @@ namespace misc_utils
           }          
           else
           {
+            const unsigned char byte = *it;
+            if (byte < 0x20)
+              ASSERT_MES_AND_THROW("JSON unescaped control character");
+            if (byte >= 0x80)
+            {
+              auto next = it;
+              auto value = boost::locale::utf::utf_traits<char>::decode(next, buf_end);
+              if (value == boost::locale::utf::illegal || value == boost::locale::utf::incomplete)
+                ASSERT_MES_AND_THROW("JSON invalid UTF-8 string");
+              val.append(it, next);
+              it = next - 1;
+              continue;
+            }
             val.push_back(*it); 
           }
         }
@@ -246,7 +272,7 @@ namespace misc_utils
         is_float_val = false;
         for(std::string::const_iterator it = star_end_string;it != buf_end;it++)
         {
-          if(isdigit(*it) || (it == star_end_string && *it == '-') || (val.size() && *it == '.' ) || (is_float_val && (*it == 'e' || *it == 'E' || *it == '-' || *it == '+' )) )
+          if(isdigit(static_cast<unsigned char>(*it)) || (it == star_end_string && *it == '-') || (val.size() && *it == '.' ) || (is_float_val && (*it == 'e' || *it == 'E' || *it == '-' || *it == '+' )) )
           {
             if(!val.size() &&  *it == '-')
               is_signed_val = true;
@@ -286,7 +312,7 @@ namespace misc_utils
 
         for(std::string::const_iterator it = star_end_string;it != buf_end;it++)
         {
-          if(!isalpha(*it))
+          if(!isalpha(static_cast<unsigned char>(*it)))
           {
             val.assign(star_end_string, it);
             if(val.size())
