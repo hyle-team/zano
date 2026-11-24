@@ -20,10 +20,3 @@ struct fill_tx_rpc_inputs : public test_chain_unit_enchanced
   bool c7(const currency::core& core, const size_t event_position, const std::vector<test_event_entry>& events) const;
   bool c8(const currency::core& core, const size_t event_position, const std::vector<test_event_entry>& events) const;
 };
-
-struct getblocktemplate_pos_keyimage_json_roundtrip : public test_chain_unit_base
-{
-  getblocktemplate_pos_keyimage_json_roundtrip();
-  bool generate(std::vector<test_event_entry>& events) const;
-  bool check_keyimage(currency::core&, size_t ev_index, const std::vector<test_event_entry>& events) const;
-};

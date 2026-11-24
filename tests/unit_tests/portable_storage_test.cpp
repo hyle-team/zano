@@ -1,5 +1,12 @@
+#include <array>
+#include <fstream>
 #include <iostream>
+#include <sstream>
+#include <vector>
+#include <boost/property_tree/json_parser.hpp>
 #include "gtest/gtest.h"
+#define UTF_CPP_CPLUSPLUS 201703L
+#include "common/utf8.h"
 #include "string_tools.h"
 #include "epee/include/serialization/keyvalue_serialization.h"
 #include "epee/include/storages/portable_storage_template_helper.h"
@@ -107,9 +114,8 @@ TEST(portable_storage_tests, json_string_unescaping_match_string2)
   ASSERT_TRUE(caught);
 
   const std::string invalid_strings[] = {
-    R"("\uDC00")", R"("\uD800")", R"("\uD800\u0041")", R"("\u012T")", "\"\\" "\xE8" "\"",
-    "\"\n\"", "\"\x01\"", std::string("\"\0\"", 3),
-    "\"\xE8\"", "\"\x80\"", "\"\xE2\x82\"", "\"\xC0\xAF\"", "\"\xED\xA0\x80\"", "\"\xF4\x90\x80\x80\""
+    R"("\uDC00")", R"("\uD800")", R"("\uD800\u0041")", R"("\u012T")",
+    "\"\n\"", "\"\x01\"", std::string("\"\0\"", 3), "\"\\\n\""
   };
   for (const auto& invalid : invalid_strings)
   {
@@ -117,6 +123,18 @@ TEST(portable_storage_tests, json_string_unescaping_match_string2)
     it = invalid.begin();
     EXPECT_THROW(epee::misc_utils::parse::match_string2(it, invalid.end(), output_buffer), std::runtime_error);
   }
+}
+
+TEST(portable_storage_tests, json_legacy_raw_bytes)
+{
+  const std::string legacy = "\xE8\x80 \xE2\x82 \xC0\xAF \xED\xA0\x80 \xF4\x90\x80\x80 \xC3\xA8";
+  const std::string input = R"({"str":")" + legacy + R"("})";
+  test_struct_1 value;
+  ASSERT_TRUE(epee::serialization::load_t_from_json(value, input));
+  ASSERT_EQ(legacy, value.str);
+
+  const std::string expected = R"(\u00e8\u0080 \u00e2\u0082 \u00c0\u00af \u00ed\u00a0\u0080 \u00f4\u0090\u0080\u0080 )" "\xC3\xA8";
+  ASSERT_EQ("{\r\n  \"str\": \"" + expected + "\"\r\n}", epee::serialization::store_t_to_json(value));
 }
 
 TEST(portable_storage_tests, json_unicode_round_trip)
@@ -137,6 +155,116 @@ TEST(portable_storage_tests, json_unicode_round_trip)
     ASSERT_TRUE(epee::serialization::load_t_from_json(decoded, serialized));
     std::cout << "reparsed bytes (" << decoded.str.size() << "): " << epee::string_tools::buff_to_hex(decoded.str) << '\n';
     EXPECT_EQ(expected, decoded.str);
+  }
+}
+
+static std::vector<std::string> json_byte_inputs()
+{
+  std::vector<std::string> inputs = {""};
+  for (unsigned first = 0; first < 256; ++first)
+  {
+    inputs.emplace_back(1, static_cast<char>(first));
+    for (unsigned second = 0; second < 256; ++second)
+      inputs.push_back({static_cast<char>(first), static_cast<char>(second)});
+  }
+
+  const std::string fragments[] = {
+    "", std::string("\0\"\\", 3), R"(\u00a6)", "\x80", "\xBF", "\xFF", "\xC3\xA8",
+    // valid UTF-8 at the three- and four-byte boundaries, including either side of the surrogate range
+    "\xE0\xA0\x80", "\xED\x9F\xBF", "\xEE\x80\x80", "\xEF\xBF\xBF", "\xF0\x90\x80\x80", "\xF4\x8F\xBF\xBF",
+    // overlongs, a surrogate, a value above U+10FFFF, and incomplete sequences
+    "\xE0\x9F\xBF", "\xED\xA0\x80", "\xF0\x8F\xBF\xBF", "\xF4\x90\x80\x80", "\xE2\x82", "\xF0\x9F\x98"
+  };
+  for (const auto& prefix : fragments)
+    for (const auto& suffix : fragments)
+      inputs.push_back(prefix + suffix);
+  return inputs;
+}
+
+struct legacy_json_byte
+{
+  std::string writer_output;
+  std::string reader_input;
+};
+
+// from the 2.2.3.609 portable_storage_test.cpp vectors g_json_utf8_str_256 (writer) and g_json_str_256 (reader), уach byte 00..FF has two NULterminated wire spellings
+static void load_legacy_json_bytes(std::array<legacy_json_byte, 256>& examples)
+{
+  std::ifstream file(ZANO_LEGACY_JSON_FIXTURE, std::ios::binary);
+  ASSERT_TRUE(file.is_open()) << ZANO_LEGACY_JSON_FIXTURE;
+  for (auto& example : examples)
+  {
+    ASSERT_TRUE(std::getline(file, example.writer_output, '\0') && !example.writer_output.empty());
+    ASSERT_TRUE(std::getline(file, example.reader_input, '\0') && !example.reader_input.empty());
+  }
+  ASSERT_FALSE(file.eof()); // The last spelling must also end in NUL.
+  ASSERT_EQ(std::char_traits<char>::eof(), file.peek());
+}
+
+TEST(portable_storage_tests, json_old_to_new)
+{
+  std::array<legacy_json_byte, 256> examples;
+  ASSERT_NO_FATAL_FAILURE(load_legacy_json_bytes(examples));
+  for (const auto& input : json_byte_inputs())
+  {
+    SCOPED_TRACE(epee::string_tools::buff_to_hex(input));
+    std::string escaped;
+    for (unsigned char byte : input)
+      escaped += examples[byte].writer_output;
+    test_struct_1 decoded;
+    ASSERT_TRUE(epee::serialization::load_t_from_json(decoded, R"({"str":")" + escaped + R"("})"));
+    ASSERT_EQ(input, decoded.str);
+  }
+}
+
+TEST(portable_storage_tests, json_new_to_old)
+{
+  std::array<legacy_json_byte, 256> examples;
+  ASSERT_NO_FATAL_FAILURE(load_legacy_json_bytes(examples));
+  for (const auto& input : json_byte_inputs())
+  {
+    SCOPED_TRACE(epee::string_tools::buff_to_hex(input));
+    std::ostringstream stream;
+    epee::serialization::strategy_json::handle_value(stream, input, 0);
+    const std::string token = stream.str();
+    ASSERT_GE(token.size(), 2u);
+    ASSERT_EQ('"', token.front());
+    ASSERT_EQ('"', token.back());
+    // each input byte must have a spelling understood by the released reader
+    size_t pos = 1;
+    for (unsigned char byte : input)
+    {
+      const auto& example = examples[byte];
+      if (token.compare(pos, example.writer_output.size(), example.writer_output) == 0)
+        pos += example.writer_output.size();
+      else
+      {
+        ASSERT_EQ(0, token.compare(pos, example.reader_input.size(), example.reader_input));
+        pos += example.reader_input.size();
+      }
+    }
+    ASSERT_EQ(token.size() - 1, pos);
+  }
+}
+
+TEST(portable_storage_tests, json_byte_string_round_trip)
+{
+  for (const auto& input : json_byte_inputs())
+  {
+    SCOPED_TRACE(epee::string_tools::buff_to_hex(input));
+    test_struct_1 original, decoded;
+    original.str = input;
+    const std::string json = epee::serialization::store_t_to_json(original);
+
+    ASSERT_TRUE(utf8::is_valid(json.begin(), json.end()));
+    std::istringstream stream(json);
+    boost::property_tree::ptree external;
+    ASSERT_NO_THROW(boost::property_tree::read_json(stream, external));
+    if (utf8::is_valid(input.begin(), input.end()))
+      ASSERT_EQ(input, external.get<std::string>("str"));
+
+    ASSERT_TRUE(epee::serialization::load_t_from_json(decoded, json));
+    ASSERT_EQ(input, decoded.str);
   }
 }
 

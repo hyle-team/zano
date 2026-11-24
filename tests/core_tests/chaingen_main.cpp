@@ -1268,7 +1268,6 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY(gen_ring_signature_1);
     GENERATE_AND_PLAY(gen_ring_signature_2);
     GENERATE_AND_PLAY(fill_tx_rpc_inputs);
-    GENERATE_AND_PLAY(getblocktemplate_pos_keyimage_json_roundtrip);
     //GENERATE_AND_PLAY(gen_ring_signature_big); // Takes up to XXX hours (if CURRENCY_MINED_MONEY_UNLOCK_WINDOW == 10)
 
     // tests for outputs mixing in

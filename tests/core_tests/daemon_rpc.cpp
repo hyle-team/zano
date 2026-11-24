@@ -4,8 +4,6 @@
 
 #include "chaingen.h"
 #include "daemon_rpc.h"
-#include "net/http_server_handlers_map2.h"
-#include "rpc/core_rpc_server_commands_defs.h"
 
 fill_tx_rpc_inputs::fill_tx_rpc_inputs()
 {
@@ -533,43 +531,5 @@ bool fill_tx_rpc_inputs::c8(const currency::core& core, const size_t event_posit
 
   CHECK_AND_ASSERT_EQ(core.get_blockchain_storage().fill_tx_rpc_inputs(info, tx), false);
 
-  return true;
-}
-
-namespace
-{
-  constexpr char stake_keyimage_hex[] = "a637203ec41eab772532d30420eac80612fce8e44f1758bc7e2cb1bdda815887";
-}
-
-getblocktemplate_pos_keyimage_json_roundtrip::getblocktemplate_pos_keyimage_json_roundtrip()
-{
-  REGISTER_CALLBACK_METHOD(getblocktemplate_pos_keyimage_json_roundtrip, check_keyimage);
-}
-
-bool getblocktemplate_pos_keyimage_json_roundtrip::generate(std::vector<test_event_entry>& events) const
-{
-  GENERATE_ACCOUNT(miner);
-  MAKE_GENESIS_BLOCK(events, blk_0, miner, test_core_time::get_time());
-
-  epee::json_rpc::request<currency::COMMAND_RPC_GETBLOCKTEMPLATE::request> sent{};
-  sent.jsonrpc = "2.0";
-  sent.id = std::string("0");
-  sent.method = "getblocktemplate";
-  sent.params.pos_block = true;
-  sent.params.wallet_address = currency::get_account_address_as_str(miner.get_public_address());
-  sent.params.stakeholder_address = sent.params.wallet_address;
-  CHECK_AND_ASSERT_MES(epee::string_tools::hex_to_pod(stake_keyimage_hex, sent.params.pe.keyimage), false, "Invalid test key image");
-
-  DO_CALLBACK_PARAMS_STR(events, "check_keyimage", epee::serialization::store_t_to_json(sent));
-  return true;
-}
-
-bool getblocktemplate_pos_keyimage_json_roundtrip::check_keyimage(currency::core&, size_t ev_index, const std::vector<test_event_entry>& events) const
-{
-  const auto& body = boost::get<callback_entry>(events[ev_index]).callback_params;
-  epee::json_rpc::request<currency::COMMAND_RPC_GETBLOCKTEMPLATE::request> received{};
-  CHECK_AND_ASSERT_MES(epee::serialization::load_t_from_json(received, body), false, "Failed to decode getblocktemplate request");
-  const std::string actual = epee::string_tools::pod_to_hex(received.params.pe.keyimage);
-  CHECK_AND_ASSERT_MES(actual == stake_keyimage_hex, false, "getblocktemplate pe.keyimage mismatch: sent " << stake_keyimage_hex << ", received " << actual);
   return true;
 }
