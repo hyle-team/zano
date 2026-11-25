@@ -1443,6 +1443,11 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY_HF(gw_nonce_strict_order, "6,8-*");
     GENERATE_AND_PLAY_HF(gw_nonce_per_tx_and_per_address, "6,8-*");
     GENERATE_AND_PLAY_HF(gw_nonce_chain_switch, "6,8-*");
+    // GW address nonce: tx pool rules, block template and pool cleanup (played in callbacks)
+    GENERATE_AND_PLAY_HF(gw_nonce_pool_rules, "8-*");
+    GENERATE_AND_PLAY_HF(gw_nonce_block_template, "8-*");
+    GENERATE_AND_PLAY_HF(gw_nonce_template_size_caps, "8-*");
+    GENERATE_AND_PLAY_HF(gw_nonce_reorg_and_pool, "8-*");
 
     GENERATE_AND_PLAY_HF(isolate_auditable_and_proof, "2-*");
     
