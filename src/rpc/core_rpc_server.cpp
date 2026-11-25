@@ -1727,7 +1727,7 @@ namespace currency
   {
     CHECK_CORE_READY();
     CHECK_RPC_LIMITS(req.count, RPC_LIMIT_COMMAND_RPC_GET_ASSETS_LIST);
-    if (req.after_asset_id && (req.offset != 0 || req.count == 0)) // after_asset_id requires offset = 0 and count > 0
+    if (req.count == 0 || (req.after_asset_id && req.offset != 0))
     {
       res.status = API_RETURN_CODE_BAD_ARG;
       return true;

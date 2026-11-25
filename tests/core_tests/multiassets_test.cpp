@@ -3104,8 +3104,12 @@ bool asset_operations_and_chain_switching::c2(currency::core& c, size_t ev_index
 
   using assets_rpc = COMMAND_RPC_GET_ASSETS_LIST;
   assets_rpc::request req{};
-  req.count = 1;
+  req.count = 0;
+  assets_rpc::response zero_count_page{};
+  CHECK_AND_ASSERT_MES(invoke_text_json_for_core(c, "get_assets_list", req, zero_count_page), false, "Zero-count asset page request failed");
+  CHECK_AND_ASSERT_EQ(zero_count_page.status, API_RETURN_CODE_BAD_ARG);
 
+  req.count = 1;
   assets_rpc::response first_page{};
   CHECK_AND_ASSERT_MES(invoke_text_json_for_core(c, "get_assets_list", req, first_page), false, "First asset page request failed");
   CHECK_AND_ASSERT_EQ(first_page.status, API_RETURN_CODE_OK);
