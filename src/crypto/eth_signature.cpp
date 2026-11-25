@@ -1,237 +1,95 @@
-// Copyright (c) 2024 Zano Project
+// Copyright (c) 2024-2026 Zano Project
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #include "eth_signature.h"
 #include "crypto.h"
-#ifndef USE_OPEN_SSL_FOR_ECDSA
-  #include "bitcoin-secp256k1/include/secp256k1.h"
-#endif
 #include "random.h"
 #include "misc_language.h"
 #include <string_tools.h>
-
 
 #ifdef USE_OPEN_SSL_FOR_ECDSA
   #include <openssl/ec.h>
   #include <openssl/ecdsa.h>
   #include <openssl/obj_mac.h>
   #include <openssl/bn.h>
-  #include <openssl/rand.h>
+#else
+  #include "bitcoin-secp256k1/include/secp256k1.h"
 #endif
 
+//
+// OpenSSL EC_KEY vs OpenSSL EVP considerations:
+//   OpenSSL EC_KEY functions (used below) are deprecated since 3.0, but the deadline is unknown and they are still present in 4.0. The replacement is OpenSSL EVP,
+//   which would require OSSL_PARAM key import and DER round-trip for sig scalars => less clean, convenient and efficient, so I decided to keep EC_KEY currently.
+// OpenSSL EC_KEY vs libsecp256k1 considerations:
+//   It looks like libsecp256k1 verifies about 9.5x faster than EC_KEY and signs about 15x faster (assuming shared context). It also rejects high-S while OpenSSL
+//   version requires manual check (already done below). The price is additional submodule/linking/CMake, while OpenSSL is already used in Zano.
+//   As for now, we decided to use OpenSSL EC_KEY version while libsecp256k1 is kept under an #ifdef here just in case we need faster ECDSA in future.
+// -- sowle
+//
 
-// Function to create EC_KEY from raw 32 - byte private key
-EC_KEY * create_ec_key_from_private_key(const unsigned char* private_key) {
-  EC_KEY* key = EC_KEY_new_by_curve_name(NID_secp256k1);
-  if (!key) {
-    std::cerr << "Failed to create new EC Key" << std::endl;
-    return nullptr;
+namespace
+{
+#ifdef USE_OPEN_SSL_FOR_ECDSA
+  // creates EC_KEY from raw 32 - byte private key
+  EC_KEY* create_ec_key_from_private_key(const unsigned char* private_key)
+  {
+    EC_KEY* key = EC_KEY_new_by_curve_name(NID_secp256k1);
+    if (!key)
+      return nullptr;
+
+    const BIGNUM* curve_order = EC_GROUP_get0_order(EC_KEY_get0_group(key));
+    if (!curve_order)
+    {
+      EC_KEY_free(key);
+      return nullptr;
+    }
+
+    BIGNUM* priv_key_bn = BN_bin2bn(private_key, 32, nullptr);
+    if (!priv_key_bn || BN_is_zero(priv_key_bn) || BN_cmp(priv_key_bn, curve_order) >= 0)
+    {
+      BN_clear_free(priv_key_bn);
+      EC_KEY_free(key);
+      return nullptr;
+    }
+
+    if (!EC_KEY_set_private_key(key, priv_key_bn))
+    {
+      BN_clear_free(priv_key_bn);
+      EC_KEY_free(key);
+      return nullptr;
+    }
+
+    BN_clear_free(priv_key_bn);
+    return key;
   }
 
-  BIGNUM* priv_key_bn = BN_bin2bn(private_key, 32, nullptr);
-  if (!priv_key_bn) {
-    std::cerr << "Failed to convert private key to BIGNUM" << std::endl;
-    EC_KEY_free(key);
-    return nullptr;
-  }
+  // creates EC_KEY from raw 33-byte compressed public key
+  EC_KEY* create_ec_key_from_compressed_public_key(const unsigned char* compressed_pub_key)
+  {
+    EC_KEY* key = EC_KEY_new_by_curve_name(NID_secp256k1);
+    if (!key)
+      return nullptr;
 
-  if (!EC_KEY_set_private_key(key, priv_key_bn)) {
-    std::cerr << "Failed to set private key" << std::endl;
-    EC_KEY_free(key);
-    BN_free(priv_key_bn);
-    return nullptr;
-  }
+    EC_POINT* pub_point = EC_POINT_new(EC_KEY_get0_group(key));
+    if (!pub_point || !EC_POINT_oct2point(EC_KEY_get0_group(key), pub_point, compressed_pub_key, 33, nullptr))
+    {
+      EC_POINT_free(pub_point);
+      EC_KEY_free(key);
+      return nullptr;
+    }
 
-  BN_free(priv_key_bn);
-  return key;
-}
+    if (!EC_KEY_set_public_key(key, pub_point))
+    {
+      EC_POINT_free(pub_point);
+      EC_KEY_free(key);
+      return nullptr;
+    }
 
-
-void ensure_canonical_s(BIGNUM* s, const EC_GROUP* group) {
-  // Get the order of the curve
-  BIGNUM* order = BN_new();
-  EC_GROUP_get_order(group, order, nullptr);
-
-  // Compute half of the order: `n / 2`
-  BIGNUM* half_order = BN_new();
-  BN_rshift1(half_order, order);
-
-  // If `s` is greater than `n / 2`, replace `s` with `n - s`
-  if (BN_cmp(s, half_order) > 0) {
-    BN_sub(s, order, s);
-  }
-
-  BN_free(order);
-  BN_free(half_order);
-}
-
-// Update the function to ensure canonical `s`
-bool generate_ethereum_signature(const unsigned char* hash, const unsigned char* private_key, crypto::eth_signature& sig_res) {
-  EC_KEY* ec_key = create_ec_key_from_private_key(private_key);
-  if (!ec_key) {
-    throw std::runtime_error("Failed to create EC key from private key");
-  }
-
-  // Sign the hash
-  unsigned int sig_len = ECDSA_size(ec_key);
-  std::vector<unsigned char> signature(sig_len);
-  if (ECDSA_sign(0, hash, 32, signature.data(), &sig_len, ec_key) == 0) {
-    EC_KEY_free(ec_key);
-    throw std::runtime_error("Failed to create signature");
-  }
-  signature.resize(sig_len);
-
- 
-  // The OpenSSL ECDSA signature output is DER encoded, Ethereum expects (r, s, v)
-  const unsigned char* p = signature.data();
-  ECDSA_SIG* sig = d2i_ECDSA_SIG(nullptr, &p, sig_len);
-  if (!sig) {
-    EC_KEY_free(ec_key);
-    throw std::runtime_error("Failed to parse ECDSA signature");
-  }
-
-  const BIGNUM* r = nullptr;
-  const BIGNUM* s = nullptr;
-  ECDSA_SIG_get0(sig, &r, &s);
-
-  // Ensure canonical `s`
-  BIGNUM* s_canonical = BN_dup(s);
-  ensure_canonical_s(s_canonical, EC_KEY_get0_group(ec_key));
-
-  BN_bn2binpad(r, (unsigned char* )&sig_res.data[0], 32);
-  BN_bn2binpad(s_canonical, (unsigned char*)&sig_res.data[32], 32);
-
-
-  ECDSA_SIG_free(sig);
-  BN_free(s_canonical);
-  EC_KEY_free(ec_key);
-  return true;
-}
-
-// Convert raw 33-byte compressed public key to EC_KEY object
-EC_KEY* create_ec_key_from_compressed_public_key(const unsigned char* compressed_pub_key) {
-  EC_KEY* key = EC_KEY_new_by_curve_name(NID_secp256k1);
-  if (!key) {
-    std::cerr << "Failed to create EC_KEY object" << std::endl;
-    return nullptr;
-  }
-
-  EC_POINT* pub_point = EC_POINT_new(EC_KEY_get0_group(key));
-  if (!EC_POINT_oct2point(EC_KEY_get0_group(key), pub_point, compressed_pub_key, 33, nullptr)) {
-    std::cerr << "Failed to convert compressed public key" << std::endl;
     EC_POINT_free(pub_point);
-    EC_KEY_free(key);
-    return nullptr;
+    return key;
   }
-
-  if (!EC_KEY_set_public_key(key, pub_point)) {
-    std::cerr << "Failed to set public key" << std::endl;
-    EC_POINT_free(pub_point);
-    EC_KEY_free(key);
-    return nullptr;
-  }
-
-  EC_POINT_free(pub_point);
-  return key;
-}
-
-// Function to verify Ethereum-compatible signature
-bool verify_ethereum_signature(const crypto::hash& m, const crypto::eth_signature& sig_res, const crypto::eth_public_key& compressed_pub_key) {
-  EC_KEY* ec_key = create_ec_key_from_compressed_public_key((const unsigned char*)&compressed_pub_key.data[0]);
-  if (!ec_key) {
-    throw std::runtime_error("Failed to create EC key from compressed public key");
-  }
-  const unsigned char* r = (unsigned char*)&sig_res.data[0];
-  const unsigned char* s = (unsigned char*)&sig_res.data[32];
-  const unsigned char* hash = (unsigned char*)&m;
-
-  // Create ECDSA_SIG from r and s
-  BIGNUM* bn_r = BN_bin2bn(r, 32, nullptr);
-  BIGNUM* bn_s = BN_bin2bn(s, 32, nullptr);
-  if (!bn_r || !bn_s) {
-    EC_KEY_free(ec_key);
-    BN_free(bn_r);
-    BN_free(bn_s);
-    throw std::runtime_error("Failed to convert r or s to BIGNUM");
-  }
-
-  ECDSA_SIG* sig = ECDSA_SIG_new();
-  if (!sig) {
-    EC_KEY_free(ec_key);
-    BN_free(bn_r);
-    BN_free(bn_s);
-    throw std::runtime_error("Failed to create ECDSA_SIG object");
-  }
-
-  if (!ECDSA_SIG_set0(sig, bn_r, bn_s)) {
-    EC_KEY_free(ec_key);
-    ECDSA_SIG_free(sig);
-    BN_free(bn_r);
-    BN_free(bn_s);
-    throw std::runtime_error("Failed to set r and s in ECDSA_SIG");
-  }
-
-  // Verify the signature
-  int verification_result = ECDSA_do_verify(hash, 32, sig, ec_key);
-
-  ECDSA_SIG_free(sig);
-  EC_KEY_free(ec_key);
-
-
-  return verification_result == 1;
-}
-
-
-// 
-// struct KeyPair {
-//   std::vector<unsigned char> private_key;  // 32 bytes
-//   std::vector<unsigned char> public_key;   // 33 bytes (compressed format)
-// };
-
-// Function to generate an Ethereum-compatible key pair
-bool generate_ethereum_key_pair(crypto::eth_secret_key& sec_key, crypto::eth_public_key& pub_key) {
-  /*KeyPair keypair;*/
-
-  // Create a new EC_KEY object with the secp256k1 curve
-  EC_KEY* key = EC_KEY_new_by_curve_name(NID_secp256k1);
-  if (!key) {
-    throw std::runtime_error("Failed to create new EC_KEY object");
-  }
-
-  // Generate the key pair
-  if (EC_KEY_generate_key(key) == 0) {
-    EC_KEY_free(key);
-    throw std::runtime_error("Failed to generate key pair");
-  }
-
-  // Extract the private key
-  const BIGNUM* priv_bn = EC_KEY_get0_private_key(key);
-  if (!priv_bn) {
-    EC_KEY_free(key);
-    throw std::runtime_error("Failed to get private key");
-  }
-
-  BN_bn2binpad(priv_bn, (unsigned char*)&sec_key.data[0], 32);
-
-  // Extract the public key in compressed format
-  const EC_POINT* pub_point = EC_KEY_get0_public_key(key);
-  if (!pub_point) {
-    EC_KEY_free(key);
-    throw std::runtime_error("Failed to get public key");
-  }
-
-  //keypair.public_key.resize(33);  // Compressed format
-  if (EC_POINT_point2oct(EC_KEY_get0_group(key), pub_point, POINT_CONVERSION_COMPRESSED,
-    (unsigned char*)&pub_key.data[0], sizeof(pub_key.data), nullptr) == 0) {
-    EC_KEY_free(key);
-    throw std::runtime_error("Failed to convert public key to compressed format");
-  }
-
-  EC_KEY_free(key);
-  return true;
-}
-
-
+#endif
+} // namespace
 
 
 
@@ -241,7 +99,36 @@ namespace crypto
   {
     try
     {
-#ifndef USE_OPEN_SSL_FOR_ECDSA
+#ifdef USE_OPEN_SSL_FOR_ECDSA
+      EC_KEY* key = EC_KEY_new_by_curve_name(NID_secp256k1);
+      if (!key)
+        return false;
+
+      auto slh = epee::misc_utils::create_scope_leave_handler([&](){ EC_KEY_free(key); });
+
+      if (EC_KEY_generate_key(key) != 1)
+        return false;
+
+      // extract the private key in BN format
+      const BIGNUM* sec_bn = EC_KEY_get0_private_key(key);
+      if (!sec_bn)
+        return false;
+
+      static_assert(sizeof sec_key.data == 32, "size mismatch");
+      if (BN_bn2binpad(sec_bn, sec_key.data, 32) != 32)
+        return false;
+
+      // extract the public key in compressed format
+      const EC_POINT* pub_pt = EC_KEY_get0_public_key(key);
+      if (!pub_pt)
+        return false;
+
+      static_assert(sizeof pub_key.data == 33, "size mismatch");
+      if (EC_POINT_point2oct(EC_KEY_get0_group(key), pub_pt, POINT_CONVERSION_COMPRESSED, pub_key.data, 33, nullptr) != 33)
+        return false;
+
+      return true;
+#else
       secp256k1_context* ctx = secp256k1_context_create(SECP256K1_CONTEXT_NONE);
       auto slh = epee::misc_utils::create_scope_leave_handler([&ctx](){
           secp256k1_context_destroy(ctx);
@@ -271,8 +158,6 @@ namespace crypto
         return false;
 
       return true;
-#else
-      return generate_ethereum_key_pair(sec_key, pub_key);
 #endif
     }
     catch(...)
@@ -314,7 +199,50 @@ namespace crypto
   {
     try
     {
-#ifndef USE_OPEN_SSL_FOR_ECDSA
+#ifdef USE_OPEN_SSL_FOR_ECDSA
+      EC_KEY* ec_key = create_ec_key_from_private_key(sec_key.data);
+      if (!ec_key)
+        return false;
+
+      auto slh_ec_key = epee::misc_utils::create_scope_leave_handler([&](){ EC_KEY_free(ec_key); });
+
+      static_assert(sizeof m == 32, "size mismatch");
+      ECDSA_SIG* ecdsa_sig = ECDSA_do_sign(reinterpret_cast<const uint8_t*>(&m), 32, ec_key);
+      if (!ecdsa_sig)
+        return false;
+
+      auto slh_ecdsa_sig = epee::misc_utils::create_scope_leave_handler([&](){ ECDSA_SIG_free(ecdsa_sig); });
+
+      const BIGNUM* r = nullptr, *s = nullptr;
+      ECDSA_SIG_get0(ecdsa_sig, &r, &s);
+
+      // ensure canonical s
+      const BIGNUM* curve_order = EC_GROUP_get0_order(EC_KEY_get0_group(ec_key));
+      if (!curve_order)
+        return false;
+
+      BIGNUM* s_canonical = BN_dup(s); // s_canonical = s
+      BIGNUM* half_order = BN_new();
+      auto slh_s_c_h = epee::misc_utils::create_scope_leave_handler([&](){ BN_free(s_canonical); BN_free(half_order); });
+
+      if (!s_canonical || !half_order)
+        return false;
+
+      if (BN_rshift1(half_order, curve_order) != 1)
+        return false;
+
+      if (BN_cmp(s_canonical, half_order) > 0 && BN_sub(s_canonical, curve_order, s_canonical) != 1) // if (s > order / 2) s = order - s
+        return false;
+
+      static_assert(sizeof sig.data == 64, "size mismatch");
+      if (BN_bn2binpad(r, &sig.data[0], 32) != 32)
+        return false;
+
+      if (BN_bn2binpad(s_canonical, &sig.data[32], 32) != 32)
+        return false;
+
+      return true;
+#else 
       secp256k1_context* ctx = secp256k1_context_create(SECP256K1_CONTEXT_NONE);
       auto slh = epee::misc_utils::create_scope_leave_handler([&ctx](){
           secp256k1_context_destroy(ctx);
@@ -334,8 +262,6 @@ namespace crypto
         return false;
       
       return true;
-#else 
-      return generate_ethereum_signature((const unsigned char*)&m.data, (unsigned char*)&sec_key.data, sig);
 #endif
     }
     catch(...)
@@ -349,35 +275,54 @@ namespace crypto
   {
     try
     {
-      // TODO (performance) consider using secp256k1_context_static for verification -- sowle
-#ifndef USE_OPEN_SSL_FOR_ECDSA
-      secp256k1_context* ctx = secp256k1_context_create(SECP256K1_CONTEXT_NONE);
-      auto slh = epee::misc_utils::create_scope_leave_handler([&ctx](){
-          secp256k1_context_destroy(ctx);
-          ctx = nullptr;
-        });
-
-      uint8_t randomness[32];
-      crypto::generate_random_bytes(sizeof randomness, randomness);
-      if (!secp256k1_context_randomize(ctx, randomness))
+#ifdef USE_OPEN_SSL_FOR_ECDSA
+      EC_KEY* ec_key = create_ec_key_from_compressed_public_key(pub_key.data);
+      if (!ec_key)
         return false;
 
-      secp256k1_ecdsa_signature secp256k1_ecdsa_sig{};
-      secp256k1_pubkey uncompressed_pub_key{};
+      static_assert(sizeof sig.data == 64, "size mismatch");
+      BIGNUM* half_order = BN_new();
+      BIGNUM* r_bn = BN_bin2bn(sig.data,      32, nullptr);
+      BIGNUM* s_bn = BN_bin2bn(sig.data + 32, 32, nullptr);
+      ECDSA_SIG* ecdsa_sig = ECDSA_SIG_new();
 
-      if (!secp256k1_ecdsa_signature_parse_compact(ctx, &secp256k1_ecdsa_sig, sig.data))
+      auto slh_rss = epee::misc_utils::create_scope_leave_handler([&](){ ECDSA_SIG_free(ecdsa_sig); BN_free(s_bn); BN_free(r_bn); BN_free(half_order); EC_KEY_free(ec_key); });
+
+      const BIGNUM* curve_order = EC_GROUP_get0_order(EC_KEY_get0_group(ec_key));
+
+      if (!half_order || !r_bn || !s_bn || !ecdsa_sig || !curve_order)
         return false;
 
-      if (!secp256k1_ec_pubkey_parse(ctx, &uncompressed_pub_key, pub_key.data, sizeof pub_key))
+      // ensure s <= order/2
+      if (BN_rshift1(half_order, curve_order) != 1 || BN_cmp(s_bn, half_order) > 0)
         return false;
 
-      // verify a signature
-      if (!secp256k1_ecdsa_verify(ctx, &secp256k1_ecdsa_sig, (const unsigned char*)m.data, &uncompressed_pub_key))
+      if (!ECDSA_SIG_set0(ecdsa_sig, r_bn, s_bn))
+        return false;
+
+      r_bn = nullptr; // ecdsa_sig now owns both of them
+      s_bn = nullptr;
+
+      static_assert(sizeof m == 32, "size mismatch");
+      if (ECDSA_do_verify(reinterpret_cast<const uint8_t*>(&m), 32, ecdsa_sig, ec_key) != 1)
         return false;
 
       return true;
 #else
-      return verify_ethereum_signature(m, sig, pub_key);
+      secp256k1_ecdsa_signature secp256k1_ecdsa_sig{};
+      secp256k1_pubkey uncompressed_pub_key{};
+
+      if (!secp256k1_ecdsa_signature_parse_compact(secp256k1_context_static, &secp256k1_ecdsa_sig, sig.data))
+        return false;
+
+      if (!secp256k1_ec_pubkey_parse(secp256k1_context_static, &uncompressed_pub_key, pub_key.data, sizeof pub_key))
+        return false;
+
+      // verify a signature
+      if (!secp256k1_ecdsa_verify(secp256k1_context_static, &secp256k1_ecdsa_sig, (const unsigned char*)m.data, &uncompressed_pub_key))
+        return false;
+
+      return true;
 #endif
     }
     catch(...)

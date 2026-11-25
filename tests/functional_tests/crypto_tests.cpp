@@ -2103,25 +2103,101 @@ TEST(crypto, generators_precomp)
 
 TEST(crypto, eth_signature_basics)
 {
-  eth_secret_key sk{};
-  eth_public_key pk{};
+  const mp::uint256_t n("0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141"); // secp256k1 group order
+  auto load_uint256_t_from_be  = [](const uint8_t* p) { mp::uint256_t v; mp::import_bits(v, p, p + 32); return v; };
+  auto store_uint256_t_to_be   = [](mp::uint256_t v, uint8_t* p) { for(size_t i = 32; i != 0; --i, v >>= 8) p[i - 1] = static_cast<uint8_t>(v & 0xff); };
 
-  ASSERT_TRUE(generate_eth_key_pair(sk, pk));
-
-  eth_signature sig{};
   hash m = hash_helper_t::h("How many of you have ever felt personally victimized by elliptic curves?");
-  
-  ASSERT_TRUE(generate_eth_signature(m, sk, sig));
+  hash m2 = hash_helper_t::h("Raise your hand if you have ever had a high-S ECDSA behind your back");
 
-  const eth_signature const_sig = sig;
-  ASSERT_TRUE(verify_eth_signature(m, pk, const_sig));
-
-  for(size_t i = 0; i < sizeof sig; ++i)
+  for(size_t i = 0; i < 64; ++i)
   {
+    eth_secret_key sk{}, sk2{};
+    eth_public_key pk{}, pk2{};
+    ASSERT_TRUE(generate_eth_key_pair(sk, pk));
+    ASSERT_TRUE(generate_eth_key_pair(sk2, pk2));
+
+    eth_signature sig{};
+    ASSERT_TRUE(generate_eth_signature(m, sk, sig));
+
+    const eth_signature const_sig = sig;
+    ASSERT_TRUE(verify_eth_signature(m, pk, const_sig));
+
+    ASSERT_FALSE(verify_eth_signature(m2, pk, sig));
+    ASSERT_FALSE(verify_eth_signature(m, pk2, sig));
+
+    const mp::uint256_t s = load_uint256_t_from_be(sig.data + 32);
+    ASSERT_TRUE(s <= n / 2);
+
     eth_signature bad_sig = sig;
-    bad_sig.data[i] ^= 1 + (rand() % 254); // xor with a number fom [1; 255] to make sure this byte will change
+    store_uint256_t_to_be(n - s, bad_sig.data + 32); // (r, n - s) is a valid ECDSA signature too, but it is high-S
     ASSERT_FALSE(verify_eth_signature(m, pk, bad_sig));
+
+    for(const mp::uint256_t& v : { mp::uint256_t(0), n })
+    {
+      bad_sig = sig;
+      store_uint256_t_to_be(v, bad_sig.data);
+      ASSERT_FALSE(verify_eth_signature(m, pk, bad_sig));
+      bad_sig = sig;
+      store_uint256_t_to_be(v, bad_sig.data + 32);
+      ASSERT_FALSE(verify_eth_signature(m, pk, bad_sig));
+    }
+
+    for(size_t j = 0; j < sizeof sig; ++j)
+    {
+      bad_sig = sig;
+      bad_sig.data[j] ^= 1 + (rand() % 254); // xor with a number fom [1; 255] to make sure this byte will change
+      ASSERT_FALSE(verify_eth_signature(m, pk, bad_sig));
+    }
+
+    eth_public_key bad_pk = pk;
+    bad_pk.data[0] ^= 1; // 02 <-> 03, i.e. -P
+    ASSERT_FALSE(verify_eth_signature(m, bad_pk, sig));
+    bad_pk.data[0] = 0x04;
+    ASSERT_FALSE(verify_eth_signature(m, bad_pk, sig));
+    bad_pk = pk;
+    memset(bad_pk.data + 1, 0x00, 32); // x = 0 is not on the curve
+    ASSERT_FALSE(verify_eth_signature(m, bad_pk, sig));
+    memset(bad_pk.data + 1, 0xff, 32); // x >= p
+    ASSERT_FALSE(verify_eth_signature(m, bad_pk, sig));
   }
+
+  // secret key bounds: [1; n - 1], the corresponding public keys are G and -G
+  eth_public_key pk_1{};
+  ASSERT_TRUE(epee::string_tools::parse_tpod_from_hex_string("0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798", pk_1)); // compressed G: 02 (even y) | G.x
+  eth_public_key pk_nm1 = pk_1;
+  pk_nm1.data[0] = 0x03; // -G = (G.x, p - G.y): the same x, odd y
+
+  eth_secret_key sk{};
+  eth_signature sig{};
+  store_uint256_t_to_be(1, sk.data);
+  ASSERT_TRUE(generate_eth_signature(m, sk, sig));
+  ASSERT_TRUE(verify_eth_signature(m, pk_1, sig));
+  store_uint256_t_to_be(n - 1, sk.data);
+  ASSERT_TRUE(generate_eth_signature(m, sk, sig));
+  ASSERT_TRUE(verify_eth_signature(m, pk_nm1, sig));
+
+  for(const mp::uint256_t& v : { mp::uint256_t(0), n, n + 1 })
+  {
+    store_uint256_t_to_be(v, sk.data);
+    ASSERT_FALSE(generate_eth_signature(m, sk, sig));
+  }
+
+  // fixed signatures for the low-S boundary: sk = 1 (P = G), nonce k = 1  =>  r = G.x, s = m + r, so (G.x, s) signs m = s - G.x for any s
+  const mp::uint256_t G_x = load_uint256_t_from_be(pk_1.data + 1);
+  auto verify_fixed = [&](const mp::uint256_t& s)
+  {
+    hash fixed_m{};
+    eth_signature fixed_sig{};
+    store_uint256_t_to_be(s >= G_x ? s - G_x : s + (n - G_x), reinterpret_cast<uint8_t*>(&fixed_m));
+    store_uint256_t_to_be(G_x, fixed_sig.data);
+    store_uint256_t_to_be(s, fixed_sig.data + 32);
+    return verify_eth_signature(fixed_m, pk_1, fixed_sig);
+  };
+  ASSERT_TRUE(verify_fixed(1));
+  ASSERT_TRUE(verify_fixed(n / 2));
+  ASSERT_FALSE(verify_fixed(n / 2 + 1));
+  ASSERT_FALSE(verify_fixed(n - 1));
 
   return true;
 }
