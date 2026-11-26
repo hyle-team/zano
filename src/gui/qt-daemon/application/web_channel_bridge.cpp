@@ -4,7 +4,10 @@
 
 #include "web_channel_bridge.h"
 
+#include <QByteArray>
+
 #include "mainwindow.h"
+#include "wallet/wallet2.h"
 
 WebChannelBridge::WebChannelBridge(MainWindow& main_window, QObject* parent)
   : QObject(parent)
@@ -46,6 +49,12 @@ WebChannelBridge::WebChannelBridge(MainWindow& main_window, QObject* parent)
     this, &WebChannelBridge::handle_current_action_state);
   connect(&m_main_window, &MainWindow::dispatch_async_call_result,
     this, &WebChannelBridge::dispatch_async_call_result);
+}
+
+bool WebChannelBridge::verify_assets_whitelist(const QString& body_base64, const QString& signature_hex)
+{
+  const auto body = QByteArray::fromBase64Encoding(body_base64.toLatin1(), QByteArray::AbortOnBase64DecodingErrors);
+  return body && tools::wallet2::verify_assets_whitelist_signature(body.decoded.toStdString(), signature_hex.toStdString());
 }
 
 #define ZANO_FORWARD_QSTRING_1(method_name) \

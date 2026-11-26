@@ -401,9 +401,8 @@ static_assert(WALLET_KDF_ROMIX_N_LOG2 <= WALLET_KDF_ROMIX_N_LOG2_MAX, "Default w
 
 #ifndef TESTNET
   #define WALLET_ASSETS_WHITELIST_URL                     "https://api.zano.org/assets_whitelist.json"
+  #define WALLET_ASSETS_WHITELIST_VALIDATION_PUBLIC_KEY   "" // TODO: SET THIS
 #else
   #define WALLET_ASSETS_WHITELIST_URL                     "https://api.zano.org/assets_whitelist_testnet.json"
+  #define WALLET_ASSETS_WHITELIST_VALIDATION_PUBLIC_KEY   "" // TODO: SET THIS
 #endif
-
-
-#define WALLET_ASSETS_WHITELIST_VALIDATION_PUBLIC_KEY   "" //TODO@#@
