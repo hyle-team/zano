@@ -454,7 +454,7 @@ namespace tools
       CHECK_AND_ASSERT_MESS_LMDB_DB(res, false, "Unable to mdb_put");
       return true;
     }
-    bool lmdb_db_backend::enumerate(container_handle h, i_db_callback* pcb)
+    bool lmdb_db_backend::enumerate(container_handle h, i_db_callback* pcb, const char* start, size_t start_size)
     {
       CHECK_AND_ASSERT_MES(pcb, false, "null capback ptr passed to enumerate");
       MDB_val key = AUTO_VAL_INIT(key);
@@ -467,18 +467,23 @@ namespace tools
       CHECK_AND_ASSERT_MES(cursor_ptr, false, "cursor_ptr is null after mdb_cursor_open");
 
       uint64_t count = 0;
-      do
+      key.mv_data = const_cast<char*>(start);
+      key.mv_size = start_size;
+      
+      auto op = start ? MDB_SET_RANGE : MDB_FIRST; // if start -> find first key, if not -> start from the beginning
+
+      while((res = mdb_cursor_get(cursor_ptr, &key, &data, op)) == MDB_SUCCESS)
       {
-        int res = mdb_cursor_get(cursor_ptr, &key, &data, MDB_NEXT);
-        if (res == MDB_NOTFOUND)
-          break;
         if (!pcb->on_enum_item(count, key.mv_data, key.mv_size, data.mv_data, data.mv_size))
-          break;
-        count++;
-      } while (cursor_ptr);
+          break; // enought items enumerated
+        
+        ++count;
+        op = MDB_NEXT;
+      }
 
       mdb_cursor_close(cursor_ptr);
       COMMIT_TX_LOCAL();
+      CHECK_AND_ASSERT_MES(res == MDB_SUCCESS || res == MDB_NOTFOUND, false, "Unable to enumerate LMDB container: " << mdb_strerror(res));
       return true;
     }
 

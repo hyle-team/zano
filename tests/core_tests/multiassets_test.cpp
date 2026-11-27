@@ -3102,6 +3102,38 @@ bool asset_operations_and_chain_switching::c2(currency::core& c, size_t ev_index
   // make sure the update operation was successfull
   CHECK_AND_ASSERT_EQ(adb.meta_info, std::string("where is they?"));
 
+  using assets_rpc = COMMAND_RPC_GET_ASSETS_LIST;
+  assets_rpc::request req{};
+  req.count = 0;
+  assets_rpc::response zero_count_page{};
+  CHECK_AND_ASSERT_MES(invoke_text_json_for_core(c, "get_assets_list", req, zero_count_page), false, "Zero-count asset page request failed");
+  CHECK_AND_ASSERT_EQ(zero_count_page.status, API_RETURN_CODE_BAD_ARG);
+
+  req.count = 1;
+  assets_rpc::response first_page{};
+  CHECK_AND_ASSERT_MES(invoke_text_json_for_core(c, "get_assets_list", req, first_page), false, "First asset page request failed");
+  CHECK_AND_ASSERT_EQ(first_page.status, API_RETURN_CODE_OK);
+  CHECK_AND_ASSERT_EQ(first_page.assets.size(), size_t{1});
+
+  req.offset = 1;
+  assets_rpc::response offset_page{};
+  CHECK_AND_ASSERT_MES(invoke_text_json_for_core(c, "get_assets_list", req, offset_page), false, "Offset asset page request failed");
+  CHECK_AND_ASSERT_EQ(offset_page.status, API_RETURN_CODE_OK);
+  CHECK_AND_ASSERT_EQ(offset_page.assets.size(), size_t{1});
+
+  req.offset = 0;
+  req.after_asset_id = first_page.assets.front().asset_id;
+  assets_rpc::response cursor_page{};
+  CHECK_AND_ASSERT_MES(invoke_text_json_for_core(c, "get_assets_list", req, cursor_page), false, "Cursor asset page request failed");
+  CHECK_AND_ASSERT_MES(epee::serialization::store_t_to_json(cursor_page) == epee::serialization::store_t_to_json(offset_page),
+    false, "The cursor page should match the offset page");
+
+  req.after_asset_id = offset_page.assets.front().asset_id;
+  assets_rpc::response last_page{};
+  CHECK_AND_ASSERT_MES(invoke_text_json_for_core(c, "get_assets_list", req, last_page), false, "Asset page request after the last asset failed");
+  CHECK_AND_ASSERT_EQ(last_page.status, API_RETURN_CODE_NOT_FOUND);
+  CHECK_AND_ASSERT_MES(last_page.assets.empty(), false, "The page after the last asset should be empty");
+
   return true;
 }
 

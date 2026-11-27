@@ -160,10 +160,12 @@ namespace currency
     {
       uint64_t offset = 0;
       uint64_t count = 100;
+      std::optional<crypto::public_key> after_asset_id = std::nullopt;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(offset)                     DOC_DSCR("Offset for the item to start copying") DOC_EXMP(0)     DOC_END
         KV_SERIALIZE(count)                      DOC_DSCR("Number of items to recieve")           DOC_EXMP(100)   DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(after_asset_id) DOC_DSCR("Return assets strictly after this asset ID, requires offset = 0 and count > 0") DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
       END_KV_SERIALIZE_MAP()
     };
 

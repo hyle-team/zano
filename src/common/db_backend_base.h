@@ -44,7 +44,7 @@ namespace tools
       virtual bool get(container_handle h, const char* k, size_t s, std::string& res_buff) = 0;
       virtual bool set(container_handle h, const char* k, size_t s, const char* v, size_t vs) = 0;
       virtual bool clear(container_handle h) = 0;
-      virtual bool enumerate(container_handle h, i_db_callback* pcb)=0;
+      virtual bool enumerate(container_handle h, i_db_callback* pcb, const char* start = nullptr, size_t start_size = 0)=0;
       virtual bool enumerate_prefix(container_handle h, const std::string& prefix, uint64_t limit, i_db_callback* pcb)=0;
       virtual bool get_stat_info(stat_info& si) = 0;
       virtual const char* name()=0;

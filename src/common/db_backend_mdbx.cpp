@@ -347,7 +347,7 @@ namespace tools
       CHECK_AND_ASSERT_MESS_MDBX_DB(res, false, "Unable to mdbx_put");
       return true;
     }
-    bool mdbx_db_backend::enumerate(container_handle h, i_db_callback* pcb)
+    bool mdbx_db_backend::enumerate(container_handle h, i_db_callback* pcb, const char* start, size_t start_size)
     {
       CHECK_AND_ASSERT_MES(pcb, false, "null capback ptr passed to enumerate");
       MDBX_val key = AUTO_VAL_INIT(key);
@@ -365,19 +365,23 @@ namespace tools
       CHECK_AND_ASSERT_MES(cursor_ptr, false, "cursor_ptr is null after mdbx_cursor_open");
 
       uint64_t count = 0;
-      do
+      key.iov_base = const_cast<char*>(start);
+      key.iov_len = start_size;
+
+      auto op = start ? MDBX_SET_RANGE : MDBX_FIRST;
+      while((res = mdbx_cursor_get(cursor_ptr, &key, &data, op)) == MDBX_SUCCESS)
       {
-        int res = mdbx_cursor_get(cursor_ptr, &key, &data, MDBX_NEXT);
-        if (res == MDBX_NOTFOUND)
-          break;
         if (!pcb->on_enum_item(count, key.iov_base, key.iov_len, data.iov_base, data.iov_len))
           break;
-        count++;
-      } while (cursor_ptr);
-
+        
+        ++count;
+        op = MDBX_NEXT;
+      }
+      
       mdbx_cursor_close(cursor_ptr);
       if (need_to_commit)
         commit_transaction();
+      CHECK_AND_ASSERT_MES(res == MDBX_SUCCESS || res == MDBX_NOTFOUND, false, "Unable to enumerate MDBX container: " << mdbx_strerror(res));
       return true;
     }
 

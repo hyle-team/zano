@@ -644,10 +644,13 @@ namespace tools
       // callback format: bool cb(uint64_t index, const key_t& key, const value_t& value)
       // cb should return true to continue, false -- to stop enumeration 
       template<class t_cb>
-      void enumerate_items(t_cb cb)const 
+      bool enumerate_items(t_cb cb, const t_key* start = nullptr)const 
       {
+        size_t start_size = 0;
+        const char* start_data = start ? key_to_ptr(*start, start_size) : nullptr;
+
         items_accessor_cb<t_cb, t_key, t_value, access_strategy_selector<is_t_access_strategy> > local_enum_handler(cb);
-        bdb.get_backend()->enumerate(m_h, &local_enum_handler);
+        return bdb.get_backend()->enumerate(m_h, &local_enum_handler, start_data, start_size);
       }
 
       template<class t_cb>
