@@ -70,65 +70,58 @@ namespace misc_utils
       return res;
     }
 
-    /* Escapes JSON control characters and ASCII control characters (00h-1Fh => \u00XX) according to JSON reference.
-       UTF-8-safe.
-       from https://www.json.org/ :
-       char --  any-Unicode-character-except-"-or-\-or-control-character: \"  \\  \/  \b  \f  \n  \r  \t  \uDDDD
-    */
+    // JSON carries Unicode as \uXXXX and a raw byte as a literal \xHH marker
+    // double original backslashes before JSON escaping to distinguish them from markers
+    //
+    // Writer input (hex) | Writer output (JSON) | Reader after JSON unescaping | Reader output (hex)
+    // A6                 | "\\xA6"              | \xA6                         | A6
+    // 5C 78 41 36        | "\\\\xA6"            | \\xA6                        | 5C 78 41 36
+    //
+    // strategy_json::handle_value adds the quotes around the writer output
+    // match_string2 unescapes JSON, then decodes Zano byte markers
     inline std::string transform_to_json_escape_sequence(const std::string& str)
     {
       std::string result;
-
-      static const char hex_map[17] = "0123456789abcdef";
-      static const std::string su00 = "\\u00";
-
-      const char* c_str = str.c_str();
-      for(size_t i = 0, len = str.length(); i < len; ++i)
+      static const char hex_map[] = "0123456789ABCDEF";
+      const char* current = str.data();
+      const char* end = current + str.size();
+      while (current != end)
       {
-        char c = c_str[i];
-        const unsigned char byte = c;
-        if (byte >= 0x80)
+        const unsigned char byte = *current;
+        if (byte >= 0x20 && byte <= 0x7e)
         {
-          const char* current = c_str + i;
-          const char* next = current;
-          const auto value = boost::locale::utf::utf_traits<char>::decode(next, c_str + len);
-          if (value != boost::locale::utf::illegal && value != boost::locale::utf::incomplete)
-          {
-            result.append(current, next - current);
-            i += next - current - 1;
-            continue;
-          }
-        }
-        switch(c)
-        {
-        case '\b':   // ASCII 08h
-          result += "\\b";
-          break;
-        case '\t':   // ASCII 09h
-          result += "\\t";
-          break;
-        case '\n':   // ASCII 0Ah
-          result += "\\n";
-          break;
-        case '\f':   // ASCII 0Ch
-          result += "\\f";
-          break;
-        case '\r':   // ASCII 0Dh
-          result += "\\r";
-          break;
-        case '"':    // ASCII 22h
-        case '\\':   // ASCII 5Ch
-        case '/':    // ASCII 2Fh
-          result.push_back('\\');
-          result.push_back(c);
-          break;
-
-        default:
-          if (byte < 0x20 || byte >= 0x80)
-            result += su00 + hex_map[byte >> 4] + hex_map[byte & 0xf];
+          if (*current == '\\')
+            result += R"(\\\\)"; // preserve literal \xA6 across both decoding steps
+          else if (*current == '"')
+            result += "\\\"";
           else
-            result.push_back(c);
+            result.push_back(*current);
+          ++current;
+          continue;
         }
+
+        const char* next = current;
+        const auto value = boost::locale::utf::utf_traits<char>::decode(next, end); // try to read utf8
+        if (value == boost::locale::utf::illegal || value == boost::locale::utf::incomplete)
+        {
+          //just save as this byte using \xHH notation
+          //std::string byte = "\xA6" // just one byte A6
+          result += R"(\\x)";                   // \\x
+          result.push_back(hex_map[byte >> 4]); // \\xA
+          result.push_back(hex_map[byte & 0xf]);// \\xA6
+          ++current;
+          continue;
+        }
+
+        char16_t units[2];// for \uXXXX, [2] cuz for example specific 😀 needs a surrogate pair like D83D and DE00
+        const auto units_end = boost::locale::utf::utf_traits<char16_t>::encode(value, units); // points past the last UTF-16 unit written
+        for (const char16_t* unit = units; unit != units_end; ++unit)
+        {
+          result += "\\u";
+          for (int shift = 12; shift >= 0; shift -= 4) // take four hex digits from high to low
+            result.push_back(hex_map[(*unit >> shift) & 0xf]); // \uD -> \uD8 -> \uD83 -> \uD83D
+        }
+        current = next;
       }
       return result;
     }
@@ -149,6 +142,13 @@ namespace misc_utils
       */
       inline void match_string2(std::string::const_iterator& star_end_string, std::string::const_iterator buf_end, std::string& val)
       {
+        const auto hex_digit = [](char c) -> int
+        {
+          if (c >= '0' && c <= '9') return c - '0';
+          if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+          if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+          return -1;
+        };
         val.clear();
         bool escape_mode = false;
         val.reserve(buf_end - star_end_string);
@@ -182,7 +182,7 @@ namespace misc_utils
               val.push_back('/');break;
             case 'u':  // \uDDDD sequence
               {
-                const auto read_code_unit = [&it, buf_end]()
+                const auto read_code_unit = [&it, buf_end, &hex_digit]()
                 {
                   size_t chars_left = buf_end - it - 1;
                   if (chars_left < 4)
@@ -190,16 +190,10 @@ namespace misc_utils
                   unsigned long value = 0;
                   for (size_t i = 0; i < 4; ++i)
                   {
-                    const char c = *++it;
-                    value <<= 4;
-                    if (c >= '0' && c <= '9')
-                      value += c - '0';
-                    else if (c >= 'a' && c <= 'f')
-                      value += c - 'a' + 10;
-                    else if (c >= 'A' && c <= 'F')
-                      value += c - 'A' + 10;
-                    else
+                    const int digit = hex_digit(*++it);
+                    if (digit < 0)
                       ASSERT_MES_AND_THROW("JSON invalid hex digit in \\u escape sequence");
+                    value = (value << 4) + digit;
                   }
                   return value;
                 };
@@ -217,11 +211,7 @@ namespace misc_utils
                 }
                 else if (value >= 0xdc00 && value <= 0xdfff)
                   ASSERT_MES_AND_THROW("JSON unexpected low surrogate in \\u escape sequence");
-                // json writer uses \u00XX to preserve individual bytes like latin-1 characters
-                if (value <= 0xff)
-                  val.push_back(static_cast<char>(value));
-                else
-                  boost::locale::utf::utf_traits<char>::encode(static_cast<boost::locale::utf::code_point>(value), std::back_inserter(val));
+                boost::locale::utf::utf_traits<char>::encode(static_cast<boost::locale::utf::code_point>(value), std::back_inserter(val));
               }
               break;
             default:
@@ -232,7 +222,7 @@ namespace misc_utils
           }else if(*it == '"')
           {
             star_end_string = it;
-            return;
+            break;
           }else if(*it == '\\')
           {
             escape_mode = true;
@@ -258,7 +248,41 @@ namespace misc_utils
             val.push_back(*it);
           }
         }
-        ASSERT_MES_AND_THROW("Failed to match string in json entry: " << std::string(star_end_string, buf_end));
+        if (it == buf_end)
+          ASSERT_MES_AND_THROW("Failed to match string in json entry: " << std::string(star_end_string, buf_end));
+
+        // decode markers in the json decoded string, only consume original input bytes
+        // reader input "A\\\\\\xA6" becomes 41 5C 5C 5C 78 41 36 in val
+        // read/write start at 1r/1w, move to 3r/2w after the backslash pair, then to 7r/3w after \xA6
+        // resize keeps the decoded bytes 41 5C A6
+
+        size_t read = val.find('\\');
+        if (read == std::string::npos)
+          return; // no escapes to decode
+        size_t write = read; // keep prefix, write from first backslash
+        while (read < val.size()) // consume original string before shrinking it
+        {
+          char c = val[read++];
+          if (c == '\\' && read < val.size()) // trailing backslash has no escape suffix
+          {
+            if (val[read] == '\\')
+            {
+              ++read; // \\\xA6 -> keep one backslash, then read \xA6
+            }
+            else if (val[read] == 'x' && val.size() - read >= 3) // need x and two digits
+            {
+              const int high = hex_digit(val[read + 1]); // A -> 10
+              const int low = hex_digit(val[read + 2]); // 6 -> 6
+              if (high >= 0 && low >= 0)
+              {
+                c = static_cast<char>((high << 4) | low); // \xA6 -> byte A6
+                read += 3; // consume x, A and 6
+              }
+            }
+          }
+          val[write++] = c;
+        }
+        val.resize(write); // A6 78 41 36 -> A6 when write == 1
       }
       inline bool match_string(std::string::const_iterator& star_end_string, std::string::const_iterator buf_end, std::string& val)
       {

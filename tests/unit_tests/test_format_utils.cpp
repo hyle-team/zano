@@ -45,7 +45,7 @@ TEST(block_rpc_details, miner_userdata_does_not_break_json_utf8)
   EXPECT_EQ(historical, details.miner_text_info);
   const std::string json = epee::serialization::store_t_to_json(rpc);
   ASSERT_TRUE(utf8::is_valid(json.begin(), json.end()));
-  EXPECT_NE(std::string::npos, json.find(R"(miner\u00e8)"));
+  EXPECT_NE(std::string::npos, json.find(R"(miner\\xE8)"));
   ASSERT_TRUE(epee::serialization::load_t_from_json(decoded, json));
   ASSERT_EQ(1u, decoded.blocks.size());
   EXPECT_EQ(historical, decoded.blocks.front().miner_text_info);
