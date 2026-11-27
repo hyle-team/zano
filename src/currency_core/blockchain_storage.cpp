@@ -7705,6 +7705,7 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
   }
   CHECK_AND_ASSERT_MES(r, false, "Transaction validation failed for hardfork specific terms");
 
+  const bool var_is_hardfork_8_zone = m_core_runtime_config.is_hardfork_active_for_height(ZANO_HARDFORK_08, block_height);
   
   // TODO @#@# consider: 1) tx.proofs, 2) new proof data structures
 
@@ -7742,6 +7743,15 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
         count_ado++;
       else if (el.type() == typeid(etc_coinbase_block_cumulative_size))
         count_etc_coinbase_block_cumulative_size++;
+      else if (var_is_hardfork_8_zone)
+      {
+        if (const auto* alias = boost::get<extra_alias_entry>(&el))
+        {
+          CHECK_AND_ASSERT_MES(alias->m_text_comment.size() <= ALIAS_COMMENT_MAX_SIZE_BYTES, false, "alias comment is too long");
+          CHECK_AND_ASSERT_MES(alias->m_view_key.size() <= 1, false, "alias entry has too many view keys");
+          CHECK_AND_ASSERT_MES(alias->m_sign.size() <= 1, false, "alias entry has too many signatures");
+        }
+      }
     }
     if (count_ado > 1)
     {
@@ -7820,7 +7830,6 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
   }
 
 
-  bool var_is_hardfork_8_zone = m_core_runtime_config.is_hardfork_active_for_height(8, block_height);
   if(var_is_hardfork_8_zone)
   {
     // forbid combining GW addresses with any other type of input, and forbid having inputs from different GW addresses in the same tx

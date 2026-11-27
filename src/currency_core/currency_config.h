@@ -257,7 +257,7 @@ static_assert(CURRENCY_FORMATION_VERSION == 103);
 
 #define ALIAS_NAME_MAX_LEN                              255
 #define ALIAS_VALID_CHARS                               "0123456789abcdefghijklmnopqrstuvwxyz-."
-#define ALIAS_COMMENT_MAX_SIZE_BYTES                    400
+#define ALIAS_COMMENT_MAX_SIZE_BYTES                    512
 
 #define CURRENCY_CORE_INSTANCE_LOCK_FILE                "lock.lck"
 
