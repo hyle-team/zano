@@ -26,6 +26,8 @@
 #pragma once 
 #include <algorithm>
 #include <ios>
+#include <iterator>
+#include <boost/locale/utf.hpp>
 
 namespace epee 
 {
@@ -68,52 +70,58 @@ namespace misc_utils
       return res;
     }
 
-    /* Escapes JSON control characters and ASCII control characters (00h-1Fh => \u00XX) according to JSON reference.
-       UTF-8-safe.
-       from https://www.json.org/ :
-       char --  any-Unicode-character-except-"-or-\-or-control-character: \"  \\  \/  \b  \f  \n  \r  \t  \uDDDD
-    */
+    // JSON carries Unicode as \uXXXX and a raw byte as a literal \xHH marker
+    // double original backslashes before JSON escaping to distinguish them from markers
+    //
+    // Writer input (hex) | Writer output (JSON) | Reader after JSON unescaping | Reader output (hex)
+    // A6                 | "\\xA6"              | \xA6                         | A6
+    // 5C 78 41 36        | "\\\\xA6"            | \\xA6                        | 5C 78 41 36
+    //
+    // strategy_json::handle_value adds the quotes around the writer output
+    // match_string2 unescapes JSON, then decodes Zano byte markers
     inline std::string transform_to_json_escape_sequence(const std::string& str)
     {
       std::string result;
-
-      static const char hex_map[17] = "0123456789abcdef";
-      static const std::string su00 = "\\u00";
-
-      const char* c_str = str.c_str();
-      for(size_t i = 0, len = str.length(); i < len; ++i)
+      static const char hex_map[] = "0123456789ABCDEF";
+      const char* current = str.data();
+      const char* end = current + str.size();
+      while (current != end)
       {
-        char c = c_str[i];
-        switch(c)
+        const unsigned char byte = *current;
+        if (byte >= 0x20 && byte <= 0x7e)
         {
-        case '\b':   // ASCII 08h
-          result += "\\b";
-          break;
-        case '\t':   // ASCII 09h
-          result += "\\t";
-          break;
-        case '\n':   // ASCII 0Ah
-          result += "\\n";
-          break;
-        case '\f':   // ASCII 0Ch
-          result += "\\f";
-          break;
-        case '\r':   // ASCII 0Dh
-          result += "\\r";
-          break;
-        case '"':    // ASCII 22h
-        case '\\':   // ASCII 5Ch
-        case '/':    // ASCII 2Fh
-          result.push_back('\\');
-          result.push_back(c);
-          break;
-
-        default:
-          if (static_cast<unsigned char>(c) < 0x20)
-            result += su00 + hex_map[(c >> 4) & 0xf] + hex_map[c & 0xf]; // encode all other control characters as \uDDDD
+          if (*current == '\\')
+            result += R"(\\\\)"; // preserve literal \xA6 across both decoding steps
+          else if (*current == '"')
+            result += "\\\"";
           else
-            result.push_back(c);
+            result.push_back(*current);
+          ++current;
+          continue;
         }
+
+        const char* next = current;
+        const auto value = boost::locale::utf::utf_traits<char>::decode(next, end); // try to read utf8
+        if (value == boost::locale::utf::illegal || value == boost::locale::utf::incomplete)
+        {
+          //just save as this byte using \xHH notation
+          //std::string byte = "\xA6" // just one byte A6
+          result += R"(\\x)";                   // \\x
+          result.push_back(hex_map[byte >> 4]); // \\xA
+          result.push_back(hex_map[byte & 0xf]);// \\xA6
+          ++current;
+          continue;
+        }
+
+        char16_t units[2];// for \uXXXX, [2] cuz for example specific 😀 needs a surrogate pair like D83D and DE00
+        const auto units_end = boost::locale::utf::utf_traits<char16_t>::encode(value, units); // points past the last UTF-16 unit written
+        for (const char16_t* unit = units; unit != units_end; ++unit)
+        {
+          result += "\\u";
+          for (int shift = 12; shift >= 0; shift -= 4) // take four hex digits from high to low
+            result.push_back(hex_map[(*unit >> shift) & 0xf]); // \uD -> \uD8 -> \uD83 -> \uD83D
+        }
+        current = next;
       }
       return result;
     }
@@ -129,11 +137,18 @@ namespace misc_utils
       \'     Apostrophe or single quote
       \"     Double quote
       \\     Backslash character
-      \u00XY ASCII character with code 0xXY
+      \uXXXX Unicode code unit
 
       */
       inline void match_string2(std::string::const_iterator& star_end_string, std::string::const_iterator buf_end, std::string& val)
       {
+        const auto hex_digit = [](char c) -> int
+        {
+          if (c >= '0' && c <= '9') return c - '0';
+          if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+          if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+          return -1;
+        };
         val.clear();
         bool escape_mode = false;
         val.reserve(buf_end - star_end_string);
@@ -167,47 +182,107 @@ namespace misc_utils
               val.push_back('/');break;
             case 'u':  // \uDDDD sequence
               {
-                bool ok = false;
-                size_t chars_left = buf_end - it - 1;
-                size_t chars_to_get = std::min(static_cast<size_t>(4), chars_left); // in [0, 4]
-                char tmp[10] = {0};
-                memcpy(tmp, &(*(it+1)), chars_to_get);
-                it = it + chars_to_get; // move forward to skip 0..4 digits
-                if (chars_to_get == 4)
+                const auto read_code_unit = [&it, buf_end, &hex_digit]()
                 {
-                  char *p_last_decoded_char = nullptr;
-                  unsigned long value = strtoul(tmp, &p_last_decoded_char, 16); // expected value is from 0x0000 (\u0000) to 0x00ff (\u00ff)
-                  if (value <= 0xff && p_last_decoded_char - tmp == 4)
+                  size_t chars_left = buf_end - it - 1;
+                  if (chars_left < 4)
+                    ASSERT_MES_AND_THROW("JSON incomplete \\u escape sequence");
+                  unsigned long value = 0;
+                  for (size_t i = 0; i < 4; ++i)
                   {
-                    val.push_back(static_cast<char>(value));
-                    ok = true;
+                    const int digit = hex_digit(*++it);
+                    if (digit < 0)
+                      ASSERT_MES_AND_THROW("JSON invalid hex digit in \\u escape sequence");
+                    value = (value << 4) + digit;
                   }
-                }
-                if (!ok)
+                  return value;
+                };
+                unsigned long value = read_code_unit();
+                if (value >= 0xd800 && value <= 0xdbff)
                 {
-                  LOG_PRINT_L0("JSON invalid escape sequence: \\u" << tmp);
+                  size_t chars_left = buf_end - it - 1;
+                  if (chars_left < 6 || *(it + 1) != '\\' || *(it + 2) != 'u')
+                    ASSERT_MES_AND_THROW("JSON missing low surrogate in \\u escape sequence");
+                  it += 2;
+                  unsigned long low = read_code_unit();
+                  if (low < 0xdc00 || low > 0xdfff)
+                    ASSERT_MES_AND_THROW("JSON invalid low surrogate in \\u escape sequence");
+                  value = 0x10000 + ((value - 0xd800) << 10) + (low - 0xdc00);
                 }
+                else if (value >= 0xdc00 && value <= 0xdfff)
+                  ASSERT_MES_AND_THROW("JSON unexpected low surrogate in \\u escape sequence");
+                boost::locale::utf::utf_traits<char>::encode(static_cast<boost::locale::utf::code_point>(value), std::back_inserter(val));
               }
               break;
             default:
-              val.push_back(*it);
               LOG_PRINT_L0("JSON unknown escape sequence :0x" << std::hex << (int)(uint8_t)*it);
+              --it; // drop the backslash and read the character normally on the next iteration
             }
             escape_mode = false;
           }else if(*it == '"')
           {
             star_end_string = it;
-            return;
+            break;
           }else if(*it == '\\')
           {
             escape_mode = true;
           }          
           else
           {
-            val.push_back(*it); 
+            const unsigned char byte = *it;
+            if (byte < 0x20)
+              ASSERT_MES_AND_THROW("JSON unescaped control character");
+            // for older versions writers emitted high bytes verbatim inside strings
+            /*
+              if (byte >= 0x80)
+              {
+                auto next = it;
+                auto value = boost::locale::utf::utf_traits<char>::decode(next, buf_end);
+                if (value == boost::locale::utf::illegal || value == boost::locale::utf::incomplete)
+                  ASSERT_MES_AND_THROW("JSON invalid UTF-8 string");
+                val.append(it, next);
+                it = next - 1;
+                continue;
+              }
+            */
+            val.push_back(*it);
           }
         }
-        ASSERT_MES_AND_THROW("Failed to match string in json entry: " << std::string(star_end_string, buf_end));
+        if (it == buf_end)
+          ASSERT_MES_AND_THROW("Failed to match string in json entry: " << std::string(star_end_string, buf_end));
+
+        // decode markers in the json decoded string, only consume original input bytes
+        // reader input "A\\\\\\xA6" becomes 41 5C 5C 5C 78 41 36 in val
+        // read/write start at 1r/1w, move to 3r/2w after the backslash pair, then to 7r/3w after \xA6
+        // resize keeps the decoded bytes 41 5C A6
+
+        size_t read = val.find('\\');
+        if (read == std::string::npos)
+          return; // no escapes to decode
+        size_t write = read; // keep prefix, write from first backslash
+        while (read < val.size()) // consume original string before shrinking it
+        {
+          char c = val[read++];
+          if (c == '\\' && read < val.size()) // trailing backslash has no escape suffix
+          {
+            if (val[read] == '\\')
+            {
+              ++read; // \\\xA6 -> keep one backslash, then read \xA6
+            }
+            else if (val[read] == 'x' && val.size() - read >= 3) // need x and two digits
+            {
+              const int high = hex_digit(val[read + 1]); // A -> 10
+              const int low = hex_digit(val[read + 2]); // 6 -> 6
+              if (high >= 0 && low >= 0)
+              {
+                c = static_cast<char>((high << 4) | low); // \xA6 -> byte A6
+                read += 3; // consume x, A and 6
+              }
+            }
+          }
+          val[write++] = c;
+        }
+        val.resize(write); // A6 78 41 36 -> A6 when write == 1
       }
       inline bool match_string(std::string::const_iterator& star_end_string, std::string::const_iterator buf_end, std::string& val)
       {
@@ -228,7 +303,7 @@ namespace misc_utils
         is_float_val = false;
         for(std::string::const_iterator it = star_end_string;it != buf_end;it++)
         {
-          if(isdigit(*it) || (it == star_end_string && *it == '-') || (val.size() && *it == '.' ) || (is_float_val && (*it == 'e' || *it == 'E' || *it == '-' || *it == '+' )) )
+          if(isdigit(static_cast<unsigned char>(*it)) || (it == star_end_string && *it == '-') || (val.size() && *it == '.' ) || (is_float_val && (*it == 'e' || *it == 'E' || *it == '-' || *it == '+' )) )
           {
             if(!val.size() &&  *it == '-')
               is_signed_val = true;
@@ -268,7 +343,7 @@ namespace misc_utils
 
         for(std::string::const_iterator it = star_end_string;it != buf_end;it++)
         {
-          if(!isalpha(*it))
+          if(!isalpha(static_cast<unsigned char>(*it)))
           {
             val.assign(star_end_string, it);
             if(val.size())
