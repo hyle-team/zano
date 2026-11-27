@@ -325,10 +325,6 @@ bool offers_expiration_test::generate(std::vector<test_event_entry>& events) con
 
   MAKE_NEXT_BLOCK(events, blk_2, blk_1, miner_acc);
 
-  // rewind time for 2 days
-  uint64_t offers_ts_plus_two_days = m_offers_ts + 60 * 60 * 24 * 2 + 1;
-  events.push_back(event_core_time(offers_ts_plus_two_days));
-
   DO_CALLBACK(events, "c1");
 
   return true;
@@ -342,6 +338,7 @@ bool offers_expiration_test::c1(currency::core& c, size_t ev_index, const std::v
   // don't need to trim_offers() here because get_all_offers() returns offers filtered by expiration_time
   // offers_service->trim_offers();
 
+  test_core_time::scoped_time core_time(m_offers_ts + 60 * 60 * 24 * 2 + 1);
   std::list<bc_services::offer_details_ex> offers;
   bool r = get_all_offers(c, offers);
   CHECK_AND_ASSERT_MES(r, false, "get_all_offers failed");
@@ -359,8 +356,8 @@ bool offers_expiration_test::c1(currency::core& c, size_t ev_index, const std::v
   r = compare_offers(m_offer, offer_3, default_offer_skip_field_mask | offers_fields::offer_field_expiration_time);
   CHECK_AND_ASSERT_MES(r, false, "offer_3 obtained via bc_service differs from original");
 
-  // rewind time very close to the offers' lifetime limit
-  test_core_time::adjust(m_offers_ts + OFFER_MAXIMUM_LIFE_TIME - 1);
+  const uint64_t lifetime_limit = m_offers_ts + OFFER_MAXIMUM_LIFE_TIME;
+  core_time.set_time(lifetime_limit - 1);
 
   offers_service->trim_offers();
   // trim_offers should still has no effect as all offers' are within their allowed lifetime (OFFER_MAXIMUM_LIFE_TIME)
@@ -373,9 +370,7 @@ bool offers_expiration_test::c1(currency::core& c, size_t ev_index, const std::v
   CHECK_V_EQ_EXPECTED_AND_ASSERT(offers.size(), 1);
   CHECK_V_EQ_EXPECTED_AND_ASSERT(offers.front().expiration_time, 0);
 
-
-  // rewind time beyond the offers' lifetime limit
-  test_core_time::adjust(m_offers_ts + OFFER_MAXIMUM_LIFE_TIME + 1);
+  core_time.set_time(lifetime_limit + 1);
 
   offers_service->trim_offers();
   // no offers should left in the backend service

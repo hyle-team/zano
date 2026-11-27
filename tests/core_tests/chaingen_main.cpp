@@ -975,11 +975,9 @@ static bool run_one_test_job(const std::string& test_name, const std::function<b
   if (!ok)
   {
     failed_tests.insert(test_name);
-    LOCAL_ASSERT(false);
-
-    const uint32_t procs = command_line::get_arg(g_vm, chaingen_args::arg_processes);
-    if (procs > 1 && wid >= 0 && g_shm_state)
+    if (publish_status)
       g_shm_state->record_fail(static_cast<uint32_t>(wid), test_name.c_str());
+    LOCAL_ASSERT(false);
 
     if (stop_on_first_fail)
       skip_all_till_the_end = true;
@@ -1008,9 +1006,6 @@ static bool run_registered_tests(bool& stop_on_first_fail, bool& skip_all_till_t
     }
     return all_ok;
   }
-
-  if (!g_shm_state)
-    return all_ok;
 
   while (!skip_all_till_the_end)
   {
@@ -1612,8 +1607,11 @@ int main(int argc, char* argv[])
   else
     g_runner.reset();
 
-  if (is_worker && multiprocess_enabled)
+  if (is_worker)
+  {
     init_shared_fail_report_if_needed();
+    CHECK_AND_ASSERT_MES(g_shm_state != nullptr, 1, "Worker could not attach to multiprocess shared memory");
+  }
 
   bool skip_all_till_the_end = false;
   size_t tests_count = 0;

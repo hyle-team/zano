@@ -5,6 +5,7 @@
 #include <mutex>
 #include <thread>
 #include <atomic>
+#include <boost/filesystem/operations.hpp>
 #include <boost/property_tree/json_parser.hpp>
 #include <boost/process.hpp>
 #include <unordered_set>
@@ -106,9 +107,15 @@ namespace
 parallel_test_runner::parallel_test_runner(
   const boost::program_options::variables_map& vm)
   : m_vm(vm)
-{}
+  , m_run_root(command_line::get_arg(vm, arg_run_root))
+{
+  if (m_run_root.empty())
+    m_run_root = paths::default_run_root;
+  if (m_run_root.is_relative())
+    m_run_root = std::filesystem::absolute(m_run_root);
+}
 
-int parallel_test_runner::run_parent_if_needed(int argc, char* argv[], const std::vector<test_job>& g_test_jobs) const
+int parallel_test_runner::run_parent_if_needed(int argc, char* argv[], const std::vector<test_job>& g_test_jobs)
 {
   const int rc = run_workers_and_wait(argc, argv, g_test_jobs);
   return (rc < 0) ? k_not_parent : rc;
@@ -119,35 +126,14 @@ bool parallel_test_runner::write_worker_report(const worker_report& rep) const
   return write_worker_report_file(rep);
 }
 
-std::filesystem::path parallel_test_runner::get_run_root_path() const
-{
-  std::string run_root = command_line::get_arg(m_vm, arg_run_root);
-  if (run_root.empty())
-    run_root = paths::default_run_root;
-
-  std::filesystem::path run_root_path(run_root);
-
-  if (run_root_path.is_relative())
-    run_root_path = std::filesystem::absolute(run_root_path);
-
-  return run_root_path;
-}
-
 std::filesystem::path parallel_test_runner::get_worker_dir_path(uint32_t worker_id) const
 {
-  return get_run_root_path() / (paths::worker_dir_prefix + std::to_string(worker_id));
+  return m_run_root / (paths::worker_dir_prefix + std::to_string(worker_id));
 }
 
 std::filesystem::path parallel_test_runner::get_worker_report_path(uint32_t worker_id) const
 {
   return get_worker_dir_path(worker_id) / files::worker_report;
-}
-
-std::string parallel_test_runner::make_worker_data_dir(const std::filesystem::path& run_root_abs, int worker_id) const
-{
-  std::filesystem::path worker_dir = run_root_abs / (std::string(paths::worker_dir_prefix) + std::to_string(worker_id));
-  std::filesystem::create_directories(worker_dir);
-  return worker_dir.string();
 }
 
 // Removes worker-specific arguments from the command line
@@ -392,7 +378,7 @@ void parallel_test_runner::print_worker_failure_reasons(uint32_t processes, cons
   }
 }
 
-int parallel_test_runner::run_workers_and_wait(int argc, char* argv[], const std::vector<test_job>& g_test_jobs) const
+int parallel_test_runner::run_workers_and_wait(int argc, char* argv[], const std::vector<test_job>& g_test_jobs)
 {
   const uint32_t processes = command_line::get_arg(m_vm, arg_processes);
   const int32_t worker_id  = command_line::get_arg(m_vm, arg_worker_id);
@@ -407,15 +393,7 @@ int parallel_test_runner::run_workers_and_wait(int argc, char* argv[], const std
   if (command_line::get_arg(m_vm, arg_test_transactions)) return -1;
 
   const auto wall_start = std::chrono::steady_clock::now();
-  const std::string run_root = command_line::get_arg(m_vm, arg_run_root);
   std::vector<std::string> base_args = build_base_args_without_worker_specific(argc, argv);
-  std::filesystem::path run_root_abs = run_root.empty() ? std::filesystem::path(paths::default_run_root) : std::filesystem::path(run_root);
-
-  if (run_root_abs.is_relative())
-    run_root_abs = std::filesystem::absolute(run_root_abs);
-
-  base_args.emplace_back(cli_args::multiprocess_run_root);
-  base_args.emplace_back(run_root_abs.string());
 
   std::string exe = (argv && argv[0]) ? std::string(argv[0]) : std::string();
   if (exe.empty())
@@ -473,6 +451,22 @@ int parallel_test_runner::run_workers_and_wait(int argc, char* argv[], const std
 
   try
   {
+    if (command_line::get_arg(m_vm, arg_run_root).empty())
+    {
+      std::filesystem::create_directories(m_run_root);
+      std::filesystem::path run_dir;
+      do
+      {
+        run_dir = m_run_root / boost::filesystem::unique_path("run-%%%%-%%%%-%%%%").native();
+      } while (!std::filesystem::create_directory(run_dir));
+      m_run_root = std::move(run_dir);
+    }
+
+    const std::string run_root = m_run_root.string();
+    base_args.emplace_back(cli_args::multiprocess_run_root);
+    base_args.emplace_back(run_root);
+    std::cout << "Run directory: " << run_root << '\n';
+
     bip::shared_memory_object shm(bip::create_only, shm_name.c_str(), bip::read_write);
     shm.truncate(sizeof(coretests_shm::shared_state));
     bip::mapped_region region(shm, bip::read_write);
@@ -498,20 +492,17 @@ int parallel_test_runner::run_workers_and_wait(int argc, char* argv[], const std
 
     for (uint32_t i = 0; i < processes; ++i)
     {
-      std::vector<std::string> args = base_args;
-
-      args.emplace_back(cli_args::multiprocess_worker_id);
-      args.emplace_back(std::to_string(i));
-
-      const std::string worker_data_dir = make_worker_data_dir(run_root_abs, static_cast<int>(i));
-      args.emplace_back(cli_args::data_dir);
-      args.emplace_back(worker_data_dir);
-
-      const std::filesystem::path worker_dir = get_worker_dir_path(i);
-      std::filesystem::create_directories(worker_dir);
-
       try
       {
+        const std::filesystem::path worker_dir = get_worker_dir_path(i);
+        const std::string worker_data_dir = worker_dir.string();
+        std::vector<std::string> args = base_args;
+        args.emplace_back(cli_args::multiprocess_worker_id);
+        args.emplace_back(std::to_string(i));
+        args.emplace_back(cli_args::data_dir);
+        args.emplace_back(worker_data_dir);
+
+        std::filesystem::create_directories(worker_dir);
         const std::filesystem::path log_path = (worker_dir / files::worker_log).string();
 
         worker_proc wp;
@@ -529,7 +520,7 @@ int parallel_test_runner::run_workers_and_wait(int argc, char* argv[], const std
         wp.child = bp::child(
           exe,
           bp::args(args),
-          bp::start_dir = worker_dir.string(),
+          bp::start_dir = worker_data_dir,
           bp::std_out > *wp.out
         );
 
@@ -809,7 +800,7 @@ void parallel_test_runner::log_test_taken_by_this_process(const std::string& tes
 
 std::filesystem::path parallel_test_runner::get_workers_report_path() const
 {
-  return get_run_root_path() / WORKERS_REPORT_FILENAME;
+  return m_run_root / WORKERS_REPORT_FILENAME;
 }
 
 bool parallel_test_runner::write_workers_report_file(uint32_t processes, const std::vector<worker_report>& reps) const

@@ -28,7 +28,7 @@ void invalidate_bppe_sig(crypto::bppe_signature& sig)
 
 void invalidate_pub_key(crypto::public_key& pk)
 {
-  pk.data[5] = 0x33;
+  pk.data[5] ^= 0x01;
 }
 
 bool invalidate_zarcanum_sig(size_t n, zarcanum_sig& sig)

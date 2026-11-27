@@ -11,7 +11,7 @@ struct test_time_hint {
   uint64_t ms;
 };
 
-// Aggregated per-test timings are written to: <run_root>/workers_report.json (default run_root is "chaingen_runs")
+// Aggregated per-test timings are written to <run_root>/workers_report.json (by default under chaingen_runs/run-<id>).
 inline const std::vector<test_time_hint> k_test_time_hints = {
   {"gen_alias_tests @ HF 4", 102170},
   {"gen_alias_tests @ HF 5", 102154},
