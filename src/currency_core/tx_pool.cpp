@@ -315,6 +315,19 @@ namespace currency
         return false;
       }
 
+      // soft rule: don't keep and don't relay a tx that is too big to be selected by fill_block_template() even for an empty block
+      // (see verify_candidate_entries()); this is not a consensus rule, such a tx is still valid as a part of a block
+      const uint64_t max_blob_size = get_tx_pool_max_tx_blob_size(m_blockchain.is_hardfork_active(ZANO_HARDFORK_06), have_type_in_variant_container<txin_gateway>(tx.vin));
+      if (blob_size > max_blob_size)
+      {
+        LOG_PRINT_L0("Transaction " << id << " is too big for a block template: " << blob_size << " bytes, the limit is " << max_blob_size << " bytes, rejected by tx pool");
+        tvc.m_added_to_pool = false;
+        tvc.m_should_be_relayed = false;
+        tvc.m_verification_failed = false;
+        tvc.m_error_code = API_RETURN_CODE_TX_IS_TOO_BIG;
+        return false;
+      }
+
       crypto::key_image spent_ki = AUTO_VAL_INIT(spent_ki);
       r = !have_tx_keyimges_as_spent(tx, &spent_ki);
       CHECK_AND_ASSERT_MES(r, false, "Transaction " << id << " uses already spent key image " << spent_ki);
@@ -1432,7 +1445,7 @@ namespace currency
       r = verify_candidate_entries(txs_v_candidates, context);
       CHECK_AND_ASSERT_MES(r, false, "verify_candidate_entries failed");
 
-      //feel addresses that have left in the selection
+      //fill addresses that have left in the selection
       std::set<gateway_address_id_type> addrs_left;
       for (auto& txv : txs_v_candidates)
       {
@@ -1531,6 +1544,18 @@ namespace currency
         }
       }
 
+      const uint64_t new_total_size = context.total_size + tx.second->blob_size;
+      uint64_t current_reward = 0;
+      const bool fits = (!context.manual_size_limit || new_total_size <= context.manual_size_limit) &&
+          get_block_reward(context.pos, context.median_size, new_total_size + context.blob_reserved_size, *context.already_generated_coins, current_reward, context.height) &&
+          context.best_money <= current_reward;
+
+      if(!fits)
+      {
+        txs_v.erase(it++);
+        continue;
+      }
+
       // is_transaction_ready_to_go can change tx_details in case of some errors, so we make local copy,
       // do check if it's changed and reassign it to db if needed
       tx_details local_copy_txd = *(tx.second);
@@ -1549,39 +1574,13 @@ namespace currency
         continue;
       }
 
-      uint64_t new_total_size = context.total_size + tx.second->blob_size;
-      if(context.manual_size_limit && new_total_size > context.manual_size_limit)
-      {
-        context.manual_size_limit_reached = true;
-        txs_v.erase(it, txs_v.end());
-        break;  // current block size is too big
-      }
 
-      uint64_t current_reward;
-      if(!get_block_reward(context.pos, context.median_size, new_total_size + context.blob_reserved_size, *context.already_generated_coins, current_reward, context.height))
-      {
-        context.size_limit_reached = true;
-        txs_v.erase(it, txs_v.end());
-        break;  // current block size is too big
-      }
+      context.current_fee += tx.second->fee;
+      context.best_money = current_reward;
+      context.total_size += tx.second->blob_size;
+      context.fee = context.current_fee;
+      append_key_images(context.k_images, tx.second->tx);
 
-      if(context.best_money <= current_reward )
-      {
-        context.current_fee += tx.second->fee;
-        context.best_money = current_reward;
-        context.total_size += tx.second->blob_size;
-        context.fee = context.current_fee;
-        append_key_images(context.k_images, tx.second->tx);
-
-
-      }
-      else
-      {
-        //should we do low-reward for miners in penalty zone? for now probably not (open for reconsideration)
-        context.size_limit_reached = true;
-        txs_v.erase(it, txs_v.end());
-        break;  // current block size is too big
-      }
 
       if(!ei.m_alias.m_alias.empty())
         ++context.alias_count;
@@ -1613,9 +1612,7 @@ namespace currency
     fbt_context.total_size = explicit_total_size;
     fbt_context.current_fee = 0;
 
-    fbt_context.blob_reserved_size = CURRENCY_COINBASE_BLOB_RESERVED_SIZE;
-    if (m_blockchain.is_hardfork_active(ZANO_HARDFORK_06))
-      fbt_context.blob_reserved_size = CURRENCY_COINBASE_BLOB_RESERVED_SIZE_HF6;
+    fbt_context.blob_reserved_size = get_coinbase_blob_reserved_size(m_blockchain.is_hardfork_active(ZANO_HARDFORK_06)); // add_tx() relies on the same value, see get_tx_pool_max_tx_blob_size()
 
     if (!get_block_reward(fbt_context.pos, fbt_context.median_size, fbt_context.blob_reserved_size, *fbt_context.already_generated_coins, fbt_context.best_money, fbt_context.height))
     {
@@ -1632,7 +1629,7 @@ namespace currency
     fbt_context.tx_expiration_ts_median = m_blockchain.get_tx_expiration_median();
     //load GW transactions first
     std::list<txv> txs_v_gw;
-    fbt_context.manual_size_limit = (CURRENCY_BLOCK_GRANTED_FULL_REWARD_ZONE - CURRENCY_BLOCK_GRANTED_FULL_REWARD_ZONE / 5);
+    fbt_context.manual_size_limit = CURRENCY_BLOCK_TEMPLATE_GW_TXS_SIZE_LIMIT;
     bool r = fill_template_with_gw_transactions(fbt_context, txs_v_gw);
     CHECK_AND_ASSERT_MES(r, false, "fill_template_with_gw_transactions failed");
     

@@ -66,6 +66,8 @@
 #define CURRENCY_COINBASE_BLOB_RESERVED_SIZE_HF6        8000
 #define CURRENCY_MAX_TRANSACTION_BLOB_SIZE              (CURRENCY_BLOCK_GRANTED_FULL_REWARD_ZONE - CURRENCY_COINBASE_BLOB_RESERVED_SIZE*2) 
 #define CURRENCY_FREE_TX_MAX_BLOB_SIZE                  1024 // soft txpool-based limit for free-of-charge txs (such as BC_OFFERS_SERVICE_INSTRUCTION_DEL)
+#define CURRENCY_BLOCK_TEMPLATE_GW_TXS_SIZE_LIMIT       (CURRENCY_BLOCK_GRANTED_FULL_REWARD_ZONE - CURRENCY_BLOCK_GRANTED_FULL_REWARD_ZONE / 5) // part of a block template (bytes) that txs with gateway inputs can take, they are selected first
+#define CURRENCY_MEMPOOL_GW_TX_MAX_BLOB_SIZE            CURRENCY_BLOCK_TEMPLATE_GW_TXS_SIZE_LIMIT // soft txpool-based limit for a tx with gateway inputs, must not be greater than CURRENCY_BLOCK_TEMPLATE_GW_TXS_SIZE_LIMIT
 #define CURRENCY_DISPLAY_DECIMAL_POINT                  12
 
 // COIN - number of smallest units in one coin

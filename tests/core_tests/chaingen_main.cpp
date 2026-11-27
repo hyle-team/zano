@@ -1175,7 +1175,7 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY(gen_wallet_fake_outputs_randomness);
     GENERATE_AND_PLAY(gen_wallet_fake_outputs_not_enough);
     GENERATE_AND_PLAY(gen_wallet_offers_basic);
-    GENERATE_AND_PLAY(gen_wallet_offers_size_limit);
+    GENERATE_AND_PLAY(gen_wallet_offers_size_limit); // pre-HF6 only (default hardfork heights), don't run it on HF6+: its biggest tx is over the tx pool limit there, see get_tx_pool_max_tx_blob_size()
     GENERATE_AND_PLAY(gen_wallet_dust_to_account);
     GENERATE_AND_PLAY(gen_wallet_selecting_pos_entries);
     GENERATE_AND_PLAY(gen_wallet_spending_coinstake_after_minting);

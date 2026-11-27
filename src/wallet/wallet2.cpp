@@ -8836,7 +8836,9 @@ void wallet2::finalize_transaction(currency::finalize_tx_param& ftp, currency::f
   //TIME_MEASURE_FINISH_MS(sign_ms_input_time);
 
   size_t tx_blob_size = tx_to_blob(result.tx).size();
-  THROW_IF_FALSE_WALLET_EX_MES(tx_blob_size < CURRENCY_MAX_TRANSACTION_BLOB_SIZE, error::tx_too_big, "Transaction size: " << tx_blob_size << " bytes, transaction size limit: " << CURRENCY_MAX_TRANSACTION_BLOB_SIZE << " bytes. Run sweep_below cycle, for more details see \"Keeping Your Wallet's UTXO Set Healthy\" article in documentation.");
+  // the limit of tx pool is used here: it's never greater than the consensus one, and the daemon doesn't accept a bigger tx
+  const uint64_t tx_blob_size_limit = get_tx_pool_max_tx_blob_size(is_in_hardfork_zone(ZANO_HARDFORK_06), have_type_in_variant_container<txin_gateway>(result.tx.vin));
+  THROW_IF_FALSE_WALLET_EX_MES(tx_blob_size <= tx_blob_size_limit, error::tx_too_big, "Transaction size: " << tx_blob_size << " bytes, transaction size limit: " << tx_blob_size_limit << " bytes. Run sweep_below cycle, for more details see \"Keeping Your Wallet's UTXO Set Healthy\" article in documentation.");
 
   if (store_tx_secret_key)
     m_tx_keys.insert(std::make_pair(result.tx_id, result.one_time_key));
@@ -9167,7 +9169,8 @@ void wallet2::sweep_below(const crypto::public_key& asset_id, size_t fake_outs_c
     max_fake_outs_count = std::max(max_fake_outs_count, get_fake_outs_count_for_transfer(m_transfers.at(selected_transfers[i])));
 
   static const size_t estimated_bytes_per_input = 85;
-  const size_t estimated_max_inputs = static_cast<size_t>(CURRENCY_MAX_TRANSACTION_BLOB_SIZE / (estimated_bytes_per_input * (max_fake_outs_count + 1.5))); // estimated number of maximum tx inputs under the tx size limit
+  const uint64_t tx_blob_size_limit = get_tx_pool_max_tx_blob_size(is_in_hardfork_zone(ZANO_HARDFORK_06), false);
+  const size_t estimated_max_inputs = static_cast<size_t>(tx_blob_size_limit / (estimated_bytes_per_input * (max_fake_outs_count + 1.5))); // estimated number of maximum tx inputs under the tx size limit of tx pool
   st_index_upper_boundary = std::min(st_index_upper_boundary, estimated_max_inputs);
 
   WLT_THROW_IF_FALSE_WALLET_EX_MES(st_index_upper_boundary >= minimum_inputs, error::tx_too_big,

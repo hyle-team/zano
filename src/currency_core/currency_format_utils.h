@@ -549,6 +549,21 @@ namespace currency
   uint64_t get_block_reward(uint64_t height, size_t median_block_size, size_t current_block_size);
   bool get_block_reward(bool is_pos, size_t median_size, size_t current_block_size, const boost::multiprecision::uint128_t& already_generated_coins, uint64_t &reward, uint64_t height);
   uint64_t get_base_block_reward(uint64_t height);
+  // the part of a block (bytes) that a block template leaves for the miner tx
+  inline size_t get_coinbase_blob_reserved_size(bool hf6_active)
+  {
+    return hf6_active ? CURRENCY_COINBASE_BLOB_RESERVED_SIZE_HF6 : CURRENCY_COINBASE_BLOB_RESERVED_SIZE;
+  }
+  // the biggest size of a tx (bytes) that tx pool accepts: such a tx fits an empty block template without leaving the full reward zone;
+  // it's a soft rule of tx_memory_pool::add_tx() that wallets follow, the consensus limit is still CURRENCY_MAX_TRANSACTION_BLOB_SIZE
+  inline uint64_t get_tx_pool_max_tx_blob_size(bool hf6_active, bool tx_has_gateway_inputs)
+  {
+    uint64_t result = CURRENCY_BLOCK_GRANTED_FULL_REWARD_ZONE - get_coinbase_blob_reserved_size(hf6_active);
+    result = std::min<uint64_t>(result, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1); // see validate_tx_semantic()
+    if (tx_has_gateway_inputs)
+      result = std::min<uint64_t>(result, CURRENCY_MEMPOOL_GW_TX_MAX_BLOB_SIZE);
+    return result;
+  }
   bool is_payment_id_size_ok(const payment_id_t& payment_id, bool allow_legacy_payment_id_size = true);
   std::string get_account_address_as_str(const account_public_address& addr, const payment_id_t& payment_id = payment_id_t{});
   std::string get_account_address_as_str(const gateway_address_id_type& addr, const payment_id_t& payment_id = payment_id_t{});
