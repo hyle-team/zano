@@ -715,7 +715,7 @@ namespace epee
           while (boost::regex_search(it_current_bound, it_end_bound, result, rexp_mach_field, boost::match_default) && result[0].matched)
           {
             const size_t field_val = 12;
-            //const size_t field_etc_name = 10;
+            const size_t field_etc_name = 10;
 
             int i = 2; //start position = 2
             if (result[i++].matched)//"Connection"
@@ -737,10 +737,8 @@ namespace epee
             }
             else if (result[i++].matched)//"Cookie"
               body_info.m_cookie = result[field_val];
-            else if (result[i++].matched)//e.t.c (HAVE TO BE MATCHED!)
-            {
-              ;
-            }
+            else if (result[field_etc_name].matched) //e.t.c (HAVE TO BE MATCHED!)
+              body_info.m_etc_fields.emplace_back(result[field_etc_name].str(), result[field_val].str());
             else
             {
               CHECK_AND_ASSERT_MES(false, false, "http_stream_filter::parse_cached_header() not matched last entry in:" << m_cache_to_process);

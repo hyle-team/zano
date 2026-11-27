@@ -15,6 +15,7 @@
 #include <iostream>
 #include <boost/utility/value_init.hpp>
 #include "include_base_utils.h"
+#include "net/http_client.h"
 #include "net/levin_client.h"
 #include "net/levin_socks5.h"
 
@@ -4112,28 +4113,60 @@ const std::unordered_map<crypto::public_key, tools::wallet_own_asset_context>& w
   return m_own_asset_descriptors;
 }
 //----------------------------------------------------------------------------------------------------
+bool wallet2::verify_assets_whitelist_signature(const std::string& body, const std::string& signature_hex)
+{
+  crypto::public_key public_key{};
+  crypto::signature signature{};
+  if (body.empty() ||
+      !epee::string_tools::hex_to_pod(WALLET_ASSETS_WHITELIST_VALIDATION_PUBLIC_KEY, public_key) ||
+      !epee::string_tools::hex_to_pod(signature_hex, signature))
+    return false;
+
+  const auto digest = crypto::cn_fast_hash(body.data(), body.size());
+  return crypto::check_signature(digest, public_key, signature);
+}
+//----------------------------------------------------------------------------------------------------
 bool wallet2::load_whitelisted_tokens() const
 {
   if (!m_use_assets_whitelisting)
     return true;
+  if (WALLET_ASSETS_WHITELIST_VALIDATION_PUBLIC_KEY[0] == '\0')
+    return false;
 
-  m_whitelisted_assets.clear();
-  std::string body;
-  wallet_public::assets_whitelist aw = AUTO_VAL_INIT(aw);
-  if (epee::net_utils::get_http_json_t(WALLET_ASSETS_WHITELIST_URL, aw))
+  TRY_ENTRY();
+  epee::net_utils::http::https_simple_client client;
+  const epee::net_utils::http::http_response_info* response = nullptr;
+  const epee::net_utils::http::fields_list headers{{"Accept-Encoding", "identity"}};
+  if (!epee::net_utils::http::invoke_request(WALLET_ASSETS_WHITELIST_URL, client, 5000, &response, "GET", {}, headers) || !response || response->m_response_code != 200)
+    return false;
+
+  const std::string* signature = nullptr;
+  for (const auto& [name, value] : response->m_header_info.m_etc_fields)
   {
-    for (auto it = aw.assets.begin(); it != aw.assets.end(); it++)
-    {
-      m_whitelisted_assets[it->asset_id] = static_cast<currency::asset_descriptor_base>(*it);
-    }
-    return true;
+    if (!boost::iequals(name, "Zano-Whitelist-Signature"))
+      continue;
+    if (signature)
+      return false;
+    signature = &value;
   }
-  return false;
+  if (!signature || !verify_assets_whitelist_signature(response->m_body, epee::string_tools::trim(*signature)))
+    return false;
+
+  wallet_public::assets_whitelist aw = AUTO_VAL_INIT(aw);
+  if (!epee::serialization::load_t_from_json(aw, response->m_body))
+    return false;
+
+  decltype(m_whitelisted_assets) verified_assets;
+  for (const auto& asset : aw.assets)
+    verified_assets[asset.asset_id] = static_cast<const currency::asset_descriptor_base&>(asset);
+  m_whitelisted_assets.swap(verified_assets);
+  return true;
+  CATCH_ENTRY2(false);
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::load_whitelisted_tokens_if_not_loaded() const
 {
-  if (m_whitelist_updated)
+  if (m_whitelist_updated || !m_whitelisted_assets.empty())
   {
     return true;
   }

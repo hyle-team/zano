@@ -793,6 +793,7 @@ namespace tools
 
     bool load_whitelisted_tokens_if_not_loaded() const;
     bool load_whitelisted_tokens() const;
+    static bool verify_assets_whitelist_signature(const std::string& body, const std::string& signature_hex);
 
     void set_connectivity_options(unsigned int timeout);
     
