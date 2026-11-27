@@ -1237,6 +1237,7 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     //GENERATE_AND_PLAY(pos_emission_test); // Long test! by demand only
     //GENERATE_AND_PLAY(pos_wallet_big_block_test); // disabled: tx fees are burned now, so the block template never goes over the penalty-free block size (hard cap), and a block bigger than the median can't be built from the pool anymore
     //GENERATE_AND_PLAY(block_template_against_txs_size); // Long test! by demand only
+    GENERATE_AND_PLAY_HF(block_size_penalty_zone, "6-*");
     GENERATE_AND_PLAY_HF(pos_altblocks_validation, "3-*");
     GENERATE_AND_PLAY_HF(pos_mining_with_decoys, "3");
     GENERATE_AND_PLAY_HF(pos_and_no_pow_blocks_between_output_and_stake, "4-*");
