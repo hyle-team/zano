@@ -7240,7 +7240,7 @@ bool wallet2::is_ionic_swap_tx_key_fresh(const crypto::public_key& tx_pub_key, c
     return true; // no spend secret key, key images can't be calculated
 
   // Would any output of a tx with this key repeat a key image this wallet has already seen (spent ones included)?
-  // Key images are compared, not the bytes of the tx pub key: a key shifted by a small-order point gives the same derivation.
+  // key images are compared, because m_key_images is the only complete record of received outputs regardless of concise-mode truncation
   for (size_t i = 0; i != CURRENCY_TX_MAX_ALLOWED_OUTS; ++i)
   {
     currency::keypair in_ephemeral = AUTO_VAL_INIT(in_ephemeral);
