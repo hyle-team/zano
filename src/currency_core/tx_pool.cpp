@@ -1471,10 +1471,6 @@ namespace currency
       
       // look into txs that passed all checks and add them to txs_v_selected, the one that didn't work should be dismissed with it's whole gw branch
       txs_v_selected.insert(txs_v_selected.end(), txs_v_candidates.begin(), txs_v_candidates.end());
-      if(context.size_limit_reached || context.manual_size_limit_reached)
-      {
-        break;
-      }
     }
     return true;
   }
@@ -1517,8 +1513,6 @@ namespace currency
   //---------------------------------------------------------------------------------
   bool tx_memory_pool::verify_candidate_entries(std::list<txv>& txs_v, fill_block_template_context& context)
   {
-    context.manual_size_limit_reached = false;
-    context.size_limit_reached = false;
     for(auto it = txs_v.begin(); it != txs_v.end();)
     {
       auto& tx = *it;
@@ -1639,38 +1633,35 @@ namespace currency
       LOG_PRINT_L2("[fill_block_template]: Added tx[gw] to block: " << tx.first);
     }
 
-    if (!fbt_context.size_limit_reached)
+    std::list<txv> txs_v;
+    // std::vector<size_t> txs;  // selected transactions, vector of indices of txs_v
+
+    m_db_transactions.enumerate_keys([&](uint64_t i, crypto::hash& k)
+                                      { txs_v.push_back(txv(k, nullptr)); return true; });
+
+    bool r = load_txs_from_ids_and_sort(txs_v, true);
+    CHECK_AND_ASSERT_MES(r, false, "load_txs_from_ids_and_sort failed");
+
+
+    for(auto txv : txs_v)
     {
-      std::list<txv> txs_v;
-      // std::vector<size_t> txs;  // selected transactions, vector of indices of txs_v
-
-      m_db_transactions.enumerate_keys([&](uint64_t i, crypto::hash& k)
-                                       { txs_v.push_back(txv(k, nullptr)); return true; });
-
-      bool r = load_txs_from_ids_and_sort(txs_v, true);
-      CHECK_AND_ASSERT_MES(r, false, "load_txs_from_ids_and_sort failed");
-
-
-      for(auto txv : txs_v)
+      tx_extra_info ei = AUTO_VAL_INIT(ei);
+      bool r2 = parse_and_validate_tx_extra(txv.second->tx, ei);
+      CHECK_AND_ASSERT_MES(r2, false, "parse_and_validate_tx_extra failed while looking up the tx pool");
+      if(!ei.m_alias.m_alias.empty() && !ei.m_alias.m_sign.size())
       {
-        tx_extra_info ei = AUTO_VAL_INIT(ei);
-        bool r2 = parse_and_validate_tx_extra(txv.second->tx, ei);
-        CHECK_AND_ASSERT_MES(r2, false, "parse_and_validate_tx_extra failed while looking up the tx pool");
-        if(!ei.m_alias.m_alias.empty() && !ei.m_alias.m_sign.size())
-        {
-          fbt_context.alias_regs_exist = true;
-          break;
-        }
+        fbt_context.alias_regs_exist = true;
+        break;
       }
-      fbt_context.manual_size_limit = 0;
-      r = verify_candidate_entries(txs_v, fbt_context);
-      CHECK_AND_ASSERT_MES(r, false, "verify_candidate_entries failed");
+    }
+    fbt_context.manual_size_limit = 0;
+    r = verify_candidate_entries(txs_v, fbt_context);
+    CHECK_AND_ASSERT_MES(r, false, "verify_candidate_entries failed");
    
-      for(auto& txv : txs_v)
-      {
-        bl.tx_hashes.push_back(txv.first);
-        LOG_PRINT_L2("[fill_block_template]: Added tx to block: " << txv.first);
-      }
+    for(auto& txv : txs_v)
+    {
+      bl.tx_hashes.push_back(txv.first);
+      LOG_PRINT_L2("[fill_block_template]: Added tx to block: " << txv.first);
     }
 
     // add explicit transactions

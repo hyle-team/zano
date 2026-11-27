@@ -207,8 +207,6 @@ namespace currency
       std::unordered_set<crypto::key_image> k_images;
 
       uint64_t manual_size_limit = 0;
-      bool size_limit_reached = false;
-      bool manual_size_limit_reached = false;
     };
 
     bool fill_template_with_gw_transactions(fill_block_template_context& context, std::list<txv>& txs_v_selected);
